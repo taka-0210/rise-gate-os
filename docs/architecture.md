@@ -1,4 +1,4 @@
-﻿# Architecture
+# Architecture
 
 ## Version
 
@@ -189,3 +189,109 @@ Laravel + MySQL を第一候補とします。
 - Tailwind CSS
 
 必要に応じて、将来 Livewire を追加できる構成にします。
+
+## Improvement as Origin
+
+運用を通じて、Improvement は Task だけでなく New Project の起点にもなることが分かりました。
+
+従来の単純な流れは以下でした。
+
+```txt
+Project
+  ↓
+Improvement
+  ↓
+Task
+```
+
+しかし実際の業務では、改善の検討結果として新しいProjectが生まれることがあります。
+
+例:
+
+```txt
+Project: ホームページ制作
+  ↓
+Improvement: お問い合わせが増え、メール管理では限界
+  ↓
+検討
+  ↓
+New Project: CRMシステム開発
+```
+
+```txt
+Project: ホームページ制作
+  ↓
+Improvement: 採用情報をもっと充実させたい
+  ↓
+New Project: 採用サイト制作
+```
+
+```txt
+Project: 勤怠管理システム
+  ↓
+Improvement: 給与計算まで管理したい
+  ↓
+New Project: 給与計算システム
+```
+
+そのため、Rise Gate OS では Improvement を「作業の起点」だけでなく、「次のProject、Document、Decision、Taskを生む起点」として扱います。
+
+Company OS が管理する中心は、Projectそのものではなく、Projectで生まれたImprovementが次の行動やProjectへつながっていく改善の連鎖です。
+
+```txt
+Project
+  ↓
+Improvement
+  ├── Task
+  ├── New Project
+  ├── Document
+  └── Decision
+```
+
+この考え方により、Project は単発で終わるものではなく、改善を通じて次のProjectや知識へ連鎖していく構造になります。
+
+## Project Relationships
+
+Project同士には、将来的に親子関係や派生関係が発生します。
+
+代表例:
+
+- 元Projectから改善が生まれる
+- 改善の結果、新しいProjectが生まれる
+- 新Projectは元Projectと独立して進行する
+- ただし、なぜ生まれたのかという由来は残す
+
+将来検討する関係:
+
+```txt
+projects.parent_project_id
+projects.source_improvement_id
+```
+
+意味:
+
+```txt
+parent_project_id      どのProjectから派生したか
+source_improvement_id  どのImprovementから生まれたか
+```
+
+ただし、現時点ではまだ実装しません。
+
+運用を続けながら、単純なカラムで足りるのか、あるいは `improvement_outputs` のような中間概念が必要かを検証します。
+
+## Improvement Outputs
+
+将来的には、Improvement の成果物を統一的に扱うために、以下のような概念を検討します。
+
+```txt
+improvement_outputs
+  improvement_id
+  output_type  task / project / document / decision
+  output_id
+```
+
+この設計にすると、Improvement から何が生まれたのかをAIや検索が追いやすくなります。
+
+ただしPhase 1では過剰に抽象化せず、運用で実例を集めてから判断します。
+
+当面は実装を保留し、Improvement がどのような Task や New Project を生むのかを実運用で観察します。

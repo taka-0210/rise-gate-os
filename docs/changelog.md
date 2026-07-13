@@ -51,3 +51,17 @@ Summary:
 現在は Laravel 実装前のドキュメント整理段階です。
 
 レビュー完了後、Laravelプロジェクトの初期構築へ進みます。
+
+## Design Addendum - Improvement Outputs and Project Lineage
+
+Status: Added after Phase 1 operation review. Not implemented yet.
+
+Summary:
+
+- 運用により、Improvement は Task だけでなく New Project の起点にもなることが分かった。
+- Project は改善を生むだけでなく、改善を通じて次のProjectへ連鎖する構造として考える。
+- Taskには通常タスクとImprovement由来タスクがある。
+- 将来候補として `projects.parent_project_id`、`projects.source_improvement_id` を検討する。
+- より汎用的な将来候補として `improvement_outputs` を検討する。
+- 現時点では実装せず、運用実績を集めてから最適なデータ構造を判断する。
+- AI活用のため、成果物だけでなく「なぜそれが生まれたか」を追える構造を重視する。

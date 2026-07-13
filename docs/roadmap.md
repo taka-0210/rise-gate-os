@@ -1,12 +1,18 @@
-﻿# Roadmap
+# Roadmap
 
 ## Current Status
 
-現在は Phase 0 です。
+現在は Phase 1-6 completed / Operation preparation です。
 
-Laravel実装はまだ開始していません。
+Organization、Workspace、Company(Client)、Project、Project Members、Improvement までの Company OS の骨格が実装されました。
+
+ここで新機能開発を一時停止し、Rise Gate OS 自身の開発を Rise Gate OS で管理する運用へ移行します。
+
+運用の中で、Improvement が Task だけでなく New Project を生むことを確認し、Company OS の中心を「Project管理」ではなく「改善の連鎖」として捉える方針を追加しました。
 
 ## Phase 0: Documentation and Project Foundation
+
+Status: Completed.
 
 目的: Rise Gate OS の思想、設計、データ構造、Phase計画をレビュー可能な状態にする。
 
@@ -20,33 +26,31 @@ Scope:
 
 ## Phase 1: Minimum OS
 
+Status: Paused after Phase 1-6 for operation preparation.
+
 目的: Projectを中心に、実際に使える最小のCompany OSを作る。
 
-Scope:
+Implemented through Phase 1-6:
 
-- ログイン
+- Laravel初期構築
+- 認証導入
+- Organization / Workspace / User 基盤
 - Workspace切替
-- 顧客管理
-- 案件管理
-- 案件メンバー
-- タスク管理
+- 権限チェック基盤
+- Client / Company 管理
+- Project 管理
+- Project Members 管理
+- Improvement 管理
+- Improvement visibility と Client role の基本制御
+
+Not implemented yet:
+
+- Task管理
 - 工程管理
-- 改善管理
 - Project Events
 - Documents基本機能
 - Activity Logs
-
-DocumentsのPhase 1範囲:
-
-- Projectへのファイルアップロード
-- 文書タイトル
-- 文書種別
-- 説明
-- アップロード者
-- ファイル一覧
-- ダウンロード
-- 論理削除
-- 権限チェック
+- ダッシュボード改善
 
 Phase 1で行わないこと:
 
@@ -63,27 +67,45 @@ Phase 1で行わないこと:
 - 自動分類
 - ClientやWorkspaceへのDocuments直接紐付け
 
-## Phase 1 Implementation Order
+## Phase 1 Operation Preparation
 
-1. Laravel初期構築
-2. 認証導入
-3. Organization / Workspace / User 基盤
-4. Workspace切替
-5. 権限チェック基盤
-6. 顧客管理
-7. 案件管理
-8. 案件メンバー管理
-9. 工程テンプレート
-10. Project Steps
-11. タスク管理
-12. 改善管理
-13. Project Events
-14. Documents基本機能
-15. Activity Logs
-16. ダッシュボード
-17. UI調整・権限テスト
+目的: Rise Gate OS を実際に運用できる状態にする。
 
-## Phase 2: Business Operations
+Scope:
+
+- README / roadmap の Current Status 更新
+- Rise Gate OS 開発用 Seeder の追加
+- `docs/operation.md` の追加
+- Project運用ルールの明文化
+- Improvement運用ルールの明文化
+- 今後の Codex 実装依頼を Project 内 Improvement から開始する運用へ移行
+
+この段階から、Rise Gate OS 自身を最初の利用者として扱います。
+
+## Phase 2: Operated Development
+
+目的: Rise Gate OS を使いながら改善点を見つけ、その改善を Rise Gate OS 自身で管理する。
+
+Start condition:
+
+- Rise Gate OS 開発用の Workspace / Client / Project / Improvement が登録されている。
+- 開発作業は Project 内 Improvement を元に開始できる。
+- 新しい機能追加は、先に Improvement として目的、問題、仮説、期待する影響を記録する。
+- Improvement から Task が生まれるのか、新しい Project が生まれるのかを運用で記録する。
+
+Candidate improvements:
+
+- Dashboard改善
+- Improvement編集・ステータス更新
+- Documents基本機能
+- Project Events
+- Activity Logs
+- Task管理
+- ImprovementからNew Projectが生まれる運用の検証
+- Project同士の関係設計の検証
+- 工程管理
+
+## Phase 3: Business Operations
 
 目的: 案件に紐付く業務処理を広げる。
 
@@ -97,7 +119,7 @@ Scope:
 - 保守
 - 詳細な議事録管理
 
-## Phase 3: Improvement OS
+## Phase 4: Improvement OS
 
 目的: 改善を蓄積・分析・活用するOSへ育てる。
 
@@ -108,8 +130,10 @@ Scope:
 - 活動ログ分析
 - ダッシュボード分析
 - Client / Workspace単位のImprovement展開
+- Improvementを起点にしたTask / Project / Document / Decisionの整理
+- 改善の連鎖を可視化するCompany OS構造
 
-## Phase 4: AI Integration
+## Phase 5: AI Integration
 
 目的: 蓄積した知識をAIが活用できる状態にする。
 
@@ -122,7 +146,7 @@ Scope:
 - Codex連携
 - GitHub連携
 
-## Phase 5: SaaS
+## Phase 6: SaaS
 
 目的: 他社にも展開できるCompany OSにする。
 

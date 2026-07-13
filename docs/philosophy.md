@@ -1,4 +1,4 @@
-﻿# Philosophy
+# Philosophy
 
 ## Purpose
 
@@ -45,6 +45,36 @@ Documents は知識の器です。
 AI は人を置き換えるものではありません。
 
 蓄積された知識を探し、整理し、改善のきっかけを提案するパートナーです。
+
+## 改善が会社を進化させる
+
+Company は Project を繰り返すだけで成長するのではありません。
+
+Project の中で見つかった Improvement が、次の行動を生みます。
+
+その行動は、小さな Task になることもあれば、新しい Project になることもあります。
+
+```txt
+Project
+  ↓
+Improvement
+  ├── Task
+  └── New Project
+```
+
+たとえば、ホームページ制作の中で「お問い合わせが増え、メール管理では限界」という Improvement が生まれた場合、それは単なる作業ではなく、CRMシステム開発という新しい Project につながる可能性があります。
+
+採用情報を充実させたいという Improvement から採用サイト制作が生まれることもあります。
+
+勤怠管理の改善から給与計算システムが生まれることもあります。
+
+Rise Gate OS が管理するものは、Project の一覧ではありません。
+
+Project で生まれた Improvement が、Task、Project、Document、Decision へ変わり、さらに次の Improvement を生む流れです。
+
+この改善の連鎖こそが、Company OS における会社の進化です。
+
+初期段階では、この考え方を設計思想として保持します。Project同士の関連、ImprovementからProject生成、Taskとの関係は、運用実績を集めた後に最適なデータ構造を判断します。
 
 ## Client Participation
 

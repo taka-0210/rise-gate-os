@@ -1,4 +1,4 @@
-﻿# Rise Gate OS
+# Rise Gate OS
 
 改善を、文化に。
 
@@ -14,6 +14,12 @@ Project は社内だけの管理画面ではありません。お客様も参加
 
 Project は改善を実行する単位であり、お客様と一緒に改善を進める共有空間です。
 
+ただし、Company OS が本当に管理する中心は Project 単体ではありません。
+
+Project で生まれた Improvement が、Task になり、新しい Project になり、Document や知識になり、さらに次の Improvement を生みます。
+
+Rise Gate OS は、この改善の連鎖を会社の成長として記録します。
+
 Improvement は会社の資産です。
 
 Documents は知識の器です。
@@ -28,6 +34,7 @@ AI は蓄積された知識を活用するパートナーです。
 - まず使う。
 - 現場で磨く。
 - 知識を資産にする。
+- 改善の連鎖を追跡する。
 - 設計も改善対象として扱う。
 - AIは人を置き換えるものではなく、改善を支援するパートナーである。
 - お客様の「今どうなっていますか？」という不安をなくす。
@@ -36,9 +43,65 @@ AI は蓄積された知識を活用するパートナーです。
 ## Project Status
 
 - Design version: v1.0 fixed
-- Current phase: Phase 0 / Documentation review
-- Laravel implementation: Not started
-- Next step: Review docs, then initialize Laravel project
+- Current phase: Phase 1-6 completed / Operation preparation
+- Laravel implementation: Phase 1 foundation implemented
+- Next step: Operate Rise Gate OS development inside Rise Gate OS itself
+
+## Implemented Foundation
+
+Phase 1-6 までで、以下の Company OS の骨格が動作しています。
+
+```txt
+Organization
+  ↓
+Workspace
+  ↓
+Company / Client
+  ↓
+Project
+  ↓
+Project Members
+  ↓
+Improvement
+```
+
+実装済みの主な範囲:
+
+- ログイン
+- Workspace切替
+- Organization / Workspace / User 基盤
+- Client / Company 管理
+- Project 管理
+- Project Members 管理
+- Improvement 管理
+- Project参加者とClient roleを考慮した権限チェック
+- Improvement visibility による公開範囲制御
+
+思想として追加した重要な方向性:
+
+```txt
+Project
+  ↓
+Improvement
+  ├── Task
+  └── New Project
+```
+
+この構造はまだ実装せず、運用実績を集めながら最適なデータ構造を判断します。
+
+## Operation Policy
+
+Phase 1-6 以降、新機能を追加する前に Rise Gate OS 自身を最初の利用者として運用します。
+
+Rise Gate OS の開発は、必ず Project を作成して進めます。
+
+Codex への実装依頼も、Project 内の Improvement を元に行います。
+
+改善の提案、実装、結果、次の改善を Rise Gate OS に残し、システム自身を会社の学習装置として育てます。
+
+運用では、Improvement から Task が生まれるだけでなく、新しい Project が生まれる流れも記録していきます。
+
+詳しくは `operation.md` を参照してください。
 
 ## Documentation Policy
 
@@ -54,21 +117,5 @@ AI は蓄積された知識を活用するパートナーです。
 - `architecture.md`: システム全体構成と責務分離
 - `database.md`: ER図・テーブル設計・データ方針
 - `roadmap.md`: Phase管理と実装順序
+- `operation.md`: Project / Improvement の運用ルール
 - `changelog.md`: 設計変更履歴と意思決定
-
-## Current Directory
-
-```txt
-rise-gate-os/
-├── docs/
-├── app/
-├── public/
-├── resources/
-├── routes/
-├── database/
-├── storage/
-├── config/
-└── .gitignore
-```
-
-Laravel導入後は、Laravel標準構成を基本に置き換えます。

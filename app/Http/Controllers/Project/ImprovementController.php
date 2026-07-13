@@ -1,0 +1,163 @@
+<?php
+
+namespace App\Http\Controllers\Project;
+
+use App\Http\Controllers\Controller;
+use App\Models\Improvement;
+use App\Models\Project;
+use App\Models\ProjectMember;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+class ImprovementController extends Controller
+{
+    public function index(Request $request, Project $project): View
+    {
+        Gate::authorize('view', $project);
+
+        $improvements = $this->visibleImprovementsQuery($request, $project)
+            ->with(['proposer', 'assignee', 'implementer'])
+            ->latest()
+            ->paginate(12);
+
+        return view('improvements.index', [
+            'project' => $project,
+            'improvements' => $improvements,
+            'statuses' => Improvement::statuses(),
+            'visibilities' => Improvement::visibilities(),
+            'canCreateImprovement' => Gate::allows('create', [Improvement::class, $project]),
+        ]);
+    }
+
+    public function create(Project $project): View
+    {
+        Gate::authorize('view', $project);
+        Gate::authorize('create', [Improvement::class, $project]);
+
+        return view('improvements.create', [
+            'project' => $project,
+            'statuses' => Improvement::statuses(),
+            'visibilities' => Improvement::visibilities(),
+            'assignableUsers' => $this->assignableUsers($project),
+        ]);
+    }
+
+    public function store(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('view', $project);
+        Gate::authorize('create', [Improvement::class, $project]);
+
+        $improvement = Improvement::create($this->validateImprovement($request, $project) + [
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $project->owning_workspace_id,
+            'project_id' => $project->id,
+            'proposed_by' => $request->user()->id,
+        ]);
+
+        return redirect()->route('projects.improvements.show', [$project, $improvement]);
+    }
+
+    public function show(Request $request, Project $project, Improvement $improvement): View
+    {
+        $this->authorizeProjectImprovement($project, $improvement);
+
+        Gate::authorize('view', $project);
+        Gate::authorize('view', $improvement);
+
+        $improvement->load(['proposer', 'assignee', 'implementer']);
+
+        return view('improvements.show', [
+            'project' => $project,
+            'improvement' => $improvement,
+            'statuses' => Improvement::statuses(),
+            'visibilities' => Improvement::visibilities(),
+            'canEditImprovement' => Gate::allows('update', $improvement),
+        ]);
+    }
+
+    public function edit(Project $project, Improvement $improvement): View
+    {
+        $this->authorizeProjectImprovement($project, $improvement);
+
+        Gate::authorize('view', $project);
+        Gate::authorize('update', $improvement);
+
+        return view('improvements.edit', [
+            'project' => $project,
+            'improvement' => $improvement,
+            'statuses' => Improvement::statuses(),
+            'visibilities' => Improvement::visibilities(),
+            'assignableUsers' => $this->assignableUsers($project),
+        ]);
+    }
+
+    public function update(Request $request, Project $project, Improvement $improvement): RedirectResponse
+    {
+        $this->authorizeProjectImprovement($project, $improvement);
+
+        Gate::authorize('view', $project);
+        Gate::authorize('update', $improvement);
+
+        $improvement->update($this->validateImprovement($request, $project));
+
+        return redirect()->route('projects.improvements.show', [$project, $improvement])->with('status', '改善を更新しました。');
+    }
+
+    protected function visibleImprovementsQuery(Request $request, Project $project)
+    {
+        $member = $project->members()
+            ->where('user_id', $request->user()->id)
+            ->where('status', ProjectMember::STATUS_ACTIVE)
+            ->first();
+
+        $query = $project->improvements();
+
+        if ($member?->project_role === ProjectMember::ROLE_CLIENT) {
+            $query->where('visibility', Improvement::VISIBILITY_CLIENT);
+        }
+
+        return $query;
+    }
+
+    protected function assignableUsers(Project $project)
+    {
+        return User::query()
+            ->whereHas('projectMemberships', function ($query) use ($project): void {
+                $query->where('project_id', $project->id)
+                    ->where('status', ProjectMember::STATUS_ACTIVE);
+            })
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function validateImprovement(Request $request, Project $project): array
+    {
+        $assignableUserIds = $this->assignableUsers($project)->pluck('id')->all();
+
+        return $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'current_state' => ['nullable', 'string', 'max:10000'],
+            'desired_state' => ['nullable', 'string', 'max:10000'],
+            'problem' => ['nullable', 'string', 'max:10000'],
+            'hypothesis' => ['nullable', 'string', 'max:10000'],
+            'action' => ['nullable', 'string', 'max:10000'],
+            'result' => ['nullable', 'string', 'max:10000'],
+            'impact' => ['nullable', 'string', 'max:10000'],
+            'next_action' => ['nullable', 'string', 'max:10000'],
+            'status' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::statuses()))],
+            'visibility' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::visibilities()))],
+            'assigned_to' => ['nullable', Rule::in($assignableUserIds)],
+            'implemented_by' => ['nullable', Rule::in($assignableUserIds)],
+            'implemented_at' => ['nullable', 'date'],
+        ]);
+    }
+
+    private function authorizeProjectImprovement(Project $project, Improvement $improvement): void
+    {
+        abort_unless($improvement->project_id === $project->id, 404);
+    }
+}

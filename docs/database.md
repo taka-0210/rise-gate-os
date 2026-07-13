@@ -287,3 +287,91 @@ Client roleには、原価、利益、社内メモ、担当者評価、社内改
 - Activity Logs を監査ログとして残す。
 - Workspaceごとの設定を保持する。
 - Client roleの表示範囲は必ずサーバー側で制御する。
+
+## Future Consideration: Improvement Outputs and Project Lineage
+
+運用上、Improvement は Task だけでなく New Project、Document、Decision の起点にもなります。
+
+Phase 1ではまだ実装しませんが、将来のER候補として以下を検討します。
+
+### Option A: Simple Project Lineage Columns
+
+```txt
+projects
+  parent_project_id nullable
+  source_improvement_id nullable
+```
+
+用途:
+
+- `parent_project_id`: どのProjectから派生したか
+- `source_improvement_id`: どのImprovementから生まれたか
+
+この方式はシンプルで、New Project の由来を追いやすいです。
+
+### Option B: Improvement Outputs Table
+
+```txt
+improvement_outputs
+  id
+  improvement_id
+  output_type
+  output_id
+  created_by
+  created_at
+  updated_at
+```
+
+`output_type` の候補:
+
+```txt
+task
+project
+document
+decision
+```
+
+この方式は、Improvement から複数種類の成果物が生まれる場合に強いです。
+
+### Tasks
+
+Task には通常タスクと Improvement 由来タスクがあります。
+
+将来の候補:
+
+```txt
+tasks
+  project_id
+  improvement_id nullable
+```
+
+意味:
+
+- `improvement_id = null`: 通常タスク
+- `improvement_idあり`: Improvementを実現するためのTask
+
+### AI and Knowledge Search
+
+AIが活用しやすい構造にするためには、成果物そのものだけでなく「なぜ生まれたか」を追えることが重要です。
+
+`source_improvement_id` や `improvement_outputs` により、以下の流れを辿れるようにします。
+
+```txt
+Project
+  ↓
+Improvement
+  ↓
+Task / New Project / Document / Decision
+  ↓
+Result / Impact / Next Action
+```
+
+この構造により、将来的に以下が可能になります。
+
+- 類似改善の検索
+- 過去Projectからの改善提案
+- 新Projectが生まれた背景の説明
+- 成果につながった改善パターンの分析
+- AIによる次の改善候補の提示
+
+現時点では設計思想として記録し、実装は十分な運用実績を得た後に判断します。

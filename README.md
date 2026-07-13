@@ -8,12 +8,67 @@ This repository contains the Laravel application and the living documentation fo
 
 ## Current Phase
 
-Phase 1-1: Laravel foundation.
+Phase 1-6 completed: Operation preparation.
 
-The goal of this phase is only to confirm that Laravel runs correctly as the base of Rise Gate OS. Business features such as authentication, database design implementation, projects, tasks, and improvements are not implemented yet.
+The Company OS foundation now works through Organization, Workspace, Client, Project, Project Members, and Improvement.
+
+The next step is not to add more features immediately, but to operate Rise Gate OS development inside Rise Gate OS itself.
+
+Tasks, Documents, Project Events, AI, and knowledge search are not implemented yet.
+
+## Implemented Through Phase 1-6
+
+- Laravel authentication without external starter kit
+- User registration and login
+- Organization creation during registration
+- Workspace creation during registration
+- Organization owner membership
+- Workspace owner membership
+- Workspace selection screen
+- Current Workspace session handling
+- Workspace middleware for protected screens
+- Owner / Admin / Member / Viewer role foundation
+- Project list
+- Project creation
+- Project detail
+- Project Members
+- Project role and permission separation
+- Cross-workspace Project participation
+- Project member-only access control
+- Client list
+- Client creation
+- Client detail
+- Project and Client association
+- Internal Project creation without Client
+- Workspace-scoped Client access control
+- Improvement list
+- Improvement creation
+- Improvement detail
+- Project-scoped Improvement access control
+- Improvement visibility foundation for internal / project / client sharing
+
+## Operation Start
+
+Rise Gate OS now uses itself as the first operational project.
+
+Development work should start from a Project and an Improvement inside Rise Gate OS.
+
+Sample operation data can be created with:
+
+```powershell
+C:\xampp\php\php.exe artisan db:seed --class=RiseGateOsOperationSeeder
+```
+
+Seeded login user:
+
+```txt
+email: takami@rise-gate.local
+password: password
+```
 
 ## What Matters
 
+- Client is a Company, not a contact person.
 - Project is a shared place to move improvements forward with members and clients.
 - Improvement is a company asset.
 - Documents are vessels for knowledge.
@@ -29,6 +84,7 @@ Design documents are managed separately from implementation code.
 - `docs/architecture.md`: System structure
 - `docs/database.md`: ER and table design
 - `docs/roadmap.md`: Phase plan
+- `docs/operation.md`: Operation rules for Project and Improvement
 - `docs/changelog.md`: Design decisions and changes
 
 ## Local Development
@@ -36,13 +92,19 @@ Design documents are managed separately from implementation code.
 PHP is provided by XAMPP in this environment.
 
 ```powershell
-C:\xampp\php\php.exe artisan serve
+C:\xampp\php\php.exe artisan serve --host=127.0.0.1 --port=8000
 ```
 
 Then open:
 
 ```txt
 http://127.0.0.1:8000
+```
+
+## Test
+
+```powershell
+C:\xampp\php\php.exe artisan test
 ```
 
 ## Environment Note
