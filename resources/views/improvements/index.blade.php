@@ -1,4 +1,4 @@
-﻿@extends('layouts.app', ['title' => '改善 - '.$project->name])
+@extends('layouts.app', ['title' => '改善 - '.$project->name])
 
 @section('content')
     <section class="stack">
@@ -44,7 +44,8 @@
                 @endforeach
             </div>
 
-            {{ $improvements->links() }}
+            {{ $improvements->links('components.pagination') }}
         @endif
     </section>
 @endsection
+

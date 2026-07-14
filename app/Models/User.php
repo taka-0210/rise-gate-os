@@ -52,6 +52,11 @@ class User extends Authenticatable
         return $this->hasMany(ProjectMember::class);
     }
 
+    public function assignedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assigned_to');
+    }
+
     public function canAccessWorkspace(int $workspaceId): bool
     {
         return $this->workspaces()->where('workspaces.id', $workspaceId)->exists();

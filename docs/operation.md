@@ -1,4 +1,4 @@
-﻿# Operation
+# Operation
 
 ## Purpose
 
@@ -185,6 +185,26 @@ client    Client roleにも公開
 
 迷った場合は `internal` で登録し、レビュー時に公開範囲を見直します。
 
+## Evolution Dashboardの運用
+
+Evolution Dashboard は、毎日最初に開くホーム画面として扱います。
+
+目的は、未完了や遅れを責めることではありません。
+
+昨日より会社が進化したことを確認し、今日育てる改善を見つけ、次の一歩へ進むことです。
+
+Dashboardで見る観点:
+
+- 今日、何が進んだか。
+- 今週、どんな改善が生まれたか。
+- 結果や影響を追記すると知識になる改善はどれか。
+- 確認すると進められる改善はどれか。
+- 次に育てるべき改善はどれか。
+
+停滞しているImprovementは、失敗や遅延として扱いません。
+
+まだ育てられる改善として扱い、必要なら担当者、結果、影響、次の行動を更新します。
+
 ## Codexとの連携運用
 
 Phase 2 以降、Codex への実装依頼は Project 内の Improvement を元に行います。
@@ -264,10 +284,19 @@ Improvement
   └── Decisionとして判断を残す
 ```
 
-現時点では、この派生関係は運用上の考え方として扱い、DB実装は行いません。
+Phase 2-2 では、Task と New Project を Improvement から生まれる Output として登録できるようにします。Document、Knowledge、Event などは引き続き将来拡張として扱います。
 
-実装判断は、実際に複数のProjectで運用し、どの派生パターンが多いかを確認してから行います。
 
+## Output生成の運用ルール
+
+Improvement をレビューした後は、次のOutputを必要に応じて作成します。
+
+- 小さな実作業は Task として作成する。
+- 複数人・別納期・独立成果物が必要な場合は New Project として作成する。
+- 1つの Improvement から複数 Task と New Project が同時に生まれてもよい。
+- 作成した Output は、元 Improvement との関係を残す。
+
+Output は「改善から会社の未来が生まれた記録」です。
 ## New Project化の判断基準
 
 Improvement を New Project として切り出す目安:

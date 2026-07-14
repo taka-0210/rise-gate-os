@@ -1,4 +1,4 @@
-﻿@extends('layouts.app', ['title' => 'Clients - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Clients - Rise Gate OS'])
 
 @section('content')
     <section class="stack">
@@ -38,7 +38,8 @@
                 @endforeach
             </div>
 
-            {{ $clients->links() }}
+            {{ $clients->links('components.pagination') }}
         @endif
     </section>
 @endsection
+

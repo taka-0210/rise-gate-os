@@ -1,4 +1,4 @@
-﻿@extends('layouts.app', ['title' => $project->name.' - Rise Gate OS'])
+@extends('layouts.app', ['title' => $project->name.' - Rise Gate OS'])
 
 @section('content')
     <section class="stack">
@@ -22,6 +22,32 @@
                 @foreach ($errors->all() as $error)
                     <div class="error">{{ $error }}</div>
                 @endforeach
+            </div>
+        @endif
+
+        @php($sourceImprovement = $project->sourceImprovementOutput?->improvement)
+        @if ($project->sourceImprovementOutput)
+            <div class="panel stack origin-panel">
+                <div>
+                    <div class="badge">改善から生まれたProject</div>
+                    <h2>このProjectの起点</h2>
+                    <p>このProjectは、別のProjectで生まれた改善から切り出されました。</p>
+                </div>
+
+                @if ($sourceImprovement && Gate::allows('view', $sourceImprovement))
+                    <div class="grid">
+                        <div class="card">
+                            <h2>元Project</h2>
+                            <p><a href="{{ route('projects.show', $sourceImprovement->project) }}">{{ $sourceImprovement->project->name }}</a></p>
+                        </div>
+                        <div class="card">
+                            <h2>元Improvement</h2>
+                            <p><a href="{{ route('projects.improvements.show', [$sourceImprovement->project, $sourceImprovement]) }}">{{ $sourceImprovement->title }}</a></p>
+                        </div>
+                    </div>
+                @else
+                    <p>起点となった改善は公開範囲により表示されません。</p>
+                @endif
             </div>
         @endif
 
@@ -189,9 +215,86 @@
         </div>
 
         <div class="grid">
-            <div id="tasks" class="card">
-                <h2>Tasks</h2>
-                <p>Coming Soon</p>
+            <div id="tasks" class="card stack">
+                <div class="actions" style="justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h2>Tasks</h2>
+                        <p>TaskはProject内で進める具体的な作業です。Improvementから生まれたTaskは、その由来も残ります。</p>
+                    </div>
+                </div>
+
+                @if ($tasks->isEmpty())
+                    <p>まだTaskはありません。</p>
+                @else
+                    @foreach ($tasks as $task)
+                        <div style="border-top:1px solid var(--line); padding-top:12px;">
+                            <div class="meta">
+                                {{ $taskStatuses[$task->status] ?? $task->status }} / {{ $taskPriorities[$task->priority] ?? $task->priority }}
+                            </div>
+                            <h2>{{ $task->title }}</h2>
+                            <p>{{ Str::limit($task->description ?: '詳細はまだありません。', 120) }}</p>
+                            <p class="meta">
+                                担当者: {{ $task->assignee?->name ?? '未設定' }}
+                                @if ($task->due_date)
+                                    / 期限: {{ $task->due_date->format('Y-m-d') }}
+                                @endif
+                                @if ($task->improvement)
+                                    / 起点: <a href="{{ route('projects.improvements.show', [$project, $task->improvement]) }}">{{ $task->improvement->title }}</a>
+                                @endif
+                            </p>
+                        </div>
+                    @endforeach
+                @endif
+
+                @if ($canCreateTask)
+                    <form class="stack" method="POST" action="{{ route('projects.tasks.store', $project) }}">
+                        @csrf
+                        <h2>ProjectからTaskを登録</h2>
+                        <p>通常作業として登録します。改善から生まれた作業は、Improvement詳細からTask化できます。</p>
+                        <div class="field">
+                            <label for="task_title">Task名</label>
+                            <input id="task_title" name="title" value="{{ old('title') }}" required>
+                        </div>
+                        <div class="field">
+                            <label for="task_description">説明</label>
+                            <textarea id="task_description" name="description" rows="3">{{ old('description') }}</textarea>
+                        </div>
+                        <div class="grid">
+                            <div class="field">
+                                <label for="task_status">状態</label>
+                                <select id="task_status" name="status" required>
+                                    @foreach ($taskStatuses as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('status', 'todo') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="task_priority">優先度</label>
+                                <select id="task_priority" name="priority" required>
+                                    @foreach ($taskPriorities as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('priority', 'normal') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="task_assigned_to">担当者</label>
+                                <select id="task_assigned_to" name="assigned_to">
+                                    <option value="">未設定</option>
+                                    @foreach ($assignableUsers as $user)
+                                        <option value="{{ $user->id }}" @selected((string) old('assigned_to') === (string) $user->id)>{{ $user->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="task_due_date">期限</label>
+                            <input id="task_due_date" name="due_date" type="date" value="{{ old('due_date') }}">
+                        </div>
+                        <div class="actions">
+                            <button type="submit">Taskを登録</button>
+                        </div>
+                    </form>
+                @endif
             </div>
             <div id="improvements" class="card stack">
                 <div class="actions" style="justify-content: space-between; align-items: flex-start;">

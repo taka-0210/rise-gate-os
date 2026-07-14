@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class ProjectController extends Controller
                     ->where('workspace_id', $currentWorkspace->id)
                     ->where('status', ProjectMember::STATUS_ACTIVE);
             })
-            ->with(['owner', 'client', 'members' => fn ($query) => $query->where('user_id', $request->user()->id)])
+            ->with(['owner', 'client', 'sourceImprovementOutput.improvement.project', 'members' => fn ($query) => $query->where('user_id', $request->user()->id)])
             ->latest()
             ->paginate(12);
 
@@ -82,13 +83,19 @@ class ProjectController extends Controller
         $currentWorkspaceRole = $request->attributes->get('currentWorkspaceRole');
         $currentMember = $project->members()->where('user_id', $request->user()->id)->where('status', ProjectMember::STATUS_ACTIVE)->first();
 
-        $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'members.user', 'members.workspace']);
+        $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'sourceImprovementOutput.improvement.project', 'members.user', 'members.workspace']);
 
         $improvements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
             ->with(['proposer', 'assignee'])
             ->latest()
             ->limit(6)
+            ->get();
+
+        $tasks = $project->tasks()
+            ->with(['assignee', 'improvement'])
+            ->latest()
+            ->limit(8)
             ->get();
 
         $canManageMembers = Gate::allows('manageMembers', [$project, $currentWorkspaceRole]);
@@ -103,6 +110,11 @@ class ProjectController extends Controller
             'improvements' => $improvements,
             'improvementStatuses' => Improvement::statuses(),
             'improvementVisibilities' => Improvement::visibilities(),
+            'tasks' => $tasks,
+            'taskStatuses' => Task::statuses(),
+            'taskPriorities' => Task::priorities(),
+            'assignableUsers' => $this->assignableUsers($project),
+            'canCreateTask' => Gate::allows('create', [Task::class, $project]),
             'canCreateImprovement' => Gate::allows('create', [Improvement::class, $project]),
             'canEditProject' => Gate::allows('update', $project),
             'canManageMembers' => $canManageMembers,
@@ -151,6 +163,17 @@ class ProjectController extends Controller
     private function workspaceClients(int $workspaceId)
     {
         return Client::query()->where('workspace_id', $workspaceId)->orderBy('name')->get();
+    }
+
+    private function assignableUsers(Project $project)
+    {
+        return User::query()
+            ->whereHas('projectMemberships', function ($query) use ($project): void {
+                $query->where('project_id', $project->id)
+                    ->where('status', ProjectMember::STATUS_ACTIVE);
+            })
+            ->orderBy('name')
+            ->get();
     }
 
     private function memberPreview(Request $request, Project $project, bool $canManageMembers): array

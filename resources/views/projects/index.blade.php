@@ -1,4 +1,4 @@
-﻿@extends('layouts.app', ['title' => 'Projects - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Projects - Rise Gate OS'])
 
 @section('content')
     <section class="stack">
@@ -21,12 +21,23 @@
         @else
             <div class="grid">
                 @foreach ($projects as $project)
+                    @php($sourceImprovement = $project->sourceImprovementOutput?->improvement)
                     <article class="card stack">
                         <div>
                             <div class="meta">
                                 {{ $project->client?->name ?? 'Internal Project' }} / {{ $statuses[$project->status] ?? $project->status }} / {{ $priorities[$project->priority] ?? $project->priority }}
                             </div>
                             <h2><a href="{{ route('projects.show', $project) }}">{{ $project->name }}</a></h2>
+                            @if ($project->sourceImprovementOutput)
+                                <div class="badge">改善から生まれたProject</div>
+                                @if ($sourceImprovement && Gate::allows('view', $sourceImprovement))
+                                    <p class="meta">
+                                        起点: <a href="{{ route('projects.improvements.show', [$sourceImprovement->project, $sourceImprovement]) }}">{{ Str::limit($sourceImprovement->title, 48) }}</a>
+                                    </p>
+                                @else
+                                    <p class="meta">起点の改善は公開範囲により表示されません。</p>
+                                @endif
+                            @endif
                             @if ($project->summary)
                                 <p>{{ Str::limit($project->summary, 120) }}</p>
                             @else
@@ -44,8 +55,9 @@
                 @endforeach
             </div>
 
-            {{ $projects->links() }}
+            {{ $projects->links('components.pagination') }}
         @endif
     </section>
 @endsection
+
 

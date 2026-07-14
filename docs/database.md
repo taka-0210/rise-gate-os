@@ -1,4 +1,4 @@
-﻿# Database
+# Database
 
 ## Version
 
@@ -292,7 +292,7 @@ Client roleには、原価、利益、社内メモ、担当者評価、社内改
 
 運用上、Improvement は Task だけでなく New Project、Document、Decision の起点にもなります。
 
-Phase 1ではまだ実装しませんが、将来のER候補として以下を検討します。
+Phase 2-2 では、Task / Project を Improvement から生まれる Output として実装します。Document / Knowledge / Event などは将来拡張として扱います。
 
 ### Option A: Simple Project Lineage Columns
 
@@ -309,7 +309,7 @@ projects
 
 この方式はシンプルで、New Project の由来を追いやすいです。
 
-### Option B: Improvement Outputs Table
+### Implemented in Phase 2-2: Improvement Outputs Table
 
 ```txt
 improvement_outputs
@@ -328,6 +328,8 @@ improvement_outputs
 task
 project
 document
+knowledge
+event
 decision
 ```
 
@@ -335,9 +337,7 @@ decision
 
 ### Tasks
 
-Task には通常タスクと Improvement 由来タスクがあります。
-
-将来の候補:
+Task には通常タスクと Improvement 由来タスクがあります。Phase 2-2 では `tasks.improvement_id` を nullable として実装します。
 
 ```txt
 tasks
@@ -374,4 +374,4 @@ Result / Impact / Next Action
 - 成果につながった改善パターンの分析
 - AIによる次の改善候補の提示
 
-現時点では設計思想として記録し、実装は十分な運用実績を得た後に判断します。
+Phase 2-2 では Task / Project の Output 生成までを実装し、Document / Knowledge / Event などは運用実績を見ながら追加判断します。

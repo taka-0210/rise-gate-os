@@ -190,6 +190,34 @@ Laravel + MySQL を第一候補とします。
 
 必要に応じて、将来 Livewire を追加できる構成にします。
 
+## Evolution Dashboard Design Principles
+
+Evolution Dashboard は、単なる管理画面ではなく、会社の未来へ進むためのホーム画面です。
+
+Phase 2-1では、既存の Project と Improvement のデータを使い、会社の改善の現在地を表示します。
+
+設計原則:
+
+- Dashboardの主役は、未完了や遅延ではなく、会社が進化している実感である。
+- 最初に表示するのは、今日・今週に生まれた改善、完了した改善、前へ進んだProjectである。
+- 停滞は「遅れ」ではなく、「確認すると進められる改善」として扱う。
+- Taskを中心にせず、Improvementを中心に情報を組み立てる。
+- 数字だけでなく、次の行動につながる短い言葉を表示する。
+- Phase 2-1ではルールベースで「次に育てる改善」を表示し、将来AI提案へ置き換えられる構造にする。
+
+初期表示候補:
+
+```txt
+今日の進化
+今週の積み重ね
+次に育てる改善
+進んでいるProject
+確認すると進められる改善
+Workspaceの現在地
+```
+
+AI連携後は、Project、Improvement、Documents、Events、History を読み取り、次に見るべき改善や、過去の類似改善を提案できる状態を目指します。
+
 ## Improvement as Origin
 
 運用を通じて、Improvement は Task だけでなく New Project の起点にもなることが分かりました。
@@ -275,13 +303,13 @@ parent_project_id      どのProjectから派生したか
 source_improvement_id  どのImprovementから生まれたか
 ```
 
-ただし、現時点ではまだ実装しません。
+Phase 2-2では、Project生成の由来を `improvement_outputs` で記録します。
 
 運用を続けながら、単純なカラムで足りるのか、あるいは `improvement_outputs` のような中間概念が必要かを検証します。
 
 ## Improvement Outputs
 
-将来的には、Improvement の成果物を統一的に扱うために、以下のような概念を検討します。
+Phase 2-2では、Improvement の成果物を統一的に扱うために、以下の概念を実装しました。
 
 ```txt
 improvement_outputs
@@ -292,6 +320,6 @@ improvement_outputs
 
 この設計にすると、Improvement から何が生まれたのかをAIや検索が追いやすくなります。
 
-ただしPhase 1では過剰に抽象化せず、運用で実例を集めてから判断します。
+Phase 2-2では Task / Project を Output として扱い、Document / Knowledge / Event は将来拡張として残します。
 
-当面は実装を保留し、Improvement がどのような Task や New Project を生むのかを実運用で観察します。
+Project一覧とProject詳細では、改善から生まれたProjectであることと、元Improvementへの動線を表示します。

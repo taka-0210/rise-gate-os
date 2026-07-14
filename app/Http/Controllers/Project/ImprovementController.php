@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Project;
 
 use App\Http\Controllers\Controller;
 use App\Models\Improvement;
+use App\Models\ImprovementOutput;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,13 +70,31 @@ class ImprovementController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('view', $improvement);
 
-        $improvement->load(['proposer', 'assignee', 'implementer']);
+        $improvement->load(['proposer', 'assignee', 'implementer', 'outputs']);
+
+        $taskOutputIds = $improvement->outputs
+            ->where('output_type', ImprovementOutput::TYPE_TASK)
+            ->pluck('output_id')
+            ->all();
+        $projectOutputIds = $improvement->outputs
+            ->where('output_type', ImprovementOutput::TYPE_PROJECT)
+            ->pluck('output_id')
+            ->all();
 
         return view('improvements.show', [
             'project' => $project,
             'improvement' => $improvement,
             'statuses' => Improvement::statuses(),
             'visibilities' => Improvement::visibilities(),
+            'taskOutputs' => Task::query()->whereIn('id', $taskOutputIds)->with(['assignee'])->latest()->get(),
+            'projectOutputs' => Project::query()->whereIn('id', $projectOutputIds)->latest()->get(),
+            'taskStatuses' => Task::statuses(),
+            'taskPriorities' => Task::priorities(),
+            'projectStatuses' => Project::statuses(),
+            'projectPriorities' => Project::priorities(),
+            'assignableUsers' => $this->assignableUsers($project),
+            'canCreateTaskOutput' => Gate::allows('create', [Task::class, $project]),
+            'canCreateProjectOutput' => Gate::allows('update', $improvement) && Gate::allows('create', [Project::class, $project->owningWorkspace]),
             'canEditImprovement' => Gate::allows('update', $improvement),
         ]);
     }

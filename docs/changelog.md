@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 このファイルは、Rise Gate OS の設計変更履歴と意思決定を記録します。
 
@@ -54,7 +54,7 @@ Summary:
 
 ## Design Addendum - Improvement Outputs and Project Lineage
 
-Status: Added after Phase 1 operation review. Not implemented yet.
+Status: Added after Phase 1 operation review. Task / Project outputs implemented in Phase 2-2.
 
 Summary:
 
@@ -65,3 +65,40 @@ Summary:
 - より汎用的な将来候補として `improvement_outputs` を検討する。
 - 現時点では実装せず、運用実績を集めてから最適なデータ構造を判断する。
 - AI活用のため、成果物だけでなく「なぜそれが生まれたか」を追える構造を重視する。
+
+## Design Addendum - Evolution Dashboard Philosophy
+
+Status: Added before Phase 2-1 implementation. Not implemented yet.
+
+Summary:
+
+- Improvement は管理するものではなく、育てるものと定義した。
+- Project は主役ではなく、改善を育てる器と定義した。
+- Company OS は思想・概念、Rise Gate OS は実装・プロダクトと整理した。
+- Rise Gate OS 自身も改善を続けながら育っていく Operating System と定義した。
+- Evolution Dashboard は会社の未来へ進むためのホーム画面と定義した。
+- Dashboardの主役は不足や遅延ではなく、会社が少しずつ良くなっている実感とした。
+- 停滞している改善は「確認すると進められる改善」として扱う方針とした。
+- Phase 2-1ではルールベースで「次に育てる改善」を表示し、将来AI提案へつなげる方針とした。
+
+## Phase 2-2 - Output Generation
+
+Status: Implemented.
+
+Summary:
+
+- Improvement を Task / Project を生み出す起点として実装した。
+- `tasks` を追加し、Project から通常Taskを登録できるようにした。
+- `improvement_outputs` を追加し、Improvementから生まれた Task / Project を追跡できるようにした。
+- 1つの Improvement から複数 Task と New Project が生まれる構造に対応した。
+- Document / Knowledge / Event のOutput化は将来拡張として残した。
+
+## Phase 2-2.1 - Project Origin Visibility
+
+Status: Implemented.
+
+Summary:
+
+- Improvementから生まれたProjectを、Project一覧で一目で判別できるようにした。
+- Project詳細に「このProjectの起点」を追加し、元Project / 元Improvementへ戻れる動線を追加した。
+- 元Improvementの閲覧権限がないユーザーには、内部改善名を表示しないようにした。

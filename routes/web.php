@@ -5,6 +5,8 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Client\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Project\ImprovementController;
+use App\Http\Controllers\Project\ImprovementOutputController;
+use App\Http\Controllers\Project\TaskController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Workspace\WorkspaceController;
@@ -33,6 +35,9 @@ Route::middleware('auth')->group(function (): void {
         Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show']);
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::resource('projects.improvements', ImprovementController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+        Route::post('/projects/{project}/tasks', [TaskController::class, 'store'])->name('projects.tasks.store');
+        Route::post('/projects/{project}/improvements/{improvement}/outputs/tasks', [ImprovementOutputController::class, 'storeTask'])->name('projects.improvements.outputs.tasks.store');
+        Route::post('/projects/{project}/improvements/{improvement}/outputs/projects', [ImprovementOutputController::class, 'storeProject'])->name('projects.improvements.outputs.projects.store');
         Route::post('/projects/{project}/members', [ProjectMemberController::class, 'store'])->name('projects.members.store');
         Route::delete('/projects/{project}/members/{projectMember}', [ProjectMemberController::class, 'destroy'])->name('projects.members.destroy');
     });

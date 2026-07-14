@@ -95,7 +95,7 @@ Start condition:
 
 Candidate improvements:
 
-- Dashboard改善
+- Evolution Dashboard
 - Improvement編集・ステータス更新
 - Documents基本機能
 - Project Events
@@ -104,6 +104,49 @@ Candidate improvements:
 - ImprovementからNew Projectが生まれる運用の検証
 - Project同士の関係設計の検証
 - 工程管理
+
+## Phase 2-1: Evolution Dashboard
+
+目的: 会社の改善の現在地を見えるようにし、次に育てる改善へ進みたくなるホーム画面を作る。
+
+Scope:
+
+- 今日・今週の進化を表示する。
+- 新しく生まれたImprovementを表示する。
+- 完了・実施済みのImprovementを表示する。
+- 最近動いたProjectを表示する。
+- 次に育てるImprovementをルールベースで表示する。
+- 停滞しているImprovementを「確認すると進められる改善」として表示する。
+- DB追加は行わず、既存の Project / Improvement データから開始する。
+
+今回やらないこと:
+
+- AI提案
+- Task管理
+- Documents
+- Project Events / Timeline
+- Activity Logs
+- Improvement同士の関連付け
+- Project同士の派生関係実装
+
+## Phase 2-2: Output Generation
+
+目的: Improvement を、Task や New Project を生み出す起点として扱えるようにする。
+
+Implemented scope:
+
+- Project から通常 Task を登録できる。
+- Improvement から複数 Task を登録できる。
+- Improvement から新しい Project を作成できる。
+- `improvement_outputs` により、元Improvementと生まれたOutputの関係を追える。
+- 改善から生まれたProjectを一覧・詳細で判別できる。
+
+Not implemented yet:
+
+- Document / Knowledge / Event のOutput化
+- Task編集・完了管理
+- Output同士の関連可視化
+- AIによる次のOutput提案
 
 ## Phase 3: Business Operations
 
