@@ -16,6 +16,8 @@ Project は改善を実行する単位であり、お客様と一緒に改善を
 
 ただし、Company OS が本当に管理する中心は Project 単体ではありません。
 
+Project には目指す未来があり、Roadmap はその未来へ向かうテーマです。Roadmap は改善そのものではなく、複数の Improvement を生み出し、束ねる一段上の視点です。必須ではなく、改善が増えてきたタイミングで自然に育てる任意のレイヤーです。
+
 Project で生まれた Improvement が、Task になり、新しい Project になり、Document や知識になり、さらに次の Improvement を生みます。
 
 Rise Gate OS は、この改善の連鎖を会社の成長として記録します。

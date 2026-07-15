@@ -102,3 +102,36 @@ Summary:
 - Improvementから生まれたProjectを、Project一覧で一目で判別できるようにした。
 - Project詳細に「このProjectの起点」を追加し、元Project / 元Improvementへ戻れる動線を追加した。
 - 元Improvementの閲覧権限がないユーザーには、内部改善名を表示しないようにした。
+
+## Phase 2-3 - Roadmap MVP
+
+Status: Implemented.
+
+Summary:
+
+- RoadmapをProjectが目指す未来へ向かうテーマとして追加した。
+- Roadmapは必須ではなく、改善が増えてきたタイミングで作成する任意テーマとした。
+- MVPでは `roadmap_items` を作らず、`improvements.roadmap_id` でシンプルに開始した。
+- 既存ImprovementをRoadmapテーマへ追加 / 未分類へ戻せるようにした。
+- 将来、RoadmapにImprovement以外も並べる必要が出た場合に `roadmap_items` へ育てる方針とした。
+
+## Phase 2-3.1 - Roadmap Theme Granularity
+
+Status: Implemented as documentation and UI refinement.
+
+Summary:
+
+- 運用レビューにより、RoadmapとImprovementの粒度が近すぎると二重表現になることが分かった。
+- Roadmapは改善そのものではなく、改善を生み出し、束ねるテーマとして再定義した。
+- ImprovementはRoadmapテーマを前へ進める具体的な改善として扱う。
+- DB構造は変更せず、文言とUIで粒度を明確にした。
+
+## Phase 2-3.2 - Roadmap Theme Position
+
+Status: Implemented.
+
+Summary:
+
+- UI文言を「改善テーマ」ではなく「ロードマップテーマ」へ統一した。
+- ロードマップテーマ作成時に、先頭または既存テーマの後ろへ配置できるようにした。
+- `roadmaps.sort_order` を使い、テーマの並び順をProject内で管理する方針を明確にした。

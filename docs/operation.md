@@ -287,6 +287,28 @@ Improvement
 Phase 2-2 では、Task と New Project を Improvement から生まれる Output として登録できるようにします。Document、Knowledge、Event などは引き続き将来拡張として扱います。
 
 
+
+## Roadmap運用ルール
+
+Roadmapは、Projectが目指す未来へ向かうテーマです。
+
+Roadmapは改善そのものではありません。複数のImprovementを生み出し、束ねる一段上の視点です。
+
+最初から必ず作る必要はありません。
+
+- ProjectはRoadmapなしで始められる。
+- Improvementが増えてきたら、テーマとしてRoadmapを作る。
+- 既存Improvementを後からRoadmapテーマへ追加できる。
+- Roadmapは完成した計画表ではなく、改善とともに育つテーマである。
+- ロードマップテーマは、作成時に先頭または既存テーマの後ろへ配置できる。
+- 小さなProjectではRoadmapを作らなくてもよい。
+
+Roadmapを作る目安:
+
+- Improvementが増えて、改善を束ねるテーマが見えてきた。
+- Projectの目指す未来をチームで共有したい。
+- 未分類のImprovementが増えてきた。
+- 改善の流れをお客様にも分かりやすく見せたい。
 ## Output生成の運用ルール
 
 Improvement をレビューした後は、次のOutputを必要に応じて作成します。

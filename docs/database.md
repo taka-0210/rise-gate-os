@@ -26,6 +26,7 @@ Phase 1では、必要以上に抽象化しすぎず、Project中心で実装し
 | client_contacts | 顧客担当者 |
 | client_notes | 顧客メモ |
 | projects | 案件本体 |
+| roadmaps | Projectが目指す未来へ向かうテーマ。任意でImprovementを生み出し、束ねる |
 | project_members | 案件参加者。社内メンバー、パートナー、お客様を含む |
 | project_types | 案件種別 |
 | project_statuses | 案件ステータス |
@@ -80,8 +81,10 @@ erDiagram
     CLIENTS ||--o{ CLIENT_NOTES : has
 
     PROJECTS ||--o{ PROJECT_MEMBERS : has
+    PROJECTS ||--o{ ROADMAPS : has
     PROJECTS ||--o{ TASKS : has
     PROJECTS ||--o{ PROJECT_STEPS : has
+    ROADMAPS ||--o{ IMPROVEMENTS : frames
     PROJECTS ||--o{ IMPROVEMENTS : has
     PROJECTS ||--o{ PROJECT_EVENTS : has
     PROJECTS ||--o{ DOCUMENTS : has
@@ -158,6 +161,40 @@ comment
 view
 ```
 
+
+### roadmaps
+
+Roadmap は Project が目指す未来へ向かうテーマです。必須ではなく、Improvement が増えてきたタイミングで後から作成できます。
+
+Roadmap は Improvement と同じ粒度の改善名ではありません。複数の Improvement を生み出し、束ねる一段上の概念として扱います。
+
+```txt
+id
+public_id
+organization_id
+workspace_id
+project_id
+title
+purpose
+status
+sort_order
+created_by
+deleted_at
+created_at
+updated_at
+```
+
+`sort_order` はProject内でロードマップテーマをどの順番に並べるかを表します。テーマ作成時に、先頭または既存テーマの後ろへ差し込めるようにします。
+
+MVPでは `roadmap_items` は作りません。
+
+```txt
+improvements
+  roadmap_id nullable
+  roadmap_sort_order nullable
+```
+
+将来、Roadmap に Improvement 以外も並べる必要が出た場合、`roadmap_items` への移行を検討します。
 ### improvements
 
 Phase 1ではProject紐付けを基本にします。

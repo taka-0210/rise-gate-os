@@ -278,6 +278,49 @@ Improvement
 
 この考え方により、Project は単発で終わるものではなく、改善を通じて次のProjectや知識へ連鎖していく構造になります。
 
+
+## Project Roadmap
+
+Roadmap は、Project が目指す未来へ向かうテーマです。
+
+Roadmap は Project の必須要素ではありません。Project は Improvement から始めることができ、改善が増えてきたタイミングで Roadmap を追加して整理できます。
+
+MVPでは、Roadmap は Improvement を生み出し、束ねる任意テーマとして実装します。
+
+Roadmap と Improvement は同じ粒度ではありません。
+
+```txt
+Project
+  RISE GATE OS
+
+Roadmap
+  運用できるOS
+
+Improvement
+  Evolution Dashboardを育てる
+  Taskを実行可能にする
+  権限を分かりやすくする
+```
+
+```txt
+Project
+  ↓
+Roadmap optional theme
+  ↓
+Improvement
+  ↓
+Outputs
+```
+
+MVPでは `roadmap_items` は作りません。
+
+```txt
+roadmaps
+improvements.roadmap_id nullable
+improvements.roadmap_sort_order nullable
+```
+
+将来、Roadmap に Project / Document / Event / Decision なども並べる必要が出てきた段階で、`roadmap_items` へ育てることを検討します。
 ## Project Relationships
 
 Project同士には、将来的に親子関係や派生関係が発生します。

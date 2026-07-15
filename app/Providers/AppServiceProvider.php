@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(Improvement::class, ImprovementPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
+        Gate::policy(Roadmap::class, RoadmapPolicy::class);
         Gate::policy(Task::class, TaskPolicy::class);
     }
 }

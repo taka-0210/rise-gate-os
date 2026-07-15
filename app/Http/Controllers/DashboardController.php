@@ -138,19 +138,40 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $applyVisibleImprovementScope = function (Builder $query) use ($internalProjectIds, $clientProjectIds): void {
+            $query->where(function (Builder $query) use ($internalProjectIds, $clientProjectIds): void {
+                if ($internalProjectIds !== []) {
+                    $query->whereIn('project_id', $internalProjectIds);
+                }
+
+                if ($clientProjectIds !== []) {
+                    $query->orWhere(function (Builder $query) use ($clientProjectIds): void {
+                        $query->whereIn('project_id', $clientProjectIds)
+                            ->where('visibility', Improvement::VISIBILITY_CLIENT);
+                    });
+                }
+            });
+        };
+
         $recentProjects = Project::query()
             ->whereIn('id', $visibleProjectIds)
             ->with(['client'])
             ->withCount([
-                'improvements',
-                'improvements as open_improvements_count' => fn (Builder $query) => $query->whereIn('status', $openStatuses),
-                'improvements as completed_improvements_count' => fn (Builder $query) => $query->whereIn('status', $completedStatuses),
+                'improvements' => fn (Builder $query) => $applyVisibleImprovementScope($query),
+                'improvements as open_improvements_count' => function (Builder $query) use ($openStatuses, $applyVisibleImprovementScope): void {
+                    $applyVisibleImprovementScope($query);
+                    $query->whereIn('status', $openStatuses);
+                },
+                'improvements as completed_improvements_count' => function (Builder $query) use ($completedStatuses, $applyVisibleImprovementScope): void {
+                    $applyVisibleImprovementScope($query);
+                    $query->whereIn('status', $completedStatuses);
+                },
             ])
             ->latest('updated_at')
             ->limit(5)
             ->get();
 
-        $this->attachProjectMovement($recentProjects, $completedStatuses);
+        $this->attachProjectMovement($recentProjects, $completedStatuses, $internalProjectIds, $clientProjectIds);
 
         return view('dashboard.index', [
             'currentWorkspace' => $currentWorkspace,
@@ -199,7 +220,7 @@ class DashboardController extends Controller
             });
     }
 
-    private function attachProjectMovement(Collection $projects, array $completedStatuses): void
+    private function attachProjectMovement(Collection $projects, array $completedStatuses, array $internalProjectIds, array $clientProjectIds): void
     {
         if ($projects->isEmpty()) {
             return;
@@ -207,14 +228,14 @@ class DashboardController extends Controller
 
         $projectIds = $projects->pluck('id')->all();
 
-        $latestImprovements = Improvement::query()
+        $latestImprovements = $this->visibleImprovementQuery($internalProjectIds, $clientProjectIds)
             ->whereIn('project_id', $projectIds)
             ->latest('updated_at')
             ->get()
             ->groupBy('project_id')
             ->map(fn (Collection $items): ?Improvement => $items->first());
 
-        $recentCompleted = Improvement::query()
+        $recentCompleted = $this->visibleImprovementQuery($internalProjectIds, $clientProjectIds)
             ->whereIn('project_id', $projectIds)
             ->whereIn('status', $completedStatuses)
             ->latest('updated_at')

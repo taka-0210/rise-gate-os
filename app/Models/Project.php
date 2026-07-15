@@ -95,6 +95,11 @@ class Project extends Model
         return $this->hasMany(Improvement::class);
     }
 
+    public function roadmaps(): HasMany
+    {
+        return $this->hasMany(Roadmap::class)->orderBy('sort_order')->latest();
+    }
+
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);

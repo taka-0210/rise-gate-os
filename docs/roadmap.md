@@ -148,6 +148,32 @@ Not implemented yet:
 - Output同士の関連可視化
 - AIによる次のOutput提案
 
+
+## Phase 2-3: Roadmap MVP
+
+目的: Roadmapを、Projectが目指す未来へ向かうテーマとして任意で育てられるようにする。
+
+Implemented scope:
+
+- RoadmapをProjectの任意テーマとして作成できる。
+- RoadmapなしでもProject / Improvementは運用できる。
+- 既存Improvementを後からRoadmapテーマへ追加できる。
+- ImprovementをRoadmapから外し、未分類へ戻せる。
+- Project詳細でRoadmapの改善数と進み具合を確認できる。
+- ロードマップテーマ作成時に、既存テーマのどの位置へ置くか選択できる。
+
+Design note:
+
+- Roadmapは改善そのものではなく、改善を生み出すテーマである。
+- ImprovementはRoadmapテーマを前へ進める具体的な改善である。
+
+Not implemented yet:
+
+- roadmap_items
+- Project / Document / Event / Decision のRoadmap配置
+- ドラッグ&ドロップ並び替え
+- DashboardへのRoadmap反映
+- AIによるRoadmap整理提案
 ## Phase 3: Business Operations
 
 目的: 案件に紐付く業務処理を広げる。

@@ -30,6 +30,8 @@ class Improvement extends Model
         'organization_id',
         'workspace_id',
         'project_id',
+        'roadmap_id',
+        'roadmap_sort_order',
         'title',
         'current_state',
         'desired_state',
@@ -74,6 +76,11 @@ class Improvement extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function roadmap(): BelongsTo
+    {
+        return $this->belongsTo(Roadmap::class);
     }
 
     public function proposer(): BelongsTo

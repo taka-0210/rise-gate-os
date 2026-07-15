@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -98,6 +99,28 @@ class ProjectController extends Controller
             ->limit(8)
             ->get();
 
+        $visibleImprovementScope = function ($query) use ($currentMember): void {
+            if ($currentMember?->project_role === ProjectMember::ROLE_CLIENT) {
+                $query->where('visibility', Improvement::VISIBILITY_CLIENT);
+            }
+        };
+
+        $roadmaps = $project->roadmaps()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->with(['improvements' => function ($query) use ($visibleImprovementScope): void {
+                $visibleImprovementScope($query);
+                $query->with(['assignee', 'proposer']);
+            }])
+            ->get();
+
+        $unclassifiedImprovements = $project->improvements()
+            ->whereNull('roadmap_id')
+            ->tap($visibleImprovementScope)
+            ->with(['assignee', 'proposer'])
+            ->latest()
+            ->get();
+
         $canManageMembers = Gate::allows('manageMembers', [$project, $currentWorkspaceRole]);
         [$memberPreview, $memberPreviewError] = $this->memberPreview($request, $project, $canManageMembers);
 
@@ -113,9 +136,13 @@ class ProjectController extends Controller
             'tasks' => $tasks,
             'taskStatuses' => Task::statuses(),
             'taskPriorities' => Task::priorities(),
+            'roadmaps' => $roadmaps,
+            'roadmapStatuses' => Roadmap::statuses(),
+            'unclassifiedImprovements' => $unclassifiedImprovements,
             'assignableUsers' => $this->assignableUsers($project),
             'canCreateTask' => Gate::allows('create', [Task::class, $project]),
             'canCreateImprovement' => Gate::allows('create', [Improvement::class, $project]),
+            'canCreateRoadmap' => Gate::allows('create', [Roadmap::class, $project]),
             'canEditProject' => Gate::allows('update', $project),
             'canManageMembers' => $canManageMembers,
             'memberPreview' => $memberPreview,

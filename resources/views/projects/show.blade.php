@@ -1,6 +1,56 @@
 @extends('layouts.app', ['title' => $project->name.' - Rise Gate OS'])
 
 @section('content')
+    <style>
+        .roadmap-lanes { display: grid; gap: 22px; }
+        .roadmap-lane {
+            display: grid;
+            grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+            gap: 18px;
+            align-items: stretch;
+        }
+        .roadmap-start { border-color: #a9d6cf; background: #f2fbf9; }
+        .roadmap-flow {
+            display: flex;
+            align-items: stretch;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 4px 4px 14px;
+            scroll-snap-type: x proximity;
+        }
+        .roadmap-step {
+            min-width: 250px;
+            max-width: 290px;
+            scroll-snap-align: start;
+        }
+        .roadmap-step-empty { border-style: dashed; background: #fbfcfd; }
+        .roadmap-arrow {
+            display: grid;
+            place-items: center;
+            flex: 0 0 32px;
+            color: var(--accent-dark);
+            font-size: 22px;
+            font-weight: 900;
+        }
+        .roadmap-arrow-forward { color: var(--ink); }
+        @media (max-width: 760px) {
+            .roadmap-lane { grid-template-columns: 1fr; }
+            .roadmap-flow {
+                display: grid;
+                overflow-x: visible;
+                padding: 0;
+            }
+            .roadmap-step {
+                min-width: 0;
+                max-width: none;
+            }
+            .roadmap-arrow {
+                min-height: 28px;
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+
     <section class="stack">
         <div class="actions" style="justify-content: space-between; align-items: flex-start;">
             <div>
@@ -94,11 +144,146 @@
         <div class="panel stack">
             <div class="actions" style="gap:8px;">
                 <a class="button" href="#members">メンバー</a>
+                <a class="button secondary" href="#roadmaps">Roadmap</a>
                 <a class="button secondary" href="#tasks">Tasks</a>
                 <a class="button secondary" href="#improvements">改善</a>
                 <a class="button secondary" href="#documents">Documents</a>
                 <a class="button secondary" href="#events">Project Events</a>
             </div>
+
+            <section id="roadmaps" class="stack">
+                <div class="actions" style="justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h2>Roadmap</h2>
+                        <p>Roadmapは、このProjectが目指す未来へ向かうテーマです。Improvementは、そのテーマを一歩ずつ前へ進める具体的な改善です。</p>
+                    </div>
+                </div>
+
+                @if ($roadmaps->isEmpty())
+                    <div class="card stack">
+                        <h2>Roadmapはまだありません</h2>
+                        <p>まずはImprovementを育てるだけでも十分です。改善が増えてきたら、未来へ向かうテーマとしてRoadmapを育てられます。</p>
+                        @if ($unclassifiedImprovements->count() >= 3)
+                            <p class="meta">このProjectには未分類の改善が{{ $unclassifiedImprovements->count() }}件あります。テーマごとに束ねると、次に進む道筋が見えやすくなります。</p>
+                        @endif
+                    </div>
+                @else
+                    <div class="roadmap-lanes">
+                        @foreach ($roadmaps as $roadmap)
+                            @php($roadmapImprovements = $roadmap->improvements)
+                            @php($completedCount = $roadmapImprovements->whereIn('status', ['implemented', 'measured', 'closed'])->count())
+                            <article class="roadmap-lane">
+                                <div class="roadmap-start card stack">
+                                    <div class="meta">ロードマップテーマ / {{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</div>
+                                    <h2>{{ $roadmap->title }}</h2>
+                                    <p>{{ $roadmap->purpose ?: 'このテーマが目指す未来はまだ記録されていません。' }}</p>
+                                    <p class="meta">{{ $roadmapImprovements->count() }}件中{{ $completedCount }}件が前へ進みました。</p>
+                                </div>
+
+                                <div class="roadmap-flow" aria-label="{{ $roadmap->title }}のテーマの流れ">
+                                    <div class="roadmap-arrow roadmap-arrow-forward" aria-hidden="true">▶</div>
+
+                                    @if ($roadmapImprovements->isEmpty())
+                                        <div class="roadmap-step roadmap-step-empty card">
+                                            <div class="meta">次の一歩</div>
+                                            <h2>Improvementを追加できます</h2>
+                                            <p>このテーマを前へ進める具体的な改善は、まだ追加されていません。</p>
+                                        </div>
+                                    @else
+                                        @foreach ($roadmapImprovements as $roadmapImprovement)
+                                            <div class="roadmap-step card stack">
+                                                <div>
+                                                    <div class="meta">Step {{ $loop->iteration }} / {{ $improvementStatuses[$roadmapImprovement->status] ?? $roadmapImprovement->status }}</div>
+                                                    <h2><a href="{{ route('projects.improvements.show', [$project, $roadmapImprovement]) }}">{{ $roadmapImprovement->title }}</a></h2>
+                                                    <p>{{ Str::limit($roadmapImprovement->next_action ?: $roadmapImprovement->problem ?: 'この改善はテーマを前へ進める一歩です。', 100) }}</p>
+                                                </div>
+                                                @if ($canCreateRoadmap)
+                                                    <form method="POST" action="{{ route('projects.improvements.roadmap.remove', [$project, $roadmapImprovement]) }}">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button class="secondary" type="submit">未分類に戻す</button>
+                                                    </form>
+                                                @endif
+                                            </div>
+
+                                            @unless ($loop->last)
+                                                <div class="roadmap-arrow" aria-hidden="true">▶</div>
+                                            @endunless
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                @endif
+
+                @if ($canCreateRoadmap)
+                    <div class="card stack">
+                        <h2>ロードマップテーマを作成</h2>
+                        <p>最初から完成した計画にする必要はありません。Projectの未来へ向かうテーマとして、育てながら使います。</p>
+                        <form class="stack" method="POST" action="{{ route('projects.roadmaps.store', $project) }}">
+                            @csrf
+                            <div class="field">
+                                <label for="roadmap_title">テーマ名</label>
+                                <input id="roadmap_title" name="title" value="{{ old('title') }}" required>
+                            </div>
+                            <div class="field">
+                                <label for="roadmap_purpose">目指す未来</label>
+                                <textarea id="roadmap_purpose" name="purpose" rows="3">{{ old('purpose') }}</textarea>
+                            </div>
+                            <div class="field">
+                                <label for="roadmap_status">状態</label>
+                                <select id="roadmap_status" name="status" required>
+                                    @foreach ($roadmapStatuses as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('status', 'active') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="position_after_roadmap_id">表示位置</label>
+                                <select id="position_after_roadmap_id" name="position_after_roadmap_id">
+                                    <option value="">先頭に置く</option>
+                                    @foreach ($roadmaps as $positionRoadmap)
+                                        <option value="{{ $positionRoadmap->id }}" @selected((string) old('position_after_roadmap_id') === (string) $positionRoadmap->id)>
+                                            「{{ $positionRoadmap->title }}」の後ろに置く
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="actions">
+                                <button type="submit">ロードマップテーマを作成</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card stack">
+                        <h2>未分類のImprovement</h2>
+                        <p>Roadmapが必要になったタイミングで、既存のImprovementを後からテーマへ追加できます。</p>
+                        @if ($unclassifiedImprovements->isEmpty())
+                            <p>未分類のImprovementはありません。</p>
+                        @else
+                            @foreach ($unclassifiedImprovements as $unclassifiedImprovement)
+                                <div style="border-top:1px solid var(--line); padding-top:12px;">
+                                    <div class="meta">{{ $improvementStatuses[$unclassifiedImprovement->status] ?? $unclassifiedImprovement->status }}</div>
+                                    <h2><a href="{{ route('projects.improvements.show', [$project, $unclassifiedImprovement]) }}">{{ $unclassifiedImprovement->title }}</a></h2>
+                                    <p>{{ Str::limit($unclassifiedImprovement->next_action ?: $unclassifiedImprovement->problem ?: '詳細は改善ページで確認できます。', 120) }}</p>
+                                    @if ($roadmaps->isNotEmpty())
+                                        <form class="actions" method="POST" action="{{ route('projects.improvements.roadmap.assign', [$project, $unclassifiedImprovement]) }}">
+                                            @csrf
+                                            <select name="roadmap_id" style="max-width:260px;" required>
+                                                @foreach ($roadmaps as $roadmap)
+                                                    <option value="{{ $roadmap->id }}">{{ $roadmap->title }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="submit">テーマへ追加</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            @endforeach
+                        @endif
+                    </div>
+                @endif
+            </section>
 
             <section id="members" class="stack">
                 <div class="actions" style="justify-content: space-between; align-items: flex-start;">
