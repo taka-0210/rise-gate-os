@@ -23,6 +23,8 @@ class AuthenticatedSessionController extends Controller
             'password' => ['required', 'string'],
         ]);
 
+        $credentials['is_active'] = true;
+
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             throw ValidationException::withMessages([
                 'email' => 'メールアドレスまたはパスワードが正しくありません。',

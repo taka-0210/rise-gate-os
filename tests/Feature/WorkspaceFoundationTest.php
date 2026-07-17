@@ -30,6 +30,7 @@ class WorkspaceFoundationTest extends TestCase
         $workspace = Workspace::where('name', 'Rise Gate Workspace')->firstOrFail();
 
         $this->assertAuthenticatedAs($user);
+        $this->assertTrue($user->is_system_admin);
         $this->assertSame($organization->id, $workspace->organization_id);
         $this->assertDatabaseHas('organization_users', [
             'organization_id' => $organization->id,
@@ -42,6 +43,23 @@ class WorkspaceFoundationTest extends TestCase
             'role' => 'owner',
         ]);
         $response->assertSessionHas('current_workspace_id', $workspace->id);
+    }
+
+    public function test_self_registration_is_closed_after_the_first_user(): void
+    {
+        User::factory()->create();
+
+        $this->get('/register')->assertNotFound();
+        $this->post('/register', [
+            'name' => 'Second User',
+            'email' => 'second@example.com',
+            'organization_name' => 'Second Organization',
+            'workspace_name' => 'Second Workspace',
+            'password' => 'password-test',
+            'password_confirmation' => 'password-test',
+        ])->assertNotFound();
+
+        $this->assertDatabaseMissing('users', ['email' => 'second@example.com']);
     }
 
     public function test_dashboard_requires_current_workspace(): void

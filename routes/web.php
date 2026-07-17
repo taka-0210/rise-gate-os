@@ -11,6 +11,7 @@ use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\RoadmapController;
 use App\Http\Controllers\Workspace\WorkspaceController;
+use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -25,11 +26,21 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 });
 
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', 'active-user'])->group(function (): void {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
     Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
     Route::post('/workspaces/{workspace}/switch', [WorkspaceController::class, 'switch'])->name('workspaces.switch');
+
+    Route::middleware('system-admin')->prefix('system-admin')->name('system-admin.')->group(function (): void {
+        Route::get('/members', [SystemAdminMemberController::class, 'index'])->name('members.index');
+        Route::post('/members', [SystemAdminMemberController::class, 'store'])->name('members.store');
+        Route::get('/members/{user}/edit', [SystemAdminMemberController::class, 'edit'])->name('members.edit');
+        Route::put('/members/{user}', [SystemAdminMemberController::class, 'update'])->name('members.update');
+        Route::post('/members/{user}/workspaces', [SystemAdminMemberController::class, 'storeWorkspace'])->name('members.workspaces.store');
+        Route::put('/members/{user}/workspaces/{workspace}', [SystemAdminMemberController::class, 'updateWorkspace'])->name('members.workspaces.update');
+        Route::delete('/members/{user}/workspaces/{workspace}', [SystemAdminMemberController::class, 'destroyWorkspace'])->name('members.workspaces.destroy');
+    });
 
     Route::middleware('workspace')->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');

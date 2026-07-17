@@ -143,6 +143,9 @@
                 <a href="{{ route('clients.index') }}">Clients</a>
                 <a href="{{ route('projects.index') }}">Projects</a>
                 <a href="{{ route('workspaces.index') }}">Workspaces</a>
+                @if (auth()->user()->is_system_admin)
+                    <a href="{{ route('system-admin.members.index') }}">System Admin</a>
+                @endif
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button class="secondary" type="submit">Logout</button>

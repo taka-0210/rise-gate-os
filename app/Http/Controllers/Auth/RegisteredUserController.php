@@ -19,11 +19,15 @@ class RegisteredUserController extends Controller
 {
     public function create(): View
     {
+        abort_if(User::query()->exists(), 404);
+
         return view('auth.register');
     }
 
     public function store(Request $request): RedirectResponse
     {
+        abort_if(User::query()->exists(), 404);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -37,6 +41,7 @@ class RegisteredUserController extends Controller
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => $validated['password'],
+                'is_system_admin' => true,
             ]);
 
             $organization = Organization::create([

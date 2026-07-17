@@ -14,10 +14,17 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
+    protected $attributes = [
+        'is_system_admin' => false,
+        'is_active' => true,
+    ];
+
     protected $fillable = [
         'name',
         'email',
         'password',
+        'is_system_admin',
+        'is_active',
     ];
 
     protected $hidden = [
@@ -30,6 +37,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_system_admin' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
