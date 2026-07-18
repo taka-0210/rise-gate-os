@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: ソースコードを取得
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: PHP 8.3を準備
         uses: shivammathur/setup-php@v2
@@ -32,6 +32,11 @@ jobs:
 
       - name: テスト用パッケージを準備
         run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: テスト用Laravel環境を準備
+        run: |
+          cp .env.example .env
+          php artisan key:generate
 
       - name: 自動テスト
         run: php artisan test
@@ -76,4 +81,3 @@ jobs:
 
       - name: 公開画面を確認
         run: curl --fail --silent --show-error --retry 5 --retry-delay 3 https://os.rise-gate.com/login > /dev/null
-
