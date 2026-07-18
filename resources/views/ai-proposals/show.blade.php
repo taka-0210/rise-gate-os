@@ -3,6 +3,27 @@
 @section('title', $proposal->title.' | AI提案')
 
 @section('content')
+    <style>
+        .proposal-outline { display:grid; gap:16px; }
+        .proposal-roadmap { padding:18px; border:2px solid #4f82c4; border-radius:10px; background:#f8fbff; }
+        .proposal-roadmap > h3 { margin:0 0 14px; color:#245ca6; }
+        .proposal-improvements { display:grid; gap:12px; }
+        .proposal-improvement { padding:16px; border:2px solid #56a27e; border-radius:9px; background:#f6fcf8; }
+        .proposal-improvement > h4 { margin:0 0 12px; color:#23845c; }
+        .proposal-tasks { display:grid; gap:8px; margin:0; padding:0; list-style:none; counter-reset:proposal-task; }
+        .proposal-task { counter-increment:proposal-task; padding:11px 13px; border:2px solid #cc735e; border-radius:8px; background:#fff9f7; }
+        .proposal-task::before { content:counter(proposal-task) '．'; margin-right:5px; color:#b5523d; font-weight:900; }
+        .proposal-impact-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+        .proposal-impact-card { padding:16px; border:1px solid var(--line); border-radius:9px; background:#fff; }
+        .proposal-impact-values { display:flex; align-items:baseline; gap:10px; margin-top:8px; }
+        .proposal-impact-values strong { font-size:28px; }
+        .proposal-impact-arrow { color:var(--muted); font-weight:900; }
+        .proposal-impact-delta { font-weight:900; }
+        .proposal-impact-delta.is-positive { color:#23845c; }
+        .proposal-impact-delta.is-negative { color:#b5523d; }
+        .proposal-impact-delta.is-neutral { color:var(--muted); }
+        @media (max-width:760px) { .proposal-impact-grid { grid-template-columns:1fr; } }
+    </style>
     <section class="panel stack">
         <div>
             <div class="eyebrow">AI提案・{{ $statuses[$proposal->status] ?? $proposal->status }}</div>
@@ -15,29 +36,33 @@
                 <div class="eyebrow">提案内容・承認後の仕事の構造</div>
                 <h2>ロードマップ・取り組み・タスク</h2>
             </div>
+            <div class="proposal-outline">
             @forelse ($proposalOutline as $roadmapIndex => $roadmap)
-                <section style="border-top:1px solid var(--line); padding-top:16px;">
+                <section class="proposal-roadmap">
                     <h3>ロードマップ {{ $roadmapIndex + 1 }}．{{ $roadmap['title'] }}</h3>
+                    <div class="proposal-improvements">
                     @forelse ($roadmap['improvements'] as $improvementIndex => $improvement)
-                        <div style="margin-left:24px; margin-top:14px;">
+                        <div class="proposal-improvement">
                             <h4>取り組み {{ $improvementIndex + 1 }}．{{ $improvement['title'] }}</h4>
                             @if ($improvement['tasks'])
-                                <ol style="margin-left:24px;">
+                                <ol class="proposal-tasks">
                                     @foreach ($improvement['tasks'] as $task)
-                                        <li>{{ $task['title'] }}</li>
+                                        <li class="proposal-task">{{ $task['title'] }}</li>
                                     @endforeach
                                 </ol>
                             @else
-                                <p class="meta" style="margin-left:24px;">この提案で追加・更新・削除するタスクはありません。</p>
+                                <p class="meta">この提案で追加・更新・削除するタスクはありません。</p>
                             @endif
                         </div>
                     @empty
-                        <p class="meta" style="margin-left:24px;">この提案で追加・更新・削除する取り組みはありません。</p>
+                        <p class="meta">この提案で追加・更新・削除する取り組みはありません。</p>
                     @endforelse
+                    </div>
                 </section>
             @empty
                 <p>この提案には、ロードマップ・取り組み・タスクの変更がありません。</p>
             @endforelse
+            </div>
         </div>
 
         <div class="actions">
@@ -66,10 +91,30 @@
             </div>
         @endif
 
+        <div class="card stack">
+            <div>
+                <div class="eyebrow">プロジェクト全体への影響</div>
+                <h2>{{ $proposal->status === \App\Models\AiProposal::STATUS_APPLIED ? '反映前と反映後の件数' : '現状と承認後の件数' }}</h2>
+            </div>
+            <div class="proposal-impact-grid">
+                @foreach (['roadmap' => 'ロードマップ', 'improvement' => '取り組み', 'task' => 'タスク'] as $entityType => $label)
+                    @php($impact = $impactCounts[$entityType])
+                    <div class="proposal-impact-card">
+                        <div class="meta">{{ $label }}</div>
+                        <div class="proposal-impact-values">
+                            <strong>{{ $impact['before'] }}</strong>
+                            <span class="proposal-impact-arrow">→</span>
+                            <strong>{{ $impact['after'] }}</strong>
+                            <span class="proposal-impact-delta {{ $impact['delta'] > 0 ? 'is-positive' : ($impact['delta'] < 0 ? 'is-negative' : 'is-neutral') }}">
+                                （{{ $impact['delta'] > 0 ? '＋' : ($impact['delta'] < 0 ? '−' : '±') }}{{ abs($impact['delta']) }}）
+                            </span>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
         <div class="grid">
-            <div class="card"><div class="meta">ロードマップ</div><h2>{{ $itemCounts['roadmap'] }}</h2></div>
-            <div class="card"><div class="meta">取り組み</div><h2>{{ $itemCounts['improvement'] }}</h2></div>
-            <div class="card"><div class="meta">タスク</div><h2>{{ $itemCounts['task'] }}</h2></div>
             <div class="card"><div class="meta">状態</div><h2>{{ $statuses[$proposal->status] ?? $proposal->status }}</h2></div>
             <div class="card"><div class="meta">変更合計</div><h2>{{ $proposal->items->count() }}</h2></div>
         </div>

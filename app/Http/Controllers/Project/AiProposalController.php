@@ -51,6 +51,29 @@ class AiProposalController extends Controller
             'task' => collect($proposalOutline)->sum(fn (array $roadmap) => collect($roadmap['improvements'])->sum(fn (array $improvement) => count($improvement['tasks']))),
         ];
 
+        $validItems = $aiProposal->items->where('validation_status', 'valid');
+        $currentEntityCounts = [
+            'roadmap' => $project->roadmaps()->count(),
+            'improvement' => $project->improvements()->count(),
+            'task' => $project->tasks()->count(),
+        ];
+        $impactCounts = collect($currentEntityCounts)->mapWithKeys(function (int $current, string $entityType) use ($aiProposal, $validItems): array {
+            $delta = $validItems
+                ->where('entity_type', $entityType)
+                ->sum(fn ($item): int => match ($item->operation) {
+                    'create' => 1,
+                    'delete' => -1,
+                    default => 0,
+                });
+            $isApplied = $aiProposal->status === AiProposal::STATUS_APPLIED;
+
+            return [$entityType => [
+                'before' => $isApplied ? max(0, $current - $delta) : $current,
+                'after' => $isApplied ? $current : max(0, $current + $delta),
+                'delta' => $delta,
+            ]];
+        })->all();
+
         return view('ai-proposals.show', [
             'project' => $project,
             'proposal' => $aiProposal,
@@ -58,6 +81,7 @@ class AiProposalController extends Controller
             'itemCounts' => $itemCounts,
             'canReview' => Gate::allows('update', $project),
             'proposalOutline' => $proposalOutline,
+            'impactCounts' => $impactCounts,
         ]);
     }
 

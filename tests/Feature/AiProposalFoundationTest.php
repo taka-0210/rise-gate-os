@@ -112,7 +112,10 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee('取り組み 1．公式サイトを見直す')
             ->assertSee('中核メッセージを整理する')
             ->assertSee('利用例を掲載する')
-            ->assertSeeInOrder(['ロードマップ', '1', '取り組み', '1', 'タスク', '2'])
+            ->assertSee('proposal-roadmap', false)
+            ->assertSee('proposal-improvement', false)
+            ->assertSee('proposal-task', false)
+            ->assertSeeInOrder(['プロジェクト全体への影響', 'ロードマップ', '1', '→', '1', '取り組み', '1', '→', '1', 'タスク', '0', '→', '2'])
             ->assertSee('技術的な変更内容');
     }
 
@@ -234,6 +237,12 @@ class AiProposalFoundationTest extends TestCase
             ['operation' => 'delete', 'entity_type' => 'roadmap', 'target_public_id' => $roadmap->public_id, 'attributes' => [], 'sort_order' => 10],
             ['operation' => 'delete', 'entity_type' => 'improvement', 'target_public_id' => $improvement->public_id, 'attributes' => [], 'sort_order' => 20],
         ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.ai-proposals.show', [$project, $proposal]))
+            ->assertOk()
+            ->assertSeeInOrder(['ロードマップ', '1', '→', '0', '取り組み', '1', '→', '0', 'タスク', '0', '→', '0']);
 
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
