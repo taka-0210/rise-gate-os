@@ -153,7 +153,11 @@ class ProjectController extends Controller
 
         $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'sourceImprovementOutput.improvement.project', 'members.user', 'members.workspace']);
         $aiRequests = $project->aiRequests()->with(['requester', 'proposal', 'attachments'])->limit(10)->get();
-        $pendingAiProposalCount = $project->aiProposals()->where('status', AiProposal::STATUS_PENDING)->count();
+        $pendingAiProposals = $project->aiProposals()
+            ->where('status', AiProposal::STATUS_PENDING)
+            ->latest()
+            ->get();
+        $pendingAiProposalCount = $pendingAiProposals->count();
 
         $allImprovements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
@@ -223,6 +227,7 @@ class ProjectController extends Controller
             'memberPreviewError' => $memberPreviewError,
             'aiRequests' => $aiRequests,
             'pendingAiProposalCount' => $pendingAiProposalCount,
+            'pendingAiProposals' => $pendingAiProposals,
         ]);
     }
 

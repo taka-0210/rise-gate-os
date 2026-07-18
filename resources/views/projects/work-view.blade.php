@@ -208,6 +208,27 @@
                 <button type="button" class="ai-drawer-close" data-ai-drawer-close aria-label="閉じる">×</button>
             </div>
             <div class="stack">
+                @if ($pendingAiProposals->isNotEmpty())
+                    <section class="ai-drawer-section stack" style="border-color:#d8a092; background:#fff9f7;">
+                        <div>
+                            <div class="meta">確認が必要です</div>
+                            <h3 style="margin-bottom:0;">承認待ちのAI提案 {{ $pendingAiProposals->count() }}件</h3>
+                        </div>
+                        <div class="ai-drawer-request-list">
+                            @foreach ($pendingAiProposals as $pendingProposal)
+                                <article class="ai-drawer-request" style="border-color:#e1b3a8; background:#fff;">
+                                    <div class="meta">{{ $pendingProposal->created_at->format('Y-m-d H:i') }} に届きました</div>
+                                    <strong>{{ $pendingProposal->title }}</strong>
+                                    @if ($pendingProposal->summary)<p>{{ Str::limit($pendingProposal->summary, 140) }}</p>@endif
+                                    <div class="actions">
+                                        <a class="button" href="{{ route('projects.ai-proposals.show', [$project, $pendingProposal]) }}">内容を確認</a>
+                                    </div>
+                                </article>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
                 <section class="ai-drawer-section stack">
                     <div>
                         <h3>AIに提案を依頼</h3>
