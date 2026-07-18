@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiAccessKey;
+use App\Models\AiAuditLog;
 use App\Models\AiProposal;
+use App\Models\Project;
 use App\Services\AiMcpToolService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Throwable;
-use App\Models\AiAuditLog;
 
 class AiMcpController extends Controller
 {
@@ -73,23 +76,27 @@ class AiMcpController extends Controller
                 'list_projects' => $tools->listProjects($key),
                 'get_project_plan' => $this->getProjectPlan($tools, $key, $arguments),
                 'list_ai_requests' => $tools->listAiRequests($key),
-                'claim_ai_request' => $tools->claimAiRequest($key, Validator::validate($arguments, ['request_public_id' => ['required','string']])['request_public_id']),
+                'claim_ai_request' => $tools->claimAiRequest($key, Validator::validate($arguments, ['request_public_id' => ['required', 'string']])['request_public_id']),
+                'get_ai_request_attachment' => $this->getAiRequestAttachment($tools, $key, $arguments),
                 'submit_proposal' => $this->submitProposal($tools, $key, $arguments),
                 default => throw new \InvalidArgumentException('存在しないツールです。'),
             };
 
             $this->audit($key, (string) $name, $arguments, $data, true, null, $startedAt);
 
+            $content = $data['_mcp_content'] ?? [['type' => 'text', 'text' => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]];
+            unset($data['_mcp_content']);
+
             return $this->result($id, [
-                'content' => [['type' => 'text', 'text' => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]],
+                'content' => $content,
                 'structuredContent' => $data,
                 'isError' => false,
             ]);
         } catch (Throwable $exception) {
             report($exception);
-            $message = $exception instanceof \Illuminate\Validation\ValidationException
+            $message = $exception instanceof ValidationException
                 ? implode("\n", $exception->validator->errors()->all())
-                : ($exception instanceof \Illuminate\Database\Eloquent\ModelNotFoundException ? '対象データが見つかりません。' : $exception->getMessage());
+                : ($exception instanceof ModelNotFoundException ? '対象データが見つかりません。' : $exception->getMessage());
 
             $this->audit($key, (string) $name, $arguments, null, false, $message, $startedAt);
 
@@ -104,7 +111,7 @@ class AiMcpController extends Controller
     {
         $projectPublicId = $arguments['project_public_id'] ?? null;
         $projectId = $projectPublicId
-            ? \App\Models\Project::query()->where('owning_workspace_id', $key->workspace_id)->where('public_id', $projectPublicId)->value('id')
+            ? Project::query()->where('owning_workspace_id', $key->workspace_id)->where('public_id', $projectPublicId)->value('id')
             : null;
         $proposalId = is_array($result) && isset($result['proposal_id'])
             ? AiProposal::query()->where('public_id', $result['proposal_id'])->value('id')
@@ -133,6 +140,7 @@ class AiMcpController extends Controller
     private function getProjectPlan(AiMcpToolService $tools, AiAccessKey $key, array $arguments): array
     {
         $validated = Validator::validate($arguments, ['project_public_id' => ['required', 'string']]);
+
         return $tools->getProjectPlan($key, $validated['project_public_id']);
     }
 
@@ -153,7 +161,18 @@ class AiMcpController extends Controller
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
             'items.*.attributes' => ['required', 'array', 'min:1'],
         ]);
+
         return $tools->submitProposal($key, $validated);
+    }
+
+    private function getAiRequestAttachment(AiMcpToolService $tools, AiAccessKey $key, array $arguments): array
+    {
+        $validated = Validator::validate($arguments, [
+            'request_public_id' => ['required', 'string'],
+            'attachment_public_id' => ['required', 'string'],
+        ]);
+
+        return $tools->getAiRequestAttachment($key, $validated['request_public_id'], $validated['attachment_public_id']);
     }
 
     private function toolDefinitions(): array
@@ -163,7 +182,7 @@ class AiMcpController extends Controller
                 'name' => 'list_projects',
                 'title' => '参加Project一覧',
                 'description' => '接続メンバーが現在のWorkspaceで参加しているProject一覧と件数を取得します。',
-                'inputSchema' => ['type' => 'object', 'properties' => new \stdClass(), 'additionalProperties' => false],
+                'inputSchema' => ['type' => 'object', 'properties' => new \stdClass, 'additionalProperties' => false],
                 'annotations' => ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true],
             ],
             [
@@ -214,15 +233,30 @@ class AiMcpController extends Controller
                 'name' => 'list_ai_requests',
                 'title' => '未処理のAI依頼一覧',
                 'description' => '現在のWorkspaceで、参加中Projectから届いた未処理のAI依頼を取得します。',
-                'inputSchema' => ['type'=>'object','properties'=>new \stdClass(),'additionalProperties'=>false],
-                'annotations' => ['readOnlyHint'=>true,'destructiveHint'=>false,'idempotentHint'=>true],
+                'inputSchema' => ['type' => 'object', 'properties' => new \stdClass, 'additionalProperties' => false],
+                'annotations' => ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true],
             ],
             [
                 'name' => 'claim_ai_request',
                 'title' => 'AI依頼を引き受ける',
                 'description' => '未処理依頼をこのCodex接続が処理中として安全に確保します。',
-                'inputSchema' => ['type'=>'object','properties'=>['request_public_id'=>['type'=>'string']],'required'=>['request_public_id'],'additionalProperties'=>false],
-                'annotations' => ['readOnlyHint'=>false,'destructiveHint'=>false,'idempotentHint'=>true],
+                'inputSchema' => ['type' => 'object', 'properties' => ['request_public_id' => ['type' => 'string']], 'required' => ['request_public_id'], 'additionalProperties' => false],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true],
+            ],
+            [
+                'name' => 'get_ai_request_attachment',
+                'title' => 'AI依頼の添付資料を取得',
+                'description' => '権限のあるAI依頼に添付された画像・PDF・Excel・CSV・Wordを1件取得します。画像とCSVは直接読める形式で返します。',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'request_public_id' => ['type' => 'string'],
+                        'attachment_public_id' => ['type' => 'string'],
+                    ],
+                    'required' => ['request_public_id', 'attachment_public_id'],
+                    'additionalProperties' => false,
+                ],
+                'annotations' => ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true],
             ],
         ];
     }
@@ -234,6 +268,7 @@ class AiMcpController extends Controller
             return true;
         }
         $appUrl = rtrim((string) config('app.url'), '/');
+
         return hash_equals($appUrl, rtrim($origin, '/'));
     }
 

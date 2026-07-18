@@ -169,7 +169,7 @@
                 </div>
                 <a class="button secondary" href="{{ route('projects.ai-proposals.index', $project) }}">AI提案一覧</a>
             </div>
-            <form method="POST" action="{{ route('projects.ai-requests.store', $project) }}" class="stack">
+            <form method="POST" action="{{ route('projects.ai-requests.store', $project) }}" enctype="multipart/form-data" class="stack">
                 @csrf
                 <div class="field">
                     <label for="ai_request_title">依頼名</label>
@@ -178,6 +178,11 @@
                 <div class="field">
                     <label for="ai_request_instructions">Codexへの依頼内容</label>
                     <textarea id="ai_request_instructions" name="instructions" rows="4" required placeholder="例：現状を読み取り、次のロードマップ・取り組み・タスクを提案してください。">{{ old('instructions') }}</textarea>
+                </div>
+                <div class="field">
+                    <label for="ai_request_attachments">参考資料（最大5ファイル・各10MB）</label>
+                    <input id="ai_request_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx">
+                    <div class="meta">画像、PDF、Excel、CSV、Wordに対応。資料は非公開領域へ保存されます。</div>
                 </div>
                 <div class="actions"><button type="submit">AIに提案を依頼</button></div>
             </form>
@@ -189,6 +194,13 @@
                             <div class="meta">{{ $aiRequest->created_at->format('Y-m-d H:i') }} / {{ $aiRequest->status }}</div>
                             <strong>{{ $aiRequest->title }}</strong>
                             <p>{{ Str::limit($aiRequest->instructions, 160) }}</p>
+                            @if ($aiRequest->attachments->isNotEmpty())
+                                <div class="actions">
+                                    @foreach ($aiRequest->attachments as $attachment)
+                                        <a href="{{ route('projects.ai-requests.attachments.download', [$project, $aiRequest, $attachment]) }}">📎 {{ $attachment->original_name }}</a>
+                                    @endforeach
+                                </div>
+                            @endif
                             @if ($aiRequest->proposal)
                                 <a href="{{ route('projects.ai-proposals.show', [$project, $aiRequest->proposal]) }}">届いた提案を確認</a>
                             @endif

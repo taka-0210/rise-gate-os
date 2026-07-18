@@ -4,11 +4,12 @@ namespace App\Services;
 
 use App\Models\AiAccessKey;
 use App\Models\AiProposal;
-use App\Models\AiProposalItem;
 use App\Models\AiRequest;
+use App\Models\AiRequestAttachment;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AiMcpToolService
@@ -76,11 +77,12 @@ class AiMcpToolService
     public function listAiRequests(AiAccessKey $key): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+
         return ['requests' => AiRequest::query()
             ->where('workspace_id', $key->workspace_id)
             ->where('status', AiRequest::STATUS_PENDING)
             ->whereHas('project.members', fn ($q) => $q->where('user_id', $key->user_id)->where('status', ProjectMember::STATUS_ACTIVE))
-            ->with(['project:id,public_id,name', 'requester:id,name'])
+            ->with(['project:id,public_id,name', 'requester:id,name', 'attachments'])
             ->oldest()->get()->map(fn (AiRequest $request) => [
                 'public_id' => $request->public_id,
                 'project_public_id' => $request->project->public_id,
@@ -89,12 +91,14 @@ class AiMcpToolService
                 'instructions' => $request->instructions,
                 'requested_by' => $request->requester?->name,
                 'created_at' => $request->created_at->toIso8601String(),
+                'attachments' => $request->attachments->map(fn (AiRequestAttachment $attachment) => $this->attachmentMetadata($attachment))->all(),
             ])->all()];
     }
 
     public function claimAiRequest(AiAccessKey $key, string $publicId): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+
         return DB::transaction(function () use ($key, $publicId): array {
             $request = AiRequest::query()->lockForUpdate()
                 ->where('workspace_id', $key->workspace_id)->where('public_id', $publicId)
@@ -105,8 +109,67 @@ class AiMcpToolService
             } elseif ($request->status !== AiRequest::STATUS_PROCESSING || $request->claimed_by_access_key_id !== $key->id) {
                 throw ValidationException::withMessages(['request' => 'このAI依頼はすでに処理されています。']);
             }
-            return ['request_public_id' => $request->public_id, 'status' => $request->status, 'project_public_id' => $request->project->public_id, 'instructions' => $request->instructions];
+            $request->load('attachments');
+
+            return [
+                'request_public_id' => $request->public_id,
+                'status' => $request->status,
+                'project_public_id' => $request->project->public_id,
+                'instructions' => $request->instructions,
+                'attachments' => $request->attachments->map(fn (AiRequestAttachment $attachment) => $this->attachmentMetadata($attachment))->all(),
+            ];
         });
+    }
+
+    public function getAiRequestAttachment(AiAccessKey $key, string $requestPublicId, string $attachmentPublicId): array
+    {
+        $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+        $request = AiRequest::query()
+            ->where('workspace_id', $key->workspace_id)
+            ->where('public_id', $requestPublicId)
+            ->whereHas('project.members', fn ($query) => $query
+                ->where('user_id', $key->user_id)
+                ->where('status', ProjectMember::STATUS_ACTIVE))
+            ->firstOrFail();
+        if ($request->status !== AiRequest::STATUS_PROCESSING || $request->claimed_by_access_key_id !== $key->id) {
+            throw ValidationException::withMessages(['request' => '先にこのAI依頼を引き受けてください。']);
+        }
+        $attachment = $request->attachments()->where('public_id', $attachmentPublicId)->firstOrFail();
+        if (! Storage::disk('local')->exists($attachment->stored_path)) {
+            throw ValidationException::withMessages(['attachment' => '添付ファイルの実体が見つかりません。']);
+        }
+        $bytes = Storage::disk('local')->get($attachment->stored_path);
+        $metadata = $this->attachmentMetadata($attachment);
+        if (str_starts_with($attachment->mime_type, 'image/')) {
+            $content = [['type' => 'image', 'data' => base64_encode($bytes), 'mimeType' => $attachment->mime_type]];
+        } elseif ($attachment->extension === 'csv') {
+            $encoding = mb_detect_encoding($bytes, ['UTF-8', 'SJIS-win', 'CP932', 'EUC-JP'], true);
+            $text = $encoding && $encoding !== 'UTF-8' ? mb_convert_encoding($bytes, 'UTF-8', $encoding) : $bytes;
+            $content = [['type' => 'text', 'text' => "添付ファイル: {$attachment->original_name}\n\n".$text]];
+        } else {
+            $content = [[
+                'type' => 'resource',
+                'resource' => [
+                    'uri' => "rise-gate-os://ai-requests/{$request->public_id}/attachments/{$attachment->public_id}",
+                    'mimeType' => $attachment->mime_type,
+                    'blob' => base64_encode($bytes),
+                ],
+            ]];
+        }
+
+        return ['attachment' => $metadata, '_mcp_content' => $content];
+    }
+
+    private function attachmentMetadata(AiRequestAttachment $attachment): array
+    {
+        return [
+            'public_id' => $attachment->public_id,
+            'name' => $attachment->original_name,
+            'mime_type' => $attachment->mime_type,
+            'extension' => $attachment->extension,
+            'size_bytes' => $attachment->size_bytes,
+            'sha256' => $attachment->sha256,
+        ];
     }
 
     public function submitProposal(AiAccessKey $key, array $arguments): array
@@ -162,6 +225,7 @@ class AiMcpToolService
                 }
                 $aiRequest->update(['status' => AiRequest::STATUS_PROPOSED, 'claimed_by_access_key_id' => $key->id, 'claimed_at' => $aiRequest->claimed_at ?? now(), 'ai_proposal_id' => $proposal->id]);
             }
+
             return $proposal;
         });
 

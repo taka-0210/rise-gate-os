@@ -63,6 +63,7 @@ rsync -a --delete \
 
 mkdir -p \
     "$app_root/storage/app/public" \
+    "$app_root/storage/app/private" \
     "$app_root/storage/framework/cache/data" \
     "$app_root/storage/framework/sessions" \
     "$app_root/storage/framework/views" \

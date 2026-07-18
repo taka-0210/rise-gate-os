@@ -4,17 +4,53 @@ namespace Tests\Feature;
 
 use App\Models\AiProposal;
 use App\Models\AiProposalItem;
+use App\Models\AiRequest;
+use App\Models\Improvement;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Roadmap;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AiProposalFoundationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_project_member_can_send_private_attachment_with_ai_request_and_download_it(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectOwner('attachments');
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-requests.store', $project), [
+                'title' => '資料を読んで提案して',
+                'instructions' => '現在の管理表をもとに計画してください。',
+                'attachments' => [UploadedFile::fake()->image('current-board.jpg')],
+            ])->assertRedirect();
+
+        $aiRequest = AiRequest::with('attachments')->firstOrFail();
+        $attachment = $aiRequest->attachments->firstOrFail();
+        Storage::disk('local')->assertExists($attachment->stored_path);
+        $this->assertDatabaseHas('ai_request_attachments', [
+            'ai_request_id' => $aiRequest->id,
+            'original_name' => 'current-board.jpg',
+            'workspace_id' => $workspace->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.ai-requests.attachments.download', [$project, $aiRequest, $attachment]))
+            ->assertOk()
+            ->assertHeader('content-disposition');
+    }
 
     public function test_project_member_can_view_pending_ai_proposal_without_changing_project_data(): void
     {
@@ -57,7 +93,7 @@ class AiProposalFoundationTest extends TestCase
         [$user, , $project] = $this->projectOwner('internal');
         $this->proposal($project, $user);
 
-        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        $this->expectException(UniqueConstraintViolationException::class);
         $this->proposal($project, $user);
     }
 
@@ -84,9 +120,9 @@ class AiProposalFoundationTest extends TestCase
             ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
             ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
 
-        $roadmap = \App\Models\Roadmap::where('title', 'AI Roadmap')->firstOrFail();
-        $improvement = \App\Models\Improvement::where('title', 'AI Improvement')->firstOrFail();
-        $task = \App\Models\Task::where('title', 'AI Task')->firstOrFail();
+        $roadmap = Roadmap::where('title', 'AI Roadmap')->firstOrFail();
+        $improvement = Improvement::where('title', 'AI Improvement')->firstOrFail();
+        $task = Task::where('title', 'AI Task')->firstOrFail();
         $this->assertSame($roadmap->id, $improvement->roadmap_id);
         $this->assertSame($improvement->id, $task->improvement_id);
         $this->assertSame(AiProposal::STATUS_APPLIED, $proposal->fresh()->status);

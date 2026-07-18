@@ -3,17 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\AiAccessKey;
+use App\Models\AiProposalItem;
 use App\Models\AiRequest;
+use App\Models\AiRequestAttachment;
+use App\Models\Improvement;
 use App\Models\Organization;
 use App\Models\Project;
-use App\Models\User;
-use App\Models\Workspace;
 use App\Models\ProjectMember;
 use App\Models\Roadmap;
-use App\Models\Improvement;
 use App\Models\Task;
+use App\Models\User;
+use App\Models\Workspace;
 use App\Models\WorkspaceAiSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AiProposalApiTest extends TestCase
@@ -90,7 +93,7 @@ class AiProposalApiTest extends TestCase
             ->assertJsonPath('invalid_items_count', 1);
 
         $this->assertDatabaseHas('ai_proposal_items', ['validation_status' => 'invalid']);
-        $message = \App\Models\AiProposalItem::firstOrFail()->validation_message;
+        $message = AiProposalItem::firstOrFail()->validation_message;
         $this->assertStringContainsString('password', $message);
         $this->assertStringContainsString('priority', $message);
         $this->assertDatabaseCount('tasks', 0);
@@ -155,6 +158,7 @@ class AiProposalApiTest extends TestCase
 
     public function test_codex_mcp_exposes_read_and_pending_proposal_tools(): void
     {
+        Storage::fake('local');
         [$workspace, $project, $user] = $this->workspaceProject('mcp');
         ProjectMember::create([
             'project_id' => $project->id,
@@ -172,12 +176,12 @@ class AiProposalApiTest extends TestCase
         ])->assertOk()->assertJsonPath('result.serverInfo.name', 'rise-gate-os');
 
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
-            'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list', 'params' => new \stdClass(),
-        ])->assertOk()->assertJsonCount(5, 'result.tools');
+            'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list', 'params' => new \stdClass,
+        ])->assertOk()->assertJsonCount(6, 'result.tools');
 
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
             'jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call',
-            'params' => ['name' => 'list_projects', 'arguments' => new \stdClass()],
+            'params' => ['name' => 'list_projects', 'arguments' => new \stdClass],
         ])->assertOk()
             ->assertJsonPath('result.isError', false)
             ->assertJsonPath('result.structuredContent.projects.0.name', $project->name);
@@ -188,12 +192,36 @@ class AiProposalApiTest extends TestCase
             'title' => '計画を提案して', 'instructions' => '次のロードマップを考えてください。',
             'status' => AiRequest::STATUS_PENDING,
         ]);
+        Storage::disk('local')->put('ai-requests/test/board.jpg', 'image-bytes');
+        $attachment = AiRequestAttachment::create([
+            'ai_request_id' => $aiRequest->id, 'workspace_id' => $workspace->id,
+            'project_id' => $project->id, 'uploaded_by' => $user->id,
+            'original_name' => '現状ボード.jpg', 'stored_path' => 'ai-requests/test/board.jpg',
+            'mime_type' => 'image/jpeg', 'extension' => 'jpg', 'size_bytes' => 11,
+            'sha256' => hash('sha256', 'image-bytes'),
+        ]);
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
-            'jsonrpc'=>'2.0','id'=>31,'method'=>'tools/call','params'=>['name'=>'list_ai_requests','arguments'=>new \stdClass()],
-        ])->assertOk()->assertJsonPath('result.structuredContent.requests.0.public_id', $aiRequest->public_id);
+            'jsonrpc' => '2.0', 'id' => 31, 'method' => 'tools/call', 'params' => ['name' => 'list_ai_requests', 'arguments' => new \stdClass],
+        ])->assertOk()
+            ->assertJsonPath('result.structuredContent.requests.0.public_id', $aiRequest->public_id)
+            ->assertJsonPath('result.structuredContent.requests.0.attachments.0.public_id', $attachment->public_id);
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
-            'jsonrpc'=>'2.0','id'=>32,'method'=>'tools/call','params'=>['name'=>'claim_ai_request','arguments'=>['request_public_id'=>$aiRequest->public_id]],
+            'jsonrpc' => '2.0', 'id' => 32, 'method' => 'tools/call', 'params' => ['name' => 'claim_ai_request', 'arguments' => ['request_public_id' => $aiRequest->public_id]],
         ])->assertOk()->assertJsonPath('result.structuredContent.status', AiRequest::STATUS_PROCESSING);
+        $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
+            'jsonrpc' => '2.0', 'id' => 33, 'method' => 'tools/call', 'params' => ['name' => 'get_ai_request_attachment', 'arguments' => [
+                'request_public_id' => $aiRequest->public_id, 'attachment_public_id' => $attachment->public_id,
+            ]],
+        ])->assertOk()
+            ->assertJsonPath('result.content.0.type', 'image')
+            ->assertJsonPath('result.content.0.data', base64_encode('image-bytes'))
+            ->assertJsonPath('result.structuredContent.attachment.name', '現状ボード.jpg');
+        $otherToken = $this->accessKey($workspace, [AiAccessKey::SCOPE_PROJECTS_READ], null, $user);
+        $this->withToken($otherToken)->postJson('/api/mcp/rise-gate-os', [
+            'jsonrpc' => '2.0', 'id' => 34, 'method' => 'tools/call', 'params' => ['name' => 'get_ai_request_attachment', 'arguments' => [
+                'request_public_id' => $aiRequest->public_id, 'attachment_public_id' => $attachment->public_id,
+            ]],
+        ])->assertOk()->assertJsonPath('result.isError', true);
 
         $arguments = $this->payload($project) + ['ai_request_public_id' => $aiRequest->public_id];
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
@@ -204,7 +232,7 @@ class AiProposalApiTest extends TestCase
             ->assertJsonPath('result.structuredContent.status', 'pending');
 
         $this->assertDatabaseHas('ai_proposals', ['requested_by' => $user->id, 'project_id' => $project->id]);
-        $this->assertDatabaseHas('ai_requests', ['id'=>$aiRequest->id,'status'=>AiRequest::STATUS_PROPOSED]);
+        $this->assertDatabaseHas('ai_requests', ['id' => $aiRequest->id, 'status' => AiRequest::STATUS_PROPOSED]);
         $this->assertDatabaseHas('ai_audit_logs', [
             'workspace_id' => $workspace->id,
             'user_id' => $user->id,
@@ -261,6 +289,7 @@ class AiProposalApiTest extends TestCase
             'scopes' => $scopes,
             'expires_at' => $expiresAt ?: now()->addHour(),
         ]);
+
         return $token;
     }
 
@@ -281,6 +310,7 @@ class AiProposalApiTest extends TestCase
             'owner_user_id' => $user->id,
             'name' => 'Project '.$slug,
         ]);
+
         return [$workspace, $project, $user];
     }
 }

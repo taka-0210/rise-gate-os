@@ -1,24 +1,24 @@
 <?php
 
+use App\Http\Controllers\AiConnectionController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Client\ClientController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Project\AiProposalController;
+use App\Http\Controllers\Project\AiRequestController;
 use App\Http\Controllers\Project\ImprovementController;
 use App\Http\Controllers\Project\ImprovementOutputController;
-use App\Http\Controllers\Project\TaskController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\RoadmapController;
-use App\Http\Controllers\Project\AiProposalController;
-use App\Http\Controllers\Project\AiRequestController;
-use App\Http\Controllers\Workspace\WorkspaceController;
-use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
+use App\Http\Controllers\Project\TaskController;
 use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdminSessionController;
+use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
 use App\Http\Controllers\SystemAdmin\WorkspaceController as SystemAdminWorkspaceController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AiConnectionController;
+use App\Http\Controllers\Workspace\WorkspaceController;
 use App\Http\Controllers\WorkspaceAiSettingController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
@@ -75,6 +75,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/apply', [AiProposalController::class, 'apply'])->name('projects.ai-proposals.apply');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/reject', [AiProposalController::class, 'reject'])->name('projects.ai-proposals.reject');
         Route::post('/projects/{project}/ai-requests', [AiRequestController::class, 'store'])->name('projects.ai-requests.store');
+        Route::get('/projects/{project}/ai-requests/{aiRequest}/attachments/{attachment}', [AiRequestController::class, 'download'])->name('projects.ai-requests.attachments.download');
         Route::get('/projects/{project}/manage', [ProjectController::class, 'legacy'])->name('projects.legacy');
         Route::post('/projects/{project}/move', [ProjectController::class, 'move'])->name('projects.move');
         Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');

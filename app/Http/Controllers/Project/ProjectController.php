@@ -14,8 +14,8 @@ use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -151,7 +151,7 @@ class ProjectController extends Controller
         $currentMember = $project->members()->where('user_id', $request->user()->id)->where('status', ProjectMember::STATUS_ACTIVE)->first();
 
         $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'sourceImprovementOutput.improvement.project', 'members.user', 'members.workspace']);
-        $aiRequests = $project->aiRequests()->with(['requester', 'proposal'])->limit(10)->get();
+        $aiRequests = $project->aiRequests()->with(['requester', 'proposal', 'attachments'])->limit(10)->get();
 
         $allImprovements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
