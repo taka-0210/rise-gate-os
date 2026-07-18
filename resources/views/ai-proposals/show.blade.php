@@ -13,6 +13,18 @@
         .proposal-tasks { display:grid; gap:8px; margin:0; padding:0; list-style:none; counter-reset:proposal-task; }
         .proposal-task { counter-increment:proposal-task; padding:11px 13px; border:2px solid #cc735e; border-radius:8px; background:#fff9f7; }
         .proposal-task::before { content:counter(proposal-task) '．'; margin-right:5px; color:#b5523d; font-weight:900; }
+        .proposal-node-title { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+        .proposal-operation-badge { display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:900; line-height:1; }
+        .proposal-operation-badge.is-context { background:#e3e7ea; color:#59636b; }
+        .proposal-operation-badge.is-create { background:#fff; color:inherit; border:1px solid currentColor; }
+        .proposal-operation-badge.is-update { background:#fff3cf; color:#795c00; }
+        .proposal-operation-badge.is-delete { background:#f9dddd; color:#9f3e3e; }
+        .proposal-roadmap.is-context,.proposal-roadmap.is-update { border-color:#aeb7bd; background:#f3f5f6; }
+        .proposal-roadmap.is-context > h3,.proposal-roadmap.is-update > h3 { color:#59636b; }
+        .proposal-improvement.is-context,.proposal-improvement.is-update { border-color:#b5bdc2; background:#f7f8f8; }
+        .proposal-improvement.is-context > h4,.proposal-improvement.is-update > h4 { color:#59636b; }
+        .proposal-task.is-context,.proposal-task.is-update { border-color:#c1c7cb; background:#f7f8f8; color:#59636b; }
+        .proposal-roadmap.is-delete,.proposal-improvement.is-delete,.proposal-task.is-delete { border-style:dashed; border-color:#bd7777; background:#faf0f0; opacity:.82; }
         .proposal-impact-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
         .proposal-impact-card { padding:16px; border:1px solid var(--line); border-radius:9px; background:#fff; }
         .proposal-impact-values { display:flex; align-items:baseline; gap:10px; margin-top:8px; }
@@ -38,16 +50,25 @@
             </div>
             <div class="proposal-outline">
             @forelse ($proposalOutline as $roadmapIndex => $roadmap)
-                <section class="proposal-roadmap">
-                    <h3>ロードマップ {{ $roadmapIndex + 1 }}．{{ $roadmap['title'] }}</h3>
+                <section class="proposal-roadmap is-{{ $roadmap['operation'] }}">
+                    <h3 class="proposal-node-title">
+                        <span>ロードマップ {{ $roadmapIndex + 1 }}．{{ $roadmap['title'] }}</span>
+                        <span class="proposal-operation-badge is-{{ $roadmap['operation'] }}">{{ match ($roadmap['operation']) { 'create' => '新設', 'update' => '既存・更新あり', 'delete' => '削除予定', default => '既存' } }}</span>
+                    </h3>
                     <div class="proposal-improvements">
                     @forelse ($roadmap['improvements'] as $improvementIndex => $improvement)
-                        <div class="proposal-improvement">
-                            <h4>取り組み {{ $improvementIndex + 1 }}．{{ $improvement['title'] }}</h4>
+                        <div class="proposal-improvement is-{{ $improvement['operation'] }}">
+                            <h4 class="proposal-node-title">
+                                <span>取り組み {{ $improvementIndex + 1 }}．{{ $improvement['title'] }}</span>
+                                <span class="proposal-operation-badge is-{{ $improvement['operation'] }}">{{ match ($improvement['operation']) { 'create' => '新設', 'update' => '既存・更新あり', 'delete' => '削除予定', default => '既存' } }}</span>
+                            </h4>
                             @if ($improvement['tasks'])
                                 <ol class="proposal-tasks">
                                     @foreach ($improvement['tasks'] as $task)
-                                        <li class="proposal-task">{{ $task['title'] }}</li>
+                                        <li class="proposal-task is-{{ $task['operation'] }}">
+                                            {{ $task['title'] }}
+                                            <span class="proposal-operation-badge is-{{ $task['operation'] }}">{{ match ($task['operation']) { 'create' => '新設', 'update' => '既存・更新あり', 'delete' => '削除予定', default => '既存' } }}</span>
+                                        </li>
                                     @endforeach
                                 </ol>
                             @else

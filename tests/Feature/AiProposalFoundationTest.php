@@ -115,6 +115,9 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee('proposal-roadmap', false)
             ->assertSee('proposal-improvement', false)
             ->assertSee('proposal-task', false)
+            ->assertSee('既存')
+            ->assertSee('既存・更新あり')
+            ->assertSee('新設')
             ->assertSeeInOrder(['プロジェクト全体への影響', 'ロードマップ', '1', '→', '1', '取り組み', '1', '→', '1', 'タスク', '0', '→', '2'])
             ->assertSee('技術的な変更内容');
     }
