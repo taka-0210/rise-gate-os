@@ -45,6 +45,7 @@
         <div class="grid">
             <div class="card"><div class="meta">追加</div><h2>{{ $itemCounts['create'] }}</h2></div>
             <div class="card"><div class="meta">更新</div><h2>{{ $itemCounts['update'] }}</h2></div>
+            <div class="card"><div class="meta">削除</div><h2>{{ $itemCounts['delete'] }}</h2></div>
             <div class="card"><div class="meta">検証OK</div><h2>{{ $itemCounts['valid'] }}</h2></div>
             <div class="card"><div class="meta">エラー</div><h2>{{ $itemCounts['invalid'] }}</h2></div>
         </div>
@@ -57,7 +58,7 @@
             @forelse ($proposal->items as $item)
                 <article style="border-top:1px solid var(--line); padding-top:16px;">
                     <div class="meta">
-                        {{ $item->operation === 'create' ? '追加' : '更新' }} /
+                        {{ match ($item->operation) { 'create' => '追加', 'update' => '更新', 'delete' => '削除' } }} /
                         {{ $item->entity_type }} /
                         {{ $item->validation_status === 'valid' ? '検証OK' : ($item->validation_status === 'invalid' ? 'エラー' : '未検証') }}
                     </div>

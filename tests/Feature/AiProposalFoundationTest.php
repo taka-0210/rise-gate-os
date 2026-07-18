@@ -155,6 +155,93 @@ class AiProposalFoundationTest extends TestCase
         $this->assertSame(AiProposal::STATUS_PENDING, $proposal->fresh()->status);
     }
 
+    public function test_project_admin_can_apply_hierarchical_delete_proposal_safely(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('delete');
+        $roadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Default Roadmap',
+            'created_by' => $user->id,
+        ]);
+        $improvement = Improvement::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'roadmap_id' => $roadmap->id,
+            'title' => 'Default Improvement',
+            'proposed_by' => $user->id,
+            'assigned_to' => $user->id,
+        ]);
+        $proposal = AiProposal::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'source' => 'codex',
+            'idempotency_key' => 'delete-001',
+            'title' => 'Delete defaults',
+            'status' => AiProposal::STATUS_PENDING,
+        ]);
+        $proposal->items()->createMany([
+            ['operation' => 'delete', 'entity_type' => 'roadmap', 'target_public_id' => $roadmap->public_id, 'attributes' => [], 'sort_order' => 10],
+            ['operation' => 'delete', 'entity_type' => 'improvement', 'target_public_id' => $improvement->public_id, 'attributes' => [], 'sort_order' => 20],
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
+
+        $this->assertSoftDeleted($improvement);
+        $this->assertSoftDeleted($roadmap);
+        $this->assertSame(AiProposal::STATUS_APPLIED, $proposal->fresh()->status);
+    }
+
+    public function test_delete_proposal_is_invalid_when_children_would_remain(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('unsafe-delete');
+        $roadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Roadmap With Child',
+            'created_by' => $user->id,
+        ]);
+        Improvement::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'roadmap_id' => $roadmap->id,
+            'title' => 'Child Improvement',
+            'proposed_by' => $user->id,
+            'assigned_to' => $user->id,
+        ]);
+        $proposal = AiProposal::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'source' => 'codex',
+            'idempotency_key' => 'delete-unsafe-001',
+            'title' => 'Unsafe delete',
+            'status' => AiProposal::STATUS_PENDING,
+        ]);
+        $proposal->items()->create([
+            'operation' => 'delete',
+            'entity_type' => 'roadmap',
+            'target_public_id' => $roadmap->public_id,
+            'attributes' => [],
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->assertSessionHasErrors('proposal');
+
+        $this->assertNotSoftDeleted($roadmap);
+        $this->assertStringContainsString('取り組みが残っている', $proposal->items()->firstOrFail()->fresh()->validation_message);
+    }
+
     private function proposal(Project $project, User $user): AiProposal
     {
         $proposal = AiProposal::create([

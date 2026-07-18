@@ -36,10 +36,18 @@ class AiProposalApplier
             }
 
             $references = [];
-            foreach ($locked->items()->orderBy('sort_order')->orderBy('id')->get() as $item) {
-                $model = $item->operation === AiProposalItem::OPERATION_CREATE
-                    ? $this->create($locked, $item, $reviewer, $references)
-                    : $this->update($locked, $item);
+            $items = $locked->items()->orderBy('sort_order')->orderBy('id')->get()
+                ->sortBy(fn (AiProposalItem $item) => $item->operation === AiProposalItem::OPERATION_DELETE
+                    ? 100 + match ($item->entity_type) { 'task' => 1, 'improvement' => 2, 'roadmap' => 3 }
+                    : 0)
+                ->values();
+
+            foreach ($items as $item) {
+                $model = match ($item->operation) {
+                    AiProposalItem::OPERATION_CREATE => $this->create($locked, $item, $reviewer, $references),
+                    AiProposalItem::OPERATION_UPDATE => $this->update($locked, $item),
+                    AiProposalItem::OPERATION_DELETE => $this->delete($locked, $item),
+                };
 
                 if ($item->reference_key) {
                     $references[$item->reference_key] = $model;
@@ -113,6 +121,19 @@ class AiProposalApplier
         if ($model instanceof Task && array_key_exists('status', $attributes)) {
             $model->update(['completed_at' => $attributes['status'] === Task::STATUS_DONE ? ($model->completed_at ?? now()) : null]);
         }
+
+        return $model;
+    }
+
+    private function delete(AiProposal $proposal, AiProposalItem $item): Model
+    {
+        $model = match ($item->entity_type) {
+            'roadmap' => $proposal->project->roadmaps()->where('public_id', $item->target_public_id)->firstOrFail(),
+            'improvement' => $proposal->project->improvements()->where('public_id', $item->target_public_id)->firstOrFail(),
+            'task' => $proposal->project->tasks()->where('public_id', $item->target_public_id)->firstOrFail(),
+        };
+
+        $model->delete();
 
         return $model;
     }

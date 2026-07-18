@@ -48,8 +48,21 @@ class AiProposalValidator
             $errors[] = '許可されていない項目: '.implode(', ', $unknown);
         }
 
-        if ($item->operation === AiProposalItem::OPERATION_UPDATE && ! $this->targetExists($project, $item)) {
+        if (in_array($item->operation, [AiProposalItem::OPERATION_UPDATE, AiProposalItem::OPERATION_DELETE], true) && ! $this->targetExists($project, $item)) {
             $errors[] = '更新対象がこのProject内に存在しません。';
+        }
+
+        if ($item->operation === AiProposalItem::OPERATION_DELETE) {
+            if ($attributes !== []) {
+                $errors[] = '削除提案に変更属性は指定できません。';
+            }
+
+            $childError = $this->deleteChildError($project, $item);
+            if ($childError) {
+                $errors[] = $childError;
+            }
+
+            return array_values(array_unique($errors));
         }
 
         $validator = Validator::make($attributes, $this->rules($item));
@@ -104,6 +117,34 @@ class AiProposalValidator
             ],
             default => [],
         };
+    }
+
+    private function deleteChildError(Project $project, AiProposalItem $item): ?string
+    {
+        $deletedTargets = $item->proposal->items()
+            ->where('operation', AiProposalItem::OPERATION_DELETE)
+            ->pluck('target_public_id')
+            ->filter();
+
+        if ($item->entity_type === 'roadmap') {
+            $remaining = $project->improvements()
+                ->whereHas('roadmap', fn ($query) => $query->where('public_id', $item->target_public_id))
+                ->whereNotIn('public_id', $deletedTargets)
+                ->exists();
+
+            return $remaining ? '取り組みが残っているRoadmapは削除できません。子要素も同じ提案で削除してください。' : null;
+        }
+
+        if ($item->entity_type === 'improvement') {
+            $remaining = $project->tasks()
+                ->whereHas('improvement', fn ($query) => $query->where('public_id', $item->target_public_id))
+                ->whereNotIn('public_id', $deletedTargets)
+                ->exists();
+
+            return $remaining ? 'Taskが残っている取り組みは削除できません。子要素も同じ提案で削除してください。' : null;
+        }
+
+        return null;
     }
 
     private function targetExists(Project $project, AiProposalItem $item): bool

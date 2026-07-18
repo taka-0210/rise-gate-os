@@ -41,6 +41,7 @@ class AiProposalController extends Controller
         $itemCounts = [
             'create' => $aiProposal->items->where('operation', 'create')->count(),
             'update' => $aiProposal->items->where('operation', 'update')->count(),
+            'delete' => $aiProposal->items->where('operation', 'delete')->count(),
             'valid' => $aiProposal->items->where('validation_status', 'valid')->count(),
             'invalid' => $aiProposal->items->where('validation_status', 'invalid')->count(),
         ];

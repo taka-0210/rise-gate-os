@@ -154,12 +154,12 @@ class AiMcpController extends Controller
             'evidence' => ['nullable', 'array'],
             'ai_request_public_id' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
-            'items.*.operation' => ['required', Rule::in(['create', 'update'])],
+            'items.*.operation' => ['required', Rule::in(['create', 'update', 'delete'])],
             'items.*.entity_type' => ['required', Rule::in(['roadmap', 'improvement', 'task'])],
             'items.*.target_public_id' => ['nullable', 'string'],
             'items.*.reference_key' => ['nullable', 'string', 'max:120'],
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
-            'items.*.attributes' => ['required', 'array', 'min:1'],
+            'items.*.attributes' => ['required', 'array'],
         ]);
 
         return $tools->submitProposal($key, $validated);
@@ -213,7 +213,7 @@ class AiMcpController extends Controller
                         'items' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 100, 'items' => [
                             'type' => 'object',
                             'properties' => [
-                                'operation' => ['type' => 'string', 'enum' => ['create', 'update']],
+                                'operation' => ['type' => 'string', 'enum' => ['create', 'update', 'delete']],
                                 'entity_type' => ['type' => 'string', 'enum' => ['roadmap', 'improvement', 'task']],
                                 'target_public_id' => ['type' => ['string', 'null']],
                                 'reference_key' => ['type' => ['string', 'null']],
@@ -227,7 +227,7 @@ class AiMcpController extends Controller
                     'required' => ['project_public_id', 'idempotency_key', 'title', 'items'],
                     'additionalProperties' => false,
                 ],
-                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true],
             ],
             [
                 'name' => 'list_ai_requests',

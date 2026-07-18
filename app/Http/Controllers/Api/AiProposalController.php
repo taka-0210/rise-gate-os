@@ -26,12 +26,12 @@ class AiProposalController extends Controller
             'summary' => ['nullable', 'string'],
             'evidence' => ['nullable', 'array'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
-            'items.*.operation' => ['required', Rule::in([AiProposalItem::OPERATION_CREATE, AiProposalItem::OPERATION_UPDATE])],
+            'items.*.operation' => ['required', Rule::in([AiProposalItem::OPERATION_CREATE, AiProposalItem::OPERATION_UPDATE, AiProposalItem::OPERATION_DELETE])],
             'items.*.entity_type' => ['required', Rule::in(['roadmap', 'improvement', 'task'])],
             'items.*.target_public_id' => ['nullable', 'string', 'required_if:items.*.operation,update'],
             'items.*.reference_key' => ['nullable', 'string', 'max:120'],
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
-            'items.*.attributes' => ['required', 'array', 'min:1'],
+            'items.*.attributes' => ['required', 'array'],
         ]);
 
         $project = Project::query()
