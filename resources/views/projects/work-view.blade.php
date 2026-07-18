@@ -52,8 +52,20 @@
         .focus-history-item { padding-top:10px; border-top:1px solid var(--line); }
         .focus-history-item:first-child { padding-top:0; border-top:0; }
         .focus-view-switch { display:flex; align-items:center; gap:5px; margin-left:auto; }
-        .focus-view-switch a { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--accent-dark); font-size:12px; text-decoration:none; white-space:nowrap; }
+        .focus-view-switch a,.focus-view-switch button { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:inherit; text-decoration:none; white-space:nowrap; }
         .focus-view-switch a.is-current { background:var(--accent-dark); color:#fff; }
+        .focus-ai-trigger { display:inline-flex; align-items:center; gap:6px; }
+        .focus-ai-count { display:inline-flex; min-width:19px; height:19px; padding:0 5px; align-items:center; justify-content:center; border-radius:999px; background:#c65a46; color:#fff; font-size:11px; font-weight:900; }
+        .ai-drawer-overlay { position:fixed; z-index:60; inset:0; border:0; background:rgba(20,30,38,.38); opacity:0; visibility:hidden; transition:opacity .2s ease,visibility .2s ease; }
+        .ai-drawer { position:fixed; z-index:61; top:0; right:0; width:min(620px,92vw); height:100vh; padding:24px; overflow-y:auto; border-left:1px solid var(--line); background:#f8fafb; box-shadow:-14px 0 38px rgba(20,40,55,.18); transform:translateX(102%); visibility:hidden; transition:transform .24s ease,visibility .24s ease; }
+        .ai-drawer.is-open { transform:translateX(0); visibility:visible; }
+        .ai-drawer-overlay.is-open { opacity:1; visibility:visible; }
+        .ai-drawer-head { position:sticky; z-index:2; top:-24px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin:-24px -24px 20px; padding:20px 24px; border-bottom:1px solid var(--line); background:rgba(248,250,251,.96); }
+        .ai-drawer-head h2 { margin:0; }
+        .ai-drawer-close { flex:0 0 auto; width:40px; height:40px; padding:0; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--ink); font-size:24px; line-height:1; }
+        .ai-drawer-section { padding:18px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+        .ai-drawer-request-list { display:grid; gap:10px; }
+        .ai-drawer-request { padding:13px; border:1px solid var(--line); border-radius:8px; background:#fbfcfd; }
         .time-layer { display:none; padding:22px; border:2px solid #4a5660; border-radius:12px; background:#fff; }
         .focus-page.time-view .time-layer { display:block; }
         .focus-page.time-view > .focus-project,.focus-page.time-view > .focus-footer { display:none; }
@@ -99,6 +111,8 @@
             .focus-toolbar-context { gap:8px; flex-wrap:wrap; }
             .focus-toolbar-inner { flex-wrap:wrap; }
             .focus-view-switch { order:3; width:100%; margin-left:0; }
+            .ai-drawer { width:100vw; padding:18px; }
+            .ai-drawer-head { top:-18px; margin:-18px -18px 18px; padding:16px 18px; }
             .focus-project { padding:14px; }
             .time-layer { padding:14px; }
             .time-layer-head { display:block; }
@@ -160,55 +174,6 @@
     @endphp
 
     <section class="stack focus-page {{ $isTimeView ? 'time-view' : '' }}" id="focus-page">
-        <section class="panel stack" id="ai-request-panel">
-            <div class="actions" style="justify-content:space-between;align-items:flex-start;">
-                <div>
-                    <div class="meta">AI REQUEST・このProjectを相談する</div>
-                    <h2>AIに提案を依頼</h2>
-                    <p>対象WorkspaceとProjectは自動で確定します。Codexからの回答は承認待ち提案として届きます。</p>
-                </div>
-                <a class="button secondary" href="{{ route('projects.ai-proposals.index', $project) }}">AI提案一覧</a>
-            </div>
-            <form method="POST" action="{{ route('projects.ai-requests.store', $project) }}" enctype="multipart/form-data" class="stack">
-                @csrf
-                <div class="field">
-                    <label for="ai_request_title">依頼名</label>
-                    <input id="ai_request_title" name="title" value="{{ old('title', 'このProjectの計画を提案して') }}" required>
-                </div>
-                <div class="field">
-                    <label for="ai_request_instructions">Codexへの依頼内容</label>
-                    <textarea id="ai_request_instructions" name="instructions" rows="4" required placeholder="例：現状を読み取り、次のロードマップ・取り組み・タスクを提案してください。">{{ old('instructions') }}</textarea>
-                </div>
-                <div class="field">
-                    <label for="ai_request_attachments">参考資料（最大5ファイル・各10MB）</label>
-                    <input id="ai_request_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx">
-                    <div class="meta">画像、PDF、Excel、CSV、Wordに対応。資料は非公開領域へ保存されます。</div>
-                </div>
-                <div class="actions"><button type="submit">AIに提案を依頼</button></div>
-            </form>
-            @if ($aiRequests->isNotEmpty())
-                <div class="stack">
-                    <h3>最近のAI依頼</h3>
-                    @foreach ($aiRequests as $aiRequest)
-                        <div class="card">
-                            <div class="meta">{{ $aiRequest->created_at->format('Y-m-d H:i') }} / {{ $aiRequest->status }}</div>
-                            <strong>{{ $aiRequest->title }}</strong>
-                            <p>{{ Str::limit($aiRequest->instructions, 160) }}</p>
-                            @if ($aiRequest->attachments->isNotEmpty())
-                                <div class="actions">
-                                    @foreach ($aiRequest->attachments as $attachment)
-                                        <a href="{{ route('projects.ai-requests.attachments.download', [$project, $aiRequest, $attachment]) }}">📎 {{ $attachment->original_name }}</a>
-                                    @endforeach
-                                </div>
-                            @endif
-                            @if ($aiRequest->proposal)
-                                <a href="{{ route('projects.ai-proposals.show', [$project, $aiRequest->proposal]) }}">届いた提案を確認</a>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </section>
         <div class="focus-toolbar">
             <div class="focus-toolbar-inner">
                 <div class="focus-toolbar-context">
@@ -222,13 +187,78 @@
                     </div>
                 </div>
                 <div class="focus-view-switch">
-                    <a href="{{ route('projects.ai-proposals.index', $project) }}">AI提案</a>
+                    <button type="button" class="focus-ai-trigger" data-ai-drawer-open aria-controls="ai-assistant-drawer" aria-expanded="false">
+                        AIアシスタント
+                        @if ($pendingAiProposalCount > 0)<span class="focus-ai-count" aria-label="承認待ち {{ $pendingAiProposalCount }}件">{{ $pendingAiProposalCount }}</span>@endif
+                    </button>
                     <a class="{{ $isTimeView ? '' : 'is-current' }}" href="{{ route('projects.show', $project) }}">フォーカス表示</a>
                     <a class="{{ $isTimeView ? 'is-current' : '' }}" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">時間表示</a>
                 </div>
                 <a class="button secondary focus-manage-link" href="{{ route('projects.legacy', $project) }}">管理詳細を見る</a>
             </div>
         </div>
+
+        <button type="button" class="ai-drawer-overlay {{ $errors->any() ? 'is-open' : '' }}" data-ai-drawer-close aria-label="AIアシスタントを閉じる"></button>
+        <aside id="ai-assistant-drawer" class="ai-drawer {{ $errors->any() ? 'is-open' : '' }}" aria-label="AIアシスタント" aria-hidden="{{ $errors->any() ? 'false' : 'true' }}">
+            <div class="ai-drawer-head">
+                <div>
+                    <div class="meta">このProjectをAIと相談する</div>
+                    <h2>AIアシスタント</h2>
+                </div>
+                <button type="button" class="ai-drawer-close" data-ai-drawer-close aria-label="閉じる">×</button>
+            </div>
+            <div class="stack">
+                <section class="ai-drawer-section stack">
+                    <div>
+                        <h3>AIに提案を依頼</h3>
+                        <p>対象WorkspaceとProjectは自動で確定します。回答は承認待ち提案として届きます。</p>
+                    </div>
+                    <form method="POST" action="{{ route('projects.ai-requests.store', $project) }}" enctype="multipart/form-data" class="stack">
+                        @csrf
+                        <div class="field">
+                            <label for="ai_request_title">依頼名</label>
+                            <input id="ai_request_title" name="title" value="{{ old('title', 'このProjectの計画を提案して') }}" required>
+                        </div>
+                        <div class="field">
+                            <label for="ai_request_instructions">Codexへの依頼内容</label>
+                            <textarea id="ai_request_instructions" name="instructions" rows="5" required placeholder="例：現状を読み取り、次のロードマップ・取り組み・タスクを提案してください。">{{ old('instructions') }}</textarea>
+                        </div>
+                        <div class="field">
+                            <label for="ai_request_attachments">参考資料（最大5ファイル・各10MB）</label>
+                            <input id="ai_request_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx">
+                            <div class="meta">画像、PDF、Excel、CSV、Wordに対応。資料は非公開領域へ保存されます。</div>
+                        </div>
+                        <div class="actions"><button type="submit">AIに提案を依頼</button></div>
+                    </form>
+                </section>
+
+                <section class="ai-drawer-section stack">
+                    <div class="actions" style="justify-content:space-between;align-items:center;">
+                        <h3 style="margin:0;">最近のAI依頼</h3>
+                        <a href="{{ route('projects.ai-proposals.index', $project) }}">AI提案一覧へ</a>
+                    </div>
+                    <div class="ai-drawer-request-list">
+                        @forelse ($aiRequests as $aiRequest)
+                            <article class="ai-drawer-request">
+                                <div class="meta">{{ $aiRequest->created_at->format('Y-m-d H:i') }} / {{ $aiRequest->status }}</div>
+                                <strong>{{ $aiRequest->title }}</strong>
+                                <p>{{ Str::limit($aiRequest->instructions, 160) }}</p>
+                                @if ($aiRequest->attachments->isNotEmpty())
+                                    <div class="actions">
+                                        @foreach ($aiRequest->attachments as $attachment)
+                                            <a href="{{ route('projects.ai-requests.attachments.download', [$project, $aiRequest, $attachment]) }}">📎 {{ $attachment->original_name }}</a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                                @if ($aiRequest->proposal)<a href="{{ route('projects.ai-proposals.show', [$project, $aiRequest->proposal]) }}">届いた提案を確認</a>@endif
+                            </article>
+                        @empty
+                            <p class="meta">AIへの依頼はまだありません。</p>
+                        @endforelse
+                    </div>
+                </section>
+            </div>
+        </aside>
 
         <div class="time-layer">
             <div class="time-layer-head">
@@ -402,6 +432,27 @@
     </section>
 
     <script>
+        (() => {
+            const drawer = document.getElementById('ai-assistant-drawer');
+            const overlay = document.querySelector('.ai-drawer-overlay');
+            const triggers = document.querySelectorAll('[data-ai-drawer-open]');
+            if (!drawer || !overlay) return;
+
+            const setOpen = open => {
+                drawer.classList.toggle('is-open', open);
+                overlay.classList.toggle('is-open', open);
+                drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+                triggers.forEach(trigger => trigger.setAttribute('aria-expanded', open ? 'true' : 'false'));
+                document.body.style.overflow = open ? 'hidden' : '';
+                if (open) drawer.querySelector('input, textarea, button, a')?.focus();
+            };
+
+            triggers.forEach(trigger => trigger.addEventListener('click', () => setOpen(true)));
+            document.querySelectorAll('[data-ai-drawer-close]').forEach(trigger => trigger.addEventListener('click', () => setOpen(false)));
+            document.addEventListener('keydown', event => { if (event.key === 'Escape') setOpen(false); });
+            if (drawer.classList.contains('is-open')) document.body.style.overflow = 'hidden';
+        })();
+
         (() => {
             const page = document.getElementById('focus-page');
             const roadmaps = document.getElementById('focus-roadmaps');

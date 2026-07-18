@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Organization;
+use App\Models\AiProposal;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
@@ -127,6 +128,15 @@ class TaskManagementTest extends TestCase
         ]);
         $task = $this->createTask($project, $owner);
         $task->update(['improvement_id' => $improvement->id]);
+        AiProposal::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'source' => 'codex',
+            'idempotency_key' => 'focus-drawer-pending',
+            'title' => '確認待ちの提案',
+            'status' => AiProposal::STATUS_PENDING,
+        ]);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
@@ -137,6 +147,10 @@ class TaskManagementTest extends TestCase
             ->assertSee('ROADMAP・実現までの道筋')
             ->assertSee('取り組み・道筋を前へ進める')
             ->assertSee('TASK・いま何をするか')
+            ->assertSee('AIアシスタント')
+            ->assertSee('aria-label="承認待ち 1件"', false)
+            ->assertSee('id="ai-assistant-drawer"', false)
+            ->assertSee('AI提案一覧へ')
             ->assertSee('data-focus-roadmap="'.$roadmap->id.'"', false)
             ->assertSee('data-focus-improvement="'.$improvement->id.'"', false)
             ->assertSee('data-focus-task="'.$task->id.'"', false)

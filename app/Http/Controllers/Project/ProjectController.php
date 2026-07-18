@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Project;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\AiProposal;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
@@ -152,6 +153,7 @@ class ProjectController extends Controller
 
         $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'sourceImprovementOutput.improvement.project', 'members.user', 'members.workspace']);
         $aiRequests = $project->aiRequests()->with(['requester', 'proposal', 'attachments'])->limit(10)->get();
+        $pendingAiProposalCount = $project->aiProposals()->where('status', AiProposal::STATUS_PENDING)->count();
 
         $allImprovements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
@@ -220,6 +222,7 @@ class ProjectController extends Controller
             'memberPreview' => $memberPreview,
             'memberPreviewError' => $memberPreviewError,
             'aiRequests' => $aiRequests,
+            'pendingAiProposalCount' => $pendingAiProposalCount,
         ]);
     }
 
