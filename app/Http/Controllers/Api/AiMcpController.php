@@ -159,7 +159,7 @@ class AiMcpController extends Controller
             'items.*.target_public_id' => ['nullable', 'string'],
             'items.*.reference_key' => ['nullable', 'string', 'max:120'],
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
-            'items.*.attributes' => ['required', 'array'],
+            'items.*.attributes' => ['present', 'array'],
         ]);
 
         return $tools->submitProposal($key, $validated);

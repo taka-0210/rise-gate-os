@@ -99,6 +99,38 @@ class AiProposalApiTest extends TestCase
         $this->assertDatabaseCount('tasks', 0);
     }
 
+    public function test_api_accepts_delete_proposal_with_empty_attributes(): void
+    {
+        [$workspace, $project, $user] = $this->workspaceProject('delete-api');
+        $roadmap = Roadmap::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Empty Default Roadmap',
+            'created_by' => $user->id,
+        ]);
+
+        $payload = [
+            'project_public_id' => $project->public_id,
+            'idempotency_key' => 'delete-api-001',
+            'title' => 'Delete empty default',
+            'items' => [[
+                'operation' => 'delete',
+                'entity_type' => 'roadmap',
+                'target_public_id' => $roadmap->public_id,
+                'attributes' => [],
+            ]],
+        ];
+
+        $this->withToken($this->accessKey($workspace))
+            ->postJson('/api/v1/ai/proposals', $payload)
+            ->assertCreated()
+            ->assertJsonPath('valid_items_count', 1)
+            ->assertJsonPath('invalid_items_count', 0);
+
+        $this->assertNotSoftDeleted($roadmap);
+    }
+
     public function test_member_key_only_reads_projects_the_member_has_joined(): void
     {
         [$workspace, $visibleProject, $user] = $this->workspaceProject('internal');

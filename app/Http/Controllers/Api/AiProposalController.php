@@ -31,7 +31,7 @@ class AiProposalController extends Controller
             'items.*.target_public_id' => ['nullable', 'string', 'required_if:items.*.operation,update'],
             'items.*.reference_key' => ['nullable', 'string', 'max:120'],
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
-            'items.*.attributes' => ['required', 'array'],
+            'items.*.attributes' => ['present', 'array'],
         ]);
 
         $project = Project::query()
