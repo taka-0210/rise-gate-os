@@ -112,7 +112,7 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee('取り組み 1．公式サイトを見直す')
             ->assertSee('中核メッセージを整理する')
             ->assertSee('利用例を掲載する')
-            ->assertSeeInOrder(['ロードマップ', '0', '取り組み', '1', 'タスク', '2'])
+            ->assertSeeInOrder(['ロードマップ', '1', '取り組み', '1', 'タスク', '2'])
             ->assertSee('技術的な変更内容');
     }
 

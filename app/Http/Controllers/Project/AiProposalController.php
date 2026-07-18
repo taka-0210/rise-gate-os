@@ -38,6 +38,7 @@ class AiProposalController extends Controller
         abort_unless($aiProposal->project_id === $project->id, 404);
 
         $aiProposal->load(['items', 'requester', 'reviewer']);
+        $proposalOutline = $outlineBuilder->build($project, $aiProposal);
 
         $itemCounts = [
             'create' => $aiProposal->items->where('operation', 'create')->count(),
@@ -45,9 +46,9 @@ class AiProposalController extends Controller
             'delete' => $aiProposal->items->where('operation', 'delete')->count(),
             'valid' => $aiProposal->items->where('validation_status', 'valid')->count(),
             'invalid' => $aiProposal->items->where('validation_status', 'invalid')->count(),
-            'roadmap' => $aiProposal->items->where('entity_type', 'roadmap')->count(),
-            'improvement' => $aiProposal->items->where('entity_type', 'improvement')->count(),
-            'task' => $aiProposal->items->where('entity_type', 'task')->count(),
+            'roadmap' => count($proposalOutline),
+            'improvement' => collect($proposalOutline)->sum(fn (array $roadmap) => count($roadmap['improvements'])),
+            'task' => collect($proposalOutline)->sum(fn (array $roadmap) => collect($roadmap['improvements'])->sum(fn (array $improvement) => count($improvement['tasks']))),
         ];
 
         return view('ai-proposals.show', [
@@ -56,7 +57,7 @@ class AiProposalController extends Controller
             'statuses' => AiProposal::statuses(),
             'itemCounts' => $itemCounts,
             'canReview' => Gate::allows('update', $project),
-            'proposalOutline' => $outlineBuilder->build($project, $aiProposal),
+            'proposalOutline' => $proposalOutline,
         ]);
     }
 
