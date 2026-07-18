@@ -105,6 +105,11 @@ class Project extends Model
         return $this->hasMany(Task::class);
     }
 
+    public function aiProposals(): HasMany
+    {
+        return $this->hasMany(AiProposal::class);
+    }
+
     public function sourceImprovementOutput(): HasOne
     {
         return $this->hasOne(ImprovementOutput::class, 'output_id')

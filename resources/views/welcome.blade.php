@@ -1,39 +1,86 @@
-﻿@extends('layouts.app', ['title' => 'Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Rise Gate OS'])
 
 @section('content')
-    <section class="panel stack">
-        <div>
-            <div class="meta">Company Operating System</div>
-            <h1>Rise Gate OS</h1>
-            <p>
-                改善を、文化に。Rise Gate OS は、案件を管理するだけのシステムではありません。
-                Project を中心に、改善、文書、判断、進捗を蓄積し、知識として育てるための土台です。
+    <section class="os-hero">
+        <div class="os-hero__grid" aria-hidden="true"></div>
+        <div class="os-hero__glow os-hero__glow--one" aria-hidden="true"></div>
+        <div class="os-hero__glow os-hero__glow--two" aria-hidden="true"></div>
+
+        <div class="os-hero__content">
+            <div class="os-hero__eyebrow">
+                <span class="os-hero__pulse"></span>
+                Project Operating System
+            </div>
+            <h1>改善と知識が、<br><span>次の行動をつくる。</span></h1>
+            <p class="os-hero__lead">
+                Rise Gate OSは、Projectを中心に、現場の改善・計画・進捗をつなぎ、
+                AIと人の力で次の行動へ変えるProject Operating Systemです。
             </p>
+
+            <div class="actions os-hero__actions">
+                @auth
+                    <a class="button os-hero__primary" href="{{ route('dashboard') }}">
+                        Dashboardへ
+                        <span aria-hidden="true">→</span>
+                    </a>
+                    <a class="button os-hero__secondary" href="{{ route('projects.index') }}">Projectsを見る</a>
+                @else
+                    <a class="button os-hero__primary" href="{{ route('register') }}">
+                        Rise Gate OSを始める
+                        <span aria-hidden="true">→</span>
+                    </a>
+                    <a class="button os-hero__secondary" href="{{ route('login') }}">Login</a>
+                @endauth
+            </div>
         </div>
 
-        <div class="grid">
-            <div class="card">
+        <div class="os-cosmos" aria-hidden="true">
+            <div class="os-cosmos__stars os-cosmos__stars--near"></div>
+            <div class="os-cosmos__stars os-cosmos__stars--far"></div>
+            <div class="os-cosmos__halo"></div>
+            <div class="os-cosmos__orbit"></div>
+
+            <div class="os-cosmos__planet">
+                <div class="os-cosmos__planet-light"></div>
+                <div class="os-cosmos__planet-copy">
+                    <strong>RISE GATE</strong>
+                    <span>OS</span>
+                </div>
+            </div>
+
+            <div class="os-cosmos__projects">
+                <div class="os-cosmos__satellite os-cosmos__satellite--one"><span>PROJECT</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--two"><span>PROJECT</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--three"><span>PROJECT</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--four"><span>PROJECT</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--five"><span>PROJECT</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--six"><span>PROJECT</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--seven"><span>PROJECT</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="os-pillars" aria-label="Rise Gate OSの主要機能">
+        <article class="os-pillar">
+            <span class="os-pillar__number">01</span>
+            <div>
                 <h2>Project</h2>
-                <p>社内メンバーとお客様が、改善プロジェクトを共有する場所。</p>
+                <p>人と目的をつなぎ、改善を前へ進める。</p>
             </div>
-            <div class="card">
+        </article>
+        <article class="os-pillar">
+            <span class="os-pillar__number">02</span>
+            <div>
                 <h2>Improvement</h2>
-                <p>現場で生まれた改善を、会社の資産として蓄積する。</p>
+                <p>現場の気づきと実践を、会社の資産にする。</p>
             </div>
-            <div class="card">
-                <h2>Workspace</h2>
-                <p>Phase 1-2では、Current Workspaceを持つ土台を作ります。</p>
+        </article>
+        <article class="os-pillar">
+            <span class="os-pillar__number">03</span>
+            <div>
+                <h2>AI & Knowledge</h2>
+                <p>蓄積した知識から、次の行動を導き出す。</p>
             </div>
-        </div>
-
-        <div class="actions">
-            @auth
-                <a class="button" href="{{ route('dashboard') }}">Dashboard</a>
-                <a class="button secondary" href="{{ route('workspaces.index') }}">Workspaces</a>
-            @else
-                <a class="button" href="{{ route('register') }}">Start</a>
-                <a class="button secondary" href="{{ route('login') }}">Login</a>
-            @endauth
-        </div>
+        </article>
     </section>
 @endsection

@@ -41,6 +41,9 @@ class Improvement extends Model
         'result',
         'impact',
         'next_action',
+        'planned_start_date',
+        'target_date',
+        'completed_at',
         'status',
         'visibility',
         'proposed_by',
@@ -60,6 +63,9 @@ class Improvement extends Model
     {
         return [
             'implemented_at' => 'datetime',
+            'planned_start_date' => 'date',
+            'target_date' => 'date',
+            'completed_at' => 'date',
         ];
     }
 

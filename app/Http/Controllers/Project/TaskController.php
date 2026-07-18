@@ -33,7 +33,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function edit(Project $project, Task $task): View
+    public function edit(Request $request, Project $project, Task $task): View
     {
         $this->authorizeProjectTask($project, $task);
 
@@ -46,6 +46,7 @@ class TaskController extends Controller
             'statuses' => Task::statuses(),
             'priorities' => Task::priorities(),
             'assignableUsers' => $this->assignableUsers($project),
+            'initiatives' => $this->assignableInitiatives($request, $project),
         ]);
     }
 
@@ -86,6 +87,12 @@ class TaskController extends Controller
         $assignableUserIds = $this->assignableUsers($project)->pluck('id')->all();
 
         return $request->validate([
+            'improvement_id' => [
+                'required',
+                Rule::exists('improvements', 'id')
+                    ->where('project_id', $project->id)
+                    ->whereNull('deleted_at'),
+            ],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Task::statuses()))],
@@ -103,6 +110,22 @@ class TaskController extends Controller
                     ->where('status', ProjectMember::STATUS_ACTIVE);
             })
             ->orderBy('name')
+            ->get();
+    }
+
+    private function assignableInitiatives(Request $request, Project $project)
+    {
+        $member = $project->members()
+            ->where('user_id', $request->user()->id)
+            ->where('status', ProjectMember::STATUS_ACTIVE)
+            ->first();
+
+        return $project->improvements()
+            ->when($member?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', \App\Models\Improvement::VISIBILITY_CLIENT))
+            ->with('roadmap')
+            ->orderBy('roadmap_id')
+            ->orderBy('roadmap_sort_order')
+            ->orderBy('id')
             ->get();
     }
 

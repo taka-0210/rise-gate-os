@@ -27,6 +27,7 @@ class DashboardController extends Controller
             ->where('user_id', $user->id)
             ->where('workspace_id', $currentWorkspace->id)
             ->where('status', ProjectMember::STATUS_ACTIVE)
+            ->whereHas('project')
             ->get(['project_id', 'project_role']);
 
         $visibleProjectIds = $memberships->pluck('project_id')->all();

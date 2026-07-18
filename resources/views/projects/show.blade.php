@@ -89,7 +89,11 @@
                 <h1>{{ $project->name }}</h1>
                 <p>{{ $project->summary ?: '概要はまだありません。' }}</p>
             </div>
-            @if ($canEditProject)<a class="button" href="{{ route('projects.edit', $project) }}">Projectを編集</a>@endif<a class="button secondary" href="{{ route('projects.index') }}">Project一覧へ戻る</a>
+            <div class="actions">
+                <a class="button secondary" href="{{ route('projects.show', $project) }}">フォーカスレイヤーへ戻る</a>
+                @if ($canEditProject)<a class="button" href="{{ route('projects.edit', $project) }}">Projectを編集</a>@endif
+                <a class="button secondary" href="{{ route('projects.index') }}">Project一覧へ戻る</a>
+            </div>
         </div>
 
         @if (session('status'))
@@ -208,6 +212,12 @@
                                     <div class="meta">ロードマップテーマ / {{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</div>
                                     <h2>{{ $roadmap->title }}</h2>
                                     <p>{{ $roadmap->purpose ?: 'このテーマが目指す未来はまだ記録されていません。' }}</p>
+                                    <p class="meta">
+                                        開始予定：{{ $roadmap->planned_start_date?->format('Y/m/d') ?? '未設定' }} ／
+                                        到達予定：{{ $roadmap->target_date?->format('Y/m/d') ?? '未設定' }} ／
+                                        実際の到達：{{ $roadmap->reached_at?->format('Y/m/d') ?? '未到達' }}
+                                    </p>
+                                    @if ($canCreateRoadmap)<a href="{{ route('projects.roadmaps.edit', [$project, $roadmap]) }}">Roadmapを編集</a>@endif
                                     <p class="meta">{{ $roadmapImprovements->count() }}件中{{ $completedCount }}件が前へ進みました。</p>
                                 </div>
 
@@ -269,6 +279,23 @@
                                         <option value="{{ $value }}" @selected(old('status', 'active') === $value)>{{ $label }}</option>
                                     @endforeach
                                 </select>
+                            </div>
+                            <div class="grid two">
+                                <div class="field">
+                                    <label for="roadmap_planned_start_date">開始予定日</label>
+                                    <input id="roadmap_planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date') }}">
+                                    @error('planned_start_date') <div class="error">{{ $message }}</div> @enderror
+                                </div>
+                                <div class="field">
+                                    <label for="roadmap_target_date">到達予定日</label>
+                                    <input id="roadmap_target_date" name="target_date" type="date" value="{{ old('target_date') }}">
+                                    @error('target_date') <div class="error">{{ $message }}</div> @enderror
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label for="roadmap_reached_at">実際の到達日</label>
+                                <input id="roadmap_reached_at" name="reached_at" type="date" value="{{ old('reached_at') }}">
+                                @error('reached_at') <div class="error">{{ $message }}</div> @enderror
                             </div>
                             <div class="field">
                                 <label for="position_after_roadmap_id">表示位置</label>
@@ -362,7 +389,7 @@
                         <h2>メンバー追加</h2>
                         <p>メールアドレスで登録済みユーザーを検索し、追加対象を確認してからProjectへ追加します。</p>
 
-                        <form class="stack" method="GET" action="{{ route('projects.show', $project) }}#members">
+                        <form class="stack" method="GET" action="{{ route('projects.legacy', $project) }}#members">
                             <div class="field">
                                 <label for="member_email">メールアドレス</label>
                                 <input id="member_email" name="member_email" type="email" value="{{ request('member_email', old('email')) }}" required>
@@ -467,6 +494,18 @@
                         @csrf
                         <h2>ProjectからTaskを登録</h2>
                         <p>通常作業として登録します。改善から生まれた作業は、Improvement詳細からTask化できます。</p>
+                        <div class="field">
+                            <label for="task_improvement_id">所属する取り組み</label>
+                            <select id="task_improvement_id" name="improvement_id" required>
+                                <option value="">取り組みを選択してください</option>
+                                @foreach ($allImprovements as $initiative)
+                                    <option value="{{ $initiative->id }}" @selected((string) old('improvement_id') === (string) $initiative->id)>
+                                        {{ $initiative->roadmap?->title }} / {{ $initiative->title }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('improvement_id') <div class="error">{{ $message }}</div> @enderror
+                        </div>
                         <div class="field">
                             <label for="task_title">Task名</label>
                             <input id="task_title" name="title" value="{{ old('title') }}" required>

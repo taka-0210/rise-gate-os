@@ -40,6 +40,11 @@ class ProjectFoundationTest extends TestCase
         $project = Project::firstOrFail();
 
         $response->assertRedirect(route('projects.show', $project));
+        $this->assertDatabaseHas('roadmaps', [
+            'project_id' => $project->id,
+            'title' => 'プロジェクトを前に進める',
+            'sort_order' => 1,
+        ]);
         $this->assertSame($workspace->id, $project->owning_workspace_id);
         $this->assertSame($workspace->id, $project->billing_workspace_id);
         $this->assertSame($workspace->organization_id, $project->organization_id);

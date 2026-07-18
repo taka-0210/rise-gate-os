@@ -13,6 +13,16 @@
             @method('PUT')
 
             <div class="field">
+                <label for="roadmap_id">所属Roadmap</label>
+                <select id="roadmap_id" name="roadmap_id" required>
+                    @foreach ($roadmaps as $roadmap)
+                        <option value="{{ $roadmap->id }}" @selected((string) old('roadmap_id', $improvement->roadmap_id) === (string) $roadmap->id)>{{ $roadmap->title }}</option>
+                    @endforeach
+                </select>
+                @error('roadmap_id') <div class="error">{{ $message }}</div> @enderror
+            </div>
+
+            <div class="field">
                 <label for="title">改善タイトル</label>
                 <input id="title" name="title" value="{{ old('title', $improvement->title) }}" required autofocus>
                 @error('title') <div class="error">{{ $message }}</div> @enderror
@@ -47,6 +57,12 @@
                     </select>
                     @error('assigned_to') <div class="error">{{ $message }}</div> @enderror
                 </div>
+            </div>
+
+            <div class="grid">
+                <div class="field"><label for="planned_start_date">開始予定日</label><input id="planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date', $improvement->planned_start_date?->format('Y-m-d')) }}">@error('planned_start_date') <div class="error">{{ $message }}</div> @enderror</div>
+                <div class="field"><label for="target_date">完了予定日</label><input id="target_date" name="target_date" type="date" value="{{ old('target_date', $improvement->target_date?->format('Y-m-d')) }}">@error('target_date') <div class="error">{{ $message }}</div> @enderror</div>
+                <div class="field"><label for="completed_at">実際の完了日</label><input id="completed_at" name="completed_at" type="date" value="{{ old('completed_at', $improvement->completed_at?->format('Y-m-d')) }}">@error('completed_at') <div class="error">{{ $message }}</div> @enderror</div>
             </div>
 
             @foreach ([

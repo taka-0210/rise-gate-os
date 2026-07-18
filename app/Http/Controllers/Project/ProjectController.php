@@ -51,6 +51,7 @@ class ProjectController extends Controller
             ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($priority, fn ($query) => $query->where('priority', $priority))
+            ->withCount(['roadmaps', 'improvements', 'tasks'])
             ->with(['owner', 'client', 'sourceImprovementOutput.improvement.project', 'members' => fn ($query) => $query->where('user_id', $request->user()->id)])
             ->when($sort === 'latest', fn ($query) => $query->latest())
             ->when($sort === 'oldest', fn ($query) => $query->oldest())
@@ -114,6 +115,31 @@ class ProjectController extends Controller
             'status' => ProjectMember::STATUS_ACTIVE,
         ]);
 
+        $defaultRoadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $project->owning_workspace_id,
+            'project_id' => $project->id,
+            'title' => 'プロジェクトを前に進める',
+            'purpose' => 'Project全体の取り組みを受け止め、実現までの道筋を具体化します。',
+            'status' => Roadmap::STATUS_ACTIVE,
+            'sort_order' => 1,
+            'created_by' => $request->user()->id,
+        ]);
+
+        Improvement::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $project->owning_workspace_id,
+            'project_id' => $project->id,
+            'roadmap_id' => $defaultRoadmap->id,
+            'roadmap_sort_order' => 1,
+            'title' => '進めるための具体的な動き',
+            'desired_state' => 'このRoadmapを具体的なTaskによって前へ進めます。',
+            'status' => Improvement::STATUS_PLANNED,
+            'visibility' => Improvement::VISIBILITY_INTERNAL,
+            'proposed_by' => $request->user()->id,
+            'assigned_to' => $request->user()->id,
+        ]);
+
         return redirect()->route('projects.show', $project);
     }
 
@@ -128,7 +154,7 @@ class ProjectController extends Controller
 
         $allImprovements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
-            ->with(['proposer', 'assignee'])
+            ->with(['proposer', 'assignee', 'roadmap'])
             ->latest()
             ->get();
         $improvements = $allImprovements->take(6);
@@ -150,7 +176,7 @@ class ProjectController extends Controller
             ->orderBy('id')
             ->with(['improvements' => function ($query) use ($visibleImprovementScope): void {
                 $visibleImprovementScope($query);
-                $query->with(['assignee', 'proposer']);
+                $query->with(['assignee', 'proposer', 'tasks.assignee']);
             }])
             ->get();
 
@@ -166,16 +192,18 @@ class ProjectController extends Controller
         $canManageMembers = Gate::allows('manageMembers', [$project, $currentWorkspaceRole]);
         [$memberPreview, $memberPreviewError] = $this->memberPreview($request, $project, $canManageMembers);
 
-        return view('projects.show', [
+        return view('projects.work-view', [
             'project' => $project,
             'statuses' => Project::statuses(),
             'priorities' => Project::priorities(),
             'roles' => ProjectMember::roles(),
             'permissions' => ProjectMember::permissions(),
             'improvements' => $improvements,
+            'allImprovements' => $allImprovements,
             'improvementStatuses' => Improvement::statuses(),
             'improvementVisibilities' => Improvement::visibilities(),
             'tasks' => $tasks,
+            'allTasks' => $allTasks,
             'taskStatuses' => Task::statuses(),
             'taskPriorities' => Task::priorities(),
             'roadmaps' => $roadmaps,
@@ -191,6 +219,11 @@ class ProjectController extends Controller
             'memberPreview' => $memberPreview,
             'memberPreviewError' => $memberPreviewError,
         ]);
+    }
+
+    public function legacy(Request $request, Project $project): View
+    {
+        return view('projects.show', $this->show($request, $project)->getData());
     }
 
     private function buildProjectTimeline(Project $project, Collection $tasks, Collection $improvements, Collection $roadmaps): Collection

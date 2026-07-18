@@ -7,6 +7,7 @@ use App\Models\Improvement;
 use App\Models\ImprovementOutput;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -79,6 +80,31 @@ class ImprovementOutputController extends Controller
                 'invited_at' => now(),
                 'accepted_at' => now(),
                 'status' => ProjectMember::STATUS_ACTIVE,
+            ]);
+
+            $defaultRoadmap = Roadmap::create([
+                'organization_id' => $newProject->organization_id,
+                'workspace_id' => $newProject->owning_workspace_id,
+                'project_id' => $newProject->id,
+                'title' => 'プロジェクトを前に進める',
+                'purpose' => 'Project全体の取り組みを受け止め、実現までの道筋を具体化します。',
+                'status' => Roadmap::STATUS_ACTIVE,
+                'sort_order' => 1,
+                'created_by' => $request->user()->id,
+            ]);
+
+            Improvement::create([
+                'organization_id' => $newProject->organization_id,
+                'workspace_id' => $newProject->owning_workspace_id,
+                'project_id' => $newProject->id,
+                'roadmap_id' => $defaultRoadmap->id,
+                'roadmap_sort_order' => 1,
+                'title' => '進めるための具体的な動き',
+                'desired_state' => 'このRoadmapを具体的なTaskによって前へ進めます。',
+                'status' => Improvement::STATUS_PLANNED,
+                'visibility' => Improvement::VISIBILITY_INTERNAL,
+                'proposed_by' => $request->user()->id,
+                'assigned_to' => $request->user()->id,
             ]);
 
             ImprovementOutput::create([

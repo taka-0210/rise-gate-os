@@ -6,6 +6,7 @@ use App\Models\Improvement;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Roadmap;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,6 +25,7 @@ class ImprovementFoundationTest extends TestCase
             ->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.improvements.store', $project), [
+                'roadmap_id' => $project->roadmaps()->firstOrFail()->id,
                 'title' => 'Improve onboarding flow',
                 'current_state' => 'Customers ask the same setup questions repeatedly.',
                 'desired_state' => 'Customers can understand the next step from the Project.',
@@ -33,6 +35,8 @@ class ImprovementFoundationTest extends TestCase
                 'result' => 'Pending measurement.',
                 'impact' => 'Better shared context.',
                 'next_action' => 'Review with the client.',
+                'planned_start_date' => '2026-07-10',
+                'target_date' => '2026-07-17',
                 'status' => 'proposed',
                 'visibility' => 'internal',
                 'assigned_to' => $owner->id,
@@ -46,6 +50,8 @@ class ImprovementFoundationTest extends TestCase
         $this->assertSame($project->id, $improvement->project_id);
         $this->assertSame($owner->id, $improvement->proposed_by);
         $this->assertSame($owner->id, $improvement->assigned_to);
+        $this->assertSame('2026-07-10', $improvement->planned_start_date->format('Y-m-d'));
+        $this->assertSame('2026-07-17', $improvement->target_date->format('Y-m-d'));
     }
 
     public function test_project_view_member_can_view_but_not_create_improvement(): void
@@ -139,6 +145,7 @@ class ImprovementFoundationTest extends TestCase
             ->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.improvements.store', $project), [
+                'roadmap_id' => $project->roadmaps()->firstOrFail()->id,
                 'title' => 'Invalid assignment',
                 'status' => 'proposed',
                 'visibility' => 'internal',
@@ -149,6 +156,23 @@ class ImprovementFoundationTest extends TestCase
         $this->assertDatabaseMissing('improvements', [
             'title' => 'Invalid assignment',
         ]);
+    }
+
+    public function test_improvement_requires_roadmap_from_same_project(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner('Owner Org', 'Owner Workspace', 'owner-roadmap@example.com');
+        $project = $this->createProjectWithOwner($owner, $workspace);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.improvements.store', $project), [
+                'title' => 'Roadmapのない改善',
+                'status' => Improvement::STATUS_PROPOSED,
+                'visibility' => Improvement::VISIBILITY_INTERNAL,
+            ])
+            ->assertSessionHasErrors('roadmap_id');
+
+        $this->assertDatabaseMissing('improvements', ['title' => 'Roadmapのない改善']);
     }
 
     public function test_project_member_can_update_improvement(): void
@@ -169,6 +193,7 @@ class ImprovementFoundationTest extends TestCase
             ->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->put(route('projects.improvements.update', [$project, $improvement]), [
+                'roadmap_id' => $project->roadmaps()->firstOrFail()->id,
                 'title' => 'Updated improvement',
                 'current_state' => 'Current state was recorded.',
                 'desired_state' => 'Desired state was clarified.',
@@ -251,6 +276,16 @@ class ImprovementFoundationTest extends TestCase
         ]);
 
         $this->addProjectMember($project, $owner, $workspace, 'owner', 'admin');
+
+        Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'プロジェクト全体を前へ進める',
+            'status' => Roadmap::STATUS_ACTIVE,
+            'sort_order' => 1,
+            'created_by' => $owner->id,
+        ]);
 
         return $project;
     }

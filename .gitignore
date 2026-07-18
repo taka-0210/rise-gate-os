@@ -24,4 +24,6 @@ Homestead.yaml
 Thumbs.db
 composer.phar
 laravel-tmp/
+/rise-gate-os-*-deploy.zip
+/rise-gate-os-production-transfer.php
 

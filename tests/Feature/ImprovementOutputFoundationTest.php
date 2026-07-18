@@ -7,6 +7,7 @@ use App\Models\ImprovementOutput;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -21,11 +22,13 @@ class ImprovementOutputFoundationTest extends TestCase
     {
         [$owner, $workspace] = $this->createWorkspaceOwner();
         $project = $this->createProjectWithOwner($owner, $workspace);
+        $improvement = $this->createImprovement($project, $owner);
 
         $response = $this
             ->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.tasks.store', $project), [
+                'improvement_id' => $improvement->id,
                 'title' => 'Prepare dashboard review',
                 'description' => 'Review the next evolution step.',
                 'status' => Task::STATUS_TODO,
@@ -37,7 +40,7 @@ class ImprovementOutputFoundationTest extends TestCase
         $response->assertRedirect(route('projects.show', $project));
         $this->assertDatabaseHas('tasks', [
             'project_id' => $project->id,
-            'improvement_id' => null,
+            'improvement_id' => $improvement->id,
             'title' => 'Prepare dashboard review',
             'assigned_to' => $owner->id,
         ]);
@@ -104,6 +107,14 @@ class ImprovementOutputFoundationTest extends TestCase
             'project_role' => ProjectMember::ROLE_OWNER,
             'permission_level' => ProjectMember::PERMISSION_ADMIN,
             'status' => ProjectMember::STATUS_ACTIVE,
+        ]);
+        $this->assertDatabaseHas('roadmaps', [
+            'project_id' => $newProject->id,
+            'title' => 'プロジェクトを前に進める',
+        ]);
+        $this->assertDatabaseHas('improvements', [
+            'project_id' => $newProject->id,
+            'title' => '進めるための具体的な動き',
         ]);
         $this->assertDatabaseHas('improvement_outputs', [
             'improvement_id' => $improvement->id,
@@ -254,10 +265,23 @@ class ImprovementOutputFoundationTest extends TestCase
 
     private function createImprovement(Project $project, User $owner): Improvement
     {
+        $roadmap = Roadmap::firstOrCreate(
+            ['project_id' => $project->id, 'title' => 'プロジェクトを前に進める'],
+            [
+                'organization_id' => $project->organization_id,
+                'workspace_id' => $project->owning_workspace_id,
+                'status' => Roadmap::STATUS_ACTIVE,
+                'sort_order' => 1,
+                'created_by' => $owner->id,
+            ]
+        );
+
         return Improvement::create([
             'organization_id' => $project->organization_id,
             'workspace_id' => $project->owning_workspace_id,
             'project_id' => $project->id,
+            'roadmap_id' => $roadmap->id,
+            'roadmap_sort_order' => 1,
             'title' => 'Create a new company activity',
             'status' => Improvement::STATUS_PROPOSED,
             'visibility' => Improvement::VISIBILITY_INTERNAL,

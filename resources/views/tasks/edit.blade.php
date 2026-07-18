@@ -13,6 +13,18 @@
             @method('PUT')
 
             <div class="field">
+                <label for="improvement_id">所属する取り組み</label>
+                <select id="improvement_id" name="improvement_id" required>
+                    @foreach ($initiatives as $initiative)
+                        <option value="{{ $initiative->id }}" @selected((string) old('improvement_id', $task->improvement_id) === (string) $initiative->id)>
+                            {{ $initiative->roadmap?->title }} / {{ $initiative->title }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('improvement_id') <div class="error">{{ $message }}</div> @enderror
+            </div>
+
+            <div class="field">
                 <label for="title">Task名</label>
                 <input id="title" name="title" value="{{ old('title', $task->title) }}" required autofocus>
                 @error('title') <div class="error">{{ $message }}</div> @enderror

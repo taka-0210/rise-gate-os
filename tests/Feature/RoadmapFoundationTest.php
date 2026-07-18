@@ -61,7 +61,7 @@ class RoadmapFoundationTest extends TestCase
         $this
             ->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.show', $project))
+            ->get(route('projects.legacy', $project))
             ->assertOk()
             ->assertSee('Roadmapは、このProjectが目指す未来へ向かうテーマです。')
             ->assertSee('Roadmapに追加する改善')
@@ -110,6 +110,51 @@ class RoadmapFoundationTest extends TestCase
             'title' => '差し込むテーマ',
             'sort_order' => 3,
         ]);
+    }
+
+    public function test_project_editor_can_set_and_update_roadmap_schedule(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $project = $this->createProjectWithOwner($owner, $workspace);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.roadmaps.store', $project), [
+                'title' => '公開までのRoadmap',
+                'purpose' => '公開できる状態へ進める',
+                'status' => Roadmap::STATUS_ACTIVE,
+                'planned_start_date' => '2026-07-01',
+                'target_date' => '2026-07-17',
+            ])
+            ->assertRedirect(route('projects.show', $project));
+
+        $roadmap = Roadmap::where('project_id', $project->id)->where('title', '公開までのRoadmap')->firstOrFail();
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.roadmaps.edit', [$project, $roadmap]))
+            ->assertOk()
+            ->assertSee('開始予定日')
+            ->assertSee('到達予定日')
+            ->assertSee('実際の到達日');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->put(route('projects.roadmaps.update', [$project, $roadmap]), [
+                'title' => '公開までのRoadmap',
+                'purpose' => '公開できる状態へ進める',
+                'status' => Roadmap::STATUS_COMPLETED,
+                'planned_start_date' => '2026-07-01',
+                'target_date' => '2026-07-17',
+                'reached_at' => '2026-07-18',
+            ])
+            ->assertRedirect(route('projects.show', $project));
+
+        $roadmap->refresh();
+        $this->assertSame('2026-07-01', $roadmap->planned_start_date->format('Y-m-d'));
+        $this->assertSame('2026-07-17', $roadmap->target_date->format('Y-m-d'));
+        $this->assertSame('2026-07-18', $roadmap->reached_at->format('Y-m-d'));
+        $this->assertSame(Roadmap::STATUS_COMPLETED, $roadmap->status);
     }
 
     public function test_view_only_project_member_cannot_create_or_assign_roadmap(): void

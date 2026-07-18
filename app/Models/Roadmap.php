@@ -25,10 +25,22 @@ class Roadmap extends Model
         'project_id',
         'title',
         'purpose',
+        'planned_start_date',
+        'target_date',
+        'reached_at',
         'status',
         'sort_order',
         'created_by',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'planned_start_date' => 'date',
+            'target_date' => 'date',
+            'reached_at' => 'date',
+        ];
+    }
 
     protected static function booted(): void
     {

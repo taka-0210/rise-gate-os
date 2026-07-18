@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Organization;
+use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -19,6 +21,7 @@ class TaskManagementTest extends TestCase
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $task = $this->createTask($project, $owner);
+        $initiative = $task->improvement;
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
@@ -30,6 +33,7 @@ class TaskManagementTest extends TestCase
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->put(route('projects.tasks.update', [$project, $task]), [
+                'improvement_id' => $initiative->id,
                 'title' => '更新したTask',
                 'description' => '更新した説明',
                 'status' => Task::STATUS_DONE,
@@ -98,6 +102,49 @@ class TaskManagementTest extends TestCase
             ->assertSee('2日遅れて完了しました。');
     }
 
+    public function test_alternative_work_view_shows_current_layer_and_existing_project_data(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $roadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '表示範囲と権限の設計',
+            'status' => Roadmap::STATUS_ACTIVE,
+            'sort_order' => 1,
+            'created_by' => $owner->id,
+        ]);
+        $improvement = Improvement::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'roadmap_id' => $roadmap->id,
+            'roadmap_sort_order' => 1,
+            'title' => '権限を整理する',
+            'status' => Improvement::STATUS_PROPOSED,
+            'visibility' => Improvement::VISIBILITY_INTERNAL,
+            'proposed_by' => $owner->id,
+        ]);
+        $task = $this->createTask($project, $owner);
+        $task->update(['improvement_id' => $improvement->id]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertSee('フォーカスレイヤー')
+            ->assertSee('PROJECT・何を実現するか')
+            ->assertSee('ROADMAP・実現までの道筋')
+            ->assertSee('取り組み・道筋を前へ進める')
+            ->assertSee('TASK・いま何をするか')
+            ->assertSee('data-focus-roadmap="'.$roadmap->id.'"', false)
+            ->assertSee('data-focus-improvement="'.$improvement->id.'"', false)
+            ->assertSee('data-focus-task="'.$task->id.'"', false)
+            ->assertSee('いま行うこと')
+            ->assertSee($task->title)
+            ->assertSee('管理詳細を見る');
+    }
+
     private function createProjectOwner(): array
     {
         $owner = User::factory()->create();
@@ -144,10 +191,33 @@ class TaskManagementTest extends TestCase
 
     private function createTask(Project $project, User $owner): Task
     {
+        $roadmap = Roadmap::firstOrCreate(
+            ['project_id' => $project->id, 'title' => 'プロジェクトを前に進める'],
+            [
+                'organization_id' => $project->organization_id,
+                'workspace_id' => $project->owning_workspace_id,
+                'status' => Roadmap::STATUS_ACTIVE,
+                'sort_order' => 1,
+                'created_by' => $owner->id,
+            ]
+        );
+        $initiative = Improvement::firstOrCreate(
+            ['project_id' => $project->id, 'roadmap_id' => $roadmap->id, 'title' => '進めるための具体的な動き'],
+            [
+                'organization_id' => $project->organization_id,
+                'workspace_id' => $project->owning_workspace_id,
+                'roadmap_sort_order' => 1,
+                'status' => Improvement::STATUS_PLANNED,
+                'visibility' => Improvement::VISIBILITY_INTERNAL,
+                'proposed_by' => $owner->id,
+            ]
+        );
+
         return Task::create([
             'organization_id' => $project->organization_id,
             'workspace_id' => $project->owning_workspace_id,
             'project_id' => $project->id,
+            'improvement_id' => $initiative->id,
             'title' => '編集対象Task',
             'status' => Task::STATUS_TODO,
             'priority' => Task::PRIORITY_NORMAL,

@@ -7,6 +7,7 @@ use App\Models\Improvement;
 use App\Models\ImprovementOutput;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -45,6 +46,8 @@ class ImprovementController extends Controller
             'statuses' => Improvement::statuses(),
             'visibilities' => Improvement::visibilities(),
             'assignableUsers' => $this->assignableUsers($project),
+            'roadmaps' => $project->roadmaps()->orderBy('sort_order')->orderBy('id')->get(),
+            'selectedRoadmapId' => request()->integer('roadmap') ?: null,
         ]);
     }
 
@@ -53,7 +56,10 @@ class ImprovementController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('create', [Improvement::class, $project]);
 
-        $improvement = Improvement::create($this->validateImprovement($request, $project) + [
+        $validated = $this->validateImprovement($request, $project);
+        $validated['roadmap_sort_order'] = (int) Improvement::where('roadmap_id', $validated['roadmap_id'])->max('roadmap_sort_order') + 1;
+
+        $improvement = Improvement::create($validated + [
             'organization_id' => $project->organization_id,
             'workspace_id' => $project->owning_workspace_id,
             'project_id' => $project->id,
@@ -93,6 +99,7 @@ class ImprovementController extends Controller
             'projectStatuses' => Project::statuses(),
             'projectPriorities' => Project::priorities(),
             'assignableUsers' => $this->assignableUsers($project),
+            'roadmaps' => $project->roadmaps()->orderBy('sort_order')->orderBy('id')->get(),
             'canCreateTaskOutput' => Gate::allows('create', [Task::class, $project]),
             'canCreateProjectOutput' => Gate::allows('update', $improvement) && Gate::allows('create', [Project::class, $project->owningWorkspace]),
             'canEditImprovement' => Gate::allows('update', $improvement),
@@ -112,6 +119,7 @@ class ImprovementController extends Controller
             'statuses' => Improvement::statuses(),
             'visibilities' => Improvement::visibilities(),
             'assignableUsers' => $this->assignableUsers($project),
+            'roadmaps' => $project->roadmaps()->orderBy('sort_order')->orderBy('id')->get(),
         ]);
     }
 
@@ -122,7 +130,11 @@ class ImprovementController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('update', $improvement);
 
-        $improvement->update($this->validateImprovement($request, $project));
+        $validated = $this->validateImprovement($request, $project);
+        if ($improvement->roadmap_id !== (int) $validated['roadmap_id']) {
+            $validated['roadmap_sort_order'] = (int) Improvement::where('roadmap_id', $validated['roadmap_id'])->max('roadmap_sort_order') + 1;
+        }
+        $improvement->update($validated);
 
         return redirect()->route('projects.improvements.show', [$project, $improvement])->with('status', '改善を更新しました。');
     }
@@ -159,6 +171,12 @@ class ImprovementController extends Controller
         $assignableUserIds = $this->assignableUsers($project)->pluck('id')->all();
 
         return $request->validate([
+            'roadmap_id' => [
+                'required',
+                Rule::exists('roadmaps', 'id')
+                    ->where('project_id', $project->id)
+                    ->whereNull('deleted_at'),
+            ],
             'title' => ['required', 'string', 'max:255'],
             'current_state' => ['nullable', 'string', 'max:10000'],
             'desired_state' => ['nullable', 'string', 'max:10000'],
@@ -168,6 +186,9 @@ class ImprovementController extends Controller
             'result' => ['nullable', 'string', 'max:10000'],
             'impact' => ['nullable', 'string', 'max:10000'],
             'next_action' => ['nullable', 'string', 'max:10000'],
+            'planned_start_date' => ['nullable', 'date'],
+            'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
+            'completed_at' => ['nullable', 'date'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::statuses()))],
             'visibility' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::visibilities()))],
             'assigned_to' => ['nullable', Rule::in($assignableUserIds)],

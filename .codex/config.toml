@@ -1,0 +1,7 @@
+[mcp_servers.rise_gate_os]
+url = "https://os.rise-gate.com/api/mcp/rise-gate-os"
+bearer_token_env_var = "RISE_GATE_OS_MCP_TOKEN"
+
+[mcp_servers.rise_gate_os_client]
+url = "https://os.rise-gate.com/api/mcp/rise-gate-os"
+bearer_token_env_var = "RISE_GATE_OS_CLIENT_MCP_TOKEN"

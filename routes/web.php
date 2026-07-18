@@ -10,11 +10,14 @@ use App\Http\Controllers\Project\TaskController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\RoadmapController;
+use App\Http\Controllers\Project\AiProposalController;
 use App\Http\Controllers\Workspace\WorkspaceController;
 use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
 use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdminSessionController;
 use App\Http\Controllers\SystemAdmin\WorkspaceController as SystemAdminWorkspaceController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AiConnectionController;
+use App\Http\Controllers\WorkspaceAiSettingController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -59,12 +62,24 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
 
     Route::middleware(['workspace-mode', 'workspace'])->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
+        Route::get('/ai-connections', [AiConnectionController::class, 'index'])->name('ai-connections.index');
+        Route::post('/ai-connections', [AiConnectionController::class, 'store'])->name('ai-connections.store');
+        Route::delete('/ai-connections/{aiAccessKey}', [AiConnectionController::class, 'destroy'])->name('ai-connections.destroy');
+        Route::get('/ai-settings', [WorkspaceAiSettingController::class, 'edit'])->name('ai-settings.edit');
+        Route::put('/ai-settings', [WorkspaceAiSettingController::class, 'update'])->name('ai-settings.update');
         Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+        Route::get('/projects/{project}/ai-proposals', [AiProposalController::class, 'index'])->name('projects.ai-proposals.index');
+        Route::get('/projects/{project}/ai-proposals/{aiProposal}', [AiProposalController::class, 'show'])->name('projects.ai-proposals.show');
+        Route::post('/projects/{project}/ai-proposals/{aiProposal}/apply', [AiProposalController::class, 'apply'])->name('projects.ai-proposals.apply');
+        Route::post('/projects/{project}/ai-proposals/{aiProposal}/reject', [AiProposalController::class, 'reject'])->name('projects.ai-proposals.reject');
+        Route::get('/projects/{project}/manage', [ProjectController::class, 'legacy'])->name('projects.legacy');
         Route::post('/projects/{project}/move', [ProjectController::class, 'move'])->name('projects.move');
         Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
         Route::resource('projects.improvements', ImprovementController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::post('/projects/{project}/roadmaps', [RoadmapController::class, 'store'])->name('projects.roadmaps.store');
+        Route::get('/projects/{project}/roadmaps/{roadmap}/edit', [RoadmapController::class, 'edit'])->name('projects.roadmaps.edit');
+        Route::put('/projects/{project}/roadmaps/{roadmap}', [RoadmapController::class, 'update'])->name('projects.roadmaps.update');
         Route::post('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'assignImprovement'])->name('projects.improvements.roadmap.assign');
         Route::delete('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'removeImprovement'])->name('projects.improvements.roadmap.remove');
         Route::resource('projects.tasks', TaskController::class)->only(['store', 'show', 'edit', 'update']);

@@ -49,7 +49,7 @@ class ProjectMemberFoundationTest extends TestCase
         $response = $this
             ->actingAs($owner)
             ->withSession(['current_workspace_id' => $ownerWorkspace->id])
-            ->get(route('projects.show', [
+            ->get(route('projects.legacy', [
                 'project' => $project,
                 'member_email' => $partner->email,
                 'project_role' => 'coder',
