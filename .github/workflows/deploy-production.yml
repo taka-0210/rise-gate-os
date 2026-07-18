@@ -66,16 +66,26 @@ jobs:
           XSERVER_HOST: ${{ secrets.XSERVER_HOST }}
           XSERVER_USER: ${{ secrets.XSERVER_USER }}
         run: |
-          scp -P 10022 -i ~/.ssh/xserver_deploy_key \
-            "$RUNNER_TEMP/rise-gate-os-${GITHUB_SHA}.tar.gz" \
-            "${XSERVER_USER}@${XSERVER_HOST}:~/rise-gate-os-${GITHUB_SHA}.tar.gz"
+          for attempt in 1 2 3; do
+            if scp -4 -o ConnectTimeout=30 -P 10022 -i ~/.ssh/xserver_deploy_key \
+              "$RUNNER_TEMP/rise-gate-os-${GITHUB_SHA}.tar.gz" \
+              "${XSERVER_USER}@${XSERVER_HOST}:~/rise-gate-os-${GITHUB_SHA}.tar.gz"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "XServerへの転送に3回失敗しました。" >&2
+              exit 1
+            fi
+            echo "転送に失敗したため、15秒後に再試行します（${attempt}/3）。"
+            sleep 15
+          done
 
       - name: XServerで本番へ反映
         env:
           XSERVER_HOST: ${{ secrets.XSERVER_HOST }}
           XSERVER_USER: ${{ secrets.XSERVER_USER }}
         run: |
-          ssh -p 10022 -i ~/.ssh/xserver_deploy_key \
+          ssh -4 -o ConnectTimeout=30 -p 10022 -i ~/.ssh/xserver_deploy_key \
             "${XSERVER_USER}@${XSERVER_HOST}" \
             "bash -s -- '${GITHUB_SHA}'" < deployment/deploy-production.sh
 
