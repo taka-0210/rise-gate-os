@@ -69,6 +69,53 @@ class AiProposalFoundationTest extends TestCase
         $this->assertDatabaseHas('ai_proposals', ['id' => $proposal->id, 'status' => 'pending']);
     }
 
+    public function test_proposal_page_shows_japanese_work_hierarchy_and_entity_counts(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('outline');
+        $roadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '会社の価値を伝える',
+            'created_by' => $user->id,
+        ]);
+        $improvement = Improvement::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'roadmap_id' => $roadmap->id,
+            'title' => '公式サイトを見直す',
+            'proposed_by' => $user->id,
+            'assigned_to' => $user->id,
+        ]);
+        $proposal = AiProposal::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'source' => 'codex',
+            'idempotency_key' => 'outline-001',
+            'title' => '公式サイト改善の提案',
+            'summary' => '人とAIが一緒に仕事を進める価値を伝えます。',
+            'status' => AiProposal::STATUS_PENDING,
+        ]);
+        $proposal->items()->createMany([
+            ['operation' => 'update', 'entity_type' => 'improvement', 'target_public_id' => $improvement->public_id, 'attributes' => ['status' => 'planned'], 'sort_order' => 10],
+            ['operation' => 'create', 'entity_type' => 'task', 'attributes' => ['title' => '中核メッセージを整理する', 'improvement_public_id' => $improvement->public_id], 'sort_order' => 20],
+            ['operation' => 'create', 'entity_type' => 'task', 'attributes' => ['title' => '利用例を掲載する', 'improvement_public_id' => $improvement->public_id], 'sort_order' => 30],
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.ai-proposals.show', [$project, $proposal]))
+            ->assertOk()
+            ->assertSee('ロードマップ 1．会社の価値を伝える')
+            ->assertSee('取り組み 1．公式サイトを見直す')
+            ->assertSee('中核メッセージを整理する')
+            ->assertSee('利用例を掲載する')
+            ->assertSeeInOrder(['ロードマップ', '0', '取り組み', '1', 'タスク', '2'])
+            ->assertSee('技術的な変更内容');
+    }
+
     public function test_ai_proposal_switches_to_its_workspace_for_an_authorized_member(): void
     {
         [$user, $workspace, $project] = $this->projectOwner('internal');

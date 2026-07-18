@@ -11,6 +11,7 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use App\Services\AiProposalApplier;
 use App\Models\AiRequest;
+use App\Services\AiProposalOutlineBuilder;
 
 class AiProposalController extends Controller
 {
@@ -31,7 +32,7 @@ class AiProposalController extends Controller
         ]);
     }
 
-    public function show(Request $request, Project $project, AiProposal $aiProposal): View
+    public function show(Request $request, Project $project, AiProposal $aiProposal, AiProposalOutlineBuilder $outlineBuilder): View
     {
         $this->authorizeWorkspaceProject($request, $project);
         abort_unless($aiProposal->project_id === $project->id, 404);
@@ -44,6 +45,9 @@ class AiProposalController extends Controller
             'delete' => $aiProposal->items->where('operation', 'delete')->count(),
             'valid' => $aiProposal->items->where('validation_status', 'valid')->count(),
             'invalid' => $aiProposal->items->where('validation_status', 'invalid')->count(),
+            'roadmap' => $aiProposal->items->where('entity_type', 'roadmap')->count(),
+            'improvement' => $aiProposal->items->where('entity_type', 'improvement')->count(),
+            'task' => $aiProposal->items->where('entity_type', 'task')->count(),
         ];
 
         return view('ai-proposals.show', [
@@ -52,6 +56,7 @@ class AiProposalController extends Controller
             'statuses' => AiProposal::statuses(),
             'itemCounts' => $itemCounts,
             'canReview' => Gate::allows('update', $project),
+            'proposalOutline' => $outlineBuilder->build($project, $aiProposal),
         ]);
     }
 
