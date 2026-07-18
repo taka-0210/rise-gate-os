@@ -30,7 +30,10 @@ class ProjectMemberController extends Controller
             return back()->withErrors(['email' => 'This user is already a project member.'])->withInput();
         }
 
-        $memberWorkspace = $user->workspaces()->orderBy('workspaces.name')->first();
+        $memberWorkspace = $user->workspaces()
+            ->where('workspaces.status', \App\Models\Workspace::STATUS_ACTIVE)
+            ->orderBy('workspaces.name')
+            ->first();
 
         if (! $memberWorkspace) {
             return back()->withErrors(['email' => 'This user does not belong to a workspace.'])->withInput();

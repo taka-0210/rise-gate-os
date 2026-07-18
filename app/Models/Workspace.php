@@ -14,11 +14,21 @@ class Workspace extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const BILLING_INCLUDED = 'included';
+    public const BILLING_ADDITIONAL = 'additional';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_SUSPENDED = 'suspended';
+
     protected $fillable = [
         'public_id',
         'organization_id',
+        'owner_user_id',
         'name',
         'slug',
+        'billing_type',
+        'status',
+        'purpose',
     ];
 
     protected static function booted(): void
@@ -31,6 +41,11 @@ class Workspace extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
     }
 
     public function users(): BelongsToMany
@@ -48,5 +63,10 @@ class Workspace extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class, 'owning_workspace_id');
+    }
+
+    public function improvements(): HasMany
+    {
+        return $this->hasMany(Improvement::class);
     }
 }

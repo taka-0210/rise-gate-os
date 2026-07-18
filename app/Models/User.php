@@ -61,6 +61,11 @@ class User extends Authenticatable
         return $this->hasMany(ProjectMember::class);
     }
 
+    public function ownedWorkspaces(): HasMany
+    {
+        return $this->hasMany(Workspace::class, 'owner_user_id');
+    }
+
     public function assignedTasks(): HasMany
     {
         return $this->hasMany(Task::class, 'assigned_to');
@@ -68,6 +73,9 @@ class User extends Authenticatable
 
     public function canAccessWorkspace(int $workspaceId): bool
     {
-        return $this->workspaces()->where('workspaces.id', $workspaceId)->exists();
+        return $this->workspaces()
+            ->where('workspaces.id', $workspaceId)
+            ->where('workspaces.status', Workspace::STATUS_ACTIVE)
+            ->exists();
     }
 }

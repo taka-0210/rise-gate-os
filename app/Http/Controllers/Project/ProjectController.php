@@ -10,9 +10,12 @@ use App\Models\ProjectMember;
 use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -21,6 +24,23 @@ class ProjectController extends Controller
     public function index(Request $request): View
     {
         $currentWorkspace = $request->attributes->get('currentWorkspace');
+        $sort = $request->input('sort', 'latest');
+        if (! in_array($sort, ['latest', 'oldest', 'client_asc', 'client_desc'], true)) {
+            $sort = 'latest';
+        }
+        $status = $request->input('status');
+        if (! array_key_exists((string) $status, Project::statuses())) {
+            $status = null;
+        }
+        $priority = $request->input('priority');
+        if (! array_key_exists((string) $priority, Project::priorities())) {
+            $priority = null;
+        }
+        $filterableClients = $this->filterableClients($request, $currentWorkspace->id);
+        $clientId = $request->integer('client_id') ?: null;
+        if ($clientId && ! $filterableClients->contains('id', $clientId)) {
+            $clientId = null;
+        }
 
         $projects = Project::query()
             ->whereHas('members', function ($query) use ($request, $currentWorkspace): void {
@@ -28,11 +48,31 @@ class ProjectController extends Controller
                     ->where('workspace_id', $currentWorkspace->id)
                     ->where('status', ProjectMember::STATUS_ACTIVE);
             })
+            ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($priority, fn ($query) => $query->where('priority', $priority))
             ->with(['owner', 'client', 'sourceImprovementOutput.improvement.project', 'members' => fn ($query) => $query->where('user_id', $request->user()->id)])
-            ->latest()
-            ->paginate(12);
+            ->when($sort === 'latest', fn ($query) => $query->latest())
+            ->when($sort === 'oldest', fn ($query) => $query->oldest())
+            ->when(in_array($sort, ['client_asc', 'client_desc'], true), function ($query) use ($sort): void {
+                $query->orderBy(
+                    Client::select('name')->whereColumn('clients.id', 'projects.client_id'),
+                    $sort === 'client_asc' ? 'asc' : 'desc'
+                )->orderBy('projects.name');
+            })
+            ->paginate(12)
+            ->withQueryString();
 
-        return view('projects.index', ['projects' => $projects, 'statuses' => Project::statuses(), 'priorities' => Project::priorities()]);
+        return view('projects.index', [
+            'projects' => $projects,
+            'statuses' => Project::statuses(),
+            'priorities' => Project::priorities(),
+            'sort' => $sort,
+            'clients' => $filterableClients,
+            'selectedClientId' => $clientId,
+            'selectedStatus' => $status,
+            'selectedPriority' => $priority,
+        ]);
     }
 
     public function create(Request $request): View
@@ -86,18 +126,18 @@ class ProjectController extends Controller
 
         $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'sourceImprovementOutput.improvement.project', 'members.user', 'members.workspace']);
 
-        $improvements = $project->improvements()
+        $allImprovements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
             ->with(['proposer', 'assignee'])
             ->latest()
-            ->limit(6)
             ->get();
+        $improvements = $allImprovements->take(6);
 
-        $tasks = $project->tasks()
+        $allTasks = $project->tasks()
             ->with(['assignee', 'improvement'])
             ->latest()
-            ->limit(8)
             ->get();
+        $tasks = $allTasks->take(8);
 
         $visibleImprovementScope = function ($query) use ($currentMember): void {
             if ($currentMember?->project_role === ProjectMember::ROLE_CLIENT) {
@@ -113,6 +153,8 @@ class ProjectController extends Controller
                 $query->with(['assignee', 'proposer']);
             }])
             ->get();
+
+        $projectTimeline = $this->buildProjectTimeline($project, $allTasks, $allImprovements, $roadmaps);
 
         $unclassifiedImprovements = $project->improvements()
             ->whereNull('roadmap_id')
@@ -138,6 +180,7 @@ class ProjectController extends Controller
             'taskPriorities' => Task::priorities(),
             'roadmaps' => $roadmaps,
             'roadmapStatuses' => Roadmap::statuses(),
+            'projectTimeline' => $projectTimeline,
             'unclassifiedImprovements' => $unclassifiedImprovements,
             'assignableUsers' => $this->assignableUsers($project),
             'canCreateTask' => Gate::allows('create', [Task::class, $project]),
@@ -150,6 +193,84 @@ class ProjectController extends Controller
         ]);
     }
 
+    private function buildProjectTimeline(Project $project, Collection $tasks, Collection $improvements, Collection $roadmaps): Collection
+    {
+        $events = collect();
+
+        if ($project->start_date) {
+            $events->push([
+                'date' => $project->start_date->copy()->startOfDay(),
+                'type' => 'Project',
+                'title' => 'Projectを開始',
+                'description' => $project->name.'の取り組みを開始しました。',
+                'url' => null,
+                'delayed' => false,
+            ]);
+        }
+
+        foreach ($tasks as $task) {
+            if (! $task->completed_at) {
+                continue;
+            }
+
+            $completedDate = $task->completed_at->copy();
+            $delayed = $task->due_date && $completedDate->toDateString() > $task->due_date->toDateString();
+            $delayedDays = $task->due_date
+                ? (int) $task->due_date->copy()->startOfDay()->diffInDays($completedDate->copy()->startOfDay())
+                : 0;
+            $description = $delayed
+                ? '期限の'.$task->due_date->format('Y年n月j日').'から'.$delayedDays.'日遅れて完了しました。'
+                : ($task->due_date ? '期限どおりに完了しました。' : '作業を完了しました。');
+
+            $events->push([
+                'date' => $completedDate,
+                'type' => 'Task',
+                'title' => $task->title,
+                'description' => $description,
+                'url' => route('projects.tasks.show', [$project, $task]),
+                'delayed' => $delayed,
+            ]);
+        }
+
+        foreach ($improvements as $improvement) {
+            $implemented = (bool) $improvement->implemented_at;
+            $events->push([
+                'date' => ($improvement->implemented_at ?? $improvement->created_at)->copy(),
+                'type' => '改善',
+                'title' => $improvement->title,
+                'description' => $implemented ? '改善を実施しました。' : '改善として記録しました。',
+                'url' => route('projects.improvements.show', [$project, $improvement]),
+                'delayed' => false,
+            ]);
+        }
+
+        foreach ($roadmaps as $roadmap) {
+            $events->push([
+                'date' => $roadmap->created_at->copy(),
+                'type' => 'Roadmap',
+                'title' => $roadmap->title,
+                'description' => 'これから目指すテーマとしてRoadmapへ追加しました。',
+                'url' => route('projects.show', $project).'#roadmaps',
+                'delayed' => false,
+            ]);
+        }
+
+        if ($project->completed_at) {
+            $events->push([
+                'date' => $project->completed_at->copy(),
+                'type' => 'Project',
+                'title' => 'Projectがひと区切り',
+                'description' => 'ここまでの取り組みを完了し、次の改善へつなげます。',
+                'url' => null,
+                'delayed' => $project->due_date && $project->completed_at->toDateString() > $project->due_date->toDateString(),
+            ]);
+        }
+
+        return $events
+            ->sortBy(fn (array $event) => $event['date']->format('Y-m-d H:i:s'))
+            ->values();
+    }
+
     public function edit(Request $request, Project $project): View
     {
         Gate::authorize('view', $project);
@@ -160,6 +281,8 @@ class ProjectController extends Controller
             'statuses' => Project::statuses(),
             'priorities' => Project::priorities(),
             'clients' => $this->workspaceClients($project->owning_workspace_id),
+            'movableWorkspaces' => $this->movableWorkspaces($request, $project),
+            'canMoveProject' => Gate::allows('move', $project),
         ]);
     }
 
@@ -173,10 +296,75 @@ class ProjectController extends Controller
         return redirect()->route('projects.show', $project)->with('status', 'Projectを更新しました。');
     }
 
+    public function move(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('move', $project);
+
+        $validated = $request->validate([
+            'destination_workspace_id' => ['required', 'integer'],
+            'destination_client_id' => ['required', 'integer'],
+        ]);
+        $destination = $this->movableWorkspaces($request, $project)
+            ->firstWhere('id', (int) $validated['destination_workspace_id']);
+
+        if (! $destination) {
+            abort(403);
+        }
+        $destinationClient = $destination->clients->firstWhere('id', (int) $validated['destination_client_id']);
+        if (! $destinationClient) {
+            return back()->withErrors(['destination_client_id' => '移動先Workspaceのクライアントを選択してください。']);
+        }
+
+        DB::transaction(function () use ($project, $destination, $destinationClient, $request): void {
+            $project->update([
+                'organization_id' => $destination->organization_id,
+                'owning_workspace_id' => $destination->id,
+                'billing_workspace_id' => $destination->id,
+                'client_id' => $destinationClient->id,
+            ]);
+            Improvement::withTrashed()->where('project_id', $project->id)->update([
+                'organization_id' => $destination->organization_id,
+                'workspace_id' => $destination->id,
+            ]);
+            Task::withTrashed()->where('project_id', $project->id)->update([
+                'organization_id' => $destination->organization_id,
+                'workspace_id' => $destination->id,
+            ]);
+            Roadmap::withTrashed()->where('project_id', $project->id)->update([
+                'organization_id' => $destination->organization_id,
+                'workspace_id' => $destination->id,
+            ]);
+            $project->members()
+                ->where('user_id', $request->user()->id)
+                ->update(['workspace_id' => $destination->id]);
+        });
+
+        $request->session()->put('current_workspace_id', $destination->id);
+
+        return redirect()->route('projects.show', $project)->with('status', 'Projectを'.$destination->name.'へ移動しました。');
+    }
+
+    public function destroy(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('delete', $project);
+
+        $request->validate([
+            'delete_password' => ['required', 'current_password'],
+        ], [
+            'delete_password.required' => '削除パスワードを入力してください。',
+            'delete_password.current_password' => '削除パスワードが正しくありません。',
+        ]);
+
+        $projectName = $project->name;
+        $project->delete();
+
+        return redirect()->route('projects.index')->with('status', $projectName.'を削除しました。');
+    }
+
     private function validateProject(Request $request, int $workspaceId): array
     {
         return $request->validate([
-            'client_id' => ['nullable', Rule::exists('clients', 'id')->where('workspace_id', $workspaceId)],
+            'client_id' => ['required', Rule::exists('clients', 'id')->where('workspace_id', $workspaceId)],
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:80'],
             'summary' => ['nullable', 'string', 'max:5000'],
@@ -190,6 +378,30 @@ class ProjectController extends Controller
     private function workspaceClients(int $workspaceId)
     {
         return Client::query()->where('workspace_id', $workspaceId)->orderBy('name')->get();
+    }
+
+    private function filterableClients(Request $request, int $workspaceId)
+    {
+        return Client::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereHas('projects.members', function ($query) use ($request, $workspaceId): void {
+                $query->where('user_id', $request->user()->id)
+                    ->where('workspace_id', $workspaceId)
+                    ->where('status', ProjectMember::STATUS_ACTIVE);
+            })
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function movableWorkspaces(Request $request, Project $project)
+    {
+        return $request->user()->workspaces()
+            ->where('workspaces.status', Workspace::STATUS_ACTIVE)
+            ->where('workspaces.id', '!=', $project->owning_workspace_id)
+            ->wherePivotIn('role', ['owner', 'admin'])
+            ->with(['organization', 'clients' => fn ($query) => $query->orderBy('name')])
+            ->orderBy('workspaces.name')
+            ->get();
     }
 
     private function assignableUsers(Project $project)
@@ -227,7 +439,10 @@ class ProjectController extends Controller
             return [null, 'このユーザーはすでにProjectに参加しています。'];
         }
 
-        $workspace = $user->workspaces()->orderBy('workspaces.name')->first();
+        $workspace = $user->workspaces()
+            ->where('workspaces.status', Workspace::STATUS_ACTIVE)
+            ->orderBy('workspaces.name')
+            ->first();
         if (! $workspace) {
             return [null, 'このユーザーはWorkspaceに所属していません。'];
         }

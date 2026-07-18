@@ -14,6 +14,10 @@
             --accent-dark: #0f4c5c;
             --danger: #a33a3a;
         }
+        html {
+            overflow-y: scroll;
+            scrollbar-gutter: stable;
+        }
         * { box-sizing: border-box; }
         body {
             margin: 0;
@@ -81,6 +85,7 @@
             font: inherit;
         }
         .button.secondary, button.secondary { background: #fff; color: var(--accent-dark); border: 1px solid var(--line); }
+        .button.danger, button.danger { background: var(--danger); color: #fff; }
         .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         .card { border: 1px solid var(--line); border-radius: 8px; padding: 18px; background: #fff; }
@@ -137,14 +142,24 @@
         <a class="brand" href="{{ route('welcome') }}">Rise Gate OS</a>
         <nav class="nav">
             @auth
-                @isset($currentWorkspace)
-                    <span class="workspace-pill">{{ $currentWorkspace->name }} / {{ $currentWorkspaceRole }}</span>
-                @endisset
-                <a href="{{ route('clients.index') }}">Clients</a>
-                <a href="{{ route('projects.index') }}">Projects</a>
-                <a href="{{ route('workspaces.index') }}">Workspaces</a>
-                @if (auth()->user()->is_system_admin)
-                    <a href="{{ route('system-admin.members.index') }}">System Admin</a>
+                @if (session('access_mode') === 'system_admin')
+                    <span class="workspace-pill">System Admin Mode</span>
+                    <a href="{{ route('system-admin.members.index') }}">Members</a>
+                    <a href="{{ route('system-admin.workspaces.index') }}">Workspaces</a>
+                    <form method="POST" action="{{ route('system-admin.exit') }}">
+                        @csrf
+                        <button class="secondary" type="submit">Workspace画面へ</button>
+                    </form>
+                @else
+                    @isset($currentWorkspace)
+                        <span class="workspace-pill">{{ $currentWorkspace->name }} / {{ $currentWorkspaceRole }}</span>
+                    @endisset
+                    <a href="{{ route('clients.index') }}">Clients</a>
+                    <a href="{{ route('projects.index') }}">Projects</a>
+                    <a href="{{ route('workspaces.index') }}">Workspaces</a>
+                    @if (auth()->user()->is_system_admin)
+                        <a href="{{ route('system-admin.login') }}">System Admin Login</a>
+                    @endif
                 @endif
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
@@ -152,6 +167,7 @@
                 </form>
             @else
                 <a href="{{ route('login') }}">Login</a>
+                <a href="{{ route('system-admin.login') }}">System Admin</a>
                 <a class="button" href="{{ route('register') }}">Start</a>
             @endauth
         </nav>

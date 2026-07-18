@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Auth;
+namespace App\Http\Controllers\SystemAdmin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -11,9 +11,9 @@ use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('auth.login');
+        return view('system-admin.auth.login', ['email' => $request->user()?->email]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -22,38 +22,36 @@ class AuthenticatedSessionController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
-
         $credentials['is_active'] = true;
+        $credentials['is_system_admin'] = true;
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             throw ValidationException::withMessages([
-                'email' => 'メールアドレスまたはパスワードが正しくありません。',
+                'email' => 'System Adminの認証情報を確認してください。',
             ]);
         }
 
         $request->session()->regenerate();
-        $request->session()->put('access_mode', 'workspace');
+        $request->session()->put('access_mode', 'system_admin');
 
+        return redirect()->intended(route('system-admin.members.index'));
+    }
+
+    public function exit(Request $request): RedirectResponse
+    {
+        $request->session()->put('access_mode', 'workspace');
         $workspace = $request->user()->workspaces()
             ->where('workspaces.status', \App\Models\Workspace::STATUS_ACTIVE)
             ->orderBy('workspaces.name')
             ->first();
 
-        if ($workspace) {
-            $request->session()->put('current_workspace_id', $workspace->id);
-            return redirect()->intended(route('dashboard'));
+        if (! $workspace) {
+            $request->session()->forget('current_workspace_id');
+            return redirect()->route('workspaces.index');
         }
 
-        return redirect()->route('workspaces.index');
-    }
+        $request->session()->put('current_workspace_id', $workspace->id);
 
-    public function destroy(Request $request): RedirectResponse
-    {
-        Auth::guard('web')->logout();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('welcome');
+        return redirect()->route('dashboard');
     }
 }

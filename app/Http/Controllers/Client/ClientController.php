@@ -70,6 +70,30 @@ class ClientController extends Controller
         return view('clients.show', [
             'client' => $client,
             'projectsCount' => $client->projects()->count(),
+            'canDelete' => Gate::allows('delete', $client),
         ]);
+    }
+
+    public function destroy(Request $request, Client $client): RedirectResponse
+    {
+        $currentWorkspace = $request->attributes->get('currentWorkspace');
+        abort_unless($client->workspace_id === $currentWorkspace->id, 404);
+        Gate::authorize('delete', $client);
+
+        if ($client->projects()->exists()) {
+            return back()->withErrors(['client' => '紐づくProjectが存在するため削除できません。先にProjectを削除してください。']);
+        }
+
+        $request->validate([
+            'delete_password' => ['required', 'current_password'],
+        ], [
+            'delete_password.required' => '削除パスワードを入力してください。',
+            'delete_password.current_password' => '削除パスワードが正しくありません。',
+        ]);
+
+        $clientName = $client->name;
+        $client->delete();
+
+        return redirect()->route('clients.index')->with('status', $clientName.'を削除しました。');
     }
 }

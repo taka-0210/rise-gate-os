@@ -21,4 +21,13 @@ class ClientPolicy
     {
         return $user->canAccessWorkspace($client->workspace_id);
     }
+
+    public function delete(User $user, Client $client): bool
+    {
+        $role = $user->workspaces()
+            ->where('workspaces.id', $client->workspace_id)
+            ->first()?->pivot?->role;
+
+        return in_array($role, ['owner', 'admin'], true);
+    }
 }

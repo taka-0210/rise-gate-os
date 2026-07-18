@@ -33,6 +33,36 @@
             font-weight: 900;
         }
         .roadmap-arrow-forward { color: var(--ink); }
+        .project-improvements-card {
+            align-content: start;
+            gap: 14px;
+        }
+        .project-timeline { grid-column: 1 / -1; }
+        .timeline-list { display: grid; gap: 0; }
+        .timeline-event {
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(100px, 130px) minmax(0, 1fr);
+            gap: 20px;
+            padding: 0 0 24px 24px;
+            margin-left: 6px;
+            border-left: 2px solid var(--line);
+        }
+        .timeline-event:last-child { padding-bottom: 0; }
+        .timeline-event::before {
+            content: '';
+            position: absolute;
+            left: -7px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-dark);
+            border: 3px solid #fff;
+        }
+        .timeline-event.is-delayed::before { background: #b46a3c; }
+        .timeline-event h2 { margin-top: 2px; }
+        .timeline-event p { margin-bottom: 0; }
         @media (max-width: 760px) {
             .roadmap-lane { grid-template-columns: 1fr; }
             .roadmap-flow {
@@ -48,6 +78,7 @@
                 min-height: 28px;
                 transform: rotate(90deg);
             }
+            .timeline-event { grid-template-columns: 1fr; gap: 4px; }
         }
     </style>
 
@@ -148,7 +179,7 @@
                 <a class="button secondary" href="#tasks">Tasks</a>
                 <a class="button secondary" href="#improvements">改善</a>
                 <a class="button secondary" href="#documents">Documents</a>
-                <a class="button secondary" href="#events">Project Events</a>
+                <a class="button secondary" href="#events">プロジェクトタイムライン</a>
             </div>
 
             <section id="roadmaps" class="stack">
@@ -416,7 +447,7 @@
                             <div class="meta">
                                 {{ $taskStatuses[$task->status] ?? $task->status }} / {{ $taskPriorities[$task->priority] ?? $task->priority }}
                             </div>
-                            <h2>{{ $task->title }}</h2>
+                            <h2><a href="{{ route('projects.tasks.show', [$project, $task]) }}">{{ $task->title }}</a></h2>
                             <p>{{ Str::limit($task->description ?: '詳細はまだありません。', 120) }}</p>
                             <p class="meta">
                                 担当者: {{ $task->assignee?->name ?? '未設定' }}
@@ -481,7 +512,7 @@
                     </form>
                 @endif
             </div>
-            <div id="improvements" class="card stack">
+            <div id="improvements" class="card stack project-improvements-card">
                 <div class="actions" style="justify-content: space-between; align-items: flex-start;">
                     <div>
                         <h2>改善</h2>
@@ -513,9 +544,36 @@
                 <h2>Documents</h2>
                 <p>Coming Soon</p>
             </div>
-            <div id="events" class="card">
-                <h2>Project Events</h2>
-                <p>Coming Soon</p>
+            <div id="events" class="card stack project-timeline">
+                <div>
+                    <h2>プロジェクトタイムライン</h2>
+                    <p>Project内のデータから、仕事がどのように進んだかを自動でまとめています。</p>
+                </div>
+
+                @if ($projectTimeline->isEmpty())
+                    <p>タイムラインに表示できる出来事はまだありません。</p>
+                @else
+                    <div class="timeline-list">
+                        @foreach ($projectTimeline as $event)
+                            <article class="timeline-event @if ($event['delayed']) is-delayed @endif">
+                                <div>
+                                    <div class="meta">{{ $event['date']->format('Y年n月j日') }}</div>
+                                    <span class="badge">{{ $event['type'] }}</span>
+                                </div>
+                                <div>
+                                    <h2>
+                                        @if ($event['url'])
+                                            <a href="{{ $event['url'] }}">{{ $event['title'] }}</a>
+                                        @else
+                                            {{ $event['title'] }}
+                                        @endif
+                                    </h2>
+                                    <p>{{ $event['description'] }}</p>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
     </section>

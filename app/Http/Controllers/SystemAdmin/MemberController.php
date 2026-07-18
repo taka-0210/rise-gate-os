@@ -57,8 +57,11 @@ class MemberController extends Controller
                 ]);
                 $workspace = Workspace::create([
                     'organization_id' => $organization->id,
+                    'owner_user_id' => $user->id,
                     'name' => $validated['workspace_name'],
                     'slug' => $this->uniqueWorkspaceSlug($organization, $validated['workspace_name']),
+                    'billing_type' => Workspace::BILLING_INCLUDED,
+                    'status' => Workspace::STATUS_ACTIVE,
                 ]);
                 $organizationRole = OrganizationUser::ROLE_OWNER;
                 $workspaceRole = WorkspaceMember::ROLE_OWNER;

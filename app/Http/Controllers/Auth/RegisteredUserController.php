@@ -51,8 +51,11 @@ class RegisteredUserController extends Controller
 
             $workspace = Workspace::create([
                 'organization_id' => $organization->id,
+                'owner_user_id' => $user->id,
                 'name' => $validated['workspace_name'],
                 'slug' => $this->uniqueWorkspaceSlug($organization, $validated['workspace_name']),
+                'billing_type' => Workspace::BILLING_INCLUDED,
+                'status' => Workspace::STATUS_ACTIVE,
             ]);
 
             $organization->users()->attach($user->id, [
@@ -70,6 +73,7 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
         $request->session()->put('current_workspace_id', $workspace->id);
+        $request->session()->put('access_mode', 'workspace');
 
         return redirect()->route('dashboard');
     }

@@ -50,4 +50,42 @@ class ProjectPolicy
             ->where('status', ProjectMember::STATUS_ACTIVE)
             ->exists();
     }
+
+    public function move(User $user, Project $project): bool
+    {
+        $hasProjectAdminPermission = $project->members()
+            ->where('user_id', $user->id)
+            ->where('permission_level', ProjectMember::PERMISSION_ADMIN)
+            ->where('status', ProjectMember::STATUS_ACTIVE)
+            ->exists();
+
+        if (! $hasProjectAdminPermission) {
+            return false;
+        }
+
+        $sourceRole = $user->workspaces()
+            ->where('workspaces.id', $project->owning_workspace_id)
+            ->first()?->pivot?->role;
+
+        return in_array($sourceRole, ['owner', 'admin'], true);
+    }
+
+    public function delete(User $user, Project $project): bool
+    {
+        $hasProjectAdminPermission = $project->members()
+            ->where('user_id', $user->id)
+            ->where('permission_level', ProjectMember::PERMISSION_ADMIN)
+            ->where('status', ProjectMember::STATUS_ACTIVE)
+            ->exists();
+
+        if (! $hasProjectAdminPermission) {
+            return false;
+        }
+
+        $workspaceRole = $user->workspaces()
+            ->where('workspaces.id', $project->owning_workspace_id)
+            ->first()?->pivot?->role;
+
+        return in_array($workspaceRole, ['owner', 'admin'], true);
+    }
 }

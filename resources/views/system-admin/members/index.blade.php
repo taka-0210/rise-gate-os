@@ -44,40 +44,50 @@
                     </select>
                     @error('assignment_type') <div class="error">{{ $message }}</div> @enderror
                 </div>
-                <div class="grid">
-                    <div class="field">
-                        <label for="organization_name">新しいOrganization名</label>
-                        <input id="organization_name" name="organization_name" value="{{ old('organization_name') }}">
-                        @error('organization_name') <div class="error">{{ $message }}</div> @enderror
+                @php($assignmentType = old('assignment_type', 'new_workspace'))
+                <fieldset data-assignment-panel="new_workspace" class="card stack" style="margin:0;" @if ($assignmentType !== 'new_workspace') hidden @endif>
+                    <legend><strong>専用Workspaceを作成</strong></legend>
+                    <p class="meta" style="margin:0;">新しいOrganizationとWorkspaceを作成し、このメンバーをOwnerに設定します。</p>
+                    <div class="grid">
+                        <div class="field">
+                            <label for="organization_name">新しいOrganization名</label>
+                            <input id="organization_name" name="organization_name" value="{{ old('organization_name') }}" @disabled($assignmentType !== 'new_workspace') @if ($assignmentType === 'new_workspace') required @endif>
+                            @error('organization_name') <div class="error">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="field">
+                            <label for="workspace_name">新しいWorkspace名</label>
+                            <input id="workspace_name" name="workspace_name" value="{{ old('workspace_name') }}" @disabled($assignmentType !== 'new_workspace') @if ($assignmentType === 'new_workspace') required @endif>
+                            @error('workspace_name') <div class="error">{{ $message }}</div> @enderror
+                        </div>
                     </div>
-                    <div class="field">
-                        <label for="workspace_name">新しいWorkspace名</label>
-                        <input id="workspace_name" name="workspace_name" value="{{ old('workspace_name') }}">
-                        @error('workspace_name') <div class="error">{{ $message }}</div> @enderror
+                </fieldset>
+
+                <fieldset data-assignment-panel="existing_workspace" class="card stack" style="margin:0;" @if ($assignmentType !== 'existing_workspace') hidden @endif>
+                    <legend><strong>既存Workspaceへ追加</strong></legend>
+                    <p class="meta" style="margin:0;">所属先のWorkspaceと、その中での権限を選択します。</p>
+                    <div class="grid">
+                        <div class="field">
+                            <label for="workspace_id">既存Workspace</label>
+                            <select id="workspace_id" name="workspace_id" @disabled($assignmentType !== 'existing_workspace') @if ($assignmentType === 'existing_workspace') required @endif>
+                                <option value="">選択してください</option>
+                                @foreach ($workspaces as $workspace)
+                                    <option value="{{ $workspace->id }}" @selected((string) old('workspace_id') === (string) $workspace->id)>{{ $workspace->organization->name }} / {{ $workspace->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('workspace_id') <div class="error">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="field">
+                            <label for="workspace_role">Workspace権限</label>
+                            <select id="workspace_role" name="workspace_role" @disabled($assignmentType !== 'existing_workspace') @if ($assignmentType === 'existing_workspace') required @endif>
+                                <option value="member" @selected(old('workspace_role', 'member') === 'member')>Member</option>
+                                <option value="admin" @selected(old('workspace_role') === 'admin')>Admin</option>
+                                <option value="viewer" @selected(old('workspace_role') === 'viewer')>Viewer</option>
+                            </select>
+                            @error('workspace_role') <div class="error">{{ $message }}</div> @enderror
+                        </div>
                     </div>
-                </div>
-                <div class="grid">
-                    <div class="field">
-                        <label for="workspace_id">既存Workspace</label>
-                        <select id="workspace_id" name="workspace_id">
-                            <option value="">選択してください</option>
-                            @foreach ($workspaces as $workspace)
-                                <option value="{{ $workspace->id }}" @selected((string) old('workspace_id') === (string) $workspace->id)>{{ $workspace->organization->name }} / {{ $workspace->name }}</option>
-                            @endforeach
-                        </select>
-                        @error('workspace_id') <div class="error">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="field">
-                        <label for="workspace_role">Workspace権限</label>
-                        <select id="workspace_role" name="workspace_role">
-                            <option value="member" @selected(old('workspace_role', 'member') === 'member')>Member</option>
-                            <option value="admin" @selected(old('workspace_role') === 'admin')>Admin</option>
-                            <option value="viewer" @selected(old('workspace_role') === 'viewer')>Viewer</option>
-                        </select>
-                        @error('workspace_role') <div class="error">{{ $message }}</div> @enderror
-                    </div>
-                </div>
-                <p class="meta">登録方法に対応する項目だけが使用されます。専用Workspaceを作成したメンバーはOwnerになります。</p>
+                </fieldset>
+                <noscript><p class="error">登録方法を変更した場合は、画面を再読み込みしてから入力してください。</p></noscript>
                 <div><button type="submit">メンバーを登録</button></div>
             </form>
         </div>
@@ -105,4 +115,25 @@
             </div>
         </div>
     </section>
+
+    <script>
+        (() => {
+            const typeSelect = document.getElementById('assignment_type');
+            const panels = document.querySelectorAll('[data-assignment-panel]');
+
+            const updateAssignmentFields = () => {
+                panels.forEach((panel) => {
+                    const active = panel.dataset.assignmentPanel === typeSelect.value;
+                    panel.hidden = !active;
+                    panel.querySelectorAll('input, select').forEach((field) => {
+                        field.disabled = !active;
+                        field.required = active;
+                    });
+                });
+            };
+
+            typeSelect.addEventListener('change', updateAssignmentFields);
+            updateAssignmentFields();
+        })();
+    </script>
 @endsection

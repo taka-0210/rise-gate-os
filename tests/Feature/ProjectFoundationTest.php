@@ -5,6 +5,10 @@ namespace Tests\Feature;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\Improvement;
+use App\Models\Task;
+use App\Models\Roadmap;
+use App\Models\Client;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,11 +21,13 @@ class ProjectFoundationTest extends TestCase
     public function test_user_can_create_project_in_current_workspace(): void
     {
         [$user, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Rise Gate Client']);
 
         $response = $this
             ->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post('/projects', [
+                'client_id' => $client->id,
                 'name' => 'Website Improvement Project',
                 'code' => 'RG-001',
                 'summary' => 'The first project centered on improvement.',
@@ -106,6 +112,7 @@ class ProjectFoundationTest extends TestCase
     public function test_project_admin_can_update_project(): void
     {
         [$user, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Update Client']);
         $project = Project::create([
             'organization_id' => $workspace->organization_id,
             'owning_workspace_id' => $workspace->id,
@@ -121,7 +128,7 @@ class ProjectFoundationTest extends TestCase
             ->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->put(route('projects.update', $project), [
-                'client_id' => null,
+                'client_id' => $client->id,
                 'name' => 'Updated Project',
                 'code' => 'UP-001',
                 'summary' => 'Updated summary for operation.',
@@ -165,6 +172,156 @@ class ProjectFoundationTest extends TestCase
                 'priority' => 'normal',
             ])
             ->assertForbidden();
+    }
+
+    public function test_workspace_owner_can_move_project_and_all_children_to_another_managed_workspace(): void
+    {
+        [$owner, $sourceWorkspace] = $this->createWorkspaceOwner();
+        $destinationOrganization = Organization::create(['name' => 'Destination Org', 'slug' => 'destination-org']);
+        $destinationWorkspace = Workspace::create([
+            'organization_id' => $destinationOrganization->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'Destination Workspace',
+            'slug' => 'destination-workspace',
+        ]);
+        $destinationOrganization->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
+        $destinationWorkspace->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
+        $destinationClient = Client::create([
+            'organization_id' => $destinationOrganization->id,
+            'workspace_id' => $destinationWorkspace->id,
+            'name' => 'Destination Client',
+        ]);
+        $project = Project::create([
+            'organization_id' => $sourceWorkspace->organization_id,
+            'owning_workspace_id' => $sourceWorkspace->id,
+            'billing_workspace_id' => $sourceWorkspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'Movable Project',
+        ]);
+        $this->addProjectMember($project, $owner, $sourceWorkspace, 'owner', 'admin');
+        $improvement = Improvement::create([
+            'organization_id' => $sourceWorkspace->organization_id,
+            'workspace_id' => $sourceWorkspace->id,
+            'project_id' => $project->id,
+            'title' => 'Move Improvement',
+        ]);
+        $task = Task::create([
+            'organization_id' => $sourceWorkspace->organization_id,
+            'workspace_id' => $sourceWorkspace->id,
+            'project_id' => $project->id,
+            'title' => 'Move Task',
+        ]);
+        $roadmap = Roadmap::create([
+            'organization_id' => $sourceWorkspace->organization_id,
+            'workspace_id' => $sourceWorkspace->id,
+            'project_id' => $project->id,
+            'title' => 'Move Roadmap',
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $sourceWorkspace->id])
+            ->post(route('projects.move', $project), [
+                'destination_workspace_id' => $destinationWorkspace->id,
+                'destination_client_id' => $destinationClient->id,
+            ])
+            ->assertRedirect(route('projects.show', $project))
+            ->assertSessionHas('current_workspace_id', $destinationWorkspace->id);
+
+        $project->refresh();
+        $this->assertSame($destinationWorkspace->id, $project->owning_workspace_id);
+        $this->assertSame($destinationWorkspace->id, $project->billing_workspace_id);
+        $this->assertSame($destinationOrganization->id, $project->organization_id);
+        $this->assertSame($destinationClient->id, $project->client_id);
+        $this->assertSame($destinationWorkspace->id, $improvement->fresh()->workspace_id);
+        $this->assertSame($destinationWorkspace->id, $task->fresh()->workspace_id);
+        $this->assertSame($destinationWorkspace->id, $roadmap->fresh()->workspace_id);
+        $this->assertDatabaseHas('project_members', ['project_id' => $project->id, 'user_id' => $owner->id, 'workspace_id' => $destinationWorkspace->id]);
+    }
+
+    public function test_project_cannot_be_moved_to_workspace_where_user_is_only_a_member(): void
+    {
+        [$owner, $sourceWorkspace] = $this->createWorkspaceOwner();
+        [, $destinationWorkspace] = $this->createWorkspaceOwner('Other Org', 'Other Workspace', 'other-owner@example.com');
+        $destinationWorkspace->organization->users()->attach($owner->id, ['role' => 'member', 'joined_at' => now()]);
+        $destinationWorkspace->users()->attach($owner->id, ['role' => 'member', 'joined_at' => now()]);
+        $project = Project::create([
+            'organization_id' => $sourceWorkspace->organization_id,
+            'owning_workspace_id' => $sourceWorkspace->id,
+            'billing_workspace_id' => $sourceWorkspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'Protected Project',
+        ]);
+        $this->addProjectMember($project, $owner, $sourceWorkspace, 'owner', 'admin');
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $sourceWorkspace->id])
+            ->post(route('projects.move', $project), ['destination_workspace_id' => $destinationWorkspace->id, 'destination_client_id' => 999])
+            ->assertForbidden();
+
+        $this->assertSame($sourceWorkspace->id, $project->fresh()->owning_workspace_id);
+    }
+
+    public function test_workspace_owner_can_soft_delete_project_with_login_password(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $project = Project::create([
+            'organization_id' => $workspace->organization_id,
+            'owning_workspace_id' => $workspace->id,
+            'billing_workspace_id' => $workspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'Delete Project',
+        ]);
+        $this->addProjectMember($project, $owner, $workspace, 'owner', 'admin');
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->delete(route('projects.destroy', $project), ['delete_password' => 'password'])
+            ->assertRedirect(route('projects.index'));
+
+        $this->assertSoftDeleted('projects', ['id' => $project->id]);
+        $this->assertDatabaseHas('project_members', ['project_id' => $project->id, 'user_id' => $owner->id]);
+    }
+
+    public function test_project_is_not_deleted_with_wrong_password(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $project = Project::create([
+            'organization_id' => $workspace->organization_id,
+            'owning_workspace_id' => $workspace->id,
+            'billing_workspace_id' => $workspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'Protected From Wrong Password',
+        ]);
+        $this->addProjectMember($project, $owner, $workspace, 'owner', 'admin');
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->delete(route('projects.destroy', $project), ['delete_password' => 'wrong-password'])
+            ->assertSessionHasErrors('delete_password');
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'deleted_at' => null]);
+    }
+
+    public function test_project_editor_cannot_delete_project(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        [$editor, $editorWorkspace] = $this->createWorkspaceOwner('Editor Org', 'Editor Workspace', 'editor@example.com');
+        $project = Project::create([
+            'organization_id' => $workspace->organization_id,
+            'owning_workspace_id' => $workspace->id,
+            'billing_workspace_id' => $workspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'Owner Only Delete',
+        ]);
+        $this->addProjectMember($project, $owner, $workspace, 'owner', 'admin');
+        $this->addProjectMember($project, $editor, $editorWorkspace, 'coder', 'edit');
+
+        $this->actingAs($editor)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $editorWorkspace->id])
+            ->delete(route('projects.destroy', $project), ['delete_password' => 'password'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'deleted_at' => null]);
     }
     protected function createWorkspaceOwner(
         string $organizationName = 'Rise Gate',

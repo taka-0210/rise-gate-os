@@ -4,16 +4,16 @@
     <section class="panel stack">
         <div>
             <h1>Create Project</h1>
-            <p>Projectは、改善を実行し、お客様と進捗を共有する中心単位です。Clientなしの社内Projectも作成できます。</p>
+            <p>Projectは、クライアントの改善を実行し、進捗を共有する中心単位です。</p>
         </div>
 
         <form class="stack" method="POST" action="{{ route('projects.store') }}">
             @csrf
 
             <div class="field">
-                <label for="client_id">Client / Company</label>
-                <select id="client_id" name="client_id">
-                    <option value="">No Client / Internal Project</option>
+                <label for="client_id">クライアント</label>
+                <select id="client_id" name="client_id" required>
+                    <option value="">クライアントを選択</option>
                     @foreach ($clients as $client)
                         <option value="{{ $client->id }}" @selected((string) old('client_id', $selectedClientId) === (string) $client->id)>{{ $client->name }}</option>
                     @endforeach

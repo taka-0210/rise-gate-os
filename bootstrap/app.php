@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureCurrentWorkspace;
 use App\Http\Middleware\EnsureSystemAdmin;
 use App\Http\Middleware\EnsureActiveUser;
+use App\Http\Middleware\EnsureWorkspaceMode;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'workspace' => EnsureCurrentWorkspace::class,
             'system-admin' => EnsureSystemAdmin::class,
             'active-user' => EnsureActiveUser::class,
+            'workspace-mode' => EnsureWorkspaceMode::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

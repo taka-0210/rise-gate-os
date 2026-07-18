@@ -114,21 +114,21 @@ class Project extends Model
     public static function statuses(): array
     {
         return [
-            self::STATUS_DRAFT => 'Draft',
-            self::STATUS_ACTIVE => 'Active',
-            self::STATUS_ON_HOLD => 'On hold',
-            self::STATUS_COMPLETED => 'Completed',
-            self::STATUS_ARCHIVED => 'Archived',
+            self::STATUS_DRAFT => '準備中',
+            self::STATUS_ACTIVE => '進行中',
+            self::STATUS_ON_HOLD => '保留',
+            self::STATUS_COMPLETED => 'ひと区切り',
+            self::STATUS_ARCHIVED => '継続フォロー',
         ];
     }
 
     public static function priorities(): array
     {
         return [
-            self::PRIORITY_LOW => 'Low',
-            self::PRIORITY_NORMAL => 'Normal',
-            self::PRIORITY_HIGH => 'High',
-            self::PRIORITY_URGENT => 'Urgent',
+            self::PRIORITY_LOW => '低',
+            self::PRIORITY_NORMAL => '通常',
+            self::PRIORITY_HIGH => '高',
+            self::PRIORITY_URGENT => '緊急',
         ];
     }
 }

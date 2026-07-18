@@ -57,5 +57,30 @@
             </div>
             <p class="meta">Client配下のProject一覧はPhase 1-5では作り込みません。Project一覧と詳細で関連を確認します。</p>
         </div>
+
+        @if ($canDelete)
+            <div class="panel stack" style="border-color:#e1bcbc;">
+                <div>
+                    <h2>クライアントを削除</h2>
+                    @if ($projectsCount > 0)
+                        <p>紐づくProjectが{{ $projectsCount }}件あるため削除できません。先にProjectを削除してください。</p>
+                    @else
+                        <p>クライアントを一覧から削除します。確認のため、ログインパスワードを入力してください。</p>
+                    @endif
+                </div>
+                @if ($errors->has('client'))<div class="error">{{ $errors->first('client') }}</div>@endif
+                @if ($projectsCount === 0)
+                    <form class="stack" method="POST" action="{{ route('clients.destroy', $client) }}">
+                        @csrf @method('DELETE')
+                        <div class="field">
+                            <label for="delete_password">削除パスワード</label>
+                            <input id="delete_password" name="delete_password" type="password" required autocomplete="current-password">
+                            @error('delete_password') <div class="error">{{ $message }}</div> @enderror
+                        </div>
+                        <div><button class="danger" type="submit">クライアントを削除</button></div>
+                    </form>
+                @endif
+            </div>
+        @endif
     </section>
 @endsection

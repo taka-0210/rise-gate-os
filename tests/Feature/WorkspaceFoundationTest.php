@@ -90,4 +90,23 @@ class WorkspaceFoundationTest extends TestCase
         $response->assertSee('Main Workspace');
         $response->assertSessionHas('current_workspace_id', $workspace->id);
     }
+
+    public function test_workspace_list_shows_dashboard_summary_and_name_change_link(): void
+    {
+        $user = User::factory()->create();
+        $organization = Organization::create(['name' => 'Summary Org', 'slug' => 'summary-org']);
+        $workspace = Workspace::create(['organization_id' => $organization->id, 'owner_user_id' => $user->id, 'name' => 'Summary Workspace', 'slug' => 'summary-workspace']);
+        $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $workspace->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+
+        $this->actingAs($user)
+            ->withSession(['access_mode' => 'workspace'])
+            ->get(route('workspaces.index'))
+            ->assertOk()
+            ->assertSee('Project')
+            ->assertSee('クライアント')
+            ->assertSee('育成中')
+            ->assertSee('今週追加')
+            ->assertSee('（名前変更）');
+    }
 }

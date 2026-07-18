@@ -133,7 +133,7 @@ class ClientFoundationTest extends TestCase
         $this->assertSame($client->id, $project->client_id);
     }
 
-    public function test_project_can_be_created_without_client(): void
+    public function test_project_requires_client(): void
     {
         [$user, $workspace] = $this->createWorkspaceOwner();
 
@@ -147,10 +147,83 @@ class ClientFoundationTest extends TestCase
                 'priority' => 'normal',
             ]);
 
-        $project = Project::firstOrFail();
+        $response->assertSessionHasErrors('client_id');
+        $this->assertDatabaseMissing('projects', ['name' => 'Internal Improvement Project']);
+    }
 
-        $response->assertRedirect(route('projects.show', $project));
-        $this->assertNull($project->client_id);
+    public function test_project_list_can_be_sorted_by_client_name(): void
+    {
+        [$user, $workspace] = $this->createWorkspaceOwner();
+        $zClient = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Zulu Client']);
+        $aClient = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Alpha Client']);
+
+        foreach ([[$zClient, 'Zulu Project'], [$aClient, 'Alpha Project']] as [$client, $name]) {
+            $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])->post('/projects', [
+                'client_id' => $client->id,
+                'name' => $name,
+                'status' => 'active',
+                'priority' => 'normal',
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.index', ['sort' => 'client_asc']))
+            ->assertOk()
+            ->assertSeeInOrder(['Alpha Client', 'Zulu Client']);
+    }
+
+    public function test_project_list_can_be_filtered_by_client(): void
+    {
+        [$user, $workspace] = $this->createWorkspaceOwner();
+        $visibleClient = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Visible Client']);
+        $hiddenClient = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Hidden Client']);
+        Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'No Project Client']);
+
+        foreach ([[$visibleClient, 'Visible Client Project'], [$hiddenClient, 'Hidden Client Project']] as [$client, $name]) {
+            $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])->post('/projects', [
+                'client_id' => $client->id,
+                'name' => $name,
+                'status' => 'active',
+                'priority' => 'normal',
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.index', ['client_id' => $visibleClient->id]))
+            ->assertOk()
+            ->assertSee('Visible Client Project')
+            ->assertDontSee('Hidden Client Project')
+            ->assertDontSee('No Project Client');
+    }
+
+    public function test_project_list_can_filter_status_and_priority_and_sort_oldest(): void
+    {
+        [$user, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Filter Client']);
+
+        foreach ([
+            ['Old Matching Project', 'active', 'high'],
+            ['New Matching Project', 'active', 'high'],
+            ['Wrong Status Project', 'on_hold', 'high'],
+            ['Wrong Priority Project', 'active', 'low'],
+        ] as [$name, $status, $priority]) {
+            $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])->post('/projects', [
+                'client_id' => $client->id,
+                'name' => $name,
+                'status' => $status,
+                'priority' => $priority,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.index', ['status' => 'active', 'priority' => 'high', 'sort' => 'oldest']))
+            ->assertOk()
+            ->assertSeeInOrder(['Old Matching Project', 'New Matching Project'])
+            ->assertDontSee('Wrong Status Project')
+            ->assertDontSee('Wrong Priority Project');
     }
 
     public function test_project_cannot_use_client_from_other_workspace(): void
@@ -177,6 +250,65 @@ class ClientFoundationTest extends TestCase
         $this->assertDatabaseMissing('projects', [
             'name' => 'Invalid Client Project',
         ]);
+    }
+
+    public function test_workspace_owner_can_delete_client_without_projects_using_password(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Delete Client']);
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->delete(route('clients.destroy', $client), ['delete_password' => 'password'])
+            ->assertRedirect(route('clients.index'));
+
+        $this->assertSoftDeleted('clients', ['id' => $client->id]);
+    }
+
+    public function test_client_with_project_cannot_be_deleted(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Protected Client']);
+        $this->actingAs($owner)->withSession(['current_workspace_id' => $workspace->id])->post('/projects', [
+            'client_id' => $client->id,
+            'name' => 'Existing Client Project',
+            'status' => 'active',
+            'priority' => 'normal',
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->delete(route('clients.destroy', $client), ['delete_password' => 'password'])
+            ->assertSessionHasErrors('client');
+
+        $this->assertDatabaseHas('clients', ['id' => $client->id, 'deleted_at' => null]);
+    }
+
+    public function test_client_is_not_deleted_with_wrong_password(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Wrong Password Client']);
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->delete(route('clients.destroy', $client), ['delete_password' => 'wrong-password'])
+            ->assertSessionHasErrors('delete_password');
+
+        $this->assertDatabaseHas('clients', ['id' => $client->id, 'deleted_at' => null]);
+    }
+
+    public function test_workspace_member_cannot_delete_client(): void
+    {
+        [$member, $workspace] = $this->createWorkspaceOwner();
+        $workspace->users()->updateExistingPivot($member->id, ['role' => 'member']);
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Owner Protected Client']);
+
+        $this->actingAs($member)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->delete(route('clients.destroy', $client), ['delete_password' => 'password'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('clients', ['id' => $client->id, 'deleted_at' => null]);
     }
 
     protected function createWorkspaceOwner(

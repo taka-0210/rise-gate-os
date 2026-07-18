@@ -20,7 +20,10 @@ class EnsureCurrentWorkspace
         }
 
         if (! $workspaceId || ! $user->canAccessWorkspace((int) $workspaceId)) {
-            $workspace = $user->workspaces()->orderBy('workspaces.name')->first();
+            $workspace = $user->workspaces()
+                ->where('workspaces.status', Workspace::STATUS_ACTIVE)
+                ->orderBy('workspaces.name')
+                ->first();
 
             if (! $workspace) {
                 $request->session()->forget('current_workspace_id');

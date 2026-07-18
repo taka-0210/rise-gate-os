@@ -29,4 +29,17 @@ class TaskPolicy
             ->where('status', ProjectMember::STATUS_ACTIVE)
             ->exists();
     }
+
+    public function update(User $user, Task $task): bool
+    {
+        return $task->project->members()
+            ->where('user_id', $user->id)
+            ->where('status', ProjectMember::STATUS_ACTIVE)
+            ->whereIn('permission_level', [
+                ProjectMember::PERMISSION_ADMIN,
+                ProjectMember::PERMISSION_EDIT,
+                ProjectMember::PERMISSION_COMMENT,
+            ])
+            ->exists();
+    }
 }

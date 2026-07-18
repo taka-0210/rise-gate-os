@@ -6,15 +6,11 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureSystemAdmin
+class EnsureWorkspaceMode
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_unless(
-            $request->user()?->is_system_admin
-            && $request->session()->get('access_mode') === 'system_admin',
-            403
-        );
+        abort_unless($request->session()->get('access_mode', 'workspace') === 'workspace', 403);
 
         return $next($request);
     }

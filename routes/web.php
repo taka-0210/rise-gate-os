@@ -12,6 +12,8 @@ use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\RoadmapController;
 use App\Http\Controllers\Workspace\WorkspaceController;
 use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
+use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdminSessionController;
+use App\Http\Controllers\SystemAdmin\WorkspaceController as SystemAdminWorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -26,13 +28,22 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 });
 
+Route::get('/system-admin/login', [SystemAdminSessionController::class, 'create'])->name('system-admin.login');
+Route::post('/system-admin/login', [SystemAdminSessionController::class, 'store'])->name('system-admin.login.store');
+
 Route::middleware(['auth', 'active-user'])->group(function (): void {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
-    Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
-    Route::post('/workspaces/{workspace}/switch', [WorkspaceController::class, 'switch'])->name('workspaces.switch');
+    Route::get('/workspaces', [WorkspaceController::class, 'index'])->middleware('workspace-mode')->name('workspaces.index');
+    Route::get('/workspaces/create', [WorkspaceController::class, 'create'])->middleware('workspace-mode')->name('workspaces.create');
+    Route::post('/workspaces', [WorkspaceController::class, 'store'])->middleware('workspace-mode')->name('workspaces.store');
+    Route::post('/workspaces/{workspace}/switch', [WorkspaceController::class, 'switch'])->middleware('workspace-mode')->name('workspaces.switch');
+    Route::post('/workspaces/{workspace}/projects', [WorkspaceController::class, 'projects'])->middleware('workspace-mode')->name('workspaces.projects');
+    Route::get('/workspaces/{workspace}/edit', [WorkspaceController::class, 'edit'])->middleware('workspace-mode')->name('workspaces.edit');
+    Route::put('/workspaces/{workspace}', [WorkspaceController::class, 'update'])->middleware('workspace-mode')->name('workspaces.update');
 
     Route::middleware('system-admin')->prefix('system-admin')->name('system-admin.')->group(function (): void {
+        Route::post('/exit', [SystemAdminSessionController::class, 'exit'])->name('exit');
         Route::get('/members', [SystemAdminMemberController::class, 'index'])->name('members.index');
         Route::post('/members', [SystemAdminMemberController::class, 'store'])->name('members.store');
         Route::get('/members/{user}/edit', [SystemAdminMemberController::class, 'edit'])->name('members.edit');
@@ -40,17 +51,23 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/members/{user}/workspaces', [SystemAdminMemberController::class, 'storeWorkspace'])->name('members.workspaces.store');
         Route::put('/members/{user}/workspaces/{workspace}', [SystemAdminMemberController::class, 'updateWorkspace'])->name('members.workspaces.update');
         Route::delete('/members/{user}/workspaces/{workspace}', [SystemAdminMemberController::class, 'destroyWorkspace'])->name('members.workspaces.destroy');
+        Route::get('/workspaces', [SystemAdminWorkspaceController::class, 'index'])->name('workspaces.index');
+        Route::get('/workspaces/{workspace}/edit', [SystemAdminWorkspaceController::class, 'edit'])->name('workspaces.edit');
+        Route::put('/workspaces/{workspace}', [SystemAdminWorkspaceController::class, 'update'])->name('workspaces.update');
+        Route::put('/workspaces/{workspace}/status', [SystemAdminWorkspaceController::class, 'updateStatus'])->name('workspaces.status.update');
     });
 
-    Route::middleware('workspace')->group(function (): void {
+    Route::middleware(['workspace-mode', 'workspace'])->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
-        Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show']);
+        Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+        Route::post('/projects/{project}/move', [ProjectController::class, 'move'])->name('projects.move');
+        Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
         Route::resource('projects.improvements', ImprovementController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::post('/projects/{project}/roadmaps', [RoadmapController::class, 'store'])->name('projects.roadmaps.store');
         Route::post('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'assignImprovement'])->name('projects.improvements.roadmap.assign');
         Route::delete('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'removeImprovement'])->name('projects.improvements.roadmap.remove');
-        Route::post('/projects/{project}/tasks', [TaskController::class, 'store'])->name('projects.tasks.store');
+        Route::resource('projects.tasks', TaskController::class)->only(['store', 'show', 'edit', 'update']);
         Route::post('/projects/{project}/improvements/{improvement}/outputs/tasks', [ImprovementOutputController::class, 'storeTask'])->name('projects.improvements.outputs.tasks.store');
         Route::post('/projects/{project}/improvements/{improvement}/outputs/projects', [ImprovementOutputController::class, 'storeProject'])->name('projects.improvements.outputs.projects.store');
         Route::post('/projects/{project}/members', [ProjectMemberController::class, 'store'])->name('projects.members.store');

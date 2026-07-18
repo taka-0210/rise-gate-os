@@ -11,9 +11,44 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class TaskController extends Controller
 {
+    public function show(Project $project, Task $task): View
+    {
+        $this->authorizeProjectTask($project, $task);
+
+        Gate::authorize('view', $project);
+        Gate::authorize('view', $task);
+
+        $task->load(['assignee', 'creator', 'improvement']);
+
+        return view('tasks.show', [
+            'project' => $project,
+            'task' => $task,
+            'statuses' => Task::statuses(),
+            'priorities' => Task::priorities(),
+            'canEditTask' => Gate::allows('update', $task),
+        ]);
+    }
+
+    public function edit(Project $project, Task $task): View
+    {
+        $this->authorizeProjectTask($project, $task);
+
+        Gate::authorize('view', $project);
+        Gate::authorize('update', $task);
+
+        return view('tasks.edit', [
+            'project' => $project,
+            'task' => $task,
+            'statuses' => Task::statuses(),
+            'priorities' => Task::priorities(),
+            'assignableUsers' => $this->assignableUsers($project),
+        ]);
+    }
+
     public function store(Request $request, Project $project): RedirectResponse
     {
         Gate::authorize('view', $project);
@@ -27,6 +62,23 @@ class TaskController extends Controller
         ]);
 
         return redirect()->route('projects.show', $project)->with('status', 'Task created.');
+    }
+
+    public function update(Request $request, Project $project, Task $task): RedirectResponse
+    {
+        $this->authorizeProjectTask($project, $task);
+
+        Gate::authorize('view', $project);
+        Gate::authorize('update', $task);
+
+        $validated = $this->validateTask($request, $project);
+        $validated['completed_at'] = $validated['status'] === Task::STATUS_DONE
+            ? ($task->completed_at ?? now())
+            : null;
+
+        $task->update($validated);
+
+        return redirect()->route('projects.tasks.show', [$project, $task])->with('status', 'Taskを更新しました。');
     }
 
     private function validateTask(Request $request, Project $project): array
@@ -52,5 +104,10 @@ class TaskController extends Controller
             })
             ->orderBy('name')
             ->get();
+    }
+
+    private function authorizeProjectTask(Project $project, Task $task): void
+    {
+        abort_unless($task->project_id === $project->id, 404);
     }
 }

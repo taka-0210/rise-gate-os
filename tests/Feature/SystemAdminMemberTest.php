@@ -17,7 +17,7 @@ class SystemAdminMemberTest extends TestCase
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
 
-        $response = $this->actingAs($admin)->post(route('system-admin.members.store'), [
+        $response = $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->post(route('system-admin.members.store'), [
             'name' => 'New Partner',
             'email' => 'partner@example.com',
             'password' => 'password-test',
@@ -38,13 +38,27 @@ class SystemAdminMemberTest extends TestCase
         $this->assertDatabaseHas('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => 'owner']);
     }
 
+    public function test_member_registration_only_exposes_fields_for_the_selected_assignment_type(): void
+    {
+        $admin = User::factory()->create(['is_system_admin' => true]);
+
+        $response = $this->actingAs($admin)
+            ->withSession(['access_mode' => 'system_admin'])
+            ->get(route('system-admin.members.index'));
+
+        $response->assertOk()
+            ->assertSee('data-assignment-panel="new_workspace"', false)
+            ->assertSee('data-assignment-panel="existing_workspace"', false)
+            ->assertSee('updateAssignmentFields', false);
+    }
+
     public function test_system_admin_can_register_member_in_an_existing_workspace(): void
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $organization = Organization::create(['name' => 'Rise Gate', 'slug' => 'rise-gate']);
         $workspace = Workspace::create(['organization_id' => $organization->id, 'name' => 'Main', 'slug' => 'main']);
 
-        $response = $this->actingAs($admin)->post(route('system-admin.members.store'), [
+        $response = $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->post(route('system-admin.members.store'), [
             'name' => 'Staff Member',
             'email' => 'staff@example.com',
             'password' => 'password-test',
@@ -65,8 +79,8 @@ class SystemAdminMemberTest extends TestCase
     {
         $user = User::factory()->create(['is_system_admin' => false]);
 
-        $this->actingAs($user)->get(route('system-admin.members.index'))->assertForbidden();
-        $this->actingAs($user)->post(route('system-admin.members.store'), [])->assertForbidden();
+        $this->actingAs($user)->withSession(['access_mode' => 'system_admin'])->get(route('system-admin.members.index'))->assertForbidden();
+        $this->actingAs($user)->withSession(['access_mode' => 'system_admin'])->post(route('system-admin.members.store'), [])->assertForbidden();
     }
 
     public function test_system_admin_can_update_member_account_and_password(): void
@@ -74,7 +88,7 @@ class SystemAdminMemberTest extends TestCase
         $admin = User::factory()->create(['is_system_admin' => true]);
         $member = User::factory()->create(['is_active' => true]);
 
-        $this->actingAs($admin)->put(route('system-admin.members.update', $member), [
+        $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->put(route('system-admin.members.update', $member), [
             'name' => 'Updated Name',
             'email' => 'updated@example.com',
             'password' => 'new-password',
@@ -94,7 +108,7 @@ class SystemAdminMemberTest extends TestCase
     {
         $admin = User::factory()->create(['is_system_admin' => true, 'is_active' => true]);
 
-        $response = $this->actingAs($admin)->from(route('system-admin.members.edit', $admin))->put(route('system-admin.members.update', $admin), [
+        $response = $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->from(route('system-admin.members.edit', $admin))->put(route('system-admin.members.update', $admin), [
             'name' => $admin->name,
             'email' => $admin->email,
             'is_system_admin' => '0',
@@ -114,18 +128,18 @@ class SystemAdminMemberTest extends TestCase
         $organization = Organization::create(['name' => 'Rise Gate', 'slug' => 'rise-gate']);
         $workspace = Workspace::create(['organization_id' => $organization->id, 'name' => 'Main', 'slug' => 'main']);
 
-        $this->actingAs($admin)->post(route('system-admin.members.workspaces.store', $member), [
+        $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->post(route('system-admin.members.workspaces.store', $member), [
             'workspace_id' => $workspace->id,
             'workspace_role' => 'member',
         ])->assertRedirect();
         $this->assertDatabaseHas('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $member->id, 'role' => 'member']);
 
-        $this->actingAs($admin)->put(route('system-admin.members.workspaces.update', [$member, $workspace]), [
+        $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->put(route('system-admin.members.workspaces.update', [$member, $workspace]), [
             'workspace_role' => 'admin',
         ])->assertRedirect();
         $this->assertDatabaseHas('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $member->id, 'role' => 'admin']);
 
-        $this->actingAs($admin)->delete(route('system-admin.members.workspaces.destroy', [$member, $workspace]))->assertRedirect();
+        $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->delete(route('system-admin.members.workspaces.destroy', [$member, $workspace]))->assertRedirect();
         $this->assertDatabaseMissing('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $member->id]);
         $this->assertDatabaseMissing('organization_users', ['organization_id' => $organization->id, 'user_id' => $member->id]);
     }
@@ -140,6 +154,7 @@ class SystemAdminMemberTest extends TestCase
         $workspace->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
 
         $this->actingAs($admin)
+            ->withSession(['access_mode' => 'system_admin'])
             ->from(route('system-admin.members.edit', $owner))
             ->delete(route('system-admin.members.workspaces.destroy', [$owner, $workspace]))
             ->assertSessionHasErrors('workspace_role');
@@ -156,6 +171,55 @@ class SystemAdminMemberTest extends TestCase
         ]);
 
         $this->post('/login', ['email' => $member->email, 'password' => 'password-test'])->assertSessionHasErrors('email');
+        $this->assertGuest();
+    }
+
+    public function test_system_admin_login_enters_admin_mode(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin@example.com',
+            'password' => 'password-test',
+            'is_system_admin' => true,
+        ]);
+
+        $this->post(route('system-admin.login.store'), [
+            'email' => $admin->email,
+            'password' => 'password-test',
+        ])->assertRedirect(route('system-admin.members.index'))
+            ->assertSessionHas('access_mode', 'system_admin');
+
+        $this->assertAuthenticatedAs($admin);
+        $this->get(route('system-admin.members.index'))->assertOk()->assertSee('System Admin Mode');
+        $this->get('/dashboard')->assertForbidden();
+    }
+
+    public function test_regular_login_cannot_open_system_admin_area_without_admin_login(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin@example.com',
+            'password' => 'password-test',
+            'is_system_admin' => true,
+        ]);
+
+        $this->post('/login', ['email' => $admin->email, 'password' => 'password-test'])
+            ->assertSessionHas('access_mode', 'workspace');
+
+        $this->get(route('system-admin.members.index'))->assertForbidden();
+    }
+
+    public function test_non_admin_cannot_use_system_admin_login(): void
+    {
+        $member = User::factory()->create([
+            'email' => 'member@example.com',
+            'password' => 'password-test',
+            'is_system_admin' => false,
+        ]);
+
+        $this->post(route('system-admin.login.store'), [
+            'email' => $member->email,
+            'password' => 'password-test',
+        ])->assertSessionHasErrors('email');
+
         $this->assertGuest();
     }
 }
