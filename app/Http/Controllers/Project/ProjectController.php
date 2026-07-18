@@ -151,6 +151,7 @@ class ProjectController extends Controller
         $currentMember = $project->members()->where('user_id', $request->user()->id)->where('status', ProjectMember::STATUS_ACTIVE)->first();
 
         $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'sourceImprovementOutput.improvement.project', 'members.user', 'members.workspace']);
+        $aiRequests = $project->aiRequests()->with(['requester', 'proposal'])->limit(10)->get();
 
         $allImprovements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
@@ -218,6 +219,7 @@ class ProjectController extends Controller
             'canManageMembers' => $canManageMembers,
             'memberPreview' => $memberPreview,
             'memberPreviewError' => $memberPreviewError,
+            'aiRequests' => $aiRequests,
         ]);
     }
 

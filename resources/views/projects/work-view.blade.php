@@ -160,6 +160,43 @@
     @endphp
 
     <section class="stack focus-page {{ $isTimeView ? 'time-view' : '' }}" id="focus-page">
+        <section class="panel stack" id="ai-request-panel">
+            <div class="actions" style="justify-content:space-between;align-items:flex-start;">
+                <div>
+                    <div class="meta">AI REQUEST・このProjectを相談する</div>
+                    <h2>AIに提案を依頼</h2>
+                    <p>対象WorkspaceとProjectは自動で確定します。Codexからの回答は承認待ち提案として届きます。</p>
+                </div>
+                <a class="button secondary" href="{{ route('projects.ai-proposals.index', $project) }}">AI提案一覧</a>
+            </div>
+            <form method="POST" action="{{ route('projects.ai-requests.store', $project) }}" class="stack">
+                @csrf
+                <div class="field">
+                    <label for="ai_request_title">依頼名</label>
+                    <input id="ai_request_title" name="title" value="{{ old('title', 'このProjectの計画を提案して') }}" required>
+                </div>
+                <div class="field">
+                    <label for="ai_request_instructions">Codexへの依頼内容</label>
+                    <textarea id="ai_request_instructions" name="instructions" rows="4" required placeholder="例：現状を読み取り、次のロードマップ・取り組み・タスクを提案してください。">{{ old('instructions') }}</textarea>
+                </div>
+                <div class="actions"><button type="submit">AIに提案を依頼</button></div>
+            </form>
+            @if ($aiRequests->isNotEmpty())
+                <div class="stack">
+                    <h3>最近のAI依頼</h3>
+                    @foreach ($aiRequests as $aiRequest)
+                        <div class="card">
+                            <div class="meta">{{ $aiRequest->created_at->format('Y-m-d H:i') }} / {{ $aiRequest->status }}</div>
+                            <strong>{{ $aiRequest->title }}</strong>
+                            <p>{{ Str::limit($aiRequest->instructions, 160) }}</p>
+                            @if ($aiRequest->proposal)
+                                <a href="{{ route('projects.ai-proposals.show', [$project, $aiRequest->proposal]) }}">届いた提案を確認</a>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </section>
         <div class="focus-toolbar">
             <div class="focus-toolbar-inner">
                 <div class="focus-toolbar-context">

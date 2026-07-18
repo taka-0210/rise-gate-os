@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use App\Services\AiProposalApplier;
+use App\Models\AiRequest;
 
 class AiProposalController extends Controller
 {
@@ -77,6 +78,7 @@ class AiProposalController extends Controller
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
         ]);
+        $aiProposal->aiRequest?->update(['status' => AiRequest::STATUS_CANCELLED, 'completed_at' => now()]);
 
         return redirect()->route('projects.ai-proposals.show', [$project, $aiProposal])
             ->with('status', 'AI提案を却下しました。');
@@ -86,6 +88,16 @@ class AiProposalController extends Controller
     {
         Gate::authorize('view', $project);
         $currentWorkspace = $request->attributes->get('currentWorkspace');
-        abort_unless($currentWorkspace && $project->owning_workspace_id === $currentWorkspace->id, 404);
+        if (! $currentWorkspace || $project->owning_workspace_id !== $currentWorkspace->id) {
+            $workspace = $request->user()->workspaces()
+                ->where('workspaces.id', $project->owning_workspace_id)
+                ->where('workspaces.status', \App\Models\Workspace::STATUS_ACTIVE)
+                ->first();
+            abort_unless($workspace, 404);
+            $request->session()->put('current_workspace_id', $workspace->id);
+            $request->session()->put('access_mode', 'workspace');
+            $request->attributes->set('currentWorkspace', $workspace);
+            $request->attributes->set('currentWorkspaceRole', $workspace->pivot->role);
+        }
     }
 }

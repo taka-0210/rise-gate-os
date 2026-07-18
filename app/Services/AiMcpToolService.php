@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiAccessKey;
 use App\Models\AiProposal;
 use App\Models\AiProposalItem;
+use App\Models\AiRequest;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +73,42 @@ class AiMcpToolService
         ];
     }
 
+    public function listAiRequests(AiAccessKey $key): array
+    {
+        $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+        return ['requests' => AiRequest::query()
+            ->where('workspace_id', $key->workspace_id)
+            ->where('status', AiRequest::STATUS_PENDING)
+            ->whereHas('project.members', fn ($q) => $q->where('user_id', $key->user_id)->where('status', ProjectMember::STATUS_ACTIVE))
+            ->with(['project:id,public_id,name', 'requester:id,name'])
+            ->oldest()->get()->map(fn (AiRequest $request) => [
+                'public_id' => $request->public_id,
+                'project_public_id' => $request->project->public_id,
+                'project_name' => $request->project->name,
+                'title' => $request->title,
+                'instructions' => $request->instructions,
+                'requested_by' => $request->requester?->name,
+                'created_at' => $request->created_at->toIso8601String(),
+            ])->all()];
+    }
+
+    public function claimAiRequest(AiAccessKey $key, string $publicId): array
+    {
+        $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+        return DB::transaction(function () use ($key, $publicId): array {
+            $request = AiRequest::query()->lockForUpdate()
+                ->where('workspace_id', $key->workspace_id)->where('public_id', $publicId)
+                ->whereHas('project.members', fn ($q) => $q->where('user_id', $key->user_id)->where('status', ProjectMember::STATUS_ACTIVE))
+                ->firstOrFail();
+            if ($request->status === AiRequest::STATUS_PENDING) {
+                $request->update(['status' => AiRequest::STATUS_PROCESSING, 'claimed_by_access_key_id' => $key->id, 'claimed_at' => now()]);
+            } elseif ($request->status !== AiRequest::STATUS_PROCESSING || $request->claimed_by_access_key_id !== $key->id) {
+                throw ValidationException::withMessages(['request' => 'このAI依頼はすでに処理されています。']);
+            }
+            return ['request_public_id' => $request->public_id, 'status' => $request->status, 'project_public_id' => $request->project->public_id, 'instructions' => $request->instructions];
+        });
+    }
+
     public function submitProposal(AiAccessKey $key, array $arguments): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROPOSALS_CREATE);
@@ -114,6 +151,16 @@ class AiMcpToolService
                     'attributes' => $item['attributes'],
                     'sort_order' => ($index + 1) * 10,
                 ]);
+            }
+            if (! empty($arguments['ai_request_public_id'])) {
+                $aiRequest = AiRequest::query()->lockForUpdate()
+                    ->where('workspace_id', $key->workspace_id)->where('project_id', $project->id)
+                    ->where('public_id', $arguments['ai_request_public_id'])->firstOrFail();
+                if (! in_array($aiRequest->status, [AiRequest::STATUS_PENDING, AiRequest::STATUS_PROCESSING], true)
+                    || ($aiRequest->claimed_by_access_key_id && $aiRequest->claimed_by_access_key_id !== $key->id)) {
+                    throw ValidationException::withMessages(['request' => 'このAI依頼には提案を紐づけられません。']);
+                }
+                $aiRequest->update(['status' => AiRequest::STATUS_PROPOSED, 'claimed_by_access_key_id' => $key->id, 'claimed_at' => $aiRequest->claimed_at ?? now(), 'ai_proposal_id' => $proposal->id]);
             }
             return $proposal;
         });

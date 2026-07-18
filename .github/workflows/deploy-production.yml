@@ -1,0 +1,79 @@
+name: 本番へデプロイ
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rise-gate-os-production
+  cancel-in-progress: false
+
+jobs:
+  test-and-deploy:
+    name: テストしてXServerへ反映
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://os.rise-gate.com
+
+    steps:
+      - name: ソースコードを取得
+        uses: actions/checkout@v4
+
+      - name: PHP 8.3を準備
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: テスト用パッケージを準備
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: 自動テスト
+        run: php artisan test
+
+      - name: 本番用パッケージへ切り替え
+        run: composer install --no-dev --classmap-authoritative --no-interaction --prefer-dist --no-progress
+
+      - name: 本番用アーカイブを作成
+        run: |
+          tar -czf "$RUNNER_TEMP/rise-gate-os-${GITHUB_SHA}.tar.gz" \
+            app bootstrap config database deployment public resources routes storage vendor \
+            artisan composer.json composer.lock
+
+      - name: SSHを安全に準備
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.XSERVER_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.XSERVER_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/xserver_deploy_key
+          chmod 600 ~/.ssh/xserver_deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: XServerへパッケージを転送
+        env:
+          XSERVER_HOST: ${{ secrets.XSERVER_HOST }}
+          XSERVER_USER: ${{ secrets.XSERVER_USER }}
+        run: |
+          scp -P 10022 -i ~/.ssh/xserver_deploy_key \
+            "$RUNNER_TEMP/rise-gate-os-${GITHUB_SHA}.tar.gz" \
+            "${XSERVER_USER}@${XSERVER_HOST}:~/rise-gate-os-${GITHUB_SHA}.tar.gz"
+
+      - name: XServerで本番へ反映
+        env:
+          XSERVER_HOST: ${{ secrets.XSERVER_HOST }}
+          XSERVER_USER: ${{ secrets.XSERVER_USER }}
+        run: |
+          ssh -p 10022 -i ~/.ssh/xserver_deploy_key \
+            "${XSERVER_USER}@${XSERVER_HOST}" \
+            "bash -s -- '${GITHUB_SHA}'" < deployment/deploy-production.sh
+
+      - name: 公開画面を確認
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 https://os.rise-gate.com/login > /dev/null
+

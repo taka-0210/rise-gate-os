@@ -72,6 +72,8 @@ class AiMcpController extends Controller
             $data = match ($name) {
                 'list_projects' => $tools->listProjects($key),
                 'get_project_plan' => $this->getProjectPlan($tools, $key, $arguments),
+                'list_ai_requests' => $tools->listAiRequests($key),
+                'claim_ai_request' => $tools->claimAiRequest($key, Validator::validate($arguments, ['request_public_id' => ['required','string']])['request_public_id']),
                 'submit_proposal' => $this->submitProposal($tools, $key, $arguments),
                 default => throw new \InvalidArgumentException('存在しないツールです。'),
             };
@@ -142,6 +144,7 @@ class AiMcpController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'summary' => ['nullable', 'string'],
             'evidence' => ['nullable', 'array'],
+            'ai_request_public_id' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*.operation' => ['required', Rule::in(['create', 'update'])],
             'items.*.entity_type' => ['required', Rule::in(['roadmap', 'improvement', 'task'])],
@@ -187,6 +190,7 @@ class AiMcpController extends Controller
                         'title' => ['type' => 'string'],
                         'summary' => ['type' => ['string', 'null']],
                         'evidence' => ['type' => ['object', 'null'], 'additionalProperties' => true],
+                        'ai_request_public_id' => ['type' => ['string', 'null']],
                         'items' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 100, 'items' => [
                             'type' => 'object',
                             'properties' => [
@@ -205,6 +209,20 @@ class AiMcpController extends Controller
                     'additionalProperties' => false,
                 ],
                 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true],
+            ],
+            [
+                'name' => 'list_ai_requests',
+                'title' => '未処理のAI依頼一覧',
+                'description' => '現在のWorkspaceで、参加中Projectから届いた未処理のAI依頼を取得します。',
+                'inputSchema' => ['type'=>'object','properties'=>new \stdClass(),'additionalProperties'=>false],
+                'annotations' => ['readOnlyHint'=>true,'destructiveHint'=>false,'idempotentHint'=>true],
+            ],
+            [
+                'name' => 'claim_ai_request',
+                'title' => 'AI依頼を引き受ける',
+                'description' => '未処理依頼をこのCodex接続が処理中として安全に確保します。',
+                'inputSchema' => ['type'=>'object','properties'=>['request_public_id'=>['type'=>'string']],'required'=>['request_public_id'],'additionalProperties'=>false],
+                'annotations' => ['readOnlyHint'=>false,'destructiveHint'=>false,'idempotentHint'=>true],
             ],
         ];
     }

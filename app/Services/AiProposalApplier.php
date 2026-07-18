@@ -53,6 +53,7 @@ class AiProposalApplier
                 'applied_at' => now(),
                 'failure_reason' => null,
             ]);
+            $locked->aiRequest?->update(['status' => \App\Models\AiRequest::STATUS_COMPLETED, 'completed_at' => now()]);
 
             return $locked->fresh(['items', 'reviewer']);
         });

@@ -11,6 +11,7 @@ use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\RoadmapController;
 use App\Http\Controllers\Project\AiProposalController;
+use App\Http\Controllers\Project\AiRequestController;
 use App\Http\Controllers\Workspace\WorkspaceController;
 use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
 use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdminSessionController;
@@ -73,6 +74,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/{project}/ai-proposals/{aiProposal}', [AiProposalController::class, 'show'])->name('projects.ai-proposals.show');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/apply', [AiProposalController::class, 'apply'])->name('projects.ai-proposals.apply');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/reject', [AiProposalController::class, 'reject'])->name('projects.ai-proposals.reject');
+        Route::post('/projects/{project}/ai-requests', [AiRequestController::class, 'store'])->name('projects.ai-requests.store');
         Route::get('/projects/{project}/manage', [ProjectController::class, 'legacy'])->name('projects.legacy');
         Route::post('/projects/{project}/move', [ProjectController::class, 'move'])->name('projects.move');
         Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');

@@ -46,6 +46,7 @@ class AiProposal extends Model
     public function requester(): BelongsTo { return $this->belongsTo(User::class, 'requested_by'); }
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
     public function items(): HasMany { return $this->hasMany(AiProposalItem::class)->orderBy('sort_order')->orderBy('id'); }
+    public function aiRequest() { return $this->hasOne(AiRequest::class); }
 
     public static function statuses(): array
     {

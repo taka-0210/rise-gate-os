@@ -110,6 +110,11 @@ class Project extends Model
         return $this->hasMany(AiProposal::class);
     }
 
+    public function aiRequests(): HasMany
+    {
+        return $this->hasMany(AiRequest::class)->latest();
+    }
+
     public function sourceImprovementOutput(): HasOne
     {
         return $this->hasOne(ImprovementOutput::class, 'output_id')

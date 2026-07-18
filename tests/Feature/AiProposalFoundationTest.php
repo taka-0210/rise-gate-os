@@ -33,7 +33,7 @@ class AiProposalFoundationTest extends TestCase
         $this->assertDatabaseHas('ai_proposals', ['id' => $proposal->id, 'status' => 'pending']);
     }
 
-    public function test_ai_proposal_cannot_be_viewed_from_a_different_current_workspace(): void
+    public function test_ai_proposal_switches_to_its_workspace_for_an_authorized_member(): void
     {
         [$user, $workspace, $project] = $this->projectOwner('internal');
         $proposal = $this->proposal($project, $user);
@@ -48,7 +48,8 @@ class AiProposalFoundationTest extends TestCase
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $otherWorkspace->id])
             ->get(route('projects.ai-proposals.show', [$project, $proposal]))
-            ->assertNotFound();
+            ->assertOk()
+            ->assertSessionHas('current_workspace_id', $workspace->id);
     }
 
     public function test_idempotency_key_is_unique_within_workspace_and_source(): void
