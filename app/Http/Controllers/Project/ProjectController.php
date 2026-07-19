@@ -45,13 +45,14 @@ class ProjectController extends Controller
         $unscheduled = $projects->reject(fn (Project $project) => $project->start_date && $project->due_date)
             ->sortBy('name')->values();
 
-        $overlapCounts = $scheduled->mapWithKeys(function (Project $project) use ($scheduled): array {
-            $count = $scheduled->filter(fn (Project $other) => $other->id !== $project->id
+        $overlapProjects = $scheduled->mapWithKeys(function (Project $project) use ($scheduled): array {
+            $overlaps = $scheduled->filter(fn (Project $other) => $other->id !== $project->id
                 && $project->start_date->lte($other->due_date)
-                && $project->due_date->gte($other->start_date))->count();
+                && $project->due_date->gte($other->start_date))->values();
 
-            return [$project->id => $count];
+            return [$project->id => $overlaps];
         });
+        $overlapCounts = $overlapProjects->map(fn ($overlaps) => $overlaps->count());
 
         $axisStart = ($scheduled->min(fn (Project $project) => $project->start_date)?->copy() ?? Carbon::today())->subDays(2);
         $axisEnd = ($scheduled->max(fn (Project $project) => $project->due_date)?->copy() ?? Carbon::today()->addDays(28))->addDays(2);
@@ -80,7 +81,7 @@ class ProjectController extends Controller
         }
 
         return view('projects.schedule', compact(
-            'scheduled', 'unscheduled', 'integrity', 'overlapCounts', 'axisStart', 'axisEnd',
+            'scheduled', 'unscheduled', 'integrity', 'overlapCounts', 'overlapProjects', 'axisStart', 'axisEnd',
             'axisDays', 'timelineWidth', 'months', 'ticks', 'currentWorkspace'
         ));
     }

@@ -11,21 +11,23 @@
         .portfolio-legend .is-overlap::before { background:#d78632; }
         .portfolio-scroll { overflow:auto; border:2px solid #52616a; border-radius:10px; background:#fff; }
         .portfolio-canvas { min-width:calc(260px + var(--timeline-width)); }
-        .portfolio-row { display:grid; grid-template-columns:260px var(--timeline-width); min-height:72px; border-bottom:1px solid #dce3e7; }
+        .portfolio-row { display:grid; grid-template-columns:260px var(--timeline-width); min-height:88px; border-bottom:1px solid #dce3e7; }
         .portfolio-row:last-child { border-bottom:0; }
         .portfolio-label { position:sticky; left:0; z-index:3; display:grid; align-content:center; gap:4px; padding:10px 12px; border-right:1px solid #cfd9de; background:#fff; }
         .portfolio-label strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .portfolio-label .meta { font-size:11px; }
-        .portfolio-track { position:relative; min-height:72px; background:repeating-linear-gradient(to right,#fff 0,#fff calc(7 * var(--day-width) - 1px),#e8edef calc(7 * var(--day-width) - 1px),#e8edef calc(7 * var(--day-width))); }
+        .portfolio-track { position:relative; min-height:88px; background:repeating-linear-gradient(to right,#fff 0,#fff calc(7 * var(--day-width) - 1px),#e8edef calc(7 * var(--day-width) - 1px),#e8edef calc(7 * var(--day-width))); }
         .portfolio-months { height:42px; background:#f3f7f8; }
         .portfolio-month { position:absolute; top:0; bottom:0; display:flex; align-items:center; justify-content:center; border-right:1px solid #c5d0d5; color:#43545c; font-size:12px; font-weight:800; }
         .portfolio-tick { position:absolute; top:43px; bottom:0; border-left:1px solid #edf1f3; }
         .portfolio-tick span { position:absolute; top:4px; left:3px; color:#8a979d; font-size:10px; white-space:nowrap; }
         .portfolio-today { position:absolute; z-index:2; top:0; bottom:0; width:2px; background:#c84d3c; pointer-events:none; }
-        .portfolio-bar { position:absolute; z-index:1; top:29px; height:32px; display:flex; align-items:center; gap:7px; min-width:18px; padding:0 9px; border-radius:7px; background:#39759a; color:#fff; font-size:12px; font-weight:800; text-decoration:none; box-shadow:0 3px 8px rgba(30,70,90,.18); overflow:hidden; white-space:nowrap; }
+        .portfolio-bar { position:absolute; z-index:1; top:37px; height:32px; display:flex; align-items:center; gap:7px; min-width:28px; padding:0 9px; border-radius:7px; background:#39759a; color:#fff; font-size:12px; font-weight:800; text-decoration:none; box-shadow:0 3px 8px rgba(30,70,90,.18); overflow:hidden; white-space:nowrap; }
         .portfolio-bar.is-overlap { background:#d78632; }
         .portfolio-bar.is-complete { opacity:.55; }
         .portfolio-bar small { font-size:10px; font-weight:600; }
+        .portfolio-period { display:flex; align-items:center; flex-wrap:wrap; gap:5px; color:#52616a; font-size:11px; }
+        .portfolio-overlap-badge { display:inline-flex; align-items:center; padding:2px 6px; border-radius:999px; background:#fff0df; color:#a85d14; font-weight:900; }
         .portfolio-issues { color:#a33f2d; font-weight:800; }
         .portfolio-unscheduled { padding:16px; border:2px solid #d5a22f; border-radius:10px; background:#fffaf0; }
         .portfolio-unscheduled-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
@@ -71,6 +73,7 @@
                         $left = $axisStart->diffInDays($project->start_date) / $axisDays * 100;
                         $width = ($project->start_date->diffInDays($project->due_date) + 1) / $axisDays * 100;
                         $overlapCount = $overlapCounts[$project->id] ?? 0;
+                        $overlappingNames = ($overlapProjects[$project->id] ?? collect())->pluck('name')->join('、');
                         $projectIntegrity = $integrity[$project->id];
                     @endphp
                     <div class="portfolio-row">
@@ -78,11 +81,15 @@
                             <strong>{{ $project->name }}</strong>
                             <span class="meta">{{ $project->client?->name ?? 'クライアント未設定' }} / {{ $statusLabels[$project->status] ?? $project->status }}</span>
                             <span class="meta">未完了Task {{ $project->open_tasks_count }}件 @if($projectIntegrity['issue_count'])・<span class="portfolio-issues">日程確認 {{ $projectIntegrity['issue_count'] }}件</span>@endif</span>
+                            <span class="portfolio-period">
+                                期間 {{ $project->start_date->format('Y/m/d') }}〜{{ $project->due_date->format('Y/m/d') }}
+                                @if($overlapCount)<span class="portfolio-overlap-badge" title="重複相手：{{ $overlappingNames }}">重複 {{ $overlapCount }}件</span>@endif
+                            </span>
                         </div>
                         <div class="portfolio-track">
                             @foreach($ticks as $tick)<div class="portfolio-tick" style="left:{{ $tick['left'] }}%;"></div>@endforeach
                             @if($todayVisible)<div class="portfolio-today" style="left:{{ $todayLeft }}%;"></div>@endif
-                            <a class="portfolio-bar {{ $overlapCount ? 'is-overlap' : '' }} {{ $project->completed_at ? 'is-complete' : '' }}" style="left:{{ $left }}%;width:{{ max($width, .6) }}%;" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}" title="{{ $project->name }}：{{ $project->start_date->format('Y/m/d') }}〜{{ $project->due_date->format('Y/m/d') }}">
+                            <a class="portfolio-bar {{ $overlapCount ? 'is-overlap' : '' }} {{ $project->completed_at ? 'is-complete' : '' }}" style="left:{{ $left }}%;width:{{ max($width, .6) }}%;" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}" title="{{ $project->name }}：{{ $project->start_date->format('Y/m/d') }}〜{{ $project->due_date->format('Y/m/d') }}@if($overlapCount) / 重複相手：{{ $overlappingNames }}@endif">
                                 <span>{{ $project->start_date->format('n/j') }}〜{{ $project->due_date->format('n/j') }}</span>
                                 @if($overlapCount)<small>{{ $overlapCount }}件と重複</small>@endif
                             </a>
