@@ -149,6 +149,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('TASK・いま何をするか')
             ->assertSee('今日を時間軸に含める')
             ->assertSee('id="time-today-toggle"', false)
+            ->assertSee('進行中かつ期限超過')
+            ->assertSee('未着手')
             ->assertSee('AIアシスタント')
             ->assertSee('aria-label="承認待ち 1件"', false)
             ->assertSee('id="ai-assistant-drawer"', false)

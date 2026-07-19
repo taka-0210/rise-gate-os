@@ -75,8 +75,11 @@
         .time-legend label { display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
         .time-legend input { width:auto; margin:0; }
         .time-legend i { width:20px; height:8px; border-radius:999px; background:#66717a; }
+        .time-legend .is-roadmap { background:#4f82c4; }
+        .time-legend .is-improvement { background:#56a27e; }
+        .time-legend .is-task { background:#b5523d; }
         .time-legend .is-inferred { background:transparent; border:2px dashed #66717a; }
-        .time-legend .is-overdue { background:#c65a46; }
+        .time-legend .is-overdue { background:repeating-linear-gradient(135deg,#e3a11d 0,#e3a11d 5px,#9f6810 5px,#9f6810 9px); }
         .time-legend .is-reached { height:14px; background:#fff; border:2px solid #245ca6; }
         .time-chart-scroll { overflow-x:auto; padding-bottom:8px; }
         .time-chart { min-width:820px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
@@ -92,17 +95,18 @@
         .time-row:last-child { border-bottom:0; }
         .time-row-label { display:flex; align-items:center; gap:7px; min-width:0; }
         .time-row-label strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .time-row-status { flex:0 0 auto; padding:2px 6px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:10px; }
         .time-row.is-improvement .time-row-label { padding-left:28px; }
         .time-row.is-task .time-row-label { padding-left:46px; }
         .time-row-dot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:#66717a; }
         .time-row.is-roadmap .time-row-dot,.time-bar.is-roadmap { background:#4f82c4; }
         .time-row.is-improvement .time-row-dot,.time-bar.is-improvement { background:#56a27e; }
-        .time-row.is-task .time-row-dot,.time-bar.is-task { background:#cc735e; }
+        .time-row.is-task .time-row-dot,.time-bar.is-task { background:#b5523d; }
         .time-bar { position:absolute; top:13px; left:var(--bar-left); width:max(var(--bar-width),6px); height:18px; border-radius:999px; }
         .time-bar.is-inferred { background:rgba(255,255,255,.72); border:2px dashed currentColor; }
         .time-bar.is-roadmap.is-inferred { color:#4f82c4; }
         .time-bar.is-improvement.is-inferred { color:#56a27e; }
-        .time-bar.is-overdue { background:#c65a46; }
+        .time-bar.is-overdue { background:repeating-linear-gradient(135deg,#e3a11d 0,#e3a11d 7px,#9f6810 7px,#9f6810 12px); }
         .time-reached-marker { position:absolute; z-index:2; top:10px; width:10px; height:24px; border:2px solid #245ca6; border-radius:999px; background:#fff; transform:translateX(-50%); }
         .time-today { position:absolute; z-index:2; top:0; bottom:0; left:var(--today-left); width:2px; background:#d24b3b; pointer-events:none; }
         .time-unscheduled { display:inline-flex; margin:11px 12px; padding:3px 8px; border:1px dashed var(--line); border-radius:999px; color:var(--muted); font-size:11px; }
@@ -165,7 +169,7 @@
                 $timeRows->push(['type' => 'improvement', 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $improvement->completed_at]);
                 foreach ($improvement->tasks as $task) {
                     [$taskStart, $taskEnd] = $taskPeriod($task);
-                $timeRows->push(['type' => 'task', 'title' => $task->title, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null]);
+                $timeRows->push(['type' => 'task', 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null]);
                 }
             }
         }
@@ -301,7 +305,7 @@
                     <p>ROADMAP・取り組み・TASKを、ひとつの時間軸で確認します。</p>
                 </div>
                 <div class="time-legend">
-                    <span><i></i>登録期間</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>進行中の遅延</span><span><i class="is-reached"></i>実際の完了・到達日</span>
+                    <span><i class="is-roadmap"></i>ロードマップ</span><span><i class="is-improvement"></i>取り組み</span><span><i class="is-task"></i>タスク</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>進行中かつ期限超過</span><span><i class="is-reached"></i>実際の完了・到達日</span>
                     <label><input id="time-today-toggle" type="checkbox" @checked($includeTodayInTimeline)>今日を時間軸に含める</label>
                 </div>
             </div>
@@ -323,11 +327,11 @@
                             $reachedLeft = $row['reached'] ? max(0, min(100, $axisStart->diffInDays($row['reached'], false) / $axisDays * 100)) : null;
                         @endphp
                         <div class="time-row is-{{ $row['type'] }}">
-                            <div class="time-row-label"><span class="time-row-dot"></span><strong title="{{ $row['title'] }}">{{ $row['title'] }}</strong></div>
+                            <div class="time-row-label"><span class="time-row-dot"></span><strong title="{{ $row['title'] }}">{{ $row['title'] }}</strong>@if ($row['status_label'] ?? null)<span class="time-row-status">{{ $row['status_label'] }}</span>@endif</div>
                             <div class="time-row-track">
                                 @if ($includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
-                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }}" style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}"></span>
+                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }}" style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}"></span>
                                 @else
                                     <span class="time-unscheduled">{{ $barStart ? '期限未設定' : '日付未設定' }}</span>
                                 @endif
