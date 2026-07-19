@@ -168,7 +168,13 @@ class EstimateController extends Controller
     private function nextNumber(int $workspaceId, string $issuedOn): string
     {
         $prefix = 'EST-'.date('Ym', strtotime($issuedOn)).'-';
-        $latest = Estimate::withTrashed()->where('workspace_id', $workspaceId)->where('estimate_number', 'like', $prefix.'%')->lockForUpdate()->max('estimate_number');
+        $latest = Estimate::withTrashed()
+            ->where('workspace_id', $workspaceId)
+            ->where('estimate_number', 'like', $prefix.'%')
+            ->orderByDesc('estimate_number')
+            ->lockForUpdate()
+            ->value('estimate_number');
+
         return $prefix.str_pad((string) (((int) substr((string) $latest, -4)) + 1), 4, '0', STR_PAD_LEFT);
     }
 

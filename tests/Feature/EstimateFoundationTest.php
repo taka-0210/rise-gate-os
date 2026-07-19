@@ -66,6 +66,11 @@ class EstimateFoundationTest extends TestCase
         $estimate->refresh();
         $this->assertSame('給与計算システムの要件定義', $estimate->items()->firstOrFail()->description);
         $this->assertSame('株式会社ライズアップ', $estimate->issuer_snapshot['legal_name']);
+
+        $this->get(route('estimates.show', $estimate))
+            ->assertOk()
+            ->assertSee('給与計算システム 御見積')
+            ->assertSee('給与計算システムの要件定義');
     }
 
     public function test_estimate_cannot_be_viewed_from_another_current_workspace(): void

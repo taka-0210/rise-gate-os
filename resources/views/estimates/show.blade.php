@@ -6,7 +6,29 @@
     @if(session('status'))<div class="panel">{{ session('status') }}</div>@endif
     <main class="estimate-sheet">
         <header class="estimate-header"><div>@if(!empty($issuer['logo_path']))<img class="estimate-logo" src="{{ route('estimates.media',[$estimate,'logo']) }}" alt="{{ $issuerName }}">@else<strong class="issuer-name">{{ $issuerName }}</strong>@endif</div><div class="estimate-title"><h2>御 見 積 書</h2><div>No. {{ $estimate->estimate_number }}</div><div>発行日 {{ $estimate->issued_on->format('Y年n月j日') }}</div></div></header>
-        <section class="estimate-parties"><div><h3>{{ $client['name'] }} 御中</h3><p>件名：{{ $estimate->title }}</p><p>有効期限：{{ $estimate->valid_until?->format('Y年n月j日')??'設定なし' }}</p></div><div class="issuer"><strong>{{ $issuer['legal_name']??$issuerName }}</strong>@if(!empty($issuer['postal_code']))<div>〒{{ $issuer['postal_code'] }}</div>@endif<div>{{ $issuer['address_line1']??'' }} {{ $issuer['address_line2']??'' }}</div>@if(!empty($issuer['phone']))<div>TEL {{ $issuer['phone'] }}</div>@endif@if(!empty($issuer['invoice_registration_number']))<div>登録番号 {{ $issuer['invoice_registration_number'] }}</div>@endif @if(!empty($issuer['seal_path']))<img class="estimate-seal" src="{{ route('estimates.media',[$estimate,'seal']) }}" alt="印章">@endif</div></section>
+        <section class="estimate-parties">
+            <div>
+                <h3>{{ $client['name'] }} 御中</h3>
+                <p>件名：{{ $estimate->title }}</p>
+                <p>有効期限：{{ $estimate->valid_until?->format('Y年n月j日') ?? '設定なし' }}</p>
+            </div>
+            <div class="issuer">
+                <strong>{{ $issuer['legal_name'] ?? $issuerName }}</strong>
+                @if(!empty($issuer['postal_code']))
+                    <div>〒{{ $issuer['postal_code'] }}</div>
+                @endif
+                <div>{{ $issuer['address_line1'] ?? '' }} {{ $issuer['address_line2'] ?? '' }}</div>
+                @if(!empty($issuer['phone']))
+                    <div>TEL {{ $issuer['phone'] }}</div>
+                @endif
+                @if(!empty($issuer['invoice_registration_number']))
+                    <div>登録番号 {{ $issuer['invoice_registration_number'] }}</div>
+                @endif
+                @if(!empty($issuer['seal_path']))
+                    <img class="estimate-seal" src="{{ route('estimates.media', [$estimate, 'seal']) }}" alt="印章">
+                @endif
+            </div>
+        </section>
         <div class="grand-total"><span>お見積金額（税込）</span><strong>￥{{ number_format($estimate->total) }}</strong></div>
         <table class="items"><thead><tr><th>No.</th><th>品名・作業内容</th><th>数量</th><th>単位</th><th>単価</th><th>金額</th></tr></thead><tbody>@foreach($estimate->items as $item)<tr><td>{{ $loop->iteration }}</td><td>{{ $item->description }}</td><td>{{ rtrim(rtrim(number_format((float)$item->quantity,3,'.',''),'0'),'.') }}</td><td>{{ $item->unit }}</td><td class="money">{{ number_format($item->unit_price) }}</td><td class="money">{{ number_format($item->amount) }}</td></tr>@endforeach</tbody></table>
         <div class="totals"><dl><dt>小計</dt><dd>￥{{ number_format($estimate->subtotal) }}</dd>@if($estimate->discount)<dt>値引き</dt><dd>－￥{{ number_format($estimate->discount) }}</dd>@endif<dt>消費税</dt><dd>￥{{ number_format($estimate->tax_amount) }}</dd><dt class="total">合計</dt><dd class="total">￥{{ number_format($estimate->total) }}</dd></dl></div>
