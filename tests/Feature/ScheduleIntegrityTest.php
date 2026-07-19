@@ -93,7 +93,7 @@ class ScheduleIntegrityTest extends TestCase
         $this->assertSame('2026-08-10', $task->fresh()->due_date->toDateString());
     }
 
-    public function test_moving_a_roadmap_moves_its_descendants_and_keeps_out_of_range_dates_visible(): void
+    public function test_roadmap_and_descendants_cannot_move_outside_the_project_period(): void
     {
         [$user, $workspace, $project, $roadmap, $improvement] = $this->scheduledProject();
         $task = Task::create([
@@ -115,16 +115,13 @@ class ScheduleIntegrityTest extends TestCase
                 'end_date' => '2026-09-06',
                 'cascade_move' => true,
             ])
-            ->assertOk()
-            ->assertJsonPath('integrity.status', ScheduleIntegrityService::STATUS_INVALID)
-            ->assertJsonPath('integrity.counts.invalid.roadmap', 1)
-            ->assertJsonPath('integrity.counts.invalid.improvement', 0)
-            ->assertJsonPath('integrity.counts.invalid.task', 0);
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('schedule');
 
-        $this->assertSame('2026-08-28', $roadmap->fresh()->planned_start_date->toDateString());
-        $this->assertSame('2026-08-28', $improvement->fresh()->planned_start_date->toDateString());
-        $this->assertSame('2026-09-01', $improvement->fresh()->target_date->toDateString());
-        $this->assertSame('2026-08-30', $task->fresh()->due_date->toDateString());
+        $this->assertSame('2026-08-08', $roadmap->fresh()->planned_start_date->toDateString());
+        $this->assertSame('2026-08-08', $improvement->fresh()->planned_start_date->toDateString());
+        $this->assertSame('2026-08-12', $improvement->fresh()->target_date->toDateString());
+        $this->assertSame('2026-08-10', $task->fresh()->due_date->toDateString());
     }
 
     public function test_resizing_a_parent_moves_its_descendants_by_the_changed_edge(): void

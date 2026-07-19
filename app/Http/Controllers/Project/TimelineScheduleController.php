@@ -46,6 +46,7 @@ class TimelineScheduleController extends Controller
 
         $integrity = DB::transaction(function () use ($project, $type, $model, $attributes): array {
             $before = app(ScheduleIntegrityService::class)->inspect($project->fresh())['invalid'];
+            $projectBoundaryBefore = $this->projectBoundaryViolations($project->fresh());
 
             if (($attributes['cascade_move'] ?? false) && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
                 $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
@@ -82,6 +83,13 @@ class TimelineScheduleController extends Controller
                 ],
                 'task' => ['due_date' => $attributes['end_date']],
             });
+
+            $projectBoundaryAfter = $this->projectBoundaryViolations($project->fresh());
+            $newBoundaryViolation = $projectBoundaryAfter->diffKeys($projectBoundaryBefore)->first();
+            if ($newBoundaryViolation) {
+                throw ValidationException::withMessages(['schedule' => $newBoundaryViolation]);
+            }
+
             $after = app(ScheduleIntegrityService::class)->inspect($project->fresh());
             $newInvalid = $after['invalid']->diff($before);
             if ($newInvalid->isNotEmpty()
@@ -141,5 +149,58 @@ class TimelineScheduleController extends Controller
     private function scheduleEnd(string $type, Project|Roadmap|Improvement $model): Carbon
     {
         return ($type === 'project' ? $model->due_date : $model->target_date)->copy();
+    }
+
+    private function projectBoundaryViolations(Project $project): \Illuminate\Support\Collection
+    {
+        $violations = collect();
+        if (! $project->start_date || ! $project->due_date) {
+            return $violations;
+        }
+
+        $outsideRoadmaps = $project->roadmaps()
+            ->where(function ($query) use ($project) {
+                $query->whereDate('planned_start_date', '<', $project->start_date)
+                    ->orWhereDate('target_date', '>', $project->due_date);
+            })
+            ->get();
+
+        foreach ($outsideRoadmaps as $outside) {
+            $violations->put(
+                'roadmap:'.$outside->id,
+                "ロードマップ「{$outside->title}」がプロジェクト期間外になるため保存できません。プロジェクト期間内へ移動してください。"
+            );
+        }
+
+        $outsideImprovements = $project->improvements()
+            ->where(function ($query) use ($project) {
+                $query->whereDate('planned_start_date', '<', $project->start_date)
+                    ->orWhereDate('target_date', '>', $project->due_date);
+            })
+            ->get();
+
+        foreach ($outsideImprovements as $outsideImprovement) {
+            $violations->put(
+                'improvement:'.$outsideImprovement->id,
+                "取り組み「{$outsideImprovement->title}」がプロジェクト期間外になるため保存できません。プロジェクト期間内へ移動してください。"
+            );
+        }
+
+        $outsideTasks = $project->tasks()
+            ->whereNotNull('due_date')
+            ->where(function ($query) use ($project) {
+                $query->whereDate('due_date', '<', $project->start_date)
+                    ->orWhereDate('due_date', '>', $project->due_date);
+            })
+            ->get();
+
+        foreach ($outsideTasks as $outsideTask) {
+            $violations->put(
+                'task:'.$outsideTask->id,
+                "タスク「{$outsideTask->title}」がプロジェクト期間外になるため保存できません。期限をプロジェクト期間内へ移動してください。"
+            );
+        }
+
+        return $violations;
     }
 }
