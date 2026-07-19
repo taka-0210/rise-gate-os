@@ -163,6 +163,35 @@ class EstimateFoundationTest extends TestCase
         $this->assertNull($estimate->items()->firstOrFail()->source_id);
     }
 
+    public function test_selected_plan_items_become_zero_value_scope_when_package_is_selected(): void
+    {
+        [$user, $workspace, $project] = $this->project();
+        $roadmap = Roadmap::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '導入準備', 'purpose' => '範囲', 'status' => 'draft',
+            'sort_order' => 1, 'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
+            ->post(route('projects.estimates.store', $project), [
+                'title' => '一式＋作業範囲', 'issued_on' => '2026-07-19',
+                'items' => [
+                    ['selected' => 1, 'source_type' => 'manual', 'source_id' => null, 'description' => '開発一式', 'quantity' => 1, 'unit' => '式', 'unit_price' => 300000, 'tax_rate' => 10],
+                    ['selected' => 1, 'source_type' => 'roadmap', 'source_id' => $roadmap->id, 'description' => '導入準備', 'quantity' => 5, 'unit' => '日', 'unit_price' => 50000, 'tax_rate' => 10],
+                ],
+            ]);
+
+        $estimate = $workspace->estimates()->firstOrFail();
+        $this->assertSame(330000, $estimate->total);
+        $scope = $estimate->items()->where('source_type', 'roadmap')->firstOrFail();
+        $this->assertTrue($scope->is_scope_only);
+        $this->assertSame(0, $scope->amount);
+        $this->get(route('estimates.show', $estimate))->assertOk()->assertSee('作業範囲・実施内容')->assertSee('導入準備');
+    }
+
     private function project(): array
     {
         $user = User::factory()->create();

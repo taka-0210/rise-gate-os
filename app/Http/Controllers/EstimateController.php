@@ -60,6 +60,11 @@ class EstimateController extends Controller
         ]);
         $items = collect($validated['items'])->filter(fn ($item) => (bool) ($item['selected'] ?? false))->values();
         if ($items->isEmpty()) throw ValidationException::withMessages(['items' => '見積明細を1件以上選択してください。']);
+        $hasPackage = $items->contains(fn ($item) => $item['source_type'] === 'manual');
+        $items = $items->map(function ($item) use ($hasPackage): array {
+            $item['is_scope_only'] = $hasPackage && $item['source_type'] !== 'manual';
+            return $item;
+        });
         $items->each(function ($item) use ($project): void {
             if ($item['source_type'] !== 'manual') {
                 $this->assertSourceBelongsToProject($project, $item['source_type'], (int) $item['source_id']);
@@ -86,7 +91,9 @@ class EstimateController extends Controller
             $clientSnapshot = $client->only(['name','kana','email','phone','website','postal_code','address']);
             $number = $this->nextNumber($workspace->id, $validated['issued_on']);
             $lines = $items->map(function ($item): array {
-                $amount = (int) round((float) $item['quantity'] * (int) $item['unit_price']);
+                $amount = $item['is_scope_only']
+                    ? 0
+                    : (int) round((float) $item['quantity'] * (int) $item['unit_price']);
                 return $item + ['amount' => $amount];
             });
             $subtotal = $lines->sum('amount');
@@ -107,6 +114,7 @@ class EstimateController extends Controller
                     : $this->source($project, $line['source_type'], (int) $line['source_id']);
                 $estimate->items()->create([
                     'source_type' => $line['source_type'], 'source_id' => $source?->id, 'source_public_id' => $source?->public_id,
+                    'is_scope_only' => $line['is_scope_only'],
                     'description' => $line['description'], 'quantity' => $line['quantity'], 'unit' => $line['unit'],
                     'unit_price' => $line['unit_price'], 'tax_rate' => $line['tax_rate'], 'amount' => $line['amount'], 'sort_order' => $index + 1,
                 ]);
@@ -145,7 +153,7 @@ class EstimateController extends Controller
 
             foreach ($estimate->items as $item) {
                 $copy->items()->create($item->only([
-                    'source_type', 'source_id', 'source_public_id', 'description',
+                    'source_type', 'source_id', 'source_public_id', 'is_scope_only', 'description',
                     'quantity', 'unit', 'unit_price', 'tax_rate', 'amount', 'sort_order',
                 ]));
             }
