@@ -130,6 +130,34 @@ class EstimateFoundationTest extends TestCase
         $this->assertSame('設計費', $copy->items()->firstOrFail()->description);
     }
 
+    public function test_project_can_be_estimated_as_one_package_without_plan_items(): void
+    {
+        [$user, $workspace, $project] = $this->project();
+
+        $response = $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
+            ->post(route('projects.estimates.store', $project), [
+                'title' => '一式見積',
+                'issued_on' => '2026-07-19',
+                'discount' => 5000,
+                'items' => [[
+                    'selected' => 1,
+                    'source_type' => 'manual',
+                    'source_id' => null,
+                    'description' => '給与計算システム開発一式',
+                    'quantity' => 1,
+                    'unit' => '式',
+                    'unit_price' => 300000,
+                    'tax_rate' => 10,
+                ]],
+            ]);
+
+        $estimate = $workspace->estimates()->firstOrFail();
+        $response->assertRedirect(route('estimates.show', $estimate));
+        $this->assertSame(324500, $estimate->total);
+        $this->assertNull($estimate->items()->firstOrFail()->source_id);
+    }
+
     private function project(): array
     {
         $user = User::factory()->create();

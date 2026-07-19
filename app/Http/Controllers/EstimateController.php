@@ -50,8 +50,8 @@ class EstimateController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
             'items' => ['required', 'array'],
             'items.*.selected' => ['nullable', 'boolean'],
-            'items.*.source_type' => ['required', Rule::in(['roadmap', 'improvement', 'task'])],
-            'items.*.source_id' => ['required', 'integer'],
+            'items.*.source_type' => ['required', Rule::in(['manual', 'roadmap', 'improvement', 'task'])],
+            'items.*.source_id' => ['nullable', 'integer'],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.unit' => ['required', 'string', 'max:30'],
@@ -60,7 +60,11 @@ class EstimateController extends Controller
         ]);
         $items = collect($validated['items'])->filter(fn ($item) => (bool) ($item['selected'] ?? false))->values();
         if ($items->isEmpty()) throw ValidationException::withMessages(['items' => '見積明細を1件以上選択してください。']);
-        $items->each(fn ($item) => $this->assertSourceBelongsToProject($project, $item['source_type'], (int) $item['source_id']));
+        $items->each(function ($item) use ($project): void {
+            if ($item['source_type'] !== 'manual') {
+                $this->assertSourceBelongsToProject($project, $item['source_type'], (int) $item['source_id']);
+            }
+        });
 
         $estimate = DB::transaction(function () use ($request, $workspace, $project, $validated, $items): Estimate {
             $profile = $workspace->businessProfile;
@@ -98,9 +102,11 @@ class EstimateController extends Controller
                 'notes' => $validated['notes'] ?? null, 'created_by' => $request->user()->id,
             ]);
             foreach ($lines as $index => $line) {
-                $source = $this->source($project, $line['source_type'], (int) $line['source_id']);
+                $source = $line['source_type'] === 'manual'
+                    ? null
+                    : $this->source($project, $line['source_type'], (int) $line['source_id']);
                 $estimate->items()->create([
-                    'source_type' => $line['source_type'], 'source_id' => $source->id, 'source_public_id' => $source->public_id,
+                    'source_type' => $line['source_type'], 'source_id' => $source?->id, 'source_public_id' => $source?->public_id,
                     'description' => $line['description'], 'quantity' => $line['quantity'], 'unit' => $line['unit'],
                     'unit_price' => $line['unit_price'], 'tax_rate' => $line['tax_rate'], 'amount' => $line['amount'], 'sort_order' => $index + 1,
                 ]);
