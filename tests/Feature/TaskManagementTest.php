@@ -147,7 +147,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('ROADMAP・実現までの道筋')
             ->assertSee('取り組み・道筋を前へ進める')
             ->assertSee('TASK・いま何をするか')
-            ->assertSee('今日の赤線を表示')
+            ->assertSee('今日を時間軸に含める')
             ->assertSee('id="time-today-toggle"', false)
             ->assertSee('AIアシスタント')
             ->assertSee('aria-label="承認待ち 1件"', false)
@@ -186,6 +186,28 @@ class TaskManagementTest extends TestCase
             ->getContent();
         preg_match('/編集対象Task.*?time-bar is-task ([^"]*)/s', $startedHtml, $startedBar);
         $this->assertStringContainsString('is-overdue', $startedBar[1] ?? '');
+    }
+
+    public function test_time_view_can_focus_on_future_plan_without_including_today(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $projectStart = now()->addMonths(3)->startOfDay();
+        $projectEnd = $projectStart->copy()->addMonth();
+        $project->update([
+            'start_date' => $projectStart->toDateString(),
+            'due_date' => $projectEnd->toDateString(),
+        ]);
+        $task = $this->createTask($project, $owner);
+        $task->update(['due_date' => $projectStart->copy()->addDays(10)->toDateString()]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => '0']))
+            ->assertOk()
+            ->assertSee('data-axis-start="'.$projectStart->copy()->subDays(2)->toDateString().'"', false)
+            ->assertSee('data-axis-end="'.$projectEnd->copy()->addDays(2)->toDateString().'"', false)
+            ->assertDontSee('<span class="time-today">', false)
+            ->assertDontSee('id="time-today-toggle" type="checkbox" checked', false);
     }
 
     private function createProjectOwner(): array

@@ -105,7 +105,6 @@
         .time-bar.is-overdue { background:#c65a46; }
         .time-reached-marker { position:absolute; z-index:2; top:10px; width:10px; height:24px; border:2px solid #245ca6; border-radius:999px; background:#fff; transform:translateX(-50%); }
         .time-today { position:absolute; z-index:2; top:0; bottom:0; left:var(--today-left); width:2px; background:#d24b3b; pointer-events:none; }
-        .time-layer.hide-today-line .time-today { display:none; }
         .time-unscheduled { display:inline-flex; margin:11px 12px; padding:3px 8px; border:1px dashed var(--line); border-radius:999px; color:var(--muted); font-size:11px; }
         @media (max-width:760px) {
             .focus-page { margin-top:-10px; }
@@ -134,13 +133,17 @@
         $completedTasks = $allTasks->where('status', \App\Models\Task::STATUS_DONE);
         $directTasks = $allTasks->whereNull('improvement_id');
         $isTimeView = request('view') === 'time';
+        $includeTodayInTimeline = request('include_today', '1') !== '0';
 
         $timeRows = collect();
         $taskPeriod = function ($task) use ($project) {
             $end = ($task->completed_at ?: $task->due_date)?->copy()->startOfDay();
             $start = $task->created_at?->copy()->startOfDay();
+            $projectStart = $project->start_date?->copy()->startOfDay();
+            if ($projectStart && $start && $start->lt($projectStart)) {
+                $start = $projectStart->copy();
+            }
             if ($start && $end && $start->gt($end)) {
-                $projectStart = $project->start_date?->copy()->startOfDay();
                 $start = $projectStart && $projectStart->lte($end) ? $projectStart : $end->copy();
             }
             return [$start, $end];
@@ -167,8 +170,14 @@
             }
         }
         $timeDates = $timeRows->flatMap(fn ($row) => [$row['start'], $row['end'], $row['reached']])->filter();
-        $axisStart = collect([$project->start_date?->copy()->startOfDay(), $timeDates->min(), now()->startOfDay()])->filter()->min() ?: now()->startOfDay();
-        $axisEnd = collect([$project->completed_at?->copy()->startOfDay(), $project->due_date?->copy()->startOfDay(), $timeDates->max(), now()->startOfDay()])->filter()->max() ?: $axisStart->copy()->addDays(14);
+        $plannedAxisStart = collect([$project->start_date?->copy()->startOfDay(), $timeDates->min()])->filter()->min() ?: now()->startOfDay();
+        $plannedAxisEnd = collect([$project->completed_at?->copy()->startOfDay(), $project->due_date?->copy()->startOfDay(), $timeDates->max()])->filter()->max() ?: $plannedAxisStart->copy()->addDays(14);
+        $axisStart = $includeTodayInTimeline
+            ? collect([$plannedAxisStart, now()->startOfDay()])->min()
+            : $plannedAxisStart->copy()->subDays(2);
+        $axisEnd = $includeTodayInTimeline
+            ? collect([$plannedAxisEnd, now()->startOfDay()])->max()
+            : $plannedAxisEnd->copy()->addDays(2);
         if ($axisEnd->lte($axisStart)) $axisEnd = $axisStart->copy()->addDays(14);
         $axisDays = max(1, $axisStart->diffInDays($axisEnd));
         $axisStep = $axisDays <= 45 ? max(1, (int) ceil($axisDays / 8)) : max(7, (int) ceil($axisDays / 8 / 7) * 7);
@@ -293,15 +302,15 @@
                 </div>
                 <div class="time-legend">
                     <span><i></i>登録期間</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>進行中の遅延</span><span><i class="is-reached"></i>実際の完了・到達日</span>
-                    <label><input id="time-today-toggle" type="checkbox" checked>今日の赤線を表示</label>
+                    <label><input id="time-today-toggle" type="checkbox" @checked($includeTodayInTimeline)>今日を時間軸に含める</label>
                 </div>
             </div>
             <div class="time-chart-scroll">
-                <div class="time-chart" style="--time-grid:{{ $axisStep / $axisDays * 100 }}%; --today-left:{{ $todayLeft }}%;">
+                <div class="time-chart" data-axis-start="{{ $axisStart->toDateString() }}" data-axis-end="{{ $axisEnd->toDateString() }}" style="--time-grid:{{ $axisStep / $axisDays * 100 }}%; --today-left:{{ $todayLeft }}%;">
                     <div class="time-axis">
-                        <div class="time-axis-label"><strong>{{ $axisDays <= 45 ? '日表示' : '週表示' }}</strong><div class="meta">赤線は今日</div></div>
+                        <div class="time-axis-label"><strong>{{ $axisDays <= 45 ? '日表示' : '週表示' }}</strong><div class="meta">{{ $includeTodayInTimeline ? '赤線は今日' : '予定期間を表示' }}</div></div>
                         <div class="time-axis-track">
-                            <span class="time-today"></span>
+                            @if ($includeTodayInTimeline)<span class="time-today"></span>@endif
                             @foreach ($axisTicks as $tick)<span class="time-axis-date {{ $loop->first ? 'is-first' : '' }} {{ $loop->last ? 'is-last' : '' }}" style="left:{{ $tick / $axisDays * 100 }}%">{{ $axisStart->copy()->addDays($tick)->format('n/j') }}</span>@endforeach
                         </div>
                     </div>
@@ -316,7 +325,7 @@
                         <div class="time-row is-{{ $row['type'] }}">
                             <div class="time-row-label"><span class="time-row-dot"></span><strong title="{{ $row['title'] }}">{{ $row['title'] }}</strong></div>
                             <div class="time-row-track">
-                                <span class="time-today"></span>
+                                @if ($includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
                                     <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }}" style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}"></span>
                                 @else
@@ -458,18 +467,21 @@
 
     <script>
         (() => {
-            const timeLayer = document.querySelector('.time-layer');
             const toggle = document.getElementById('time-today-toggle');
-            if (!timeLayer || !toggle) return;
-            const storageKey = 'rise-gate-os-show-today-line';
+            if (!toggle) return;
+            const storageKey = 'rise-gate-os-include-today-in-timeline';
             const saved = localStorage.getItem(storageKey);
-            toggle.checked = saved !== 'false';
-            const render = () => timeLayer.classList.toggle('hide-today-line', !toggle.checked);
+            const url = new URL(window.location.href);
+            if (!url.searchParams.has('include_today') && saved !== null && saved !== String(toggle.checked)) {
+                url.searchParams.set('include_today', saved === 'true' ? '1' : '0');
+                window.location.replace(url);
+                return;
+            }
             toggle.addEventListener('change', () => {
                 localStorage.setItem(storageKey, String(toggle.checked));
-                render();
+                url.searchParams.set('include_today', toggle.checked ? '1' : '0');
+                window.location.assign(url);
             });
-            render();
         })();
 
         (() => {
