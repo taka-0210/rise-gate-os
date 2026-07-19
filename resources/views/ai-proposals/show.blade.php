@@ -106,7 +106,7 @@
                     </form>
                     <form method="POST" action="{{ route('projects.ai-proposals.reject', [$project, $proposal]) }}">
                         @csrf
-                        <button class="secondary" type="submit">却下</button>
+                        <button class="secondary" type="submit">承認待ちから外す</button>
                     </form>
                 </div>
             </div>

@@ -64,6 +64,7 @@ class AiProposalFoundationTest extends TestCase
         $response->assertOk()
             ->assertSee('新しいタスクを登録する')
             ->assertSee('承認待ち')
+            ->assertSee('承認待ちから外す')
             ->assertSee('現在は閲覧のみです');
         $this->assertDatabaseCount('tasks', 0);
         $this->assertDatabaseHas('ai_proposals', ['id' => $proposal->id, 'status' => 'pending']);

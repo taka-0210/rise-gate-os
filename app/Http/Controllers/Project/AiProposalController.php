@@ -112,7 +112,7 @@ class AiProposalController extends Controller
         $aiProposal->aiRequest?->update(['status' => AiRequest::STATUS_CANCELLED, 'completed_at' => now()]);
 
         return redirect()->route('projects.ai-proposals.show', [$project, $aiProposal])
-            ->with('status', 'AI提案を却下しました。');
+            ->with('status', 'AI提案を承認待ちから外しました。');
     }
 
     private function authorizeWorkspaceProject(Request $request, Project $project): void

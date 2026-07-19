@@ -147,6 +147,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('ROADMAP・実現までの道筋')
             ->assertSee('取り組み・道筋を前へ進める')
             ->assertSee('TASK・いま何をするか')
+            ->assertSee('今日の赤線を表示')
+            ->assertSee('id="time-today-toggle"', false)
             ->assertSee('AIアシスタント')
             ->assertSee('aria-label="承認待ち 1件"', false)
             ->assertSee('id="ai-assistant-drawer"', false)
@@ -160,6 +162,30 @@ class TaskManagementTest extends TestCase
             ->assertSee('いま行うこと')
             ->assertSee($task->title)
             ->assertSee('管理詳細を見る');
+    }
+
+    public function test_time_view_only_marks_started_overdue_tasks_as_delayed(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $task = $this->createTask($project, $owner);
+        $task->update(['due_date' => now()->subDay()->toDateString()]);
+
+        $todoHtml = $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
+            ->assertOk()
+            ->getContent();
+        preg_match('/編集対象Task.*?time-bar is-task ([^"]*)/s', $todoHtml, $todoBar);
+        $this->assertStringNotContainsString('is-overdue', $todoBar[1] ?? '');
+
+        $task->update(['status' => Task::STATUS_IN_PROGRESS]);
+        $startedHtml = $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
+            ->assertOk()
+            ->getContent();
+        preg_match('/編集対象Task.*?time-bar is-task ([^"]*)/s', $startedHtml, $startedBar);
+        $this->assertStringContainsString('is-overdue', $startedBar[1] ?? '');
     }
 
     private function createProjectOwner(): array

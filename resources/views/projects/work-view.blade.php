@@ -72,6 +72,8 @@
         .time-layer-head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:18px; }
         .time-legend { display:flex; flex-wrap:wrap; gap:12px; color:var(--muted); font-size:12px; }
         .time-legend span { display:inline-flex; align-items:center; gap:5px; }
+        .time-legend label { display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
+        .time-legend input { width:auto; margin:0; }
         .time-legend i { width:20px; height:8px; border-radius:999px; background:#66717a; }
         .time-legend .is-inferred { background:transparent; border:2px dashed #66717a; }
         .time-legend .is-overdue { background:#c65a46; }
@@ -103,6 +105,7 @@
         .time-bar.is-overdue { background:#c65a46; }
         .time-reached-marker { position:absolute; z-index:2; top:10px; width:10px; height:24px; border:2px solid #245ca6; border-radius:999px; background:#fff; transform:translateX(-50%); }
         .time-today { position:absolute; z-index:2; top:0; bottom:0; left:var(--today-left); width:2px; background:#d24b3b; pointer-events:none; }
+        .time-layer.hide-today-line .time-today { display:none; }
         .time-unscheduled { display:inline-flex; margin:11px 12px; padding:3px 8px; border:1px dashed var(--line); border-radius:999px; color:var(--muted); font-size:11px; }
         @media (max-width:760px) {
             .focus-page { margin-top:-10px; }
@@ -159,7 +162,7 @@
                 $timeRows->push(['type' => 'improvement', 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $improvement->completed_at]);
                 foreach ($improvement->tasks as $task) {
                     [$taskStart, $taskEnd] = $taskPeriod($task);
-                    $timeRows->push(['type' => 'task', 'title' => $task->title, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null]);
+                $timeRows->push(['type' => 'task', 'title' => $task->title, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null]);
                 }
             }
         }
@@ -289,7 +292,8 @@
                     <p>ROADMAP・取り組み・TASKを、ひとつの時間軸で確認します。</p>
                 </div>
                 <div class="time-legend">
-                    <span><i></i>登録期間</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>遅延</span><span><i class="is-reached"></i>実際の完了・到達日</span>
+                    <span><i></i>登録期間</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>進行中の遅延</span><span><i class="is-reached"></i>実際の完了・到達日</span>
+                    <label><input id="time-today-toggle" type="checkbox" checked>今日の赤線を表示</label>
                 </div>
             </div>
             <div class="time-chart-scroll">
@@ -453,6 +457,21 @@
     </section>
 
     <script>
+        (() => {
+            const timeLayer = document.querySelector('.time-layer');
+            const toggle = document.getElementById('time-today-toggle');
+            if (!timeLayer || !toggle) return;
+            const storageKey = 'rise-gate-os-show-today-line';
+            const saved = localStorage.getItem(storageKey);
+            toggle.checked = saved !== 'false';
+            const render = () => timeLayer.classList.toggle('hide-today-line', !toggle.checked);
+            toggle.addEventListener('change', () => {
+                localStorage.setItem(storageKey, String(toggle.checked));
+                render();
+            });
+            render();
+        })();
+
         (() => {
             const drawer = document.getElementById('ai-assistant-drawer');
             const overlay = document.querySelector('.ai-drawer-overlay');

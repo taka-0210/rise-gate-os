@@ -53,7 +53,7 @@ class AiProposal extends Model
         return [
             self::STATUS_PENDING => '承認待ち',
             self::STATUS_APPROVED => '承認済み',
-            self::STATUS_REJECTED => '却下',
+            self::STATUS_REJECTED => '見送り',
             self::STATUS_APPLIED => '反映済み',
             self::STATUS_FAILED => '反映失敗',
         ];
