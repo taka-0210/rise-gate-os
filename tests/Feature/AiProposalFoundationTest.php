@@ -330,6 +330,20 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee('Codexへ作業開始を伝える')
             ->assertSee("プロジェクト「{$project->name}」", false)
             ->assertSee('現在のプロジェクト計画を確認し、承認内容に基づく次の作業を開始してください。');
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.handoff', [$project, $proposal]))
+            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
+
+        $proposal->refresh();
+        $this->assertSame($user->id, $proposal->handed_off_by);
+        $this->assertNotNull($proposal->handed_off_at);
+
+        $this->get(route('projects.ai-proposals.show', [$project, $proposal]))
+            ->assertOk()
+            ->assertSee('Codexへ伝達済み')
+            ->assertSee('伝達済み');
     }
 
     public function test_invalid_proposal_cannot_be_applied(): void

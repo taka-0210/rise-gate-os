@@ -115,6 +115,24 @@ class AiProposalController extends Controller
             ->with('status', 'AI提案を承認待ちから外しました。');
     }
 
+    public function handoff(Request $request, Project $project, AiProposal $aiProposal): RedirectResponse
+    {
+        $this->authorizeWorkspaceProject($request, $project);
+        Gate::authorize('update', $project);
+        abort_unless($aiProposal->project_id === $project->id, 404);
+        abort_unless($aiProposal->status === AiProposal::STATUS_APPLIED, 422);
+
+        if (! $aiProposal->handed_off_at) {
+            $aiProposal->update([
+                'handed_off_by' => $request->user()->id,
+                'handed_off_at' => now(),
+            ]);
+        }
+
+        return redirect()->route('projects.ai-proposals.show', [$project, $aiProposal])
+            ->with('status', 'Codexへ作業開始を伝えたことを記録しました。');
+    }
+
     private function authorizeWorkspaceProject(Request $request, Project $project): void
     {
         Gate::authorize('view', $project);

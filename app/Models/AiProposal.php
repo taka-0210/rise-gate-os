@@ -21,7 +21,8 @@ class AiProposal extends Model
     protected $fillable = [
         'public_id', 'organization_id', 'workspace_id', 'project_id', 'source',
         'idempotency_key', 'title', 'summary', 'status', 'evidence',
-        'requested_by', 'reviewed_by', 'reviewed_at', 'applied_at', 'failure_reason',
+        'requested_by', 'reviewed_by', 'reviewed_at', 'applied_at',
+        'handed_off_by', 'handed_off_at', 'failure_reason',
     ];
 
     protected function casts(): array
@@ -30,6 +31,7 @@ class AiProposal extends Model
             'evidence' => 'array',
             'reviewed_at' => 'datetime',
             'applied_at' => 'datetime',
+            'handed_off_at' => 'datetime',
         ];
     }
 
