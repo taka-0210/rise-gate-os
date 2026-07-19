@@ -70,7 +70,10 @@ class EstimateFoundationTest extends TestCase
         $this->get(route('estimates.show', $estimate))
             ->assertOk()
             ->assertSee('給与計算システム 御見積')
-            ->assertSee('給与計算システムの要件定義');
+            ->assertSee('給与計算システムの要件定義')
+            ->assertSee('@page{size:A4 portrait;margin:12mm 14mm}', false)
+            ->assertSee('display:table-header-group', false)
+            ->assertSee('break-inside:avoid', false);
     }
 
     public function test_estimate_cannot_be_viewed_from_another_current_workspace(): void
