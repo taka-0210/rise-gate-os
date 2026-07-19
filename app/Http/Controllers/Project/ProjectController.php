@@ -102,6 +102,9 @@ class ProjectController extends Controller
         Gate::authorize('create', [Project::class, $currentWorkspace]);
 
         $validated = $this->validateProject($request, $currentWorkspace->id);
+        $starterMode = $request->validate([
+            'starter_mode' => ['nullable', 'string', Rule::in(['blank', 'starter'])],
+        ])['starter_mode'] ?? 'starter';
 
         $project = Project::create($validated + [
             'organization_id' => $currentWorkspace->organization_id,
@@ -122,30 +125,32 @@ class ProjectController extends Controller
             'status' => ProjectMember::STATUS_ACTIVE,
         ]);
 
-        $defaultRoadmap = Roadmap::create([
-            'organization_id' => $project->organization_id,
-            'workspace_id' => $project->owning_workspace_id,
-            'project_id' => $project->id,
-            'title' => 'プロジェクトを前に進める',
-            'purpose' => 'Project全体の取り組みを受け止め、実現までの道筋を具体化します。',
-            'status' => Roadmap::STATUS_ACTIVE,
-            'sort_order' => 1,
-            'created_by' => $request->user()->id,
-        ]);
+        if ($starterMode === 'starter') {
+            $defaultRoadmap = Roadmap::create([
+                'organization_id' => $project->organization_id,
+                'workspace_id' => $project->owning_workspace_id,
+                'project_id' => $project->id,
+                'title' => 'プロジェクトを前に進める',
+                'purpose' => 'Project全体の取り組みを受け止め、実現までの道筋を具体化します。',
+                'status' => Roadmap::STATUS_ACTIVE,
+                'sort_order' => 1,
+                'created_by' => $request->user()->id,
+            ]);
 
-        Improvement::create([
-            'organization_id' => $project->organization_id,
-            'workspace_id' => $project->owning_workspace_id,
-            'project_id' => $project->id,
-            'roadmap_id' => $defaultRoadmap->id,
-            'roadmap_sort_order' => 1,
-            'title' => '進めるための具体的な動き',
-            'desired_state' => 'このRoadmapを具体的なTaskによって前へ進めます。',
-            'status' => Improvement::STATUS_PLANNED,
-            'visibility' => Improvement::VISIBILITY_INTERNAL,
-            'proposed_by' => $request->user()->id,
-            'assigned_to' => $request->user()->id,
-        ]);
+            Improvement::create([
+                'organization_id' => $project->organization_id,
+                'workspace_id' => $project->owning_workspace_id,
+                'project_id' => $project->id,
+                'roadmap_id' => $defaultRoadmap->id,
+                'roadmap_sort_order' => 1,
+                'title' => '進めるための具体的な動き',
+                'desired_state' => 'このRoadmapを具体的なTaskによって前へ進めます。',
+                'status' => Improvement::STATUS_PLANNED,
+                'visibility' => Improvement::VISIBILITY_INTERNAL,
+                'proposed_by' => $request->user()->id,
+                'assigned_to' => $request->user()->id,
+            ]);
+        }
 
         return redirect()->route('projects.show', $project);
     }

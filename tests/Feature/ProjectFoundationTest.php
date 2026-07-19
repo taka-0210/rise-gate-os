@@ -59,6 +59,32 @@ class ProjectFoundationTest extends TestCase
         ]);
     }
 
+    public function test_user_can_create_blank_project_for_manual_or_ai_planning(): void
+    {
+        [$user, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'name' => 'AI Planning Client',
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.store'), [
+                'client_id' => $client->id,
+                'name' => 'AIと設計するProject',
+                'status' => Project::STATUS_DRAFT,
+                'priority' => Project::PRIORITY_NORMAL,
+                'starter_mode' => 'blank',
+            ])
+            ->assertRedirect();
+
+        $project = Project::where('name', 'AIと設計するProject')->firstOrFail();
+        $this->assertSame(0, $project->roadmaps()->count());
+        $this->assertSame(0, $project->improvements()->count());
+        $this->assertSame(0, $project->tasks()->count());
+    }
+
     public function test_project_list_only_shows_joined_projects_for_current_workspace(): void
     {
         [$user, $workspace] = $this->createWorkspaceOwner();
