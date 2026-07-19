@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -22,8 +23,11 @@ class EstimateController extends Controller
     public function index(Request $request): View
     {
         $workspace = $request->attributes->get('currentWorkspace');
+        $query = $workspace->estimates()->with(['project', 'client']);
+        if (! $request->boolean('history')) $query->where('is_current', true);
+        if ($request->filled('status')) $query->where('status', $request->string('status'));
         return view('estimates.index', [
-            'estimates' => $workspace->estimates()->with(['project', 'client'])->latest('issued_on')->latest()->paginate(20),
+            'estimates' => $query->latest('issued_on')->latest()->paginate(20)->withQueryString(),
             'statuses' => Estimate::statuses(),
         ]);
     }
@@ -132,24 +136,116 @@ class EstimateController extends Controller
         return view('estimates.show', compact('estimate'));
     }
 
+    public function edit(Request $request, Estimate $estimate): View
+    {
+        $this->assertCurrentWorkspace($request, $estimate->workspace_id);
+        Gate::authorize('update', $estimate->project);
+        abort_unless($estimate->status === Estimate::STATUS_DRAFT && $estimate->is_current, 409, '下書きの最新版だけ編集できます。');
+        $estimate->load('items');
+
+        return view('estimates.edit', compact('estimate'));
+    }
+
+    public function update(Request $request, Estimate $estimate): RedirectResponse
+    {
+        $this->assertCurrentWorkspace($request, $estimate->workspace_id);
+        Gate::authorize('update', $estimate->project);
+        abort_unless($estimate->status === Estimate::STATUS_DRAFT && $estimate->is_current, 409, '下書きの最新版だけ編集できます。');
+        $validated = $this->validateEditableEstimate($request);
+        $items = collect($validated['items'])->values();
+        [$lines, $subtotal, $discount, $tax, $total] = $this->calculateLines($items, (int) ($validated['discount'] ?? 0));
+
+        DB::transaction(function () use ($estimate, $validated, $lines, $subtotal, $discount, $tax, $total): void {
+            $estimate->update([
+                'title' => $validated['title'], 'issued_on' => $validated['issued_on'],
+                'valid_until' => $validated['valid_until'] ?? null, 'notes' => $validated['notes'] ?? null,
+                'subtotal' => $subtotal, 'discount' => $discount, 'tax_amount' => $tax, 'total' => $total,
+            ]);
+            $estimate->items()->delete();
+            foreach ($lines as $index => $line) {
+                $estimate->items()->create($line + ['sort_order' => $index + 1]);
+            }
+        });
+
+        return redirect()->route('estimates.show', $estimate)->with('status', '見積書を更新しました。');
+    }
+
+    public function destroy(Request $request, Estimate $estimate): RedirectResponse
+    {
+        $this->assertCurrentWorkspace($request, $estimate->workspace_id);
+        Gate::authorize('update', $estimate->project);
+        if ($estimate->status === Estimate::STATUS_DRAFT) {
+            $estimate->delete();
+            return redirect()->route('estimates.index')->with('status', '下書き見積を削除しました。');
+        }
+        $estimate->update(['status' => Estimate::STATUS_VOID, 'voided_at' => now(), 'voided_by' => $request->user()->id, 'is_current' => false]);
+        return redirect()->route('estimates.index')->with('status', '提出済み見積を無効にしました。');
+    }
+
+    public function updateStatus(Request $request, Estimate $estimate): RedirectResponse
+    {
+        $this->assertCurrentWorkspace($request, $estimate->workspace_id);
+        Gate::authorize('update', $estimate->project);
+        $validated = $request->validate([
+            'status' => ['required', Rule::in([Estimate::STATUS_SUBMITTED, Estimate::STATUS_PENDING, Estimate::STATUS_ACCEPTED, Estimate::STATUS_REJECTED, Estimate::STATUS_EXPIRED, Estimate::STATUS_VOID])],
+            'ordered_on' => ['nullable', 'date'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $changes = ['status' => $validated['status']];
+        if ($validated['status'] === Estimate::STATUS_SUBMITTED) {
+            $changes += ['submitted_at' => now(), 'submitted_by' => $request->user()->id, 'client_access_token' => $estimate->client_access_token ?: Str::random(48)];
+        }
+        if ($validated['status'] === Estimate::STATUS_PENDING) $changes['client_access_token'] = $estimate->client_access_token ?: Str::random(48);
+        if ($validated['status'] === Estimate::STATUS_ACCEPTED) $changes += ['ordered_on' => $validated['ordered_on'] ?? now()->toDateString(), 'responded_at' => now(), 'response_note' => $validated['note'] ?? null];
+        if ($validated['status'] === Estimate::STATUS_REJECTED) $changes += ['lost_reason' => $validated['note'] ?? null, 'responded_at' => now()];
+        if ($validated['status'] === Estimate::STATUS_VOID) $changes += ['voided_at' => now(), 'voided_by' => $request->user()->id, 'is_current' => false];
+        $estimate->update($changes);
+
+        return back()->with('status', '見積書の状態を更新しました。');
+    }
+
+    public function revise(Request $request, Estimate $estimate): RedirectResponse
+    {
+        $this->assertCurrentWorkspace($request, $estimate->workspace_id);
+        Gate::authorize('update', $estimate->project);
+        abort_unless($estimate->is_current, 409, '最新版からのみ改訂できます。');
+        $copy = $this->copyEstimate($request, $estimate, true);
+        return redirect()->route('estimates.edit', $copy)->with('status', '改訂版を作成しました。内容を確認してください。');
+    }
+
     public function duplicate(Request $request, Estimate $estimate): RedirectResponse
     {
         $this->assertCurrentWorkspace($request, $estimate->workspace_id);
         Gate::authorize('update', $estimate->project);
 
-        $copy = DB::transaction(function () use ($request, $estimate): Estimate {
+        $copy = $this->copyEstimate($request, $estimate, false);
+
+        return redirect()->route('estimates.show', $copy)->with('status', '見積書を複製し、下書き保存しました。');
+    }
+
+    private function copyEstimate(Request $request, Estimate $estimate, bool $revision): Estimate
+    {
+        return DB::transaction(function () use ($request, $estimate, $revision): Estimate {
             $estimate->load('items');
             $copy = $estimate->replicate([
                 'public_id', 'estimate_number', 'status', 'issued_on', 'valid_until',
-                'created_by', 'created_at', 'updated_at', 'deleted_at',
+                'created_by', 'created_at', 'updated_at', 'deleted_at', 'client_access_token',
+                'submitted_at', 'submitted_by', 'client_viewed_at', 'responded_at', 'response_note',
+                'ordered_on', 'lost_reason', 'voided_at', 'voided_by',
             ]);
             $copy->estimate_number = $this->nextNumber($estimate->workspace_id, now()->toDateString());
-            $copy->title = $estimate->title.'（複製）';
+            $copy->title = $revision ? $estimate->title : $estimate->title.'（複製）';
             $copy->status = Estimate::STATUS_DRAFT;
             $copy->issued_on = now()->toDateString();
             $copy->valid_until = now()->addMonth()->toDateString();
             $copy->created_by = $request->user()->id;
+            $copy->revision_group = $revision ? $estimate->revision_group : null;
+            $copy->revision_no = $revision ? $estimate->revision_no + 1 : 1;
+            $copy->previous_estimate_id = $revision ? $estimate->id : null;
+            $copy->is_current = true;
             $copy->save();
+
+            if ($revision) $estimate->update(['is_current' => false]);
 
             foreach ($estimate->items as $item) {
                 $copy->items()->create($item->only([
@@ -160,8 +256,6 @@ class EstimateController extends Controller
 
             return $copy;
         });
-
-        return redirect()->route('estimates.show', $copy)->with('status', '見積書を複製し、下書き保存しました。');
     }
 
     public function media(Request $request, Estimate $estimate, string $type): StreamedResponse
@@ -197,4 +291,37 @@ class EstimateController extends Controller
 
     private function assertSourceBelongsToProject(Project $project, string $type, int $id): void { $this->source($project, $type, $id); }
     private function assertCurrentWorkspace(Request $request, int $workspaceId): void { abort_unless($request->attributes->get('currentWorkspace')->id === $workspaceId, 404); }
+
+    private function validateEditableEstimate(Request $request): array
+    {
+        return $request->validate([
+            'title' => ['required', 'string', 'max:255'], 'issued_on' => ['required', 'date'],
+            'valid_until' => ['nullable', 'date', 'after_or_equal:issued_on'], 'discount' => ['nullable', 'integer', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:5000'], 'items' => ['required', 'array', 'min:1'],
+            'items.*.source_type' => ['nullable', Rule::in(['manual','roadmap','improvement','task'])],
+            'items.*.source_id' => ['nullable', 'integer'], 'items.*.source_public_id' => ['nullable', 'string'],
+            'items.*.is_scope_only' => ['nullable', 'boolean'], 'items.*.description' => ['required', 'string', 'max:255'],
+            'items.*.quantity' => ['required', 'numeric', 'gt:0'], 'items.*.unit' => ['required', 'string', 'max:30'],
+            'items.*.unit_price' => ['required', 'integer', 'min:0'], 'items.*.tax_rate' => ['required', 'numeric', Rule::in([0,8,10])],
+        ]);
+    }
+
+    private function calculateLines($items, int $requestedDiscount): array
+    {
+        $lines = $items->map(function ($item): array {
+            $scope = (bool) ($item['is_scope_only'] ?? false);
+            return [
+                'source_type' => $item['source_type'] ?? 'manual', 'source_id' => $item['source_id'] ?? null,
+                'source_public_id' => $item['source_public_id'] ?? null, 'is_scope_only' => $scope,
+                'description' => $item['description'], 'quantity' => $item['quantity'], 'unit' => $item['unit'],
+                'unit_price' => $item['unit_price'], 'tax_rate' => $item['tax_rate'],
+                'amount' => $scope ? 0 : (int) round((float) $item['quantity'] * (int) $item['unit_price']),
+            ];
+        });
+        $subtotal = $lines->sum('amount');
+        $discount = min($requestedDiscount, $subtotal);
+        $ratio = $subtotal > 0 ? ($subtotal - $discount) / $subtotal : 0;
+        $tax = (int) floor($lines->sum(fn ($line) => $line['amount'] * $ratio * ((float) $line['tax_rate'] / 100)));
+        return [$lines, $subtotal, $discount, $tax, $subtotal - $discount + $tax];
+    }
 }

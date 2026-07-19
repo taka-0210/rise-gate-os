@@ -197,6 +197,72 @@ class EstimateFoundationTest extends TestCase
         $this->get(route('estimates.show', $estimate))->assertOk()->assertSee('作業範囲・実施内容')->assertSee('導入準備');
     }
 
+    public function test_draft_can_be_edited_and_deleted(): void
+    {
+        [$user, $workspace, $project] = $this->project();
+        $estimate = $this->estimate($workspace, $project, $user);
+        $estimate->items()->create(['source_type'=>'manual','description'=>'旧明細','quantity'=>1,'unit'=>'式','unit_price'=>10000,'tax_rate'=>10,'amount'=>10000]);
+        $session = ['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'];
+
+        $this->actingAs($user)->withSession($session)->put(route('estimates.update', $estimate), [
+            'title'=>'更新後見積','issued_on'=>'2026-07-20','discount'=>1000,'items'=>[[
+                'source_type'=>'manual','is_scope_only'=>0,'description'=>'新明細','quantity'=>2,'unit'=>'式','unit_price'=>20000,'tax_rate'=>10,
+            ]],
+        ])->assertRedirect(route('estimates.show', $estimate));
+        $estimate->refresh();
+        $this->assertSame('更新後見積', $estimate->title);
+        $this->assertSame(42900, $estimate->total);
+        $this->assertSame('新明細', $estimate->items()->firstOrFail()->description);
+
+        $this->actingAs($user)->withSession($session)->delete(route('estimates.destroy', $estimate))->assertRedirect(route('estimates.index'));
+        $this->assertSoftDeleted('estimates', ['id'=>$estimate->id]);
+    }
+
+    public function test_submitted_estimate_can_be_viewed_and_accepted_by_client(): void
+    {
+        [$user, $workspace, $project] = $this->project();
+        $estimate = $this->estimate($workspace, $project, $user);
+        $estimate->items()->create(['source_type'=>'manual','description'=>'開発一式','quantity'=>1,'unit'=>'式','unit_price'=>10000,'tax_rate'=>10,'amount'=>10000]);
+        $session = ['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'];
+        $this->actingAs($user)->withSession($session)->post(route('estimates.status',$estimate), ['status'=>'submitted'])->assertRedirect();
+        $estimate->refresh();
+        $this->assertNotNull($estimate->client_access_token);
+
+        $this->get(route('public.estimates.show',$estimate->client_access_token))->assertOk()->assertSee('見積内容へのご回答');
+        $this->post(route('public.estimates.respond',$estimate->client_access_token), ['response'=>'accept','note'=>'お願いします'])->assertRedirect();
+        $estimate->refresh();
+        $this->assertSame('accepted', $estimate->status);
+        $this->assertNotNull($estimate->client_viewed_at);
+        $this->assertNotNull($estimate->ordered_on);
+    }
+
+    public function test_submitted_estimate_can_create_a_new_revision(): void
+    {
+        [$user, $workspace, $project] = $this->project();
+        $estimate = $this->estimate($workspace, $project, $user);
+        $estimate->update(['status'=>'submitted']);
+        $estimate->items()->create(['source_type'=>'manual','description'=>'初版','quantity'=>1,'unit'=>'式','unit_price'=>10000,'tax_rate'=>10,'amount'=>10000]);
+
+        $this->actingAs($user)->withSession(['current_workspace_id'=>$workspace->id,'access_mode'=>'workspace'])
+            ->post(route('estimates.revise',$estimate))->assertRedirect();
+        $estimate->refresh();
+        $revision = $workspace->estimates()->whereKeyNot($estimate->id)->firstOrFail();
+        $this->assertFalse($estimate->is_current);
+        $this->assertTrue($revision->is_current);
+        $this->assertSame(2, $revision->revision_no);
+        $this->assertSame($estimate->revision_group, $revision->revision_group);
+        $this->assertSame('draft', $revision->status);
+    }
+
+    private function estimate(Workspace $workspace, Project $project, User $user): \App\Models\Estimate
+    {
+        return $workspace->estimates()->create([
+            'project_id'=>$project->id,'client_id'=>$project->client_id,'estimate_number'=>'EST-202607-'.str_pad((string) random_int(1,9999),4,'0',STR_PAD_LEFT),
+            'title'=>'テスト見積','issued_on'=>'2026-07-20','status'=>'draft','issuer_snapshot'=>['legal_name'=>'発行元'],
+            'client_snapshot'=>['name'=>'提出先'],'subtotal'=>10000,'tax_amount'=>1000,'total'=>11000,'created_by'=>$user->id,
+        ]);
+    }
+
     private function project(): array
     {
         $user = User::factory()->create();

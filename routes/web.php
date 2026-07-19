@@ -40,6 +40,9 @@ Route::middleware('guest')->group(function (): void {
 Route::get('/system-admin/login', [SystemAdminSessionController::class, 'create'])->name('system-admin.login');
 Route::post('/system-admin/login', [SystemAdminSessionController::class, 'store'])->name('system-admin.login.store');
 
+Route::get('/estimate-review/{token}', [\App\Http\Controllers\PublicEstimateController::class, 'show'])->name('public.estimates.show');
+Route::post('/estimate-review/{token}/respond', [\App\Http\Controllers\PublicEstimateController::class, 'respond'])->name('public.estimates.respond');
+
 Route::middleware(['auth', 'active-user'])->group(function (): void {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
@@ -73,6 +76,11 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/{project}/estimates/create', [EstimateController::class, 'create'])->name('projects.estimates.create');
         Route::post('/projects/{project}/estimates', [EstimateController::class, 'store'])->name('projects.estimates.store');
         Route::get('/estimates/{estimate}', [EstimateController::class, 'show'])->name('estimates.show');
+        Route::get('/estimates/{estimate}/edit', [EstimateController::class, 'edit'])->name('estimates.edit');
+        Route::put('/estimates/{estimate}', [EstimateController::class, 'update'])->name('estimates.update');
+        Route::delete('/estimates/{estimate}', [EstimateController::class, 'destroy'])->name('estimates.destroy');
+        Route::post('/estimates/{estimate}/status', [EstimateController::class, 'updateStatus'])->name('estimates.status');
+        Route::post('/estimates/{estimate}/revise', [EstimateController::class, 'revise'])->name('estimates.revise');
         Route::post('/estimates/{estimate}/duplicate', [EstimateController::class, 'duplicate'])->name('estimates.duplicate');
         Route::get('/estimates/{estimate}/media/{type}', [EstimateController::class, 'media'])->name('estimates.media');
         Route::get('/ai-connections', [AiConnectionController::class, 'index'])->name('ai-connections.index');
