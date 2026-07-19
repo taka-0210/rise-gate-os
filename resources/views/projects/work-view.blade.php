@@ -672,7 +672,12 @@
                             const response = await fetch(bar.dataset.scheduleUrl, {
                                 method: 'PATCH',
                                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf},
-                                body: JSON.stringify({start_date: formatDate(nextStart), end_date: formatDate(nextEnd)}),
+                                body: JSON.stringify({
+                                    start_date: formatDate(nextStart),
+                                    end_date: formatDate(nextEnd),
+                                    cascade_children: bar.dataset.entityType !== 'task',
+                                    cascade_anchor: side,
+                                }),
                             });
                             const body = await response.json();
                             if (!response.ok) {

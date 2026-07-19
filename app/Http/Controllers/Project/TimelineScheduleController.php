@@ -34,6 +34,8 @@ class TimelineScheduleController extends Controller
                 'start_date' => ['required', 'date'],
                 'end_date' => ['required', 'date', 'after_or_equal:start_date'],
                 'cascade_move' => ['sometimes', 'boolean'],
+                'cascade_children' => ['sometimes', 'boolean'],
+                'cascade_anchor' => ['sometimes', 'in:start,end'],
             ]),
             'task' => $request->validate([
                 'end_date' => ['required', 'date'],
@@ -58,6 +60,14 @@ class TimelineScheduleController extends Controller
                 $this->moveDescendants($type, $model, $dayDelta);
             }
 
+            if (($attributes['cascade_children'] ?? false) && in_array($type, ['roadmap', 'improvement'], true)) {
+                $anchor = $attributes['cascade_anchor'] ?? 'end';
+                $originalDate = $anchor === 'start' ? $model->planned_start_date : $model->target_date;
+                $changedDate = Carbon::parse($attributes[$anchor.'_date'])->startOfDay();
+                $dayDelta = $originalDate->copy()->startOfDay()->diffInDays($changedDate, false);
+                $this->moveDescendants($type, $model, $dayDelta);
+            }
+
             $model->update(match ($type) {
                 'roadmap', 'improvement' => [
                     'planned_start_date' => $attributes['start_date'],
@@ -67,7 +77,9 @@ class TimelineScheduleController extends Controller
             });
             $after = app(ScheduleIntegrityService::class)->inspect($project->fresh());
             $newInvalid = $after['invalid']->diff($before);
-            if ($newInvalid->isNotEmpty() && ! ($attributes['cascade_move'] ?? false)) {
+            if ($newInvalid->isNotEmpty()
+                && ! ($attributes['cascade_move'] ?? false)
+                && ! ($attributes['cascade_children'] ?? false)) {
                 throw ValidationException::withMessages(['schedule' => $newInvalid->first()]);
             }
             return $after;

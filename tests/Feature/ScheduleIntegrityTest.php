@@ -127,6 +127,36 @@ class ScheduleIntegrityTest extends TestCase
         $this->assertSame('2026-08-30', $task->fresh()->due_date->toDateString());
     }
 
+    public function test_resizing_a_parent_moves_its_descendants_by_the_changed_edge(): void
+    {
+        [$user, $workspace, $project, $roadmap, $improvement] = $this->scheduledProject();
+        $task = Task::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'improvement_id' => $improvement->id,
+            'title' => '端の変更についていくタスク',
+            'status' => Task::STATUS_TODO,
+            'priority' => Task::PRIORITY_NORMAL,
+            'due_date' => '2026-08-10',
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), [
+                'start_date' => '2026-08-08',
+                'end_date' => '2026-08-20',
+                'cascade_children' => true,
+                'cascade_anchor' => 'end',
+            ])
+            ->assertOk();
+
+        $this->assertSame('2026-08-11', $improvement->fresh()->planned_start_date->toDateString());
+        $this->assertSame('2026-08-15', $improvement->fresh()->target_date->toDateString());
+        $this->assertSame('2026-08-13', $task->fresh()->due_date->toDateString());
+    }
+
     private function scheduledProject(): array
     {
         $user = User::factory()->create();
