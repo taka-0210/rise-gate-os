@@ -71,10 +71,11 @@ class ProjectInternalNoteController extends Controller
     public function view(Request $request, Project $project, ProjectInternalNote $internalNote, ProjectInternalNoteAttachment $attachment): StreamedResponse
     {
         $this->authorizeAttachment($request, $project, $internalNote, $attachment);
-        abort_unless($attachment->isImage(), 404);
+        abort_unless($attachment->isBrowserPreviewable(), 404);
+        $previewMime = $attachment->isCsv() ? 'text/plain; charset=UTF-8' : $attachment->mime_type;
 
         return Storage::disk('local')->response($attachment->stored_path, $attachment->original_name, [
-            'Content-Type' => $attachment->mime_type,
+            'Content-Type' => $previewMime,
             'Content-Disposition' => 'inline',
             'X-Content-Type-Options' => 'nosniff',
         ]);

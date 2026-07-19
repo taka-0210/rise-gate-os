@@ -32,4 +32,20 @@ class ProjectInternalNoteAttachment extends Model
     {
         return str_starts_with($this->mime_type, 'image/');
     }
+
+    public function isPdf(): bool
+    {
+        return $this->mime_type === 'application/pdf' || $this->extension === 'pdf';
+    }
+
+    public function isCsv(): bool
+    {
+        return in_array($this->extension, ['csv'], true)
+            || in_array($this->mime_type, ['text/csv', 'text/plain'], true);
+    }
+
+    public function isBrowserPreviewable(): bool
+    {
+        return $this->isImage() || $this->isPdf() || $this->isCsv();
+    }
 }

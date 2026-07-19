@@ -61,6 +61,9 @@
         .internal-image-viewer { position:fixed; z-index:100; inset:0; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(8,16,22,.86); }
         .internal-image-viewer.is-open { display:flex; }
         .internal-image-viewer img { max-width:min(1200px,94vw); max-height:88vh; border-radius:8px; background:#fff; box-shadow:0 15px 60px rgba(0,0,0,.45); }
+        .internal-image-viewer iframe { display:none; width:min(1200px,94vw); height:88vh; border:0; border-radius:8px; background:#fff; box-shadow:0 15px 60px rgba(0,0,0,.45); }
+        .internal-image-viewer.is-document img { display:none; }
+        .internal-image-viewer.is-document iframe { display:block; }
         .internal-image-viewer button { position:absolute; top:18px; right:18px; width:44px; height:44px; padding:0; border-radius:999px; background:#fff; color:#17202a; font-size:25px; }
         .internal-ai-references { display:grid; gap:7px; padding:12px; border:1px solid #cfd8de; border-radius:8px; background:#f8fafb; }
         .internal-ai-references label { display:flex; align-items:flex-start; gap:8px; font-weight:400; }
@@ -675,7 +678,13 @@
                                 <div class="internal-attachments">
                                     @foreach($internalNote->attachments as $attachment)
                                         @if($attachment->isImage())
-                                            <button type="button" class="internal-attachment internal-attachment-image" data-internal-image="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-image-name="{{ $attachment->original_name }}">🖼 {{ $attachment->original_name }}</button>
+                                            <button type="button" class="internal-attachment internal-attachment-image" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="image" data-internal-preview-name="{{ $attachment->original_name }}">🖼 {{ $attachment->original_name }}</button>
+                                        @elseif($attachment->isPdf())
+                                            <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="pdf" data-internal-preview-name="{{ $attachment->original_name }}">📄 {{ $attachment->original_name }}を表示</button>
+                                            <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">⬇ ダウンロード</a>
+                                        @elseif($attachment->isCsv())
+                                            <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="csv" data-internal-preview-name="{{ $attachment->original_name }}">📊 {{ $attachment->original_name }}を表示</button>
+                                            <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">⬇ ダウンロード</a>
                                         @else
                                             <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">📎 {{ $attachment->original_name }}（{{ number_format($attachment->size_bytes / 1024, 1) }}KB）</a>
                                         @endif
@@ -690,7 +699,7 @@
             </section>
         @endif
 
-        <div class="internal-image-viewer" id="internal-image-viewer" aria-hidden="true"><button type="button" aria-label="画像を閉じる">×</button><img src="" alt=""></div>
+        <div class="internal-image-viewer" id="internal-image-viewer" aria-hidden="true"><button type="button" aria-label="資料を閉じる">×</button><img src="" alt=""><iframe src="about:blank" title="PDF資料"></iframe></div>
 
         <div class="focus-footer">
             <section class="card stack">
@@ -933,16 +942,26 @@
             const viewer = document.getElementById('internal-image-viewer');
             if (!viewer) return;
             const image = viewer.querySelector('img');
+            const frame = viewer.querySelector('iframe');
             const close = () => {
                 viewer.classList.remove('is-open');
+                viewer.classList.remove('is-document');
                 viewer.setAttribute('aria-hidden', 'true');
                 image.removeAttribute('src');
+                frame.src = 'about:blank';
             };
             document.addEventListener('click', event => {
-                const trigger = event.target.closest('[data-internal-image]');
+                const trigger = event.target.closest('[data-internal-preview]');
                 if (!trigger) return;
-                image.src = trigger.dataset.internalImage;
-                image.alt = trigger.dataset.internalImageName || '社内資料の画像';
+                const isDocument = trigger.dataset.internalPreviewType !== 'image';
+                viewer.classList.toggle('is-document', isDocument);
+                if (isDocument) {
+                    frame.src = trigger.dataset.internalPreview;
+                    frame.title = trigger.dataset.internalPreviewName || 'PDF資料';
+                } else {
+                    image.src = trigger.dataset.internalPreview;
+                    image.alt = trigger.dataset.internalPreviewName || '社内資料の画像';
+                }
                 viewer.classList.add('is-open');
                 viewer.setAttribute('aria-hidden', 'false');
             });

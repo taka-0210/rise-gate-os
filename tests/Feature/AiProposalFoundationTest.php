@@ -100,17 +100,41 @@ class AiProposalFoundationTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.internal-notes.store', $project), [
                 'body' => '社内確認用の画像です。',
-                'attachments' => [UploadedFile::fake()->image('internal-board.jpg')],
+                'attachments' => [
+                    UploadedFile::fake()->image('internal-board.jpg'),
+                    UploadedFile::fake()->create('internal-guide.pdf', 10, 'application/pdf'),
+                    UploadedFile::fake()->createWithContent('internal-list.csv', "name,amount\nA,1000"),
+                ],
             ])->assertRedirect();
 
         $note = $project->internalNotes()->firstOrFail();
-        $attachment = $note->attachments()->firstOrFail();
+        $attachment = $note->attachments()->where('extension', 'jpg')->firstOrFail();
+        $pdf = $note->attachments()->where('extension', 'pdf')->firstOrFail();
+        $csv = $note->attachments()->where('extension', 'csv')->firstOrFail();
         Storage::disk('local')->assertExists($attachment->stored_path);
+        Storage::disk('local')->assertExists($pdf->stored_path);
+        Storage::disk('local')->assertExists($csv->stored_path);
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.internal-notes.attachments.view', [$project, $note, $attachment]))
             ->assertOk()
             ->assertHeader('content-type', 'image/jpeg');
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.internal-notes.attachments.view', [$project, $note, $pdf]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'inline');
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.internal-notes.attachments.download', [$project, $note, $pdf]))
+            ->assertOk()
+            ->assertHeader('content-disposition');
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.internal-notes.attachments.view', [$project, $note, $csv]))
+            ->assertOk()
+            ->assertHeader('content-disposition', 'inline');
 
         $client = User::factory()->create();
         $project->organization->users()->attach($client->id, ['role' => 'member', 'joined_at' => now()]);
