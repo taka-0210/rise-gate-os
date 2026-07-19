@@ -149,6 +149,8 @@ class AiProposalFoundationTest extends TestCase
 
         $this->get(route('projects.show', $project))
             ->assertOk()
+            ->assertSee('class="internal-reference-fields"', false)
+            ->assertSee('▼ 参考Webページを追加')
             ->assertSee('参考トップページ')
             ->assertSee('Codexへ共有');
     }

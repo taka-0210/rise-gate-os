@@ -55,6 +55,13 @@
         .internal-note-list { display:grid; gap:9px; }
         .internal-note { padding:12px 14px; border:1px solid #d5d9dd; border-radius:8px; background:#fff; }
         .internal-note p { margin:5px 0 0; white-space:pre-wrap; }
+        .internal-reference-fields { border:1px solid var(--line); border-radius:9px; background:#f7fafc; }
+        .internal-reference-fields summary { padding:14px 16px; cursor:pointer; color:var(--accent-dark); font-weight:800; }
+        .internal-reference-fields[open] summary { border-bottom:1px solid var(--line); }
+        .internal-reference-fields-body { padding:16px; }
+        .internal-reference-points { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+        .internal-reference-points > .field { min-width:0; }
+        .internal-reference-points textarea { display:block; width:100%; min-width:0; resize:vertical; }
         .internal-attachments { display:flex; flex-wrap:wrap; gap:8px; margin-top:9px; }
         .internal-attachment-file { display:grid; gap:7px; min-width:230px; padding:10px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; }
         .internal-attachment-name { color:var(--text); font-size:12px; overflow-wrap:anywhere; }
@@ -71,6 +78,7 @@
         .internal-ai-references { display:grid; gap:7px; padding:12px; border:1px solid #cfd8de; border-radius:8px; background:#f8fafb; }
         .internal-ai-references label { display:flex; align-items:flex-start; gap:8px; font-weight:400; }
         .internal-ai-references input { width:auto; margin-top:4px; }
+        @media (max-width:700px) { .internal-reference-points { grid-template-columns:1fr; } }
         .focus-view-switch { display:flex; align-items:center; gap:5px; margin-left:auto; }
         .focus-view-switch a,.focus-view-switch button { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:inherit; text-decoration:none; white-space:nowrap; }
         .focus-view-switch a.is-current { background:var(--accent-dark); color:#fff; }
@@ -719,16 +727,19 @@
                     <form class="stack" method="POST" action="{{ route('projects.internal-notes.store', $project) }}" enctype="multipart/form-data">
                         @csrf
                         <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body')<div class="error">{{ $message }}</div>@enderror</div>
-                        <div class="card stack" style="background:#f7fafc;">
-                            <div><h3 style="margin:0;">参考Webページ</h3><p class="meta">Codexに見てほしいページと、参考にする箇所を具体的に登録します。</p></div>
-                            <div class="field"><label for="reference_url">URL</label><input id="reference_url" name="reference_url" type="url" inputmode="url" placeholder="https://example.com/" value="{{ old('reference_url') }}">@error('reference_url')<div class="error">{{ $message }}</div>@enderror</div>
-                            <div class="field"><label for="reference_title">ページ名（任意）</label><input id="reference_title" name="reference_title" placeholder="参考サイトのトップページ" value="{{ old('reference_title') }}"></div>
-                            <div class="grid two">
-                                <div class="field"><label for="reference_points">参考にする点</label><textarea id="reference_points" name="reference_points" rows="3" placeholder="余白、ファーストビュー、導線など">{{ old('reference_points') }}</textarea></div>
-                                <div class="field"><label for="reference_avoid_points">取り入れない点</label><textarea id="reference_avoid_points" name="reference_avoid_points" rows="3" placeholder="配色は模倣しない、文章は流用しないなど">{{ old('reference_avoid_points') }}</textarea></div>
+                        <details class="internal-reference-fields" @if(old('reference_url') || $errors->has('reference_url')) open @endif>
+                            <summary>▼ 参考Webページを追加</summary>
+                            <div class="internal-reference-fields-body stack">
+                                <div class="meta">Codexに見てほしいページと、参考にする箇所を具体的に登録します。</div>
+                                <div class="field"><label for="reference_url">URL</label><input id="reference_url" name="reference_url" type="url" inputmode="url" placeholder="https://example.com/" value="{{ old('reference_url') }}">@error('reference_url')<div class="error">{{ $message }}</div>@enderror</div>
+                                <div class="field"><label for="reference_title">ページ名（任意）</label><input id="reference_title" name="reference_title" placeholder="参考サイトのトップページ" value="{{ old('reference_title') }}"></div>
+                                <div class="internal-reference-points">
+                                    <div class="field"><label for="reference_points">参考にする点</label><textarea id="reference_points" name="reference_points" rows="3" placeholder="余白、ファーストビュー、導線など">{{ old('reference_points') }}</textarea></div>
+                                    <div class="field"><label for="reference_avoid_points">取り入れない点</label><textarea id="reference_avoid_points" name="reference_avoid_points" rows="3" placeholder="配色は模倣しない、文章は流用しないなど">{{ old('reference_avoid_points') }}</textarea></div>
+                                </div>
+                                <label class="actions"><input type="checkbox" name="reference_share_with_ai" value="1" style="width:auto;" @checked(old('reference_share_with_ai', true))> このURLをCodexへ共有する</label>
                             </div>
-                            <label class="actions"><input type="checkbox" name="reference_share_with_ai" value="1" style="width:auto;" @checked(old('reference_share_with_ai', true))> このURLをCodexへ共有する</label>
-                        </div>
+                        </details>
                         <div class="field"><label for="internal_note_attachments">画像・社内資料（最大5ファイル・各10MB）</label><input id="internal_note_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx"><div class="meta">画像、PDF、Excel、CSV、Wordに対応。ファイルは非公開領域へ保存されます。</div>@error('attachments')<div class="error">{{ $message }}</div>@enderror @error('attachments.*')<div class="error">{{ $message }}</div>@enderror</div>
                         <div class="actions"><button type="submit">社内メモを追加</button></div>
                     </form>
