@@ -20,9 +20,10 @@ class TimelineScheduleController extends Controller
     public function update(Request $request, Project $project, string $type, int $entity): JsonResponse
     {
         Gate::authorize('view', $project);
-        abort_unless(in_array($type, ['roadmap', 'improvement', 'task'], true), 404);
+        abort_unless(in_array($type, ['project', 'roadmap', 'improvement', 'task'], true), 404);
 
         $model = match ($type) {
+            'project' => $entity === $project->id ? $project : abort(404),
             'roadmap' => $project->roadmaps()->findOrFail($entity),
             'improvement' => $project->improvements()->findOrFail($entity),
             'task' => $project->tasks()->findOrFail($entity),
@@ -30,7 +31,7 @@ class TimelineScheduleController extends Controller
         Gate::authorize('update', $model);
 
         $attributes = match ($type) {
-            'roadmap', 'improvement' => $request->validate([
+            'project', 'roadmap', 'improvement' => $request->validate([
                 'start_date' => ['required', 'date'],
                 'end_date' => ['required', 'date', 'after_or_equal:start_date'],
                 'cascade_move' => ['sometimes', 'boolean'],
@@ -46,10 +47,10 @@ class TimelineScheduleController extends Controller
         $integrity = DB::transaction(function () use ($project, $type, $model, $attributes): array {
             $before = app(ScheduleIntegrityService::class)->inspect($project->fresh())['invalid'];
 
-            if (($attributes['cascade_move'] ?? false) && in_array($type, ['roadmap', 'improvement'], true)) {
+            if (($attributes['cascade_move'] ?? false) && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
                 $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
-                $dayDelta = $model->planned_start_date->copy()->startOfDay()->diffInDays($newStart, false);
-                $expectedEnd = $model->target_date->copy()->addDays($dayDelta)->toDateString();
+                $dayDelta = $this->scheduleStart($type, $model)->copy()->startOfDay()->diffInDays($newStart, false);
+                $expectedEnd = $this->scheduleEnd($type, $model)->copy()->addDays($dayDelta)->toDateString();
 
                 if ($attributes['end_date'] !== $expectedEnd) {
                     throw ValidationException::withMessages([
@@ -60,15 +61,21 @@ class TimelineScheduleController extends Controller
                 $this->moveDescendants($type, $model, $dayDelta);
             }
 
-            if (($attributes['cascade_children'] ?? false) && in_array($type, ['roadmap', 'improvement'], true)) {
+            if (($attributes['cascade_children'] ?? false) && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
                 $anchor = $attributes['cascade_anchor'] ?? 'end';
-                $originalDate = $anchor === 'start' ? $model->planned_start_date : $model->target_date;
+                $originalDate = $anchor === 'start'
+                    ? $this->scheduleStart($type, $model)
+                    : $this->scheduleEnd($type, $model);
                 $changedDate = Carbon::parse($attributes[$anchor.'_date'])->startOfDay();
                 $dayDelta = $originalDate->copy()->startOfDay()->diffInDays($changedDate, false);
                 $this->moveDescendants($type, $model, $dayDelta);
             }
 
             $model->update(match ($type) {
+                'project' => [
+                    'start_date' => $attributes['start_date'],
+                    'due_date' => $attributes['end_date'],
+                ],
                 'roadmap', 'improvement' => [
                     'planned_start_date' => $attributes['start_date'],
                     'target_date' => $attributes['end_date'],
@@ -88,9 +95,21 @@ class TimelineScheduleController extends Controller
         return response()->json(['message' => '日程を更新しました。', 'integrity' => $integrity]);
     }
 
-    private function moveDescendants(string $type, Roadmap|Improvement $model, int $dayDelta): void
+    private function moveDescendants(string $type, Project|Roadmap|Improvement $model, int $dayDelta): void
     {
         if ($dayDelta === 0) {
+            return;
+        }
+
+        if ($type === 'project') {
+            foreach ($model->roadmaps()->with('improvements.tasks')->get() as $roadmap) {
+                $roadmap->update([
+                    'planned_start_date' => $roadmap->planned_start_date?->copy()->addDays($dayDelta),
+                    'target_date' => $roadmap->target_date?->copy()->addDays($dayDelta),
+                ]);
+                $this->moveDescendants('roadmap', $roadmap, $dayDelta);
+            }
+
             return;
         }
 
@@ -112,5 +131,15 @@ class TimelineScheduleController extends Controller
                 }
             }
         }
+    }
+
+    private function scheduleStart(string $type, Project|Roadmap|Improvement $model): Carbon
+    {
+        return ($type === 'project' ? $model->start_date : $model->planned_start_date)->copy();
+    }
+
+    private function scheduleEnd(string $type, Project|Roadmap|Improvement $model): Carbon
+    {
+        return ($type === 'project' ? $model->due_date : $model->target_date)->copy();
     }
 }

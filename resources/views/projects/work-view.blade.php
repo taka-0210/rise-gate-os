@@ -81,6 +81,7 @@
         .time-legend label { display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
         .time-legend input { width:auto; margin:0; }
         .time-legend i { width:20px; height:8px; border-radius:999px; background:#66717a; }
+        .time-legend .is-project { background:#263f4d; }
         .time-legend .is-roadmap { background:#4f82c4; }
         .time-legend .is-improvement { background:#56a27e; }
         .time-legend .is-task { background:#b5523d; }
@@ -108,6 +109,7 @@
         .time-row.is-improvement .time-row-label { padding-left:28px; }
         .time-row.is-task .time-row-label { padding-left:46px; }
         .time-row-dot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:#66717a; }
+        .time-row.is-project .time-row-dot,.time-bar.is-project { background:#263f4d; }
         .time-row.is-roadmap .time-row-dot,.time-bar.is-roadmap { background:#4f82c4; }
         .time-row.is-improvement .time-row-dot,.time-bar.is-improvement { background:#56a27e; }
         .time-row.is-task .time-row-dot,.time-bar.is-task { background:#b5523d; }
@@ -120,6 +122,7 @@
         .time-save-status { position:fixed; z-index:80; right:20px; bottom:20px; max-width:420px; padding:12px 16px; border-radius:8px; background:#263f4d; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2); }
         .time-save-status.is-error { background:#a33f2d; }
         .time-bar.is-inferred { background:rgba(255,255,255,.72); border:2px dashed currentColor; }
+        .time-bar.is-project.is-inferred { color:#263f4d; }
         .time-bar.is-roadmap.is-inferred { color:#4f82c4; }
         .time-bar.is-improvement.is-inferred { color:#56a27e; }
         .time-bar.is-overdue { background:repeating-linear-gradient(135deg,#e3a11d 0,#e3a11d 7px,#9f6810 7px,#9f6810 12px); }
@@ -179,6 +182,19 @@
             }
             return [$start, $end];
         };
+        $timeRows->push([
+            'type' => 'project',
+            'id' => $project->id,
+            'title' => $project->name,
+            'start' => $project->start_date,
+            'end' => $project->due_date,
+            'inferred' => false,
+            'overdue' => $project->due_date && !$project->completed_at && $project->due_date->isPast(),
+            'reached' => $project->completed_at,
+            'schedule_issue' => $scheduleIssueFor('project', $project->id),
+            'editable' => Gate::allows('update', $project),
+            'update_url' => route('projects.timeline.update', [$project, 'project', $project->id]),
+        ]);
         $timelineRoadmaps = $roadmaps->sortBy(fn ($roadmap) => [
             $roadmap->planned_start_date?->timestamp ?? PHP_INT_MAX,
             $roadmap->sort_order ?? PHP_INT_MAX,
@@ -380,7 +396,7 @@
                     <p>ROADMAP・取り組み・TASKを、ひとつの時間軸で確認します。</p>
                 </div>
                 <div class="time-legend">
-                    <span><i class="is-roadmap"></i>ロードマップ</span><span><i class="is-improvement"></i>取り組み</span><span><i class="is-task"></i>タスク</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>進行中かつ期限超過</span><span><i class="is-reached"></i>実際の完了・到達日</span>
+                    <span><i class="is-project"></i>プロジェクト</span><span><i class="is-roadmap"></i>ロードマップ</span><span><i class="is-improvement"></i>取り組み</span><span><i class="is-task"></i>タスク</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>進行中かつ期限超過</span><span><i class="is-reached"></i>実際の完了・到達日</span>
                     <label><input id="time-today-toggle" type="checkbox" @checked($includeTodayInTimeline)>今日を時間軸に含める</label>
                 </div>
             </div>
