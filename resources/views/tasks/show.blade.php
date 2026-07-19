@@ -28,7 +28,7 @@
         </div>
 
         <div class="actions">
-            <span class="meta">期限：{{ $task->due_date?->format('Y年n月j日') ?? '未設定' }}</span>
+            <span class="meta">予定期間：{{ $task->planned_start_date?->format('Y年n月j日') ?? '未設定' }}〜{{ $task->due_date?->format('Y年n月j日') ?? '未設定' }}</span>
             @if ($task->improvement)
                 <a href="{{ route('projects.improvements.show', [$project, $task->improvement]) }}">元になった改善を見る</a>
             @endif

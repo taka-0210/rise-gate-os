@@ -34,6 +34,7 @@ class Task extends Model
         'priority',
         'assigned_to',
         'created_by',
+        'planned_start_date',
         'due_date',
         'completed_at',
     ];
@@ -48,6 +49,7 @@ class Task extends Model
     protected function casts(): array
     {
         return [
+            'planned_start_date' => 'date',
             'due_date' => 'date',
             'completed_at' => 'datetime',
         ];

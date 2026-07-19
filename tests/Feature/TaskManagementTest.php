@@ -170,11 +170,14 @@ class TaskManagementTest extends TestCase
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $task = $this->createTask($project, $owner);
-        $task->update(['due_date' => now()->subDay()->toDateString()]);
+        $task->update([
+            'planned_start_date' => now()->subWeek()->toDateString(),
+            'due_date' => now()->subDay()->toDateString(),
+        ]);
 
         $todoHtml = $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all']))
             ->assertOk()
             ->getContent();
         preg_match('/編集対象Task.*?time-bar is-task ([^"]*)/s', $todoHtml, $todoBar);
@@ -183,7 +186,7 @@ class TaskManagementTest extends TestCase
         $task->update(['status' => Task::STATUS_IN_PROGRESS]);
         $startedHtml = $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all']))
             ->assertOk()
             ->getContent();
         preg_match('/編集対象Task.*?time-bar is-task ([^"]*)/s', $startedHtml, $startedBar);
@@ -206,7 +209,7 @@ class TaskManagementTest extends TestCase
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => '0']))
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => '0', 'schedule_step' => 'all']))
             ->assertOk()
             ->assertSee('data-axis-start="'.$projectStart->copy()->subDays(2)->toDateString().'"', false)
             ->assertSee('data-axis-end="'.$projectEnd->copy()->addDays(2)->toDateString().'"', false)
@@ -243,7 +246,7 @@ class TaskManagementTest extends TestCase
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => '0']))
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => '0', 'schedule_step' => 'all']))
             ->assertOk()
             ->assertSeeInOrder([
                 'data-time-row-title="最初の工程"',

@@ -102,7 +102,7 @@ class AiProposalApplier
                 'proposed_by' => $reviewer->id,
                 'assigned_to' => $reviewer->id,
             ]),
-            'task' => Task::create(Arr::only($attributes, ['title', 'description', 'status', 'priority', 'due_date']) + [
+            'task' => Task::create(Arr::only($attributes, ['title', 'description', 'status', 'priority', 'planned_start_date', 'due_date']) + [
                 'organization_id' => $proposal->organization_id,
                 'workspace_id' => $proposal->workspace_id,
                 'project_id' => $proposal->project_id,
@@ -127,7 +127,7 @@ class AiProposalApplier
         $allowed = match ($item->entity_type) {
             'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date'],
             'improvement' => ['title', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date'],
-            'task' => ['title', 'description', 'status', 'priority', 'due_date'],
+            'task' => ['title', 'description', 'status', 'priority', 'planned_start_date', 'due_date'],
         };
         $model->update(Arr::only($attributes, $allowed));
 

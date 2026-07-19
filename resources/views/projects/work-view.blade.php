@@ -121,6 +121,10 @@
         .time-resize-handle.is-end { right:-4px; }
         .time-save-status { position:fixed; z-index:80; right:20px; bottom:20px; max-width:420px; padding:12px 16px; border-radius:8px; background:#263f4d; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2); }
         .time-save-status.is-error { background:#a33f2d; }
+        .schedule-step-guide { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px; padding:14px 16px; border:2px solid #263f4d; border-radius:10px; background:#fff; }
+        .schedule-step-guide strong { margin-right:auto; }
+        .schedule-step-guide a,.schedule-step-guide span { padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:12px; }
+        .schedule-step-guide .is-current { border-color:#263f4d; background:#263f4d; color:#fff; font-weight:900; }
         .time-bar.is-inferred { background:rgba(255,255,255,.72); border:2px dashed currentColor; }
         .time-bar.is-project.is-inferred { color:#263f4d; }
         .time-bar.is-roadmap.is-inferred { color:#4f82c4; }
@@ -166,13 +170,9 @@
             if ($scheduleIntegrity['entities']['unverifiable']->contains($key)) return 'unverifiable';
             return null;
         };
-        $improvementPlanStarts = $roadmaps
-            ->flatMap(fn ($roadmap) => $roadmap->improvements)
-            ->mapWithKeys(fn ($improvement) => [$improvement->id => $improvement->planned_start_date]);
-        $taskPeriod = function ($task) use ($project, $improvementPlanStarts) {
+        $taskPeriod = function ($task) use ($project) {
             $end = ($task->completed_at ?: $task->due_date)?->copy()->startOfDay();
-            $start = $improvementPlanStarts->get($task->improvement_id)?->copy()->startOfDay()
-                ?: $task->created_at?->copy()->startOfDay();
+            $start = $task->planned_start_date?->copy()->startOfDay();
             $projectStart = $project->start_date?->copy()->startOfDay();
             if ($projectStart && $start && $start->lt($projectStart)) {
                 $start = $projectStart->copy();
@@ -182,6 +182,9 @@
             }
             return [$start, $end];
         };
+        $projectDescendantCount = $roadmaps->filter(fn ($item) => $item->planned_start_date || $item->target_date)->count()
+            + $project->improvements->filter(fn ($item) => $item->planned_start_date || $item->target_date)->count()
+            + $allTasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
         $timeRows->push([
             'type' => 'project',
             'id' => $project->id,
@@ -194,6 +197,7 @@
             'schedule_issue' => $scheduleIssueFor('project', $project->id),
             'editable' => Gate::allows('update', $project),
             'update_url' => route('projects.timeline.update', [$project, 'project', $project->id]),
+            'descendant_count' => $projectDescendantCount,
         ]);
         $timelineRoadmaps = $roadmaps->sortBy(fn ($roadmap) => [
             $roadmap->planned_start_date?->timestamp ?? PHP_INT_MAX,
@@ -210,26 +214,48 @@
             $roadmapStarts = $roadmapTasks->map(fn ($task) => $taskPeriod($task)[0])->filter();
             $roadmapEnds = $roadmapTasks->map(fn ($task) => $taskPeriod($task)[1])->filter();
             $roadmapHasPlan = $roadmap->planned_start_date && $roadmap->target_date;
-            $roadmapStart = $roadmap->planned_start_date ?: $roadmapStarts->min();
-            $roadmapEnd = $roadmap->target_date ?: $roadmapEnds->max();
-            $timeRows->push(['type' => 'roadmap', 'id' => $roadmap->id, 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $roadmap->reached_at, 'schedule_issue' => $scheduleIssueFor('roadmap', $roadmap->id), 'editable' => Gate::allows('update', $roadmap), 'update_url' => route('projects.timeline.update', [$project, 'roadmap', $roadmap->id])]);
+            $roadmapStart = $roadmap->planned_start_date ?: ($roadmapStarts->min() ?: $project->start_date);
+            $roadmapEnd = $roadmap->target_date ?: ($roadmapEnds->max() ?: $project->due_date);
+            $roadmapDescendantCount = $timelineImprovements->filter(fn ($item) => $item->planned_start_date || $item->target_date)->count()
+                + $roadmapTasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
+            $timeRows->push(['type' => 'roadmap', 'id' => $roadmap->id, 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $roadmap->reached_at, 'schedule_issue' => $scheduleIssueFor('roadmap', $roadmap->id), 'editable' => Gate::allows('update', $roadmap), 'update_url' => route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), 'descendant_count' => $roadmapDescendantCount]);
             foreach ($timelineImprovements as $improvement) {
                 $initiativeStarts = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[0])->filter();
                 $initiativeEnds = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[1])->filter();
                 $initiativeHasPlan = $improvement->planned_start_date && $improvement->target_date;
-                $initiativeStart = $improvement->planned_start_date ?: $initiativeStarts->min();
-                $initiativeEnd = $improvement->target_date ?: $initiativeEnds->max();
-                $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id])]);
+                $initiativeStart = $improvement->planned_start_date ?: ($initiativeStarts->min() ?: $roadmap->planned_start_date);
+                $initiativeEnd = $improvement->target_date ?: ($initiativeEnds->max() ?: $roadmap->target_date);
+                $improvementDescendantCount = $improvement->tasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
+                $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id]), 'descendant_count' => $improvementDescendantCount]);
                 $timelineTasks = $improvement->tasks->sortBy(fn ($task) => [
                     $task->due_date?->timestamp ?? PHP_INT_MAX,
                     $task->id,
                 ])->values();
                 foreach ($timelineTasks as $task) {
                     [$taskStart, $taskEnd] = $taskPeriod($task);
-                $timeRows->push(['type' => 'task', 'id' => $task->id, 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null, 'schedule_issue' => $scheduleIssueFor('task', $task->id), 'editable' => Gate::allows('update', $task) && $task->status !== \App\Models\Task::STATUS_DONE, 'update_url' => route('projects.timeline.update', [$project, 'task', $task->id])]);
+                    $taskHasPlan = $task->planned_start_date && $task->due_date;
+                    $taskStart ??= $improvement->planned_start_date;
+                    $taskEnd ??= $improvement->target_date;
+                $timeRows->push(['type' => 'task', 'id' => $task->id, 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => ! $taskHasPlan, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null, 'schedule_issue' => $scheduleIssueFor('task', $task->id), 'editable' => Gate::allows('update', $task) && $task->status !== \App\Models\Task::STATUS_DONE, 'update_url' => route('projects.timeline.update', [$project, 'task', $task->id]), 'descendant_count' => 0]);
                 }
             }
         }
+        $autoScheduleStage = ! $project->start_date || ! $project->due_date ? 'project'
+            : ($roadmaps->contains(fn ($item) => ! $item->planned_start_date || ! $item->target_date) ? 'roadmap'
+            : ($project->improvements->contains(fn ($item) => ! $item->planned_start_date || ! $item->target_date) ? 'improvement'
+            : ($allTasks->contains(fn ($item) => ! $item->planned_start_date || ! $item->due_date) ? 'task' : 'all')));
+        $requestedScheduleStage = request('schedule_step');
+        $scheduleStage = in_array($requestedScheduleStage, ['project', 'roadmap', 'improvement', 'task', 'all'], true)
+            ? $requestedScheduleStage
+            : $autoScheduleStage;
+        $visibleTypes = match ($scheduleStage) {
+            'project' => ['project'],
+            'roadmap' => ['project', 'roadmap'],
+            'improvement' => ['roadmap', 'improvement'],
+            'task' => ['improvement', 'task'],
+            default => ['project', 'roadmap', 'improvement', 'task'],
+        };
+        $timeRows = $timeRows->whereIn('type', $visibleTypes)->values();
         $timeDates = $timeRows->flatMap(fn ($row) => [$row['start'], $row['end'], $row['reached']])->filter();
         $plannedAxisStart = collect([$project->start_date?->copy()->startOfDay(), $timeDates->min()])->filter()->min() ?: now()->startOfDay();
         $plannedAxisEnd = collect([$project->completed_at?->copy()->startOfDay(), $project->due_date?->copy()->startOfDay(), $timeDates->max()])->filter()->max() ?: $plannedAxisStart->copy()->addDays(14);
@@ -400,6 +426,16 @@
                     <label><input id="time-today-toggle" type="checkbox" @checked($includeTodayInTimeline)>今日を時間軸に含める</label>
                 </div>
             </div>
+            @php
+                $scheduleStageLabels = ['project' => '1. プロジェクト期間', 'roadmap' => '2. ロードマップ期間', 'improvement' => '3. 取り組み期間', 'task' => '4. タスク期間', 'all' => '5. 全体確認'];
+            @endphp
+            <div class="schedule-step-guide">
+                <strong>現在の設定：{{ $scheduleStageLabels[$scheduleStage] }}</strong>
+                @foreach ($scheduleStageLabels as $stageKey => $stageLabel)
+                    <a class="{{ $scheduleStage === $stageKey ? 'is-current' : '' }}" href="{{ route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => $includeTodayInTimeline ? 1 : 0, 'schedule_step' => $stageKey]) }}">{{ $stageLabel }}</a>
+                @endforeach
+                <span>未設定を埋めると次の段階へ自動で進みます</span>
+            </div>
             <div class="time-chart-scroll">
                 <div class="time-chart" data-axis-start="{{ $axisStart->toDateString() }}" data-axis-end="{{ $axisEnd->toDateString() }}" style="--time-grid:{{ $axisStep / $axisDays * 100 }}%; --today-left:{{ $todayLeft }}%;">
                     <div class="time-axis">
@@ -422,8 +458,8 @@
                             <div class="time-row-track">
                                 @if ($includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
-                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
-                                        @if ($row['editable'] && $row['type'] !== 'task')<i class="time-resize-handle is-start" data-resize="start" title="開始日を変更"></i>@endif
+                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" data-descendant-count="{{ $row['descendant_count'] ?? 0 }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
+                                        @if ($row['editable'])<i class="time-resize-handle is-start" data-resize="start" title="開始日を変更"></i>@endif
                                         @if ($row['editable'])<i class="time-resize-handle is-end" data-resize="end" title="{{ $row['type'] === 'task' ? '期限を変更' : '終了日を変更' }}"></i>@endif
                                     </span>
                                 @else
@@ -511,7 +547,7 @@
                                                         <button type="button" class="focus-task-trigger" data-focus-task="{{ $task->id }}">
                                                             <div class="focus-layer-label focus-task-label">TASK・いま何をするか</div>
                                                             <div class="focus-trigger-head"><h2>{{ $task->title }}</h2><span class="focus-open-hint">内容を見る</span></div>
-                                                            <div class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / 期限 {{ $task->due_date?->format('Y年n月j日') ?? '未設定' }}</div>
+                                                            <div class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / 予定 {{ $task->planned_start_date?->format('Y年n月j日') ?? '未設定' }}〜{{ $task->due_date?->format('Y年n月j日') ?? '未設定' }}</div>
                                                         </button>
                                                         <div class="focus-task-detail">
                                                             <p>{{ $task->description ?: '説明はまだありません。' }}</p>
@@ -582,11 +618,18 @@
                 document.body.append(status);
                 setTimeout(() => status.remove(), 5000);
             };
+            const confirmDescendantReset = bar => {
+                if (bar.dataset.entityType === 'task') return true;
+                const count = Number(bar.dataset.descendantCount || 0);
+                if (count === 0) return true;
+                return window.confirm(`この変更により、配下${count}件の日程が未設定に戻ります。続けますか？`);
+            };
 
             document.querySelectorAll('.time-bar.is-editable:not(.is-task)').forEach(bar => {
                 bar.addEventListener('pointerdown', event => {
                     if (event.target.closest('.time-resize-handle')) return;
                     event.preventDefault();
+                    if (!confirmDescendantReset(bar)) return;
                     const track = bar.closest('.time-row-track');
                     const originalStart = parseDate(bar.dataset.barStart);
                     const originalEnd = parseDate(bar.dataset.barEnd);
@@ -619,7 +662,7 @@
                                 body: JSON.stringify({
                                     start_date: formatDate(nextStart),
                                     end_date: formatDate(nextEnd),
-                                    cascade_move: true,
+                                    reset_descendants: true,
                                 }),
                             });
                             const body = await response.json();
@@ -653,6 +696,7 @@
                     event.preventDefault();
                     event.stopPropagation();
                     const bar = handle.closest('.time-bar');
+                    if (!confirmDescendantReset(bar)) return;
                     const track = bar.closest('.time-row-track');
                     const side = handle.dataset.resize;
                     const originalStart = parseDate(bar.dataset.barStart);
@@ -691,8 +735,7 @@
                                 body: JSON.stringify({
                                     start_date: formatDate(nextStart),
                                     end_date: formatDate(nextEnd),
-                                    cascade_children: bar.dataset.entityType !== 'task',
-                                    cascade_anchor: side,
+                                    reset_descendants: bar.dataset.entityType !== 'task',
                                 }),
                             });
                             const body = await response.json();

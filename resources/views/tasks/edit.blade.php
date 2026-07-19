@@ -68,7 +68,13 @@
             </div>
 
             <div class="field" style="max-width: 320px;">
-                <label for="due_date">期限</label>
+                <label for="planned_start_date">開始予定日</label>
+                <input id="planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date', $task->planned_start_date?->format('Y-m-d')) }}">
+                @error('planned_start_date') <div class="error">{{ $message }}</div> @enderror
+            </div>
+
+            <div class="field" style="max-width: 320px;">
+                <label for="due_date">終了予定日</label>
                 <input id="due_date" name="due_date" type="date" value="{{ old('due_date', $task->due_date?->format('Y-m-d')) }}">
                 @error('due_date') <div class="error">{{ $message }}</div> @enderror
             </div>

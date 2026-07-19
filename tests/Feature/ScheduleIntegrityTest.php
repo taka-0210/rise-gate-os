@@ -29,9 +29,10 @@ class ScheduleIntegrityTest extends TestCase
                 'title' => '期間外のタスク',
                 'status' => Task::STATUS_TODO,
                 'priority' => Task::PRIORITY_NORMAL,
+                'planned_start_date' => '2026-08-09',
                 'due_date' => '2026-08-20',
             ])
-            ->assertSessionHasErrors('due_date');
+            ->assertSessionHasErrors('planned_start_date');
 
         $this->assertDatabaseMissing('tasks', ['title' => '期間外のタスク']);
     }
@@ -48,6 +49,7 @@ class ScheduleIntegrityTest extends TestCase
             'title' => '既存の期間外タスク',
             'status' => Task::STATUS_TODO,
             'priority' => Task::PRIORITY_NORMAL,
+            'planned_start_date' => '2026-08-09',
             'due_date' => '2026-08-20',
             'created_by' => $user->id,
         ]);
@@ -78,6 +80,7 @@ class ScheduleIntegrityTest extends TestCase
             'title' => 'ドラッグで直すタスク',
             'status' => Task::STATUS_TODO,
             'priority' => Task::PRIORITY_NORMAL,
+            'planned_start_date' => '2026-08-09',
             'due_date' => '2026-08-20',
             'created_by' => $user->id,
         ]);
@@ -85,6 +88,7 @@ class ScheduleIntegrityTest extends TestCase
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->patchJson(route('projects.timeline.update', [$project, 'task', $task->id]), [
+                'start_date' => '2026-08-09',
                 'end_date' => '2026-08-10',
             ])
             ->assertOk()
@@ -104,6 +108,7 @@ class ScheduleIntegrityTest extends TestCase
             'title' => '移動対象タスク',
             'status' => Task::STATUS_TODO,
             'priority' => Task::PRIORITY_NORMAL,
+            'planned_start_date' => '2026-08-09',
             'due_date' => '2026-08-10',
             'created_by' => $user->id,
         ]);
@@ -135,6 +140,7 @@ class ScheduleIntegrityTest extends TestCase
             'title' => '端の変更についていくタスク',
             'status' => Task::STATUS_TODO,
             'priority' => Task::PRIORITY_NORMAL,
+            'planned_start_date' => '2026-08-09',
             'due_date' => '2026-08-10',
             'created_by' => $user->id,
         ]);
@@ -165,6 +171,7 @@ class ScheduleIntegrityTest extends TestCase
             'title' => 'プロジェクトと動くタスク',
             'status' => Task::STATUS_TODO,
             'priority' => Task::PRIORITY_NORMAL,
+            'planned_start_date' => '2026-08-09',
             'due_date' => '2026-08-10',
             'created_by' => $user->id,
         ]);
@@ -183,6 +190,41 @@ class ScheduleIntegrityTest extends TestCase
         $this->assertSame('2026-08-13', $roadmap->fresh()->planned_start_date->toDateString());
         $this->assertSame('2026-08-13', $improvement->fresh()->planned_start_date->toDateString());
         $this->assertSame('2026-08-15', $task->fresh()->due_date->toDateString());
+    }
+
+    public function test_changing_the_project_period_can_reset_all_descendant_schedules(): void
+    {
+        [$user, $workspace, $project, $roadmap, $improvement] = $this->scheduledProject();
+        $task = Task::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'improvement_id' => $improvement->id,
+            'title' => '日程を再設定するタスク',
+            'status' => Task::STATUS_TODO,
+            'priority' => Task::PRIORITY_NORMAL,
+            'planned_start_date' => '2026-08-09',
+            'due_date' => '2026-08-10',
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.timeline.update', [$project, 'project', $project->id]), [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'reset_descendants' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('integrity.status', ScheduleIntegrityService::STATUS_MISSING);
+
+        $this->assertSame('2026-09-01', $project->fresh()->start_date->toDateString());
+        $this->assertNull($roadmap->fresh()->planned_start_date);
+        $this->assertNull($roadmap->fresh()->target_date);
+        $this->assertNull($improvement->fresh()->planned_start_date);
+        $this->assertNull($improvement->fresh()->target_date);
+        $this->assertNull($task->fresh()->planned_start_date);
+        $this->assertNull($task->fresh()->due_date);
     }
 
     private function scheduledProject(): array

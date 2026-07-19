@@ -19,7 +19,7 @@ class AiProposalValidator
     private const ALLOWED_ATTRIBUTES = [
         'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date'],
         'improvement' => ['title', 'roadmap_public_id', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date'],
-        'task' => ['title', 'improvement_public_id', 'description', 'status', 'priority', 'due_date'],
+        'task' => ['title', 'improvement_public_id', 'description', 'status', 'priority', 'planned_start_date', 'due_date'],
     ];
 
     public function validate(AiProposal $proposal): AiProposal
@@ -113,7 +113,8 @@ class AiProposalValidator
                 'description' => ['nullable', 'string'],
                 'status' => ['sometimes', Rule::in(array_keys(Task::statuses()))],
                 'priority' => ['sometimes', Rule::in(array_keys(Task::priorities()))],
-                'due_date' => ['nullable', 'date'],
+                'planned_start_date' => ['nullable', 'date'],
+                'due_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
             ],
             default => [],
         };

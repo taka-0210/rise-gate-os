@@ -37,9 +37,11 @@ class TimelineScheduleController extends Controller
                 'cascade_move' => ['sometimes', 'boolean'],
                 'cascade_children' => ['sometimes', 'boolean'],
                 'cascade_anchor' => ['sometimes', 'in:start,end'],
+                'reset_descendants' => ['sometimes', 'boolean'],
             ]),
             'task' => $request->validate([
-                'end_date' => ['required', 'date'],
+                'start_date' => ['required', 'date'],
+                'end_date' => ['required', 'date', 'after_or_equal:start_date'],
                 'cascade_move' => ['sometimes', 'boolean'],
             ]),
         };
@@ -48,7 +50,13 @@ class TimelineScheduleController extends Controller
             $before = app(ScheduleIntegrityService::class)->inspect($project->fresh())['invalid'];
             $projectBoundaryBefore = $this->projectBoundaryViolations($project->fresh());
 
-            if (($attributes['cascade_move'] ?? false) && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
+            if (($attributes['reset_descendants'] ?? false) && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
+                $this->resetDescendantSchedules($type, $model);
+            }
+
+            if (! ($attributes['reset_descendants'] ?? false)
+                && ($attributes['cascade_move'] ?? false)
+                && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
                 $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
                 $dayDelta = $this->scheduleStart($type, $model)->copy()->startOfDay()->diffInDays($newStart, false);
                 $expectedEnd = $this->scheduleEnd($type, $model)->copy()->addDays($dayDelta)->toDateString();
@@ -62,7 +70,9 @@ class TimelineScheduleController extends Controller
                 $this->moveDescendants($type, $model, $dayDelta);
             }
 
-            if (($attributes['cascade_children'] ?? false) && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
+            if (! ($attributes['reset_descendants'] ?? false)
+                && ($attributes['cascade_children'] ?? false)
+                && in_array($type, ['project', 'roadmap', 'improvement'], true)) {
                 $anchor = $attributes['cascade_anchor'] ?? 'end';
                 $originalDate = $anchor === 'start'
                     ? $this->scheduleStart($type, $model)
@@ -81,7 +91,10 @@ class TimelineScheduleController extends Controller
                     'planned_start_date' => $attributes['start_date'],
                     'target_date' => $attributes['end_date'],
                 ],
-                'task' => ['due_date' => $attributes['end_date']],
+                'task' => [
+                    'planned_start_date' => $attributes['start_date'],
+                    'due_date' => $attributes['end_date'],
+                ],
             });
 
             $projectBoundaryAfter = $this->projectBoundaryViolations($project->fresh());
@@ -135,10 +148,34 @@ class TimelineScheduleController extends Controller
 
             foreach ($improvement->tasks as $task) {
                 if ($task->due_date) {
-                    $task->update(['due_date' => $task->due_date->copy()->addDays($dayDelta)]);
+                    $task->update([
+                        'planned_start_date' => $task->planned_start_date?->copy()->addDays($dayDelta),
+                        'due_date' => $task->due_date->copy()->addDays($dayDelta),
+                    ]);
                 }
             }
         }
+    }
+
+    private function resetDescendantSchedules(string $type, Project|Roadmap|Improvement $model): void
+    {
+        if ($type === 'project') {
+            $model->roadmaps()->update(['planned_start_date' => null, 'target_date' => null]);
+            $model->improvements()->update(['planned_start_date' => null, 'target_date' => null]);
+            $model->tasks()->update(['planned_start_date' => null, 'due_date' => null]);
+
+            return;
+        }
+
+        if ($type === 'roadmap') {
+            $improvementIds = $model->improvements()->pluck('id');
+            $model->improvements()->update(['planned_start_date' => null, 'target_date' => null]);
+            Task::query()->whereIn('improvement_id', $improvementIds)->update(['planned_start_date' => null, 'due_date' => null]);
+
+            return;
+        }
+
+        $model->tasks()->update(['planned_start_date' => null, 'due_date' => null]);
     }
 
     private function scheduleStart(string $type, Project|Roadmap|Improvement $model): Carbon
@@ -187,9 +224,8 @@ class TimelineScheduleController extends Controller
         }
 
         $outsideTasks = $project->tasks()
-            ->whereNotNull('due_date')
             ->where(function ($query) use ($project) {
-                $query->whereDate('due_date', '<', $project->start_date)
+                $query->whereDate('planned_start_date', '<', $project->start_date)
                     ->orWhereDate('due_date', '>', $project->due_date);
             })
             ->get();

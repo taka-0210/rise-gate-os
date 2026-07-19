@@ -130,7 +130,8 @@ class ImprovementOutputController extends Controller
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Task::statuses()))],
             'priority' => ['required', 'string', 'in:'.implode(',', array_keys(Task::priorities()))],
             'assigned_to' => ['nullable', Rule::in($assignableUserIds)],
-            'due_date' => ['nullable', 'date'],
+            'planned_start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
         ]);
     }
 

@@ -478,8 +478,8 @@
                             <p>{{ Str::limit($task->description ?: '詳細はまだありません。', 120) }}</p>
                             <p class="meta">
                                 担当者: {{ $task->assignee?->name ?? '未設定' }}
-                                @if ($task->due_date)
-                                    / 期限: {{ $task->due_date->format('Y-m-d') }}
+                                @if ($task->planned_start_date || $task->due_date)
+                                    / 予定: {{ $task->planned_start_date?->format('Y-m-d') ?? '未設定' }}〜{{ $task->due_date?->format('Y-m-d') ?? '未設定' }}
                                 @endif
                                 @if ($task->improvement)
                                     / 起点: <a href="{{ route('projects.improvements.show', [$project, $task->improvement]) }}">{{ $task->improvement->title }}</a>
@@ -542,7 +542,12 @@
                             </div>
                         </div>
                         <div class="field">
-                            <label for="task_due_date">期限</label>
+                            <label for="task_planned_start_date">開始予定日</label>
+                            <input id="task_planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date') }}">
+                            @error('planned_start_date') <div class="error">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="field">
+                            <label for="task_due_date">終了予定日</label>
                             <input id="task_due_date" name="due_date" type="date" value="{{ old('due_date') }}">
                         </div>
                         <div class="actions">

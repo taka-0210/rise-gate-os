@@ -99,15 +99,17 @@ class TaskController extends Controller
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Task::statuses()))],
             'priority' => ['required', 'string', 'in:'.implode(',', array_keys(Task::priorities()))],
             'assigned_to' => ['nullable', Rule::in($assignableUserIds)],
-            'due_date' => ['nullable', 'date'],
+            'planned_start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
         ]);
 
         $improvement = $project->improvements()->findOrFail($validated['improvement_id']);
-        if (! empty($validated['due_date']) && $improvement->planned_start_date && $improvement->target_date
-            && ($validated['due_date'] < $improvement->planned_start_date->toDateString()
+        if (! empty($validated['planned_start_date']) && ! empty($validated['due_date'])
+            && $improvement->planned_start_date && $improvement->target_date
+            && ($validated['planned_start_date'] < $improvement->planned_start_date->toDateString()
                 || $validated['due_date'] > $improvement->target_date->toDateString())) {
             throw ValidationException::withMessages([
-                'due_date' => "タスクの期限は、取り組みの予定期間（{$improvement->planned_start_date->format('Y/m/d')}〜{$improvement->target_date->format('Y/m/d')}）内で設定してください。",
+                'planned_start_date' => "タスクの期間は、取り組みの予定期間（{$improvement->planned_start_date->format('Y/m/d')}〜{$improvement->target_date->format('Y/m/d')}）内で設定してください。",
             ]);
         }
 

@@ -134,7 +134,11 @@
                             </select>
                         </div>
                         <div class="field">
-                            <label for="output_task_due_date">期限</label>
+                            <label for="output_task_planned_start_date">開始予定日</label>
+                            <input id="output_task_planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date') }}">
+                        </div>
+                        <div class="field">
+                            <label for="output_task_due_date">終了予定日</label>
                             <input id="output_task_due_date" name="due_date" type="date" value="{{ old('due_date') }}">
                         </div>
                         <div class="actions">

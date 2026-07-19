@@ -65,12 +65,12 @@ class ScheduleIntegrityService
                 }
 
                 foreach ($improvement->tasks as $task) {
-                    if (! $task->due_date) {
-                        $missing->push("タスク「{$task->title}」の期限が未設定です。");
+                    if (! $task->planned_start_date || ! $task->due_date) {
+                        $missing->push("タスク「{$task->title}」の期間が未設定です。");
                         $entities['missing']->push('task:'.$task->id);
                     } elseif ($improvement->planned_start_date && $improvement->target_date
-                        && ! $task->due_date->betweenIncluded($improvement->planned_start_date, $improvement->target_date)) {
-                        $invalid->push("タスク「{$task->title}」の期限が取り組みの期間外です。");
+                        && ! $this->within($task->planned_start_date, $task->due_date, $improvement->planned_start_date, $improvement->target_date)) {
+                        $invalid->push("タスク「{$task->title}」の期間が取り組みの期間外です。");
                         $entities['invalid']->push('task:'.$task->id);
                     } elseif (! $improvement->planned_start_date || ! $improvement->target_date) {
                         $unverifiable->push("タスク「{$task->title}」は取り組みの日程未設定により判定できません。");

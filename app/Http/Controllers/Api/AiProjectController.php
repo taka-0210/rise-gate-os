@@ -67,6 +67,7 @@ class AiProjectController extends Controller
                             'description' => $task->description,
                             'status' => $task->status,
                             'priority' => $task->priority,
+                            'planned_start_date' => $task->planned_start_date?->toDateString(),
                             'due_date' => $task->due_date?->toDateString(),
                             'assigned_to' => $task->assigned_to,
                         ])->values(),
