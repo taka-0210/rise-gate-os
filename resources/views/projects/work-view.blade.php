@@ -133,6 +133,33 @@
         .time-reached-marker { position:absolute; z-index:2; top:10px; width:10px; height:24px; border:2px solid #245ca6; border-radius:999px; background:#fff; transform:translateX(-50%); }
         .time-today { position:absolute; z-index:2; top:0; bottom:0; left:var(--today-left); width:2px; background:#d24b3b; pointer-events:none; }
         .time-unscheduled { display:inline-flex; margin:11px 12px; padding:3px 8px; border:1px dashed var(--line); border-radius:999px; color:var(--muted); font-size:11px; }
+        .time-print-summary { display:none; }
+        .time-print-button { white-space:nowrap; }
+        @media print {
+            @page { size:A4 landscape; margin:8mm; }
+            html,body { overflow:visible; background:#fff; }
+            .topbar,.focus-toolbar,.schedule-integrity,.ai-drawer,.ai-drawer-overlay,.schedule-step-guide,.time-print-button,.time-legend label,.focus-project,.focus-footer { display:none !important; }
+            .shell,.main,.focus-page { display:block; width:100%; min-height:0; margin:0; padding:0; }
+            .time-layer { display:block !important; padding:0; border:0; }
+            .time-print-summary { display:block; margin-bottom:8mm; }
+            .time-print-summary h1 { margin:3px 0 7px; font-size:24px; }
+            .time-print-client { color:#245ca6; font-size:14px; font-weight:800; }
+            .time-print-description { margin:0 0 8px; color:#374751; line-height:1.55; }
+            .time-print-counts { display:flex; gap:8px; }
+            .time-print-counts span { padding:5px 10px; border:1px solid #cbd5dc; border-radius:6px; font-size:12px; }
+            .time-layer-head { margin-bottom:5mm; }
+            .time-layer-head h1,.time-layer-head p { display:none; }
+            .time-legend { justify-content:flex-end; gap:8px; }
+            .time-chart-scroll { overflow:visible; padding:0; }
+            .time-chart { width:100%; min-width:0; break-inside:avoid; }
+            .time-axis,.time-row { grid-template-columns:31% 69%; }
+            .time-axis-label,.time-row-label { padding:6px 8px; }
+            .time-axis-track,.time-row-track { min-height:30px; }
+            .time-axis-track { min-height:34px; }
+            .time-bar { top:8px; height:14px; }
+            .time-resize-handle { display:none; }
+            .time-row-status { font-size:8px; }
+        }
         @media (max-width:760px) {
             .focus-page { margin-top:-10px; }
             .focus-toolbar { top:0; }
@@ -160,7 +187,8 @@
         $completedTasks = $allTasks->where('status', \App\Models\Task::STATUS_DONE);
         $directTasks = $allTasks->whereNull('improvement_id');
         $isTimeView = request('view') === 'time';
-        $includeTodayInTimeline = request('include_today', '1') !== '0';
+        $isPrintTimeView = $isTimeView && request()->boolean('print');
+        $includeTodayInTimeline = ! $isPrintTimeView && request('include_today', '1') !== '0';
 
         $timeRows = collect();
         $scheduleIssueFor = function (string $type, int $id) use ($scheduleIntegrity): ?string {
@@ -244,7 +272,7 @@
             : ($roadmaps->contains(fn ($item) => ! $item->planned_start_date || ! $item->target_date) ? 'roadmap'
             : ($project->improvements->contains(fn ($item) => ! $item->planned_start_date || ! $item->target_date) ? 'improvement'
             : ($allTasks->contains(fn ($item) => ! $item->planned_start_date || ! $item->due_date) ? 'task' : 'all')));
-        $requestedScheduleStage = request('schedule_step');
+        $requestedScheduleStage = $isPrintTimeView ? 'all' : request('schedule_step');
         $scheduleStage = in_array($requestedScheduleStage, ['project', 'roadmap', 'improvement', 'task', 'all'], true)
             ? $requestedScheduleStage
             : $autoScheduleStage;
@@ -292,6 +320,9 @@
                     </button>
                     <a class="{{ $isTimeView ? '' : 'is-current' }}" href="{{ route('projects.show', $project) }}">フォーカス表示</a>
                     <a class="{{ $isTimeView ? 'is-current' : '' }}" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">時間表示</a>
+                    @if ($isTimeView)
+                        <a class="time-print-button" href="{{ route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all', 'include_today' => 0, 'print' => 1]) }}" target="_blank" rel="noopener">印刷</a>
+                    @endif
                 </div>
                 <a class="button secondary focus-manage-link" href="{{ route('projects.legacy', $project) }}">管理詳細を見る</a>
             </div>
@@ -415,6 +446,16 @@
         </aside>
 
         <div class="time-layer">
+            <section class="time-print-summary">
+                <div class="time-print-client">クライアント：{{ $project->client?->name ?? '未設定' }}</div>
+                <h1>{{ $project->name }}</h1>
+                <p class="time-print-description">{{ $project->summary ?: 'プロジェクト概要は未設定です。' }}</p>
+                <div class="time-print-counts">
+                    <span>ロードマップ {{ $roadmaps->count() }}件</span>
+                    <span>取り組み {{ $allImprovements->count() }}件</span>
+                    <span>タスク {{ $allTasks->count() }}件</span>
+                </div>
+            </section>
             <div class="time-layer-head">
                 <div>
                     <div class="focus-layer-label focus-project-label">時間レイヤー・いつ、どの順番で進めるか</div>
@@ -601,6 +642,10 @@
 
     <script>
         (() => {
+            @if ($isPrintTimeView)
+                window.addEventListener('load', () => window.print(), { once: true });
+            @endif
+
             const chart = document.querySelector('.time-chart');
             if (!chart) return;
             const axisStart = new Date(`${chart.dataset.axisStart}T00:00:00`);

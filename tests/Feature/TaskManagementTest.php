@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Organization;
 use App\Models\AiProposal;
+use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
@@ -252,6 +253,34 @@ class TaskManagementTest extends TestCase
                 'data-time-row-title="最初の工程"',
                 'data-time-row-title="後半工程"',
             ], false);
+    }
+
+    public function test_time_view_has_a_print_layout_with_project_summary_and_counts(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $client = Client::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'name' => '印刷確認クライアント',
+        ]);
+        $project->update([
+            'client_id' => $client->id,
+            'summary' => '印刷用のプロジェクト概要です。',
+            'start_date' => '2026-08-01',
+            'due_date' => '2026-08-31',
+        ]);
+        $this->createTask($project, $owner);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'print' => 1]))
+            ->assertOk()
+            ->assertSee('クライアント：印刷確認クライアント')
+            ->assertSee('印刷用のプロジェクト概要です。')
+            ->assertSee('ロードマップ 1件')
+            ->assertSee('取り組み 1件')
+            ->assertSee('タスク 1件')
+            ->assertSee("window.addEventListener('load', () => window.print()", false);
     }
 
     private function createProjectOwner(): array
