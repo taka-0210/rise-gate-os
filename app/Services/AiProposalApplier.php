@@ -15,7 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 class AiProposalApplier
 {
-    public function __construct(private readonly AiProposalValidator $validator) {}
+    public function __construct(
+        private readonly AiProposalValidator $validator,
+        private readonly ScheduleIntegrityService $scheduleIntegrity,
+    ) {}
 
     public function apply(AiProposal $proposal, User $reviewer): AiProposal
     {
@@ -35,6 +38,8 @@ class AiProposalApplier
                 throw ValidationException::withMessages(['proposal' => 'この提案はすでに処理されています。']);
             }
 
+            $invalidBefore = $this->scheduleIntegrity->inspect($locked->project->fresh())['invalid'];
+
             $references = [];
             $items = $locked->items()->orderBy('sort_order')->orderBy('id')->get()
                 ->sortBy(fn (AiProposalItem $item) => $item->operation === AiProposalItem::OPERATION_DELETE
@@ -52,6 +57,14 @@ class AiProposalApplier
                 if ($item->reference_key) {
                     $references[$item->reference_key] = $model;
                 }
+            }
+
+            $invalidAfter = $this->scheduleIntegrity->inspect($locked->project->fresh())['invalid'];
+            $newInvalid = $invalidAfter->diff($invalidBefore);
+            if ($newInvalid->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'proposal' => 'この提案を反映すると日程が上位期間から外れます。'.PHP_EOL.$newInvalid->implode(PHP_EOL),
+                ]);
             }
 
             $locked->update([

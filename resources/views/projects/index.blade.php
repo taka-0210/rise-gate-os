@@ -30,6 +30,9 @@
         .project-counts div { padding:9px; border:1px solid var(--line); border-radius:7px; background:#fff; text-align:center; }
         .project-counts strong { display:block; color:var(--accent-dark); font-size:20px; }
         .origin-project-badge { margin-top:10px; }
+        .schedule-badge { display:inline-flex; margin-top:9px; padding:5px 9px; border-radius:999px; font-size:12px; font-weight:900; }
+        .schedule-badge.is-missing { background:#fff4d6; color:#8a5b00; }
+        .schedule-badge.is-invalid { background:#fff0ed; color:#a33f2d; }
         @media (max-width:760px) {
             .project-index-page { margin-top:-10px; }
             .project-index-toolbar-inner { width:min(100% - 28px,1040px); gap:10px; }
@@ -107,6 +110,10 @@
                                     <span class="project-open-hint">この中を見る</span>
                                 </div>
                                 <p class="project-client">{{ $project->client?->name ?? 'クライアント未設定' }} / {{ $statuses[$project->status] ?? $project->status }} / {{ $priorities[$project->priority] ?? $project->priority }}</p>
+                                @php($integrity = $scheduleIntegrity[$project->id])
+                                @if ($integrity['status'] !== \App\Services\ScheduleIntegrityService::STATUS_OK)
+                                    <span class="schedule-badge is-{{ $integrity['status'] }}">{{ $integrity['label'] }}・{{ $integrity['issue_count'] }}件</span>
+                                @endif
                                 @php($sourceImprovement = $project->sourceImprovementOutput?->improvement)
                                 @if ($project->sourceImprovementOutput)
                                     <div class="badge origin-project-badge">改善から生まれたProject</div>

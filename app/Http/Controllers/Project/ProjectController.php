@@ -12,6 +12,7 @@ use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\ScheduleIntegrityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -53,7 +54,7 @@ class ProjectController extends Controller
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($priority, fn ($query) => $query->where('priority', $priority))
             ->withCount(['roadmaps', 'improvements', 'tasks'])
-            ->with(['owner', 'client', 'sourceImprovementOutput.improvement.project', 'members' => fn ($query) => $query->where('user_id', $request->user()->id)])
+            ->with(['owner', 'client', 'roadmaps.improvements.tasks', 'improvements.tasks', 'sourceImprovementOutput.improvement.project', 'members' => fn ($query) => $query->where('user_id', $request->user()->id)])
             ->when($sort === 'latest', fn ($query) => $query->latest())
             ->when($sort === 'oldest', fn ($query) => $query->oldest())
             ->when(in_array($sort, ['client_asc', 'client_desc'], true), function ($query) use ($sort): void {
@@ -65,6 +66,10 @@ class ProjectController extends Controller
             ->paginate(12)
             ->withQueryString();
 
+        $scheduleIntegrity = $projects->getCollection()->mapWithKeys(
+            fn (Project $project) => [$project->id => app(ScheduleIntegrityService::class)->inspect($project)]
+        );
+
         return view('projects.index', [
             'projects' => $projects,
             'statuses' => Project::statuses(),
@@ -74,6 +79,7 @@ class ProjectController extends Controller
             'selectedClientId' => $clientId,
             'selectedStatus' => $status,
             'selectedPriority' => $priority,
+            'scheduleIntegrity' => $scheduleIntegrity,
         ]);
     }
 
@@ -188,6 +194,7 @@ class ProjectController extends Controller
             ->get();
 
         $projectTimeline = $this->buildProjectTimeline($project, $allTasks, $allImprovements, $roadmaps);
+        $scheduleIntegrity = app(ScheduleIntegrityService::class)->inspect($project);
 
         $unclassifiedImprovements = $project->improvements()
             ->whereNull('roadmap_id')
@@ -228,6 +235,7 @@ class ProjectController extends Controller
             'aiRequests' => $aiRequests,
             'pendingAiProposalCount' => $pendingAiProposalCount,
             'pendingAiProposals' => $pendingAiProposals,
+            'scheduleIntegrity' => $scheduleIntegrity,
         ]);
     }
 
@@ -334,7 +342,22 @@ class ProjectController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('update', $project);
 
-        $project->update($this->validateProject($request, $project->owning_workspace_id));
+        $validated = $this->validateProject($request, $project->owning_workspace_id);
+        if (! empty($validated['start_date']) && ! empty($validated['due_date'])) {
+            $count = $project->roadmaps()
+                ->whereNotNull('planned_start_date')
+                ->whereNotNull('target_date')
+                ->where(fn ($query) => $query
+                    ->whereDate('planned_start_date', '<', $validated['start_date'])
+                    ->orWhereDate('target_date', '>', $validated['due_date']))
+                ->count();
+            if ($count > 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'start_date' => "この変更により、ロードマップ{$count}件がProjectの期間外になります。先にロードマップの日程を調整してください。",
+                ]);
+            }
+        }
+        $project->update($validated);
 
         return redirect()->route('projects.show', $project)->with('status', 'Projectを更新しました。');
     }

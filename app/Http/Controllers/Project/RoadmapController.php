@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class RoadmapController extends Controller
@@ -34,6 +35,8 @@ class RoadmapController extends Controller
                     ->whereNull('deleted_at'),
             ],
         ]);
+
+        $this->ensureWithinProject($project, $validated);
 
         DB::transaction(function () use ($project, $request, $validated): void {
             $orderedRoadmaps = $project->roadmaps()
@@ -90,14 +93,18 @@ class RoadmapController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('update', $roadmap);
 
-        $roadmap->update($request->validate([
+        $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'purpose' => ['nullable', 'string', 'max:5000'],
             'planned_start_date' => ['nullable', 'date'],
             'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
             'reached_at' => ['nullable', 'date'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Roadmap::statuses()))],
-        ]));
+        ]);
+
+        $this->ensureWithinProject($project, $validated);
+        $this->ensureImprovementsRemainWithin($roadmap, $validated);
+        $roadmap->update($validated);
 
         return redirect()->route('projects.show', $project)->with('status', 'Roadmapを更新しました。');
     }
@@ -120,6 +127,13 @@ class RoadmapController extends Controller
 
         $roadmap = Roadmap::where('project_id', $project->id)->findOrFail($validated['roadmap_id']);
         Gate::authorize('update', $roadmap);
+
+        if ($improvement->planned_start_date && $improvement->target_date && $roadmap->planned_start_date && $roadmap->target_date
+            && ($improvement->planned_start_date->lt($roadmap->planned_start_date) || $improvement->target_date->gt($roadmap->target_date))) {
+            throw ValidationException::withMessages([
+                'roadmap_id' => "この取り組みの期間は、ロードマップの予定期間（{$roadmap->planned_start_date->format('Y/m/d')}〜{$roadmap->target_date->format('Y/m/d')}）内で設定してください。",
+            ]);
+        }
 
         $maxSortOrder = (int) $roadmap->improvements()->max('roadmap_sort_order');
 
@@ -158,5 +172,39 @@ class RoadmapController extends Controller
     private function authorizeProjectRoadmap(Project $project, Roadmap $roadmap): void
     {
         abort_unless($roadmap->project_id === $project->id, 404);
+    }
+
+    private function ensureWithinProject(Project $project, array $attributes): void
+    {
+        if (! $project->start_date || ! $project->due_date || empty($attributes['planned_start_date']) || empty($attributes['target_date'])) {
+            return;
+        }
+
+        if ($attributes['planned_start_date'] < $project->start_date->toDateString() || $attributes['target_date'] > $project->due_date->toDateString()) {
+            throw ValidationException::withMessages([
+                'planned_start_date' => "ロードマップの期間は、Projectの予定期間（{$project->start_date->format('Y/m/d')}〜{$project->due_date->format('Y/m/d')}）内で設定してください。",
+            ]);
+        }
+    }
+
+    private function ensureImprovementsRemainWithin(Roadmap $roadmap, array $attributes): void
+    {
+        if (empty($attributes['planned_start_date']) || empty($attributes['target_date'])) {
+            return;
+        }
+
+        $count = $roadmap->improvements()
+            ->whereNotNull('planned_start_date')
+            ->whereNotNull('target_date')
+            ->where(fn ($query) => $query
+                ->whereDate('planned_start_date', '<', $attributes['planned_start_date'])
+                ->orWhereDate('target_date', '>', $attributes['target_date']))
+            ->count();
+
+        if ($count > 0) {
+            throw ValidationException::withMessages([
+                'planned_start_date' => "この変更により、取り組み{$count}件がロードマップの期間外になります。先に取り組みの日程を調整してください。",
+            ]);
+        }
     }
 }

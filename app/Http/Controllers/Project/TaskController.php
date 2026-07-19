@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class TaskController extends Controller
@@ -86,7 +87,7 @@ class TaskController extends Controller
     {
         $assignableUserIds = $this->assignableUsers($project)->pluck('id')->all();
 
-        return $request->validate([
+        $validated = $request->validate([
             'improvement_id' => [
                 'required',
                 Rule::exists('improvements', 'id')
@@ -100,6 +101,17 @@ class TaskController extends Controller
             'assigned_to' => ['nullable', Rule::in($assignableUserIds)],
             'due_date' => ['nullable', 'date'],
         ]);
+
+        $improvement = $project->improvements()->findOrFail($validated['improvement_id']);
+        if (! empty($validated['due_date']) && $improvement->planned_start_date && $improvement->target_date
+            && ($validated['due_date'] < $improvement->planned_start_date->toDateString()
+                || $validated['due_date'] > $improvement->target_date->toDateString())) {
+            throw ValidationException::withMessages([
+                'due_date' => "タスクの期限は、取り組みの予定期間（{$improvement->planned_start_date->format('Y/m/d')}〜{$improvement->target_date->format('Y/m/d')}）内で設定してください。",
+            ]);
+        }
+
+        return $validated;
     }
 
     private function assignableUsers(Project $project)

@@ -14,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ImprovementController extends Controller
@@ -170,7 +171,7 @@ class ImprovementController extends Controller
     {
         $assignableUserIds = $this->assignableUsers($project)->pluck('id')->all();
 
-        return $request->validate([
+        $validated = $request->validate([
             'roadmap_id' => [
                 'required',
                 Rule::exists('roadmaps', 'id')
@@ -195,6 +196,32 @@ class ImprovementController extends Controller
             'implemented_by' => ['nullable', Rule::in($assignableUserIds)],
             'implemented_at' => ['nullable', 'date'],
         ]);
+
+        $roadmap = $project->roadmaps()->findOrFail($validated['roadmap_id']);
+        if (! empty($validated['planned_start_date']) && ! empty($validated['target_date'])
+            && $roadmap->planned_start_date && $roadmap->target_date
+            && ($validated['planned_start_date'] < $roadmap->planned_start_date->toDateString()
+                || $validated['target_date'] > $roadmap->target_date->toDateString())) {
+            throw ValidationException::withMessages([
+                'planned_start_date' => "取り組みの期間は、ロードマップの予定期間（{$roadmap->planned_start_date->format('Y/m/d')}〜{$roadmap->target_date->format('Y/m/d')}）内で設定してください。",
+            ]);
+        }
+
+        if ($request->route('improvement') && ! empty($validated['planned_start_date']) && ! empty($validated['target_date'])) {
+            $count = $request->route('improvement')->tasks()
+                ->whereNotNull('due_date')
+                ->where(fn ($query) => $query
+                    ->whereDate('due_date', '<', $validated['planned_start_date'])
+                    ->orWhereDate('due_date', '>', $validated['target_date']))
+                ->count();
+            if ($count > 0) {
+                throw ValidationException::withMessages([
+                    'planned_start_date' => "この変更により、タスク{$count}件が取り組みの期間外になります。先にタスクの期限を調整してください。",
+                ]);
+            }
+        }
+
+        return $validated;
     }
 
     private function authorizeProjectImprovement(Project $project, Improvement $improvement): void

@@ -56,6 +56,10 @@
         .focus-view-switch a.is-current { background:var(--accent-dark); color:#fff; }
         .focus-ai-trigger { display:inline-flex; align-items:center; gap:6px; }
         .focus-ai-count { display:inline-flex; min-width:19px; height:19px; padding:0 5px; align-items:center; justify-content:center; border-radius:999px; background:#c65a46; color:#fff; font-size:11px; font-weight:900; }
+        .schedule-integrity { padding:14px 18px; border:2px solid #d5a22f; border-radius:10px; background:#fffaf0; }
+        .schedule-integrity.is-invalid { border-color:#c65a46; background:#fff7f5; }
+        .schedule-integrity summary { cursor:pointer; font-weight:900; }
+        .schedule-integrity ul { margin:12px 0 0; }
         .ai-drawer-overlay { position:fixed; z-index:60; inset:0; border:0; background:rgba(20,30,38,.38); opacity:0; visibility:hidden; transition:opacity .2s ease,visibility .2s ease; }
         .ai-drawer { position:fixed; z-index:61; top:0; right:0; width:min(620px,92vw); height:100vh; padding:24px; overflow-y:auto; border-left:1px solid var(--line); background:#f8fafb; box-shadow:-14px 0 38px rgba(20,40,55,.18); transform:translateX(102%); visibility:hidden; transition:transform .24s ease,visibility .24s ease; }
         .ai-drawer.is-open { transform:translateX(0); visibility:visible; }
@@ -231,6 +235,20 @@
                 <a class="button secondary focus-manage-link" href="{{ route('projects.legacy', $project) }}">管理詳細を見る</a>
             </div>
         </div>
+
+        @if ($scheduleIntegrity['status'] !== \App\Services\ScheduleIntegrityService::STATUS_OK)
+            <details class="schedule-integrity is-{{ $scheduleIntegrity['status'] }}">
+                <summary>{{ $scheduleIntegrity['label'] }}：日程の整合性に関する確認が{{ $scheduleIntegrity['issue_count'] }}件あります</summary>
+                @if ($scheduleIntegrity['invalid']->isNotEmpty())
+                    <h3>再設定が必要</h3>
+                    <ul>@foreach ($scheduleIntegrity['invalid'] as $issue)<li>{{ $issue }}</li>@endforeach</ul>
+                @endif
+                @if ($scheduleIntegrity['missing']->isNotEmpty())
+                    <h3>日程の確認が必要</h3>
+                    <ul>@foreach ($scheduleIntegrity['missing'] as $issue)<li>{{ $issue }}</li>@endforeach</ul>
+                @endif
+            </details>
+        @endif
 
         <button type="button" class="ai-drawer-overlay {{ $errors->any() ? 'is-open' : '' }}" data-ai-drawer-close aria-label="AIアシスタントを閉じる"></button>
         <aside id="ai-assistant-drawer" class="ai-drawer {{ $errors->any() ? 'is-open' : '' }}" aria-label="AIアシスタント" aria-hidden="{{ $errors->any() ? 'false' : 'true' }}">
