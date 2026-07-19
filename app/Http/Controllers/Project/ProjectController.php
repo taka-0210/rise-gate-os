@@ -197,7 +197,6 @@ class ProjectController extends Controller
                 $query->with(['assignee', 'proposer', 'tasks.assignee']);
             }])
             ->get();
-
         $projectTimeline = $this->buildProjectTimeline($project, $allTasks, $allImprovements, $roadmaps);
         $scheduleIntegrity = app(ScheduleIntegrityService::class)->inspect($project);
 
@@ -241,6 +240,60 @@ class ProjectController extends Controller
             'pendingAiProposalCount' => $pendingAiProposalCount,
             'pendingAiProposals' => $pendingAiProposals,
             'scheduleIntegrity' => $scheduleIntegrity,
+        ]);
+    }
+
+    public function clientPlan(Request $request, Project $project): View
+    {
+        Gate::authorize('view', $project);
+
+        $scope = $request->input('scope') === 'all' ? 'all' : 'client';
+        $showTasks = $request->boolean('show_tasks', true);
+        $showProgress = $request->boolean('show_progress', true);
+
+        $project->load(['client', 'owner', 'owningWorkspace']);
+        $roadmaps = $project->roadmaps()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->with(['improvements' => function ($query) use ($scope): void {
+                if ($scope === 'client') {
+                    $query->where('visibility', Improvement::VISIBILITY_CLIENT);
+                }
+                $query->orderBy('roadmap_sort_order')->orderBy('id')->with(['tasks' => fn ($tasks) => $tasks->orderBy('planned_start_date')->orderBy('due_date')->orderBy('id')]);
+            }])
+            ->get();
+        if ($scope === 'client') {
+            $roadmaps = $roadmaps->filter(fn (Roadmap $roadmap) => $roadmap->improvements->isNotEmpty())->values();
+        }
+
+        $unclassifiedImprovements = $project->improvements()
+            ->whereNull('roadmap_id')
+            ->when($scope === 'client', fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
+            ->orderBy('planned_start_date')
+            ->orderBy('id')
+            ->with(['tasks' => fn ($tasks) => $tasks->orderBy('planned_start_date')->orderBy('due_date')->orderBy('id')])
+            ->get();
+
+        $visibleImprovements = $roadmaps->flatMap->improvements->concat($unclassifiedImprovements);
+        $visibleTasks = $visibleImprovements->flatMap->tasks;
+
+        return view('projects.client-plan', [
+            'project' => $project,
+            'roadmaps' => $roadmaps,
+            'unclassifiedImprovements' => $unclassifiedImprovements,
+            'visibleImprovements' => $visibleImprovements,
+            'visibleTasks' => $visibleTasks,
+            'taskStatuses' => Task::statuses(),
+            'improvementStatuses' => Improvement::statuses(),
+            'roadmapStatuses' => Roadmap::statuses(),
+            'documentOptions' => [
+                'scope' => $scope,
+                'show_tasks' => $showTasks,
+                'show_progress' => $showProgress,
+                'version' => trim((string) $request->input('version', '1.0')),
+                'prepared_by' => trim((string) $request->input('prepared_by', $project->owner?->name ?? '')),
+                'prepared_on' => $request->date('prepared_on')?->toDateString() ?? now()->toDateString(),
+            ],
         ]);
     }
 

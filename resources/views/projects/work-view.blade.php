@@ -321,7 +321,8 @@
                     <a class="{{ $isTimeView ? '' : 'is-current' }}" href="{{ route('projects.show', $project) }}">フォーカス表示</a>
                     <a class="{{ $isTimeView ? 'is-current' : '' }}" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">時間表示</a>
                     @if ($isTimeView)
-                        <a class="time-print-button" href="{{ route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all', 'include_today' => 0, 'print' => 1]) }}" target="_blank" rel="noopener">印刷</a>
+                        <a class="time-print-button" href="{{ route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all', 'include_today' => 0, 'print' => 1]) }}" target="_blank" rel="noopener">社内用印刷</a>
+                        <a class="time-print-button" href="{{ route('projects.client-plan', $project) }}" target="_blank" rel="noopener">お客さま提出資料</a>
                     @endif
                 </div>
                 <a class="button secondary focus-manage-link" href="{{ route('projects.legacy', $project) }}">管理詳細を見る</a>

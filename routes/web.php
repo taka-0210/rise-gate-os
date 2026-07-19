@@ -71,6 +71,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::put('/ai-settings', [WorkspaceAiSettingController::class, 'update'])->name('ai-settings.update');
         Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+        Route::get('/projects/{project}/client-plan', [ProjectController::class, 'clientPlan'])->name('projects.client-plan');
         Route::get('/projects/{project}/ai-proposals', [AiProposalController::class, 'index'])->name('projects.ai-proposals.index');
         Route::get('/projects/{project}/ai-proposals/{aiProposal}', [AiProposalController::class, 'show'])->name('projects.ai-proposals.show');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/apply', [AiProposalController::class, 'apply'])->name('projects.ai-proposals.apply');

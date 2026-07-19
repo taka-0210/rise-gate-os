@@ -283,6 +283,45 @@ class TaskManagementTest extends TestCase
             ->assertSee("window.addEventListener('load', () => window.print()", false);
     }
 
+    public function test_project_member_can_preview_a_client_facing_project_plan(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $client = Client::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'name' => '提出先株式会社',
+        ]);
+        $project->update([
+            'client_id' => $client->id,
+            'summary' => 'お客さまへ提出する計画概要',
+            'start_date' => '2026-08-01',
+            'due_date' => '2026-08-31',
+        ]);
+        $task = $this->createTask($project, $owner);
+        $task->improvement->update([
+            'visibility' => Improvement::VISIBILITY_CLIENT,
+            'planned_start_date' => '2026-08-02',
+            'target_date' => '2026-08-20',
+        ]);
+        $task->improvement->roadmap->update([
+            'planned_start_date' => '2026-08-01',
+            'target_date' => '2026-08-25',
+        ]);
+        $task->update(['planned_start_date' => '2026-08-03', 'due_date' => '2026-08-10']);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.client-plan', $project))
+            ->assertOk()
+            ->assertSee('プロジェクト実施計画書')
+            ->assertSee('提出先株式会社 御中')
+            ->assertSee('お客さまへ提出する計画概要')
+            ->assertSee($task->improvement->roadmap->title)
+            ->assertSee($task->improvement->title)
+            ->assertSee($task->title)
+            ->assertSee('PDF保存・印刷');
+    }
+
     private function createProjectOwner(): array
     {
         $owner = User::factory()->create();
