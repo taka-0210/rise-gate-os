@@ -112,6 +112,7 @@
         .time-row.is-improvement .time-row-dot,.time-bar.is-improvement { background:#56a27e; }
         .time-row.is-task .time-row-dot,.time-bar.is-task { background:#b5523d; }
         .time-bar { position:absolute; top:13px; left:var(--bar-left); width:max(var(--bar-width),6px); height:18px; border-radius:999px; }
+        .time-bar.is-editable:not(.is-task) { cursor:grab; }
         .time-bar.is-dragging { cursor:grabbing; opacity:.78; }
         .time-resize-handle { position:absolute; z-index:2; top:-4px; width:10px; height:26px; border:2px solid #fff; border-radius:5px; background:#263f4d; cursor:ew-resize; box-shadow:0 1px 4px rgba(0,0,0,.25); }
         .time-resize-handle.is-start { left:-4px; }
@@ -565,6 +566,71 @@
                 document.body.append(status);
                 setTimeout(() => status.remove(), 5000);
             };
+
+            document.querySelectorAll('.time-bar.is-editable:not(.is-task)').forEach(bar => {
+                bar.addEventListener('pointerdown', event => {
+                    if (event.target.closest('.time-resize-handle')) return;
+                    event.preventDefault();
+                    const track = bar.closest('.time-row-track');
+                    const originalStart = parseDate(bar.dataset.barStart);
+                    const originalEnd = parseDate(bar.dataset.barEnd);
+                    const originX = event.clientX;
+                    let dayDelta = 0;
+                    bar.classList.add('is-dragging');
+                    bar.setPointerCapture(event.pointerId);
+
+                    const move = moveEvent => {
+                        dayDelta = Math.round((moveEvent.clientX - originX) / track.clientWidth * axisDays);
+                        const nextStart = addDays(originalStart, dayDelta);
+                        const nextEnd = addDays(originalEnd, dayDelta);
+                        const left = (nextStart - axisStart) / 86400000 / axisDays * 100;
+                        bar.style.setProperty('--bar-left', `${left}%`);
+                        bar.title = `${formatDate(nextStart)}〜${formatDate(nextEnd)}`;
+                    };
+
+                    const finish = async () => {
+                        bar.removeEventListener('pointermove', move);
+                        bar.removeEventListener('pointerup', finish);
+                        bar.removeEventListener('pointercancel', cancel);
+                        bar.classList.remove('is-dragging');
+                        if (dayDelta === 0) return;
+                        const nextStart = addDays(originalStart, dayDelta);
+                        const nextEnd = addDays(originalEnd, dayDelta);
+                        try {
+                            const response = await fetch(bar.dataset.scheduleUrl, {
+                                method: 'PATCH',
+                                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf},
+                                body: JSON.stringify({
+                                    start_date: formatDate(nextStart),
+                                    end_date: formatDate(nextEnd),
+                                    cascade_move: true,
+                                }),
+                            });
+                            const body = await response.json();
+                            if (!response.ok) {
+                                const message = Object.values(body.errors || {}).flat()[0] || body.message || '日程を保存できませんでした。';
+                                throw new Error(message);
+                            }
+                            notify('親要素と配下の日程をまとめて移動しました。');
+                            window.location.reload();
+                        } catch (error) {
+                            bar.style.removeProperty('--bar-left');
+                            bar.title = `${formatDate(originalStart)}〜${formatDate(originalEnd)}`;
+                            notify(error.message, true);
+                        }
+                    };
+                    const cancel = () => {
+                        bar.removeEventListener('pointermove', move);
+                        bar.removeEventListener('pointerup', finish);
+                        bar.removeEventListener('pointercancel', cancel);
+                        bar.classList.remove('is-dragging');
+                        bar.style.removeProperty('--bar-left');
+                    };
+                    bar.addEventListener('pointermove', move);
+                    bar.addEventListener('pointerup', finish);
+                    bar.addEventListener('pointercancel', cancel);
+                });
+            });
 
             document.querySelectorAll('.time-resize-handle').forEach(handle => {
                 handle.addEventListener('pointerdown', event => {

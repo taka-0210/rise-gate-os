@@ -90,6 +90,40 @@ class ScheduleIntegrityTest extends TestCase
         $this->assertSame('2026-08-10', $task->fresh()->due_date->toDateString());
     }
 
+    public function test_moving_a_roadmap_moves_its_descendants_and_keeps_out_of_range_dates_visible(): void
+    {
+        [$user, $workspace, $project, $roadmap, $improvement] = $this->scheduledProject();
+        $task = Task::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'improvement_id' => $improvement->id,
+            'title' => '移動対象タスク',
+            'status' => Task::STATUS_TODO,
+            'priority' => Task::PRIORITY_NORMAL,
+            'due_date' => '2026-08-10',
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), [
+                'start_date' => '2026-08-28',
+                'end_date' => '2026-09-06',
+                'cascade_move' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('integrity.status', ScheduleIntegrityService::STATUS_INVALID)
+            ->assertJsonPath('integrity.counts.invalid.roadmap', 1)
+            ->assertJsonPath('integrity.counts.invalid.improvement', 0)
+            ->assertJsonPath('integrity.counts.invalid.task', 0);
+
+        $this->assertSame('2026-08-28', $roadmap->fresh()->planned_start_date->toDateString());
+        $this->assertSame('2026-08-28', $improvement->fresh()->planned_start_date->toDateString());
+        $this->assertSame('2026-09-01', $improvement->fresh()->target_date->toDateString());
+        $this->assertSame('2026-08-30', $task->fresh()->due_date->toDateString());
+    }
+
     private function scheduledProject(): array
     {
         $user = User::factory()->create();
