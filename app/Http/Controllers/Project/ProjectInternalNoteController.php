@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -88,6 +89,18 @@ class ProjectInternalNoteController extends Controller
         return Storage::disk('local')->download($attachment->stored_path, $attachment->original_name, [
             'Content-Type' => $attachment->mime_type,
             'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function excelViewer(Request $request, Project $project, ProjectInternalNote $internalNote, ProjectInternalNoteAttachment $attachment): View
+    {
+        $this->authorizeAttachment($request, $project, $internalNote, $attachment);
+        abort_unless($attachment->isExcel(), 404);
+
+        return view('projects.internal-note-excel-viewer', [
+            'attachment' => $attachment,
+            'fileUrl' => route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]),
+            'downloadUrl' => route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]),
         ]);
     }
 

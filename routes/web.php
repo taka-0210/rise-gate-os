@@ -76,6 +76,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/projects/{project}/internal-notes', [ProjectInternalNoteController::class, 'store'])->name('projects.internal-notes.store');
         Route::delete('/projects/{project}/internal-notes/{internalNote}', [ProjectInternalNoteController::class, 'destroy'])->name('projects.internal-notes.destroy');
         Route::get('/projects/{project}/internal-notes/{internalNote}/attachments/{attachment}/view', [ProjectInternalNoteController::class, 'view'])->name('projects.internal-notes.attachments.view');
+        Route::get('/projects/{project}/internal-notes/{internalNote}/attachments/{attachment}/excel', [ProjectInternalNoteController::class, 'excelViewer'])->name('projects.internal-notes.attachments.excel');
         Route::get('/projects/{project}/internal-notes/{internalNote}/attachments/{attachment}/download', [ProjectInternalNoteController::class, 'download'])->name('projects.internal-notes.attachments.download');
         Route::get('/projects/{project}/ai-proposals', [AiProposalController::class, 'index'])->name('projects.ai-proposals.index');
         Route::get('/projects/{project}/ai-proposals/{aiProposal}', [AiProposalController::class, 'show'])->name('projects.ai-proposals.show');

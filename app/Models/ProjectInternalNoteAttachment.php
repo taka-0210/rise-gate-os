@@ -44,8 +44,13 @@ class ProjectInternalNoteAttachment extends Model
             || in_array($this->mime_type, ['text/csv', 'text/plain'], true);
     }
 
+    public function isExcel(): bool
+    {
+        return in_array($this->extension, ['xlsx', 'xls'], true);
+    }
+
     public function isBrowserPreviewable(): bool
     {
-        return $this->isImage() || $this->isPdf() || $this->isCsv();
+        return $this->isImage() || $this->isPdf() || $this->isCsv() || $this->isExcel();
     }
 }

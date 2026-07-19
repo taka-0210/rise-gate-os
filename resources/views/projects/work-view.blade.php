@@ -691,6 +691,9 @@
                                                 @elseif($attachment->isCsv())
                                                     <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="csv" data-internal-preview-name="{{ $attachment->original_name }}">CSVを閲覧</button>
                                                     <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">ダウンロード</a>
+                                                @elseif($attachment->isExcel())
+                                                    <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.excel', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="excel" data-internal-preview-name="{{ $attachment->original_name }}">Excelを閲覧</button>
+                                                    <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">ダウンロード</a>
                                                 @else
                                                     <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">ダウンロード</a>
                                                 @endif

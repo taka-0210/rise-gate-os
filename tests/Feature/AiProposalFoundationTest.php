@@ -104,6 +104,7 @@ class AiProposalFoundationTest extends TestCase
                     UploadedFile::fake()->image('internal-board.jpg'),
                     UploadedFile::fake()->create('internal-guide.pdf', 10, 'application/pdf'),
                     UploadedFile::fake()->createWithContent('internal-list.csv', "name,amount\nA,1000"),
+                    UploadedFile::fake()->create('internal-plan.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
                 ],
             ])->assertRedirect();
 
@@ -111,16 +112,19 @@ class AiProposalFoundationTest extends TestCase
         $attachment = $note->attachments()->where('extension', 'jpg')->firstOrFail();
         $pdf = $note->attachments()->where('extension', 'pdf')->firstOrFail();
         $csv = $note->attachments()->where('extension', 'csv')->firstOrFail();
+        $excel = $note->attachments()->where('extension', 'xlsx')->firstOrFail();
         Storage::disk('local')->assertExists($attachment->stored_path);
         Storage::disk('local')->assertExists($pdf->stored_path);
         Storage::disk('local')->assertExists($csv->stored_path);
+        Storage::disk('local')->assertExists($excel->stored_path);
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.show', $project))
             ->assertOk()
             ->assertSee('画像を閲覧')
             ->assertSee('PDFを閲覧')
-            ->assertSee('CSVを閲覧');
+            ->assertSee('CSVを閲覧')
+            ->assertSee('Excelを閲覧');
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.internal-notes.attachments.view', [$project, $note, $attachment]))
@@ -142,6 +146,12 @@ class AiProposalFoundationTest extends TestCase
             ->get(route('projects.internal-notes.attachments.view', [$project, $note, $csv]))
             ->assertOk()
             ->assertHeader('content-disposition', 'inline');
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.internal-notes.attachments.excel', [$project, $note, $excel]))
+            ->assertOk()
+            ->assertSee('internal-plan.xlsx')
+            ->assertSee('xlsx.full.min.js');
 
         $client = User::factory()->create();
         $project->organization->users()->attach($client->id, ['role' => 'member', 'joined_at' => now()]);
@@ -157,6 +167,10 @@ class AiProposalFoundationTest extends TestCase
         $this->actingAs($client)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.internal-notes.attachments.view', [$project, $note, $attachment]))
+            ->assertForbidden();
+        $this->actingAs($client)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.internal-notes.attachments.excel', [$project, $note, $excel]))
             ->assertForbidden();
     }
 
