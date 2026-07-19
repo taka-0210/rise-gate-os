@@ -10,6 +10,7 @@ use App\Http\Controllers\Project\AiRequestController;
 use App\Http\Controllers\Project\ImprovementController;
 use App\Http\Controllers\Project\ImprovementOutputController;
 use App\Http\Controllers\Project\ProjectController;
+use App\Http\Controllers\Project\ProjectInternalNoteController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\RoadmapController;
 use App\Http\Controllers\Project\TaskController;
@@ -72,6 +73,8 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::get('/projects/{project}/client-plan', [ProjectController::class, 'clientPlan'])->name('projects.client-plan');
+        Route::post('/projects/{project}/internal-notes', [ProjectInternalNoteController::class, 'store'])->name('projects.internal-notes.store');
+        Route::delete('/projects/{project}/internal-notes/{internalNote}', [ProjectInternalNoteController::class, 'destroy'])->name('projects.internal-notes.destroy');
         Route::get('/projects/{project}/ai-proposals', [AiProposalController::class, 'index'])->name('projects.ai-proposals.index');
         Route::get('/projects/{project}/ai-proposals/{aiProposal}', [AiProposalController::class, 'show'])->name('projects.ai-proposals.show');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/apply', [AiProposalController::class, 'apply'])->name('projects.ai-proposals.apply');

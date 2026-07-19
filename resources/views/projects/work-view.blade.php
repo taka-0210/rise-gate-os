@@ -51,6 +51,10 @@
         .focus-footer { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; }
         .focus-history-item { padding-top:10px; border-top:1px solid var(--line); }
         .focus-history-item:first-child { padding-top:0; border-top:0; }
+        .internal-notes { padding:20px; border:2px solid #6b7280; border-radius:10px; background:#f7f7f8; }
+        .internal-note-list { display:grid; gap:9px; }
+        .internal-note { padding:12px 14px; border:1px solid #d5d9dd; border-radius:8px; background:#fff; }
+        .internal-note p { margin:5px 0 0; white-space:pre-wrap; }
         .focus-view-switch { display:flex; align-items:center; gap:5px; margin-left:auto; }
         .focus-view-switch a,.focus-view-switch button { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:inherit; text-decoration:none; white-space:nowrap; }
         .focus-view-switch a.is-current { background:var(--accent-dark); color:#fff; }
@@ -583,6 +587,9 @@
                                         </button>
 
                                         <div class="focus-improvement-body">
+                                            <div class="actions" style="justify-content:flex-end;margin-bottom:10px;">
+                                                <a class="button secondary" href="{{ route('projects.improvements.edit', [$project, $improvement]) }}">取り組みを編集</a>
+                                            </div>
                                             <div class="focus-tasks" data-tasks-for="{{ $improvement->id }}">
                                                 @forelse ($improvement->tasks as $task)
                                                     <article class="focus-task" data-task="{{ $task->id }}" data-title="{{ $task->title }}">
@@ -618,6 +625,36 @@
                 </div>
             @endif
         </div>
+
+        @if ($canViewInternalNotes)
+            <section class="internal-notes stack">
+                <div>
+                    <div class="focus-layer-label focus-project-label">社内非公開エリア</div>
+                    <h2>社内メモ</h2>
+                    <p>検討中の内容・懸念・相談事項を残す場所です。お客さま提出資料には一切掲載されません。</p>
+                </div>
+                @if ($canCreateInternalNote)
+                    <form class="stack" method="POST" action="{{ route('projects.internal-notes.store', $project) }}">
+                        @csrf
+                        <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" required placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body')<div class="error">{{ $message }}</div>@enderror</div>
+                        <div class="actions"><button type="submit">社内メモを追加</button></div>
+                    </form>
+                @endif
+                <div class="internal-note-list">
+                    @forelse ($internalNotes as $internalNote)
+                        <article class="internal-note">
+                            <div class="actions" style="justify-content:space-between;align-items:center;">
+                                <div class="meta">{{ $internalNote->user?->name ?? '不明' }} / {{ $internalNote->created_at->format('Y年n月j日 H:i') }}</div>
+                                @if ($canCreateInternalNote)<form method="POST" action="{{ route('projects.internal-notes.destroy', [$project, $internalNote]) }}" onsubmit="return confirm('この社内メモを削除しますか？')">@csrf @method('DELETE')<button type="submit" class="secondary">削除</button></form>@endif
+                            </div>
+                            <p>{{ $internalNote->body }}</p>
+                        </article>
+                    @empty
+                        <p class="meta">社内メモはまだありません。</p>
+                    @endforelse
+                </div>
+            </section>
+        @endif
 
         <div class="focus-footer">
             <section class="card stack">

@@ -115,6 +115,11 @@ class Project extends Model
         return $this->hasMany(AiRequest::class)->latest();
     }
 
+    public function internalNotes(): HasMany
+    {
+        return $this->hasMany(ProjectInternalNote::class)->latest();
+    }
+
     public function sourceImprovementOutput(): HasOne
     {
         return $this->hasOne(ImprovementOutput::class, 'output_id')

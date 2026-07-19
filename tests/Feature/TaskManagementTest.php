@@ -322,6 +322,35 @@ class TaskManagementTest extends TestCase
             ->assertSee('PDF保存・印刷');
     }
 
+    public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.internal-notes.store', $project), ['body' => '見積条件について社内で再確認する'])
+            ->assertRedirect(route('projects.show', $project));
+
+        $this->assertDatabaseHas('project_internal_notes', [
+            'project_id' => $project->id,
+            'user_id' => $owner->id,
+            'body' => '見積条件について社内で再確認する',
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertSee('社内非公開エリア')
+            ->assertSee('見積条件について社内で再確認する');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.client-plan', $project))
+            ->assertOk()
+            ->assertDontSee('見積条件について社内で再確認する');
+    }
+
     private function createProjectOwner(): array
     {
         $owner = User::factory()->create();

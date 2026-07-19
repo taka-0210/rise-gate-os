@@ -161,6 +161,7 @@ class ProjectController extends Controller
 
         $currentWorkspaceRole = $request->attributes->get('currentWorkspaceRole');
         $currentMember = $project->members()->where('user_id', $request->user()->id)->where('status', ProjectMember::STATUS_ACTIVE)->first();
+        $canViewInternalNotes = $currentMember?->project_role !== ProjectMember::ROLE_CLIENT;
 
         $project->load(['client', 'owner', 'owningWorkspace', 'billingWorkspace', 'sourceImprovementOutput.improvement.project', 'members.user', 'members.workspace']);
         $aiRequests = $project->aiRequests()->with(['requester', 'proposal', 'attachments'])->limit(10)->get();
@@ -240,6 +241,9 @@ class ProjectController extends Controller
             'pendingAiProposalCount' => $pendingAiProposalCount,
             'pendingAiProposals' => $pendingAiProposals,
             'scheduleIntegrity' => $scheduleIntegrity,
+            'internalNotes' => $canViewInternalNotes ? $project->internalNotes()->with('user')->limit(50)->get() : collect(),
+            'canViewInternalNotes' => $canViewInternalNotes,
+            'canCreateInternalNote' => $canViewInternalNotes && Gate::allows('update', $project),
         ]);
     }
 
@@ -247,7 +251,6 @@ class ProjectController extends Controller
     {
         Gate::authorize('view', $project);
 
-        $scope = $request->input('scope') === 'all' ? 'all' : 'client';
         $showTasks = $request->boolean('show_tasks', true);
         $showProgress = $request->boolean('show_progress', true);
 
@@ -255,20 +258,13 @@ class ProjectController extends Controller
         $roadmaps = $project->roadmaps()
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->with(['improvements' => function ($query) use ($scope): void {
-                if ($scope === 'client') {
-                    $query->where('visibility', Improvement::VISIBILITY_CLIENT);
-                }
+            ->with(['improvements' => function ($query): void {
                 $query->orderBy('roadmap_sort_order')->orderBy('id')->with(['tasks' => fn ($tasks) => $tasks->orderBy('planned_start_date')->orderBy('due_date')->orderBy('id')]);
             }])
             ->get();
-        if ($scope === 'client') {
-            $roadmaps = $roadmaps->filter(fn (Roadmap $roadmap) => $roadmap->improvements->isNotEmpty())->values();
-        }
 
         $unclassifiedImprovements = $project->improvements()
             ->whereNull('roadmap_id')
-            ->when($scope === 'client', fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
             ->orderBy('planned_start_date')
             ->orderBy('id')
             ->with(['tasks' => fn ($tasks) => $tasks->orderBy('planned_start_date')->orderBy('due_date')->orderBy('id')])
@@ -287,7 +283,6 @@ class ProjectController extends Controller
             'improvementStatuses' => Improvement::statuses(),
             'roadmapStatuses' => Roadmap::statuses(),
             'documentOptions' => [
-                'scope' => $scope,
                 'show_tasks' => $showTasks,
                 'show_progress' => $showProgress,
                 'version' => trim((string) $request->input('version', '1.0')),

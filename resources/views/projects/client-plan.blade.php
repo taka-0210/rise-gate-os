@@ -108,7 +108,6 @@
 <form class="controls" method="GET" action="{{ route('projects.client-plan', $project) }}">
     <div class="controls-inner">
         <a class="button secondary" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">Projectへ戻る</a>
-        <label>掲載範囲<select name="scope"><option value="client" @selected($documentOptions['scope']==='client')>クライアント公開のみ</option><option value="all" @selected($documentOptions['scope']==='all')>すべて</option></select></label>
         <input type="hidden" name="show_tasks" value="0"><label class="check"><input type="checkbox" name="show_tasks" value="1" @checked($showTasks)>タスクを掲載</label>
         <input type="hidden" name="show_progress" value="0"><label class="check"><input type="checkbox" name="show_progress" value="1" @checked($showProgress)>進捗を掲載</label>
         <label>版番号<input name="version" value="{{ $documentOptions['version'] }}"></label>
@@ -146,7 +145,6 @@
             <div class="stat"><strong>{{ $visibleImprovements->count() }}</strong>取り組み</div>
             <div class="stat"><strong>{{ $visibleTasks->count() }}</strong>タスク</div>
         </div>
-        @if ($documentOptions['scope'] === 'client')<p class="notice">本資料には「クライアント公開」に設定された取り組みと、その配下のタスクを掲載しています。</p>@endif
         <div class="roadmap-overview">
             @forelse ($roadmaps as $roadmap)
                 <article>
