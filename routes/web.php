@@ -19,6 +19,7 @@ use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdm
 use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
 use App\Http\Controllers\SystemAdmin\WorkspaceController as SystemAdminWorkspaceController;
 use App\Http\Controllers\Workspace\WorkspaceController;
+use App\Http\Controllers\Workspace\WorkspaceBusinessProfileController;
 use App\Http\Controllers\WorkspaceAiSettingController;
 use Illuminate\Support\Facades\Route;
 
@@ -70,10 +71,14 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::delete('/ai-connections/{aiAccessKey}', [AiConnectionController::class, 'destroy'])->name('ai-connections.destroy');
         Route::get('/ai-settings', [WorkspaceAiSettingController::class, 'edit'])->name('ai-settings.edit');
         Route::put('/ai-settings', [WorkspaceAiSettingController::class, 'update'])->name('ai-settings.update');
+        Route::get('/workspace-business-profile', [WorkspaceBusinessProfileController::class, 'edit'])->name('workspace-business-profile.edit');
+        Route::put('/workspace-business-profile', [WorkspaceBusinessProfileController::class, 'update'])->name('workspace-business-profile.update');
+        Route::get('/workspace-business-profile/media/{type}', [WorkspaceBusinessProfileController::class, 'media'])->name('workspace-business-profile.media');
         Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::get('/projects/schedule', [ProjectController::class, 'schedule'])->name('projects.schedule');
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::get('/projects/{project}/client-plan', [ProjectController::class, 'clientPlan'])->name('projects.client-plan');
+        Route::get('/projects/{project}/business-media/{type}', [WorkspaceBusinessProfileController::class, 'projectMedia'])->name('projects.business-media');
         Route::post('/projects/{project}/internal-notes', [ProjectInternalNoteController::class, 'store'])->name('projects.internal-notes.store');
         Route::delete('/projects/{project}/internal-notes/{internalNote}', [ProjectInternalNoteController::class, 'destroy'])->name('projects.internal-notes.destroy');
         Route::get('/projects/{project}/internal-notes/{internalNote}/attachments/{attachment}/view', [ProjectInternalNoteController::class, 'view'])->name('projects.internal-notes.attachments.view');

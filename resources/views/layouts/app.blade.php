@@ -296,6 +296,7 @@
                     <a href="{{ route('projects.index') }}">Projects</a>
                     <a href="{{ route('ai-connections.index') }}">AI接続</a>
                     <a href="{{ route('ai-settings.edit') }}">AI設定</a>
+                    <a href="{{ route('workspace-business-profile.edit') }}">事業者情報</a>
                     <a href="{{ route('workspaces.index') }}">Workspaces</a>
                     @if (auth()->user()->is_system_admin)
                         <a href="{{ route('system-admin.login') }}">System Admin Login</a>

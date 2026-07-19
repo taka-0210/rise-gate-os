@@ -20,6 +20,8 @@
         .sheet { position:relative; min-height:190mm; margin-bottom:22px; padding:17mm; background:#fff; box-shadow:0 8px 30px rgba(28,50,64,.10); }
         .cover { min-height:190mm; display:flex; flex-direction:column; justify-content:space-between; border-top:9px solid var(--navy); }
         .logo { width:205px; height:auto; }
+        .issuer-name { color:var(--navy); font-size:23px; font-weight:900; }
+        .issuer-details { margin-top:8px; color:var(--muted); font-size:12px; line-height:1.6; }
         .eyebrow { margin-top:24mm; color:var(--blue); font-weight:800; letter-spacing:.12em; }
         h1 { margin:8px 0 12px; font-size:38px; line-height:1.25; }
         h2 { margin:0 0 18px; padding-bottom:9px; border-bottom:2px solid var(--navy); font-size:24px; }
@@ -81,6 +83,8 @@
 </head>
 <body>
 @php
+    $businessProfile = $project->owningWorkspace->businessProfile;
+    $issuerName = $businessProfile?->trade_name ?: ($businessProfile?->legal_name ?: $project->owningWorkspace->name);
     $showTasks = $documentOptions['show_tasks'];
     $showProgress = $documentOptions['show_progress'];
     $periodText = ($project->start_date?->format('Y年n月j日') ?? '未設定').' 〜 '.($project->due_date?->format('Y年n月j日') ?? '未設定');
@@ -121,7 +125,18 @@
 <main class="document">
     <section class="sheet cover">
         <div>
-            <img class="logo" src="{{ asset('images/rise-gate-os-logo.png') }}" alt="RISE GATE OS">
+            @if($businessProfile?->logo_path)
+                <img class="logo" src="{{ route('projects.business-media', [$project, 'logo']) }}" alt="{{ $issuerName }}">
+            @else
+                <div class="issuer-name">{{ $issuerName }}</div>
+            @endif
+            @if($businessProfile)
+                <div class="issuer-details">
+                    @if($businessProfile->legal_name && $businessProfile->legal_name !== $issuerName)<div>{{ $businessProfile->legal_name }}</div>@endif
+                    @if($businessProfile->postal_code || $businessProfile->address_line1)<div>〒{{ $businessProfile->postal_code }} {{ $businessProfile->address_line1 }} {{ $businessProfile->address_line2 }}</div>@endif
+                    @if($businessProfile->phone)<div>TEL {{ $businessProfile->phone }}</div>@endif
+                </div>
+            @endif
             <div class="eyebrow">PROJECT IMPLEMENTATION PLAN</div>
             <h1>プロジェクト実施計画書</h1>
             <p class="cover-client">{{ $project->client?->name ?? 'クライアント未設定' }} 御中</p>
@@ -133,7 +148,7 @@
             <dt>作成者</dt><dd>{{ $documentOptions['prepared_by'] ?: '未設定' }}</dd>
             <dt>版番号</dt><dd>Ver. {{ $documentOptions['version'] ?: '1.0' }}</dd>
         </dl>
-        <span class="confidential">RISE GATE OS / Confidential</span>
+        <span class="confidential">{{ $issuerName }} / Confidential</span>
     </section>
 
     <section class="sheet">
@@ -156,7 +171,7 @@
                 <p>掲載対象のロードマップはありません。</p>
             @endforelse
         </div>
-        <span class="confidential">RISE GATE OS / Confidential</span>
+        <span class="confidential">{{ $issuerName }} / Confidential</span>
     </section>
 
     <section class="sheet">
@@ -172,7 +187,7 @@
                 <div class="schedule-row {{ $row['type'] }}"><div class="schedule-label"><strong>{{ $row['title'] }}</strong></div><div class="schedule-track">@if($row['start']&&$row['end'])<span class="schedule-bar {{ $row['type'] }}" style="left:{{ $left }}%;width:{{ $width }}%"></span>@endif</div></div>
             @endforeach
         </div>
-        <span class="confidential">RISE GATE OS / Confidential</span>
+        <span class="confidential">{{ $issuerName }} / Confidential</span>
     </section>
 
     <section class="sheet">
@@ -196,7 +211,7 @@
         @empty
             <p>掲載対象のロードマップはありません。</p>
         @endforelse
-        <span class="confidential">RISE GATE OS / Confidential</span>
+        <span class="confidential">{{ $issuerName }} / Confidential</span>
     </section>
 </main>
 </body>

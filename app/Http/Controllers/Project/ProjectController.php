@@ -317,7 +317,7 @@ class ProjectController extends Controller
         $showTasks = $request->boolean('show_tasks', true);
         $showProgress = $request->boolean('show_progress', true);
 
-        $project->load(['client', 'owner', 'owningWorkspace']);
+        $project->load(['client', 'owner', 'owningWorkspace.businessProfile', 'owningWorkspace.bankAccounts']);
         $roadmaps = $project->roadmaps()
             ->orderBy('sort_order')
             ->orderBy('id')

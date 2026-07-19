@@ -75,4 +75,14 @@ class Workspace extends Model
     {
         return $this->hasOne(WorkspaceAiSetting::class);
     }
+
+    public function businessProfile(): HasOne
+    {
+        return $this->hasOne(WorkspaceBusinessProfile::class);
+    }
+
+    public function bankAccounts(): HasMany
+    {
+        return $this->hasMany(WorkspaceBankAccount::class)->orderByDesc('is_default')->orderBy('sort_order');
+    }
 }
