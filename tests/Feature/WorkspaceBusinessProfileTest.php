@@ -85,6 +85,18 @@ class WorkspaceBusinessProfileTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_document_center_has_a_clear_link_to_the_business_profile(): void
+    {
+        [$user, $workspace] = $this->workspace('owner');
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
+            ->get(route('documents.index'))
+            ->assertOk()
+            ->assertSee('事業者情報を設定')
+            ->assertSee(route('workspace-business-profile.edit'), false);
+    }
+
     public function test_company_profile_can_be_saved_before_optional_bank_account_is_entered(): void
     {
         [$user, $workspace] = $this->workspace('owner');
