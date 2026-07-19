@@ -37,6 +37,22 @@
         @media (max-width:760px) { .proposal-impact-grid { grid-template-columns:1fr; } }
     </style>
     <section class="panel stack">
+        @if ($errors->any())
+            <div class="card stack" role="alert" style="border:2px solid #c65a46;background:#fff7f5;">
+                <div>
+                    <div class="eyebrow" style="color:#a33f2d;">反映できませんでした</div>
+                    <h2>日程または提案内容を確認してください</h2>
+                </div>
+                <ul style="margin:0;">
+                    @foreach ($errors->all() as $error)
+                        @foreach (preg_split('/\R/u', $error) as $line)
+                            @if (trim($line) !== '')<li>{{ $line }}</li>@endif
+                        @endforeach
+                    @endforeach
+                </ul>
+                <p class="meta">データは変更されていません。表示された内容を直したあと、もう一度承認できます。</p>
+            </div>
+        @endif
         <div>
             <div class="eyebrow">AI提案・{{ $statuses[$proposal->status] ?? $proposal->status }}</div>
             <h1>{{ $proposal->title }}</h1>
