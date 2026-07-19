@@ -121,7 +121,7 @@ class AiRequestController extends Controller
             }
         }
 
-        $copyText = "RISE GATE OSにAI依頼「{$aiRequest->title}」を登録しました。"
+        $copyText = "RISE GATE OSのプロジェクト「{$project->name}」にAI依頼「{$aiRequest->title}」を登録しました。"
             .'未処理のAI依頼を確認し、この依頼を進めてください。';
 
         return back()->with([

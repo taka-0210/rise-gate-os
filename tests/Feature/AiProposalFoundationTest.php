@@ -65,8 +65,9 @@ class AiProposalFoundationTest extends TestCase
                 'instructions' => '登録済みの計画を確認して作業してください。',
             ])
             ->assertRedirect(route('projects.show', $project))
-            ->assertSessionHas('ai_request_copy_text', function (string $text): bool {
-                return str_contains($text, '見積機能の続きを進める')
+            ->assertSessionHas('ai_request_copy_text', function (string $text) use ($project): bool {
+                return str_contains($text, "プロジェクト「{$project->name}」")
+                    && str_contains($text, '見積機能の続きを進める')
                     && str_contains($text, '未処理のAI依頼を確認');
             });
     }
