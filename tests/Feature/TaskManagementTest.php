@@ -215,6 +215,42 @@ class TaskManagementTest extends TestCase
             ->assertDontSee('id="time-today-toggle" type="checkbox" checked', false);
     }
 
+    public function test_time_view_orders_roadmaps_by_planned_start_instead_of_registration_order(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '後半工程',
+            'status' => Roadmap::STATUS_ACTIVE,
+            'sort_order' => 1,
+            'planned_start_date' => '2026-08-20',
+            'target_date' => '2026-08-31',
+            'created_by' => $owner->id,
+        ]);
+        Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '最初の工程',
+            'status' => Roadmap::STATUS_ACTIVE,
+            'sort_order' => 99,
+            'planned_start_date' => '2026-08-01',
+            'target_date' => '2026-08-10',
+            'created_by' => $owner->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => '0']))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'data-time-row-title="最初の工程"',
+                'data-time-row-title="後半工程"',
+            ], false);
+    }
+
     private function createProjectOwner(): array
     {
         $owner = User::factory()->create();

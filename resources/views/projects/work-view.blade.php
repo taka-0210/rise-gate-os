@@ -156,22 +156,36 @@
             }
             return [$start, $end];
         };
-        foreach ($roadmaps as $roadmap) {
-            $roadmapTasks = $roadmap->improvements->flatMap->tasks;
+        $timelineRoadmaps = $roadmaps->sortBy(fn ($roadmap) => [
+            $roadmap->planned_start_date?->timestamp ?? PHP_INT_MAX,
+            $roadmap->sort_order ?? PHP_INT_MAX,
+            $roadmap->id,
+        ])->values();
+        foreach ($timelineRoadmaps as $roadmap) {
+            $timelineImprovements = $roadmap->improvements->sortBy(fn ($improvement) => [
+                $improvement->planned_start_date?->timestamp ?? PHP_INT_MAX,
+                $improvement->roadmap_sort_order ?? PHP_INT_MAX,
+                $improvement->id,
+            ])->values();
+            $roadmapTasks = $timelineImprovements->flatMap->tasks;
             $roadmapStarts = $roadmapTasks->map(fn ($task) => $taskPeriod($task)[0])->filter();
             $roadmapEnds = $roadmapTasks->map(fn ($task) => $taskPeriod($task)[1])->filter();
             $roadmapHasPlan = $roadmap->planned_start_date && $roadmap->target_date;
             $roadmapStart = $roadmap->planned_start_date ?: $roadmapStarts->min();
             $roadmapEnd = $roadmap->target_date ?: $roadmapEnds->max();
             $timeRows->push(['type' => 'roadmap', 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $roadmap->reached_at]);
-            foreach ($roadmap->improvements as $improvement) {
+            foreach ($timelineImprovements as $improvement) {
                 $initiativeStarts = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[0])->filter();
                 $initiativeEnds = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[1])->filter();
                 $initiativeHasPlan = $improvement->planned_start_date && $improvement->target_date;
                 $initiativeStart = $improvement->planned_start_date ?: $initiativeStarts->min();
                 $initiativeEnd = $improvement->target_date ?: $initiativeEnds->max();
                 $timeRows->push(['type' => 'improvement', 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $improvement->completed_at]);
-                foreach ($improvement->tasks as $task) {
+                $timelineTasks = $improvement->tasks->sortBy(fn ($task) => [
+                    $task->due_date?->timestamp ?? PHP_INT_MAX,
+                    $task->id,
+                ])->values();
+                foreach ($timelineTasks as $task) {
                     [$taskStart, $taskEnd] = $taskPeriod($task);
                 $timeRows->push(['type' => 'task', 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null]);
                 }
@@ -330,7 +344,7 @@
                             $barWidth = ($barStart && $barEnd) ? max(.8, $barStart->diffInDays($barEnd) / $axisDays * 100) : 0;
                             $reachedLeft = $row['reached'] ? max(0, min(100, $axisStart->diffInDays($row['reached'], false) / $axisDays * 100)) : null;
                         @endphp
-                        <div class="time-row is-{{ $row['type'] }}">
+                        <div class="time-row is-{{ $row['type'] }}" data-time-row-title="{{ $row['title'] }}">
                             <div class="time-row-label"><span class="time-row-dot"></span><strong title="{{ $row['title'] }}">{{ $row['title'] }}</strong>@if ($row['status_label'] ?? null)<span class="time-row-status">{{ $row['status_label'] }}</span>@endif</div>
                             <div class="time-row-track">
                                 @if ($includeTodayInTimeline)<span class="time-today"></span>@endif
