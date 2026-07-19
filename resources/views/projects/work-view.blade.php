@@ -140,9 +140,13 @@
         $includeTodayInTimeline = request('include_today', '1') !== '0';
 
         $timeRows = collect();
-        $taskPeriod = function ($task) use ($project) {
+        $improvementPlanStarts = $roadmaps
+            ->flatMap(fn ($roadmap) => $roadmap->improvements)
+            ->mapWithKeys(fn ($improvement) => [$improvement->id => $improvement->planned_start_date]);
+        $taskPeriod = function ($task) use ($project, $improvementPlanStarts) {
             $end = ($task->completed_at ?: $task->due_date)?->copy()->startOfDay();
-            $start = $task->created_at?->copy()->startOfDay();
+            $start = $improvementPlanStarts->get($task->improvement_id)?->copy()->startOfDay()
+                ?: $task->created_at?->copy()->startOfDay();
             $projectStart = $project->start_date?->copy()->startOfDay();
             if ($projectStart && $start && $start->lt($projectStart)) {
                 $start = $projectStart->copy();
@@ -331,7 +335,7 @@
                             <div class="time-row-track">
                                 @if ($includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
-                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }}" style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}"></span>
+                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}"></span>
                                 @else
                                     <span class="time-unscheduled">{{ $barStart ? '期限未設定' : '日付未設定' }}</span>
                                 @endif
