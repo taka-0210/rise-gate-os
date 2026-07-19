@@ -18,14 +18,22 @@ class ScheduleIntegrityService
 
         $missing = collect();
         $invalid = collect();
+        $unverifiable = collect();
+        $entities = [
+            'missing' => collect(),
+            'invalid' => collect(),
+            'unverifiable' => collect(),
+        ];
 
         if (! $project->start_date || ! $project->due_date) {
             $missing->push('Projectの開始予定日または期限が未設定です。');
+            $entities['missing']->push('project:'.$project->id);
         }
 
         foreach ($project->roadmaps as $roadmap) {
             if (! $roadmap->planned_start_date || ! $roadmap->target_date) {
                 $missing->push("ロードマップ「{$roadmap->title}」の期間が未設定です。");
+                $entities['missing']->push('roadmap:'.$roadmap->id);
             } elseif ($project->start_date && $project->due_date && ! $this->within(
                 $roadmap->planned_start_date,
                 $roadmap->target_date,
@@ -33,11 +41,16 @@ class ScheduleIntegrityService
                 $project->due_date
             )) {
                 $invalid->push("ロードマップ「{$roadmap->title}」がProjectの期間外です。");
+                $entities['invalid']->push('roadmap:'.$roadmap->id);
+            } elseif (! $project->start_date || ! $project->due_date) {
+                $unverifiable->push("ロードマップ「{$roadmap->title}」はProjectの日程未設定により判定できません。");
+                $entities['unverifiable']->push('roadmap:'.$roadmap->id);
             }
 
             foreach ($roadmap->improvements as $improvement) {
                 if (! $improvement->planned_start_date || ! $improvement->target_date) {
                     $missing->push("取り組み「{$improvement->title}」の期間が未設定です。");
+                    $entities['missing']->push('improvement:'.$improvement->id);
                 } elseif ($roadmap->planned_start_date && $roadmap->target_date && ! $this->within(
                     $improvement->planned_start_date,
                     $improvement->target_date,
@@ -45,14 +58,23 @@ class ScheduleIntegrityService
                     $roadmap->target_date
                 )) {
                     $invalid->push("取り組み「{$improvement->title}」がロードマップの期間外です。");
+                    $entities['invalid']->push('improvement:'.$improvement->id);
+                } elseif (! $roadmap->planned_start_date || ! $roadmap->target_date) {
+                    $unverifiable->push("取り組み「{$improvement->title}」はロードマップの日程未設定により判定できません。");
+                    $entities['unverifiable']->push('improvement:'.$improvement->id);
                 }
 
                 foreach ($improvement->tasks as $task) {
                     if (! $task->due_date) {
                         $missing->push("タスク「{$task->title}」の期限が未設定です。");
+                        $entities['missing']->push('task:'.$task->id);
                     } elseif ($improvement->planned_start_date && $improvement->target_date
                         && ! $task->due_date->betweenIncluded($improvement->planned_start_date, $improvement->target_date)) {
                         $invalid->push("タスク「{$task->title}」の期限が取り組みの期間外です。");
+                        $entities['invalid']->push('task:'.$task->id);
+                    } elseif (! $improvement->planned_start_date || ! $improvement->target_date) {
+                        $unverifiable->push("タスク「{$task->title}」は取り組みの日程未設定により判定できません。");
+                        $entities['unverifiable']->push('task:'.$task->id);
                     }
                 }
             }
@@ -60,14 +82,26 @@ class ScheduleIntegrityService
 
         foreach ($project->improvements->whereNull('roadmap_id') as $improvement) {
             $missing->push("取り組み「{$improvement->title}」にロードマップが設定されていません。");
+            $entities['missing']->push('improvement:'.$improvement->id);
         }
+
+        $counts = fn (Collection $items) => collect(['project', 'roadmap', 'improvement', 'task'])
+            ->mapWithKeys(fn (string $type) => [$type => $items->unique()->filter(fn (string $key) => str_starts_with($key, $type.':'))->count()])
+            ->all();
 
         return [
             'status' => $invalid->isNotEmpty() ? self::STATUS_INVALID : ($missing->isNotEmpty() ? self::STATUS_MISSING : self::STATUS_OK),
-            'label' => $invalid->isNotEmpty() ? '再設定必要' : ($missing->isNotEmpty() ? '要確認' : '整合性OK'),
+            'label' => $invalid->isNotEmpty() ? '日程要再設定' : ($missing->isNotEmpty() ? '日程未設定' : '整合性OK'),
             'missing' => $missing->unique()->values(),
             'invalid' => $invalid->unique()->values(),
-            'issue_count' => $missing->unique()->count() + $invalid->unique()->count(),
+            'unverifiable' => $unverifiable->unique()->values(),
+            'entities' => collect($entities)->map(fn (Collection $items) => $items->unique()->values()),
+            'counts' => [
+                'missing' => $counts($entities['missing']),
+                'invalid' => $counts($entities['invalid']),
+                'unverifiable' => $counts($entities['unverifiable']),
+            ],
+            'issue_count' => $entities['missing']->merge($entities['invalid'])->merge($entities['unverifiable'])->unique()->count(),
         ];
     }
 

@@ -60,6 +60,8 @@
         .schedule-integrity.is-invalid { border-color:#c65a46; background:#fff7f5; }
         .schedule-integrity summary { cursor:pointer; font-weight:900; }
         .schedule-integrity ul { margin:12px 0 0; }
+        .schedule-counts { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+        .schedule-counts span { padding:4px 8px; border:1px solid currentColor; border-radius:999px; font-size:12px; }
         .ai-drawer-overlay { position:fixed; z-index:60; inset:0; border:0; background:rgba(20,30,38,.38); opacity:0; visibility:hidden; transition:opacity .2s ease,visibility .2s ease; }
         .ai-drawer { position:fixed; z-index:61; top:0; right:0; width:min(620px,92vw); height:100vh; padding:24px; overflow-y:auto; border-left:1px solid var(--line); background:#f8fafb; box-shadow:-14px 0 38px rgba(20,40,55,.18); transform:translateX(102%); visibility:hidden; transition:transform .24s ease,visibility .24s ease; }
         .ai-drawer.is-open { transform:translateX(0); visibility:visible; }
@@ -97,6 +99,9 @@
         .time-axis-date.is-last { right:4px; left:auto !important; transform:none; }
         .time-row { border-bottom:1px solid var(--line); }
         .time-row:last-child { border-bottom:0; }
+        .time-row.is-schedule-missing { background:#fff9e9; }
+        .time-row.is-schedule-invalid { background:#fff0ed; }
+        .time-row.is-schedule-unverifiable { background:#fff6dc; }
         .time-row-label { display:flex; align-items:center; gap:7px; min-width:0; }
         .time-row-label strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .time-row-status { flex:0 0 auto; padding:2px 6px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:10px; }
@@ -107,6 +112,12 @@
         .time-row.is-improvement .time-row-dot,.time-bar.is-improvement { background:#56a27e; }
         .time-row.is-task .time-row-dot,.time-bar.is-task { background:#b5523d; }
         .time-bar { position:absolute; top:13px; left:var(--bar-left); width:max(var(--bar-width),6px); height:18px; border-radius:999px; }
+        .time-bar.is-dragging { cursor:grabbing; opacity:.78; }
+        .time-resize-handle { position:absolute; z-index:2; top:-4px; width:10px; height:26px; border:2px solid #fff; border-radius:5px; background:#263f4d; cursor:ew-resize; box-shadow:0 1px 4px rgba(0,0,0,.25); }
+        .time-resize-handle.is-start { left:-4px; }
+        .time-resize-handle.is-end { right:-4px; }
+        .time-save-status { position:fixed; z-index:80; right:20px; bottom:20px; max-width:420px; padding:12px 16px; border-radius:8px; background:#263f4d; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2); }
+        .time-save-status.is-error { background:#a33f2d; }
         .time-bar.is-inferred { background:rgba(255,255,255,.72); border:2px dashed currentColor; }
         .time-bar.is-roadmap.is-inferred { color:#4f82c4; }
         .time-bar.is-improvement.is-inferred { color:#56a27e; }
@@ -144,6 +155,13 @@
         $includeTodayInTimeline = request('include_today', '1') !== '0';
 
         $timeRows = collect();
+        $scheduleIssueFor = function (string $type, int $id) use ($scheduleIntegrity): ?string {
+            $key = $type.':'.$id;
+            if ($scheduleIntegrity['entities']['invalid']->contains($key)) return 'invalid';
+            if ($scheduleIntegrity['entities']['missing']->contains($key)) return 'missing';
+            if ($scheduleIntegrity['entities']['unverifiable']->contains($key)) return 'unverifiable';
+            return null;
+        };
         $improvementPlanStarts = $roadmaps
             ->flatMap(fn ($roadmap) => $roadmap->improvements)
             ->mapWithKeys(fn ($improvement) => [$improvement->id => $improvement->planned_start_date]);
@@ -177,21 +195,21 @@
             $roadmapHasPlan = $roadmap->planned_start_date && $roadmap->target_date;
             $roadmapStart = $roadmap->planned_start_date ?: $roadmapStarts->min();
             $roadmapEnd = $roadmap->target_date ?: $roadmapEnds->max();
-            $timeRows->push(['type' => 'roadmap', 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $roadmap->reached_at]);
+            $timeRows->push(['type' => 'roadmap', 'id' => $roadmap->id, 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $roadmap->reached_at, 'schedule_issue' => $scheduleIssueFor('roadmap', $roadmap->id), 'editable' => Gate::allows('update', $roadmap), 'update_url' => route('projects.timeline.update', [$project, 'roadmap', $roadmap->id])]);
             foreach ($timelineImprovements as $improvement) {
                 $initiativeStarts = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[0])->filter();
                 $initiativeEnds = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[1])->filter();
                 $initiativeHasPlan = $improvement->planned_start_date && $improvement->target_date;
                 $initiativeStart = $improvement->planned_start_date ?: $initiativeStarts->min();
                 $initiativeEnd = $improvement->target_date ?: $initiativeEnds->max();
-                $timeRows->push(['type' => 'improvement', 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $improvement->completed_at]);
+                $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id])]);
                 $timelineTasks = $improvement->tasks->sortBy(fn ($task) => [
                     $task->due_date?->timestamp ?? PHP_INT_MAX,
                     $task->id,
                 ])->values();
                 foreach ($timelineTasks as $task) {
                     [$taskStart, $taskEnd] = $taskPeriod($task);
-                $timeRows->push(['type' => 'task', 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null]);
+                $timeRows->push(['type' => 'task', 'id' => $task->id, 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => false, 'overdue' => $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null, 'schedule_issue' => $scheduleIssueFor('task', $task->id), 'editable' => Gate::allows('update', $task) && $task->status !== \App\Models\Task::STATUS_DONE, 'update_url' => route('projects.timeline.update', [$project, 'task', $task->id])]);
                 }
             }
         }
@@ -238,14 +256,34 @@
 
         @if ($scheduleIntegrity['status'] !== \App\Services\ScheduleIntegrityService::STATUS_OK)
             <details class="schedule-integrity is-{{ $scheduleIntegrity['status'] }}">
-                <summary>{{ $scheduleIntegrity['label'] }}：日程の整合性に関する確認が{{ $scheduleIntegrity['issue_count'] }}件あります</summary>
+                <summary>{{ $scheduleIntegrity['label'] }}</summary>
                 @if ($scheduleIntegrity['invalid']->isNotEmpty())
-                    <h3>再設定が必要</h3>
+                    <h3>日程要再設定</h3>
+                    <div class="schedule-counts">
+                        <span>ロードマップ {{ $scheduleIntegrity['counts']['invalid']['roadmap'] }}</span>
+                        <span>取り組み {{ $scheduleIntegrity['counts']['invalid']['improvement'] }}</span>
+                        <span>タスク {{ $scheduleIntegrity['counts']['invalid']['task'] }}</span>
+                    </div>
                     <ul>@foreach ($scheduleIntegrity['invalid'] as $issue)<li>{{ $issue }}</li>@endforeach</ul>
                 @endif
                 @if ($scheduleIntegrity['missing']->isNotEmpty())
-                    <h3>日程の確認が必要</h3>
+                    <h3>日程未設定</h3>
+                    <div class="schedule-counts">
+                        <span>Project {{ $scheduleIntegrity['counts']['missing']['project'] }}</span>
+                        <span>ロードマップ {{ $scheduleIntegrity['counts']['missing']['roadmap'] }}</span>
+                        <span>取り組み {{ $scheduleIntegrity['counts']['missing']['improvement'] }}</span>
+                        <span>タスク {{ $scheduleIntegrity['counts']['missing']['task'] }}</span>
+                    </div>
                     <ul>@foreach ($scheduleIntegrity['missing'] as $issue)<li>{{ $issue }}</li>@endforeach</ul>
+                @endif
+                @if ($scheduleIntegrity['unverifiable']->isNotEmpty())
+                    <h3>親の日程未設定により判定できない項目</h3>
+                    <div class="schedule-counts">
+                        <span>ロードマップ {{ $scheduleIntegrity['counts']['unverifiable']['roadmap'] }}</span>
+                        <span>取り組み {{ $scheduleIntegrity['counts']['unverifiable']['improvement'] }}</span>
+                        <span>タスク {{ $scheduleIntegrity['counts']['unverifiable']['task'] }}</span>
+                    </div>
+                    <ul>@foreach ($scheduleIntegrity['unverifiable'] as $issue)<li>{{ $issue }}</li>@endforeach</ul>
                 @endif
             </details>
         @endif
@@ -362,12 +400,15 @@
                             $barWidth = ($barStart && $barEnd) ? max(.8, $barStart->diffInDays($barEnd) / $axisDays * 100) : 0;
                             $reachedLeft = $row['reached'] ? max(0, min(100, $axisStart->diffInDays($row['reached'], false) / $axisDays * 100)) : null;
                         @endphp
-                        <div class="time-row is-{{ $row['type'] }}" data-time-row-title="{{ $row['title'] }}">
+                        <div class="time-row is-{{ $row['type'] }} {{ $row['schedule_issue'] ? 'is-schedule-'.$row['schedule_issue'] : '' }}" data-time-row-title="{{ $row['title'] }}">
                             <div class="time-row-label"><span class="time-row-dot"></span><strong title="{{ $row['title'] }}">{{ $row['title'] }}</strong>@if ($row['status_label'] ?? null)<span class="time-row-status">{{ $row['status_label'] }}</span>@endif</div>
                             <div class="time-row-track">
                                 @if ($includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
-                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}"></span>
+                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $barStart->format('Y/m/d') }}〜{{ $barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
+                                        @if ($row['editable'] && $row['type'] !== 'task')<i class="time-resize-handle is-start" data-resize="start" title="開始日を変更"></i>@endif
+                                        @if ($row['editable'])<i class="time-resize-handle is-end" data-resize="end" title="{{ $row['type'] === 'task' ? '期限を変更' : '終了日を変更' }}"></i>@endif
+                                    </span>
                                 @else
                                     <span class="time-unscheduled">{{ $barStart ? '期限未設定' : '日付未設定' }}</span>
                                 @endif
@@ -506,6 +547,96 @@
     </section>
 
     <script>
+        (() => {
+            const chart = document.querySelector('.time-chart');
+            if (!chart) return;
+            const axisStart = new Date(`${chart.dataset.axisStart}T00:00:00`);
+            const axisEnd = new Date(`${chart.dataset.axisEnd}T00:00:00`);
+            const axisDays = Math.max(1, Math.round((axisEnd - axisStart) / 86400000));
+            const csrf = @json(csrf_token());
+            const parseDate = value => new Date(`${value}T00:00:00`);
+            const formatDate = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            const addDays = (date, days) => { const next = new Date(date); next.setDate(next.getDate() + days); return next; };
+            const notify = (message, error = false) => {
+                document.querySelector('.time-save-status')?.remove();
+                const status = document.createElement('div');
+                status.className = `time-save-status${error ? ' is-error' : ''}`;
+                status.textContent = message;
+                document.body.append(status);
+                setTimeout(() => status.remove(), 5000);
+            };
+
+            document.querySelectorAll('.time-resize-handle').forEach(handle => {
+                handle.addEventListener('pointerdown', event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const bar = handle.closest('.time-bar');
+                    const track = bar.closest('.time-row-track');
+                    const side = handle.dataset.resize;
+                    const originalStart = parseDate(bar.dataset.barStart);
+                    const originalEnd = parseDate(bar.dataset.barEnd);
+                    const originX = event.clientX;
+                    let nextStart = new Date(originalStart);
+                    let nextEnd = new Date(originalEnd);
+                    bar.classList.add('is-dragging');
+                    handle.setPointerCapture(event.pointerId);
+
+                    const move = moveEvent => {
+                        const dayDelta = Math.round((moveEvent.clientX - originX) / track.clientWidth * axisDays);
+                        if (side === 'start') {
+                            nextStart = addDays(originalStart, dayDelta);
+                            if (nextStart > nextEnd) nextStart = new Date(nextEnd);
+                        } else {
+                            nextEnd = addDays(originalEnd, dayDelta);
+                            if (nextEnd < nextStart) nextEnd = new Date(nextStart);
+                        }
+                        const left = Math.max(0, Math.min(100, (nextStart - axisStart) / 86400000 / axisDays * 100));
+                        const width = Math.max(.8, (nextEnd - nextStart) / 86400000 / axisDays * 100);
+                        bar.style.setProperty('--bar-left', `${left}%`);
+                        bar.style.setProperty('--bar-width', `${width}%`);
+                        bar.title = `${formatDate(nextStart)}〜${formatDate(nextEnd)}`;
+                    };
+
+                    const finish = async () => {
+                        handle.removeEventListener('pointermove', move);
+                        handle.removeEventListener('pointerup', finish);
+                        handle.removeEventListener('pointercancel', cancel);
+                        bar.classList.remove('is-dragging');
+                        try {
+                            const response = await fetch(bar.dataset.scheduleUrl, {
+                                method: 'PATCH',
+                                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf},
+                                body: JSON.stringify({start_date: formatDate(nextStart), end_date: formatDate(nextEnd)}),
+                            });
+                            const body = await response.json();
+                            if (!response.ok) {
+                                const message = Object.values(body.errors || {}).flat()[0] || body.message || '日程を保存できませんでした。';
+                                throw new Error(message);
+                            }
+                            notify('日程を更新しました。整合性を再確認しています。');
+                            window.location.reload();
+                        } catch (error) {
+                            bar.style.removeProperty('--bar-left');
+                            bar.style.removeProperty('--bar-width');
+                            bar.title = `${formatDate(originalStart)}〜${formatDate(originalEnd)}`;
+                            notify(error.message, true);
+                        }
+                    };
+                    const cancel = () => {
+                        handle.removeEventListener('pointermove', move);
+                        handle.removeEventListener('pointerup', finish);
+                        handle.removeEventListener('pointercancel', cancel);
+                        bar.classList.remove('is-dragging');
+                        bar.style.removeProperty('--bar-left');
+                        bar.style.removeProperty('--bar-width');
+                    };
+                    handle.addEventListener('pointermove', move);
+                    handle.addEventListener('pointerup', finish);
+                    handle.addEventListener('pointercancel', cancel);
+                });
+            });
+        })();
+
         (() => {
             const toggle = document.getElementById('time-today-toggle');
             if (!toggle) return;

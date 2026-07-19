@@ -55,11 +55,39 @@ class ScheduleIntegrityTest extends TestCase
         $result = app(ScheduleIntegrityService::class)->inspect($project->fresh());
         $this->assertSame(ScheduleIntegrityService::STATUS_INVALID, $result['status']);
         $this->assertTrue($result['invalid']->contains(fn (string $issue) => str_contains($issue, '既存の期間外タスク')));
+        $this->assertSame(1, $result['counts']['invalid']['task']);
 
         $improvement->update(['planned_start_date' => null, 'target_date' => null]);
-        Task::where('project_id', $project->id)->delete();
         $result = app(ScheduleIntegrityService::class)->inspect($project->fresh());
         $this->assertSame(ScheduleIntegrityService::STATUS_MISSING, $result['status']);
+        $this->assertSame(1, $result['counts']['missing']['improvement']);
+        $this->assertSame(1, $result['counts']['unverifiable']['task']);
+    }
+
+    public function test_timeline_drag_endpoint_can_correct_an_existing_invalid_task(): void
+    {
+        [$user, $workspace, $project, $roadmap, $improvement] = $this->scheduledProject();
+        $task = Task::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'improvement_id' => $improvement->id,
+            'title' => 'ドラッグで直すタスク',
+            'status' => Task::STATUS_TODO,
+            'priority' => Task::PRIORITY_NORMAL,
+            'due_date' => '2026-08-20',
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.timeline.update', [$project, 'task', $task->id]), [
+                'end_date' => '2026-08-10',
+            ])
+            ->assertOk()
+            ->assertJsonPath('integrity.status', ScheduleIntegrityService::STATUS_OK);
+
+        $this->assertSame('2026-08-10', $task->fresh()->due_date->toDateString());
     }
 
     private function scheduledProject(): array

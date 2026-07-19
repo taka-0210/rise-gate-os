@@ -210,7 +210,7 @@ class TaskManagementTest extends TestCase
             ->assertOk()
             ->assertSee('data-axis-start="'.$projectStart->copy()->subDays(2)->toDateString().'"', false)
             ->assertSee('data-axis-end="'.$projectEnd->copy()->addDays(2)->toDateString().'"', false)
-            ->assertSee('class="time-bar is-task  " data-bar-start="'.$improvementStart->toDateString().'"', false)
+            ->assertSee('data-bar-start="'.$improvementStart->toDateString().'"', false)
             ->assertDontSee('<span class="time-today">', false)
             ->assertDontSee('id="time-today-toggle" type="checkbox" checked', false);
     }

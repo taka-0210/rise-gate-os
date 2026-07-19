@@ -112,7 +112,7 @@
                                 <p class="project-client">{{ $project->client?->name ?? 'クライアント未設定' }} / {{ $statuses[$project->status] ?? $project->status }} / {{ $priorities[$project->priority] ?? $project->priority }}</p>
                                 @php($integrity = $scheduleIntegrity[$project->id])
                                 @if ($integrity['status'] !== \App\Services\ScheduleIntegrityService::STATUS_OK)
-                                    <span class="schedule-badge is-{{ $integrity['status'] }}">{{ $integrity['label'] }}・{{ $integrity['issue_count'] }}件</span>
+                                    <span class="schedule-badge is-{{ $integrity['status'] }}">{{ $integrity['label'] }}</span>
                                 @endif
                                 @php($sourceImprovement = $project->sourceImprovementOutput?->improvement)
                                 @if ($project->sourceImprovementOutput)

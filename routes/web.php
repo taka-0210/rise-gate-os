@@ -13,6 +13,7 @@ use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\RoadmapController;
 use App\Http\Controllers\Project\TaskController;
+use App\Http\Controllers\Project\TimelineScheduleController;
 use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdminSessionController;
 use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
 use App\Http\Controllers\SystemAdmin\WorkspaceController as SystemAdminWorkspaceController;
@@ -86,6 +87,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'assignImprovement'])->name('projects.improvements.roadmap.assign');
         Route::delete('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'removeImprovement'])->name('projects.improvements.roadmap.remove');
         Route::resource('projects.tasks', TaskController::class)->only(['store', 'show', 'edit', 'update']);
+        Route::patch('/projects/{project}/timeline/{type}/{entity}', [TimelineScheduleController::class, 'update'])->name('projects.timeline.update');
         Route::post('/projects/{project}/improvements/{improvement}/outputs/tasks', [ImprovementOutputController::class, 'storeTask'])->name('projects.improvements.outputs.tasks.store');
         Route::post('/projects/{project}/improvements/{improvement}/outputs/projects', [ImprovementOutputController::class, 'storeProject'])->name('projects.improvements.outputs.projects.store');
         Route::post('/projects/{project}/members', [ProjectMemberController::class, 'store'])->name('projects.members.store');
