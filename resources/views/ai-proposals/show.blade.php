@@ -147,7 +147,7 @@
                             <button class="secondary" type="submit">伝えた！</button>
                         </form>
                     @else
-                        <span class="badge">{{ $proposal->handed_off_at->format('Y/m/d H:i') }} 伝達済み</span>
+                        <span class="badge">{{ $proposal->handed_off_at->timezone(config('app.display_timezone'))->format('Y/m/d H:i') }} 伝達済み</span>
                     @endif
                     <span class="meta" data-copy-proposal-result aria-live="polite"></span>
                 </div>

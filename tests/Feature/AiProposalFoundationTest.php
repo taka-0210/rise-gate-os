@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -331,6 +332,8 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee("プロジェクト「{$project->name}」", false)
             ->assertSee('現在のプロジェクト計画を確認し、承認内容に基づく次の作業を開始してください。');
 
+        Carbon::setTestNow('2026-07-20 12:34:00 UTC');
+
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.ai-proposals.handoff', [$project, $proposal]))
@@ -343,7 +346,10 @@ class AiProposalFoundationTest extends TestCase
         $this->get(route('projects.ai-proposals.show', [$project, $proposal]))
             ->assertOk()
             ->assertSee('Codexへ伝達済み')
+            ->assertSee('2026/07/20 21:34')
             ->assertSee('伝達済み');
+
+        Carbon::setTestNow();
     }
 
     public function test_invalid_proposal_cannot_be_applied(): void
