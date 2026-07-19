@@ -73,7 +73,9 @@ class EstimateFoundationTest extends TestCase
             ->assertSee('給与計算システムの要件定義')
             ->assertSee('@page{size:A4 portrait;margin:12mm 14mm}', false)
             ->assertSee('display:table-header-group', false)
-            ->assertSee('break-inside:avoid', false);
+            ->assertSee('break-inside:avoid', false)
+            ->assertSee('class="print-blank-row"', false)
+            ->assertSee('height:9mm', false);
     }
 
     public function test_estimate_cannot_be_viewed_from_another_current_workspace(): void
