@@ -85,4 +85,9 @@ class Workspace extends Model
     {
         return $this->hasMany(WorkspaceBankAccount::class)->orderByDesc('is_default')->orderBy('sort_order');
     }
+
+    public function estimates(): HasMany
+    {
+        return $this->hasMany(Estimate::class);
+    }
 }

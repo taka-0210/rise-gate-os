@@ -354,6 +354,7 @@
                     </div>
                 </div>
                 <div class="focus-view-switch">
+                    <a href="{{ route('projects.estimates.create', $project) }}">帳票</a>
                     <button type="button" class="focus-ai-trigger" data-ai-drawer-open aria-controls="ai-assistant-drawer" aria-expanded="false">
                         AIアシスタント
                         @if ($pendingAiProposalCount > 0)<span class="focus-ai-count" aria-label="承認待ち {{ $pendingAiProposalCount }}件">{{ $pendingAiProposalCount }}</span>@endif

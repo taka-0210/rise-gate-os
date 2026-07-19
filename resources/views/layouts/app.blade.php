@@ -294,6 +294,7 @@
                     @endisset
                     <a href="{{ route('clients.index') }}">Clients</a>
                     <a href="{{ route('projects.index') }}">Projects</a>
+                    <a href="{{ route('documents.index') }}">帳票管理</a>
                     <a href="{{ route('ai-connections.index') }}">AI接続</a>
                     <a href="{{ route('ai-settings.edit') }}">AI設定</a>
                     <a href="{{ route('workspace-business-profile.edit') }}">事業者情報</a>

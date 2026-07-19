@@ -5,6 +5,8 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Client\ClientController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\EstimateController;
 use App\Http\Controllers\Project\AiProposalController;
 use App\Http\Controllers\Project\AiRequestController;
 use App\Http\Controllers\Project\ImprovementController;
@@ -66,6 +68,13 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
 
     Route::middleware(['workspace-mode', 'workspace'])->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
+        Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
+        Route::get('/estimates', [EstimateController::class, 'index'])->name('estimates.index');
+        Route::get('/projects/{project}/estimates/create', [EstimateController::class, 'create'])->name('projects.estimates.create');
+        Route::post('/projects/{project}/estimates', [EstimateController::class, 'store'])->name('projects.estimates.store');
+        Route::get('/estimates/{estimate}', [EstimateController::class, 'show'])->name('estimates.show');
+        Route::post('/estimates/{estimate}/duplicate', [EstimateController::class, 'duplicate'])->name('estimates.duplicate');
+        Route::get('/estimates/{estimate}/media/{type}', [EstimateController::class, 'media'])->name('estimates.media');
         Route::get('/ai-connections', [AiConnectionController::class, 'index'])->name('ai-connections.index');
         Route::post('/ai-connections', [AiConnectionController::class, 'store'])->name('ai-connections.store');
         Route::delete('/ai-connections/{aiAccessKey}', [AiConnectionController::class, 'destroy'])->name('ai-connections.destroy');
