@@ -8,6 +8,7 @@ use App\Models\AiRequest;
 use App\Models\Improvement;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\ProjectInternalNoteAttachment;
 use App\Models\ProjectMember;
 use App\Models\Roadmap;
 use App\Models\Task;
@@ -50,6 +51,82 @@ class AiProposalFoundationTest extends TestCase
             ->get(route('projects.ai-requests.attachments.download', [$project, $aiRequest, $attachment]))
             ->assertOk()
             ->assertHeader('content-disposition');
+    }
+
+    public function test_selected_internal_note_and_its_file_are_snapshotted_into_ai_request(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectOwner('internal-note-ai');
+        $note = $project->internalNotes()->create([
+            'user_id' => $user->id,
+            'body' => '給与計算の締日は毎月末日です。',
+        ]);
+        Storage::disk('local')->put('project-internal-notes/source/format.csv', "name,amount\nA,1000");
+        ProjectInternalNoteAttachment::create([
+            'project_internal_note_id' => $note->id,
+            'project_id' => $project->id,
+            'uploaded_by' => $user->id,
+            'original_name' => '給与形式.csv',
+            'stored_path' => 'project-internal-notes/source/format.csv',
+            'mime_type' => 'text/csv',
+            'extension' => 'csv',
+            'size_bytes' => 18,
+            'sha256' => hash('sha256', "name,amount\nA,1000"),
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-requests.store', $project), [
+                'title' => '社内資料を参照して計画して',
+                'instructions' => 'ロードマップを提案してください。',
+                'internal_note_ids' => [$note->id],
+            ])->assertRedirect();
+
+        $aiRequest = AiRequest::with('attachments')->firstOrFail();
+        $this->assertStringContainsString('給与計算の締日は毎月末日です。', $aiRequest->instructions);
+        $this->assertStringContainsString('給与形式.csv', $aiRequest->instructions);
+        $this->assertCount(1, $aiRequest->attachments);
+        $snapshot = $aiRequest->attachments->first();
+        $this->assertNotSame('project-internal-notes/source/format.csv', $snapshot->stored_path);
+        Storage::disk('local')->assertExists($snapshot->stored_path);
+    }
+
+    public function test_internal_note_image_is_private_and_viewable_only_by_internal_members(): void
+    {
+        Storage::fake('local');
+        [$owner, $workspace, $project] = $this->projectOwner('private-note-file');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.internal-notes.store', $project), [
+                'body' => '社内確認用の画像です。',
+                'attachments' => [UploadedFile::fake()->image('internal-board.jpg')],
+            ])->assertRedirect();
+
+        $note = $project->internalNotes()->firstOrFail();
+        $attachment = $note->attachments()->firstOrFail();
+        Storage::disk('local')->assertExists($attachment->stored_path);
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.internal-notes.attachments.view', [$project, $note, $attachment]))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg');
+
+        $client = User::factory()->create();
+        $project->organization->users()->attach($client->id, ['role' => 'member', 'joined_at' => now()]);
+        $workspace->users()->attach($client->id, ['role' => 'member', 'joined_at' => now()]);
+        ProjectMember::create([
+            'project_id' => $project->id,
+            'user_id' => $client->id,
+            'workspace_id' => $workspace->id,
+            'project_role' => ProjectMember::ROLE_CLIENT,
+            'permission_level' => ProjectMember::PERMISSION_VIEW,
+            'status' => ProjectMember::STATUS_ACTIVE,
+        ]);
+        $this->actingAs($client)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.internal-notes.attachments.view', [$project, $note, $attachment]))
+            ->assertForbidden();
     }
 
     public function test_project_member_can_view_pending_ai_proposal_without_changing_project_data(): void

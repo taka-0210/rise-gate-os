@@ -241,7 +241,7 @@ class ProjectController extends Controller
             'pendingAiProposalCount' => $pendingAiProposalCount,
             'pendingAiProposals' => $pendingAiProposals,
             'scheduleIntegrity' => $scheduleIntegrity,
-            'internalNotes' => $canViewInternalNotes ? $project->internalNotes()->with('user')->limit(50)->get() : collect(),
+            'internalNotes' => $canViewInternalNotes ? $project->internalNotes()->with(['user', 'attachments'])->limit(50)->get() : collect(),
             'canViewInternalNotes' => $canViewInternalNotes,
             'canCreateInternalNote' => $canViewInternalNotes && Gate::allows('update', $project),
         ]);

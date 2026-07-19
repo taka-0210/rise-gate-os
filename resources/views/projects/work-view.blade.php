@@ -55,6 +55,16 @@
         .internal-note-list { display:grid; gap:9px; }
         .internal-note { padding:12px 14px; border:1px solid #d5d9dd; border-radius:8px; background:#fff; }
         .internal-note p { margin:5px 0 0; white-space:pre-wrap; }
+        .internal-attachments { display:flex; flex-wrap:wrap; gap:8px; margin-top:9px; }
+        .internal-attachment { display:inline-flex; align-items:center; gap:7px; padding:7px 9px; border:1px solid var(--line); border-radius:7px; background:#f8fafb; font-size:12px; }
+        .internal-attachment-image { padding:0; border:0; background:transparent; color:var(--accent-dark); }
+        .internal-image-viewer { position:fixed; z-index:100; inset:0; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(8,16,22,.86); }
+        .internal-image-viewer.is-open { display:flex; }
+        .internal-image-viewer img { max-width:min(1200px,94vw); max-height:88vh; border-radius:8px; background:#fff; box-shadow:0 15px 60px rgba(0,0,0,.45); }
+        .internal-image-viewer button { position:absolute; top:18px; right:18px; width:44px; height:44px; padding:0; border-radius:999px; background:#fff; color:#17202a; font-size:25px; }
+        .internal-ai-references { display:grid; gap:7px; padding:12px; border:1px solid #cfd8de; border-radius:8px; background:#f8fafb; }
+        .internal-ai-references label { display:flex; align-items:flex-start; gap:8px; font-weight:400; }
+        .internal-ai-references input { width:auto; margin-top:4px; }
         .focus-view-switch { display:flex; align-items:center; gap:5px; margin-left:auto; }
         .focus-view-switch a,.focus-view-switch button { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:inherit; text-decoration:none; white-space:nowrap; }
         .focus-view-switch a.is-current { background:var(--accent-dark); color:#fff; }
@@ -418,6 +428,18 @@
                             <input id="ai_request_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx">
                             <div class="meta">画像、PDF、Excel、CSV、Wordに対応。資料は非公開領域へ保存されます。</div>
                         </div>
+                        @if ($canViewInternalNotes && $internalNotes->isNotEmpty())
+                            <div class="field">
+                                <label>AIに参照させる社内メモ・資料</label>
+                                <div class="internal-ai-references">
+                                    <div class="meta">必要なものだけ選択してください。選択した内容は、このAI依頼の参照履歴として保存されます。</div>
+                                    @foreach ($internalNotes as $internalNote)
+                                        <label><input type="checkbox" name="internal_note_ids[]" value="{{ $internalNote->id }}"><span>{{ Str::limit($internalNote->body ?: '添付資料のみ', 90) }}@if($internalNote->attachments->isNotEmpty())（資料 {{ $internalNote->attachments->count() }}件）@endif</span></label>
+                                    @endforeach
+                                </div>
+                                @error('internal_note_ids')<div class="error">{{ $message }}</div>@enderror
+                            </div>
+                        @endif
                         <div class="actions"><button type="submit">AIに提案を依頼</button></div>
                     </form>
                 </section>
@@ -634,9 +656,10 @@
                     <p>検討中の内容・懸念・相談事項を残す場所です。お客さま提出資料には一切掲載されません。</p>
                 </div>
                 @if ($canCreateInternalNote)
-                    <form class="stack" method="POST" action="{{ route('projects.internal-notes.store', $project) }}">
+                    <form class="stack" method="POST" action="{{ route('projects.internal-notes.store', $project) }}" enctype="multipart/form-data">
                         @csrf
-                        <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" required placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body')<div class="error">{{ $message }}</div>@enderror</div>
+                        <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body')<div class="error">{{ $message }}</div>@enderror</div>
+                        <div class="field"><label for="internal_note_attachments">画像・社内資料（最大5ファイル・各10MB）</label><input id="internal_note_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx"><div class="meta">画像、PDF、Excel、CSV、Wordに対応。ファイルは非公開領域へ保存されます。</div>@error('attachments')<div class="error">{{ $message }}</div>@enderror @error('attachments.*')<div class="error">{{ $message }}</div>@enderror</div>
                         <div class="actions"><button type="submit">社内メモを追加</button></div>
                     </form>
                 @endif
@@ -647,7 +670,18 @@
                                 <div class="meta">{{ $internalNote->user?->name ?? '不明' }} / {{ $internalNote->created_at->format('Y年n月j日 H:i') }}</div>
                                 @if ($canCreateInternalNote)<form method="POST" action="{{ route('projects.internal-notes.destroy', [$project, $internalNote]) }}" onsubmit="return confirm('この社内メモを削除しますか？')">@csrf @method('DELETE')<button type="submit" class="secondary">削除</button></form>@endif
                             </div>
-                            <p>{{ $internalNote->body }}</p>
+                            @if($internalNote->body)<p>{{ $internalNote->body }}</p>@endif
+                            @if($internalNote->attachments->isNotEmpty())
+                                <div class="internal-attachments">
+                                    @foreach($internalNote->attachments as $attachment)
+                                        @if($attachment->isImage())
+                                            <button type="button" class="internal-attachment internal-attachment-image" data-internal-image="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-image-name="{{ $attachment->original_name }}">🖼 {{ $attachment->original_name }}</button>
+                                        @else
+                                            <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">📎 {{ $attachment->original_name }}（{{ number_format($attachment->size_bytes / 1024, 1) }}KB）</a>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
                         </article>
                     @empty
                         <p class="meta">社内メモはまだありません。</p>
@@ -655,6 +689,8 @@
                 </div>
             </section>
         @endif
+
+        <div class="internal-image-viewer" id="internal-image-viewer" aria-hidden="true"><button type="button" aria-label="画像を閉じる">×</button><img src="" alt=""></div>
 
         <div class="focus-footer">
             <section class="card stack">
@@ -891,6 +927,28 @@
             document.querySelectorAll('[data-ai-drawer-close]').forEach(trigger => trigger.addEventListener('click', () => setOpen(false)));
             document.addEventListener('keydown', event => { if (event.key === 'Escape') setOpen(false); });
             if (drawer.classList.contains('is-open')) document.body.style.overflow = 'hidden';
+        })();
+
+        (() => {
+            const viewer = document.getElementById('internal-image-viewer');
+            if (!viewer) return;
+            const image = viewer.querySelector('img');
+            const close = () => {
+                viewer.classList.remove('is-open');
+                viewer.setAttribute('aria-hidden', 'true');
+                image.removeAttribute('src');
+            };
+            document.addEventListener('click', event => {
+                const trigger = event.target.closest('[data-internal-image]');
+                if (!trigger) return;
+                image.src = trigger.dataset.internalImage;
+                image.alt = trigger.dataset.internalImageName || '社内資料の画像';
+                viewer.classList.add('is-open');
+                viewer.setAttribute('aria-hidden', 'false');
+            });
+            viewer.querySelector('button')?.addEventListener('click', close);
+            viewer.addEventListener('click', event => { if (event.target === viewer) close(); });
+            document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
         })();
 
         (() => {
