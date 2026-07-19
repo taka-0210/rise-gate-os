@@ -116,6 +116,13 @@ class AiProposalFoundationTest extends TestCase
         Storage::disk('local')->assertExists($csv->stored_path);
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertSee('画像を閲覧')
+            ->assertSee('PDFを閲覧')
+            ->assertSee('CSVを閲覧');
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.internal-notes.attachments.view', [$project, $note, $attachment]))
             ->assertOk()
             ->assertHeader('content-type', 'image/jpeg');

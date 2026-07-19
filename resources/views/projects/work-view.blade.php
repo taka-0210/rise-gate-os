@@ -56,8 +56,11 @@
         .internal-note { padding:12px 14px; border:1px solid #d5d9dd; border-radius:8px; background:#fff; }
         .internal-note p { margin:5px 0 0; white-space:pre-wrap; }
         .internal-attachments { display:flex; flex-wrap:wrap; gap:8px; margin-top:9px; }
-        .internal-attachment { display:inline-flex; align-items:center; gap:7px; padding:7px 9px; border:1px solid var(--line); border-radius:7px; background:#f8fafb; font-size:12px; }
-        .internal-attachment-image { padding:0; border:0; background:transparent; color:var(--accent-dark); }
+        .internal-attachment-file { display:grid; gap:7px; min-width:230px; padding:10px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; }
+        .internal-attachment-name { color:var(--text); font-size:12px; overflow-wrap:anywhere; }
+        .internal-attachment-actions { display:flex; flex-wrap:wrap; gap:7px; }
+        .internal-attachment { display:inline-flex; align-items:center; gap:7px; width:auto; padding:7px 10px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--accent-dark); font-size:12px; text-decoration:none; }
+        button.internal-attachment { background:var(--accent-dark); color:#fff; }
         .internal-image-viewer { position:fixed; z-index:100; inset:0; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(8,16,22,.86); }
         .internal-image-viewer.is-open { display:flex; }
         .internal-image-viewer img { max-width:min(1200px,94vw); max-height:88vh; border-radius:8px; background:#fff; box-shadow:0 15px 60px rgba(0,0,0,.45); }
@@ -677,17 +680,22 @@
                             @if($internalNote->attachments->isNotEmpty())
                                 <div class="internal-attachments">
                                     @foreach($internalNote->attachments as $attachment)
-                                        @if($attachment->isImage())
-                                            <button type="button" class="internal-attachment internal-attachment-image" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="image" data-internal-preview-name="{{ $attachment->original_name }}">🖼 {{ $attachment->original_name }}</button>
-                                        @elseif($attachment->isPdf())
-                                            <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="pdf" data-internal-preview-name="{{ $attachment->original_name }}">📄 {{ $attachment->original_name }}を表示</button>
-                                            <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">⬇ ダウンロード</a>
-                                        @elseif($attachment->isCsv())
-                                            <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="csv" data-internal-preview-name="{{ $attachment->original_name }}">📊 {{ $attachment->original_name }}を表示</button>
-                                            <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">⬇ ダウンロード</a>
-                                        @else
-                                            <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">📎 {{ $attachment->original_name }}（{{ number_format($attachment->size_bytes / 1024, 1) }}KB）</a>
-                                        @endif
+                                        <div class="internal-attachment-file">
+                                            <div class="internal-attachment-name">📎 {{ $attachment->original_name }}（{{ number_format($attachment->size_bytes / 1024, 1) }}KB）</div>
+                                            <div class="internal-attachment-actions">
+                                                @if($attachment->isImage())
+                                                    <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="image" data-internal-preview-name="{{ $attachment->original_name }}">画像を閲覧</button>
+                                                @elseif($attachment->isPdf())
+                                                    <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="pdf" data-internal-preview-name="{{ $attachment->original_name }}">PDFを閲覧</button>
+                                                    <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">ダウンロード</a>
+                                                @elseif($attachment->isCsv())
+                                                    <button type="button" class="internal-attachment" data-internal-preview="{{ route('projects.internal-notes.attachments.view', [$project, $internalNote, $attachment]) }}" data-internal-preview-type="csv" data-internal-preview-name="{{ $attachment->original_name }}">CSVを閲覧</button>
+                                                    <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">ダウンロード</a>
+                                                @else
+                                                    <a class="internal-attachment" href="{{ route('projects.internal-notes.attachments.download', [$project, $internalNote, $attachment]) }}">ダウンロード</a>
+                                                @endif
+                                            </div>
+                                        </div>
                                     @endforeach
                                 </div>
                             @endif
