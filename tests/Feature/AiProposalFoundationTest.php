@@ -321,6 +321,15 @@ class AiProposalFoundationTest extends TestCase
         $this->assertSame($roadmap->id, $improvement->roadmap_id);
         $this->assertSame($improvement->id, $task->improvement_id);
         $this->assertSame(AiProposal::STATUS_APPLIED, $proposal->fresh()->status);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.ai-proposals.show', [$project, $proposal]))
+            ->assertOk()
+            ->assertSee('反映済み／Codexは待機中')
+            ->assertSee('Codexへ作業開始を伝える')
+            ->assertSee("プロジェクト「{$project->name}」", false)
+            ->assertSee('現在のプロジェクト計画を確認し、承認内容に基づく次の作業を開始してください。');
     }
 
     public function test_invalid_proposal_cannot_be_applied(): void

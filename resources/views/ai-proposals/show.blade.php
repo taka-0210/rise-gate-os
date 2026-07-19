@@ -34,6 +34,8 @@
         .proposal-impact-delta.is-positive { color:#23845c; }
         .proposal-impact-delta.is-negative { color:#b5523d; }
         .proposal-impact-delta.is-neutral { color:var(--muted); }
+        .proposal-next-action { border:2px solid #79a991; background:#f5fcf8; }
+        .proposal-next-action textarea { margin:0; background:#fff; }
         @media (max-width:760px) { .proposal-impact-grid { grid-template-columns:1fr; } }
     </style>
     <section class="panel stack">
@@ -128,6 +130,22 @@
             </div>
         @endif
 
+        @if ($proposal->status === \App\Models\AiProposal::STATUS_APPLIED)
+            @php($continuationText = "RISE GATE OSのプロジェクト「{$project->name}」でAI提案「{$proposal->title}」を承認・反映しました。現在のプロジェクト計画を確認し、承認内容に基づく次の作業を開始してください。")
+            <div class="card stack proposal-next-action">
+                <div>
+                    <div class="eyebrow">現在の状態・反映済み／Codexは待機中</div>
+                    <h2>Codexへ作業開始を伝える</h2>
+                    <p>承認内容はRISE GATE OSへ反映済みです。次の作業を始めるには、下の文章をCodexへ送ってください。</p>
+                </div>
+                <textarea id="proposal-continuation-copy-text" rows="4" readonly>{{ $continuationText }}</textarea>
+                <div class="actions">
+                    <button type="button" data-copy-proposal-continuation>文章をコピー</button>
+                    <span class="meta" data-copy-proposal-result aria-live="polite"></span>
+                </div>
+            </div>
+        @endif
+
         <div class="card stack">
             <div>
                 <div class="eyebrow">プロジェクト全体への影響</div>
@@ -202,4 +220,27 @@
             </div>
         @endif
     </section>
+
+    @if ($proposal->status === \App\Models\AiProposal::STATUS_APPLIED)
+        <script>
+            (() => {
+                const button = document.querySelector('[data-copy-proposal-continuation]');
+                const source = document.getElementById('proposal-continuation-copy-text');
+                const result = document.querySelector('[data-copy-proposal-result]');
+                if (!button || !source) return;
+
+                button.addEventListener('click', async () => {
+                    try {
+                        await navigator.clipboard.writeText(source.value);
+                    } catch (error) {
+                        source.focus();
+                        source.select();
+                        document.execCommand('copy');
+                    }
+                    button.textContent = 'コピーしました';
+                    if (result) result.textContent = 'Codexの会話へ貼り付けてください。';
+                });
+            })();
+        </script>
+    @endif
 @endsection
