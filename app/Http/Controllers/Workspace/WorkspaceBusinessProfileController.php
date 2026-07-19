@@ -34,7 +34,7 @@ class WorkspaceBusinessProfileController extends Controller
         abort_unless($this->canManage($request), 403);
         $workspace = $request->attributes->get('currentWorkspace');
         $validated = $request->validate([
-            'legal_name' => ['nullable', 'string', 'max:255'],
+            'legal_name' => ['required', 'string', 'max:255'],
             'trade_name' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:16'],
             'address_line1' => ['nullable', 'string', 'max:255'],
@@ -82,7 +82,8 @@ class WorkspaceBusinessProfileController extends Controller
             $profile->save();
 
             $bankValues = collect($validated)->only(['bank_name', 'branch_name', 'account_type', 'account_number', 'account_holder']);
-            if ($bankValues->filter()->isNotEmpty()) {
+            $hasBankInput = collect($validated)->only(['bank_name', 'branch_name', 'account_number', 'account_holder'])->filter()->isNotEmpty();
+            if ($hasBankInput) {
                 $request->validate([
                     'bank_name' => ['required', 'string', 'max:255'],
                     'account_type' => ['required', Rule::in(array_keys(WorkspaceBankAccount::types()))],

@@ -85,6 +85,34 @@ class WorkspaceBusinessProfileTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_company_profile_can_be_saved_before_optional_bank_account_is_entered(): void
+    {
+        [$user, $workspace] = $this->workspace('owner');
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
+            ->put(route('workspace-business-profile.update'), [
+                'legal_name' => '株式会社ライズアップ',
+                'account_type' => 'ordinary',
+            ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('workspace_business_profiles', ['workspace_id' => $workspace->id, 'legal_name' => '株式会社ライズアップ']);
+        $this->assertDatabaseCount('workspace_bank_accounts', 0);
+    }
+
+    public function test_required_fields_are_validated_when_a_bank_account_is_started(): void
+    {
+        [$user, $workspace] = $this->workspace('owner');
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
+            ->from(route('workspace-business-profile.edit'))
+            ->put(route('workspace-business-profile.update'), [
+                'legal_name' => '株式会社ライズアップ',
+                'bank_name' => 'テスト銀行',
+                'account_type' => 'ordinary',
+            ])->assertRedirect(route('workspace-business-profile.edit'))
+            ->assertSessionHasErrors(['account_number', 'account_holder']);
+    }
+
     private function workspace(string $role): array
     {
         $user = User::factory()->create();
