@@ -728,7 +728,7 @@
                         @csrf
                         <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body')<div class="error">{{ $message }}</div>@enderror</div>
                         <details class="internal-reference-fields" @if(old('reference_url') || $errors->has('reference_url')) open @endif>
-                            <summary>▼ 参考Webページを追加</summary>
+                            <summary>参考Webページを追加</summary>
                             <div class="internal-reference-fields-body stack">
                                 <div class="meta">Codexに見てほしいページと、参考にする箇所を具体的に登録します。</div>
                                 <div class="field"><label for="reference_url">URL</label><input id="reference_url" name="reference_url" type="url" inputmode="url" placeholder="https://example.com/" value="{{ old('reference_url') }}">@error('reference_url')<div class="error">{{ $message }}</div>@enderror</div>
