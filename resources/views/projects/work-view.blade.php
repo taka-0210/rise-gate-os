@@ -404,8 +404,8 @@
             </details>
         @endif
 
-        <button type="button" class="ai-drawer-overlay {{ $errors->any() ? 'is-open' : '' }}" data-ai-drawer-close aria-label="AIアシスタントを閉じる"></button>
-        <aside id="ai-assistant-drawer" class="ai-drawer {{ $errors->any() ? 'is-open' : '' }}" aria-label="AIアシスタント" aria-hidden="{{ $errors->any() ? 'false' : 'true' }}">
+        <button type="button" class="ai-drawer-overlay {{ ($errors->any() || session('ai_request_copy_text')) ? 'is-open' : '' }}" data-ai-drawer-close aria-label="AIアシスタントを閉じる"></button>
+        <aside id="ai-assistant-drawer" class="ai-drawer {{ ($errors->any() || session('ai_request_copy_text')) ? 'is-open' : '' }}" aria-label="AIアシスタント" aria-hidden="{{ ($errors->any() || session('ai_request_copy_text')) ? 'false' : 'true' }}">
             <div class="ai-drawer-head">
                 <div>
                     <div class="meta">このProjectをAIと相談する</div>
@@ -414,6 +414,21 @@
                 <button type="button" class="ai-drawer-close" data-ai-drawer-close aria-label="閉じる">×</button>
             </div>
             <div class="stack">
+                @if (session('ai_request_copy_text'))
+                    <section class="ai-drawer-section stack" style="border-color:#79a991;background:#f5fcf8;">
+                        <div>
+                            <div class="meta">AI依頼を登録しました</div>
+                            <h3 style="margin-bottom:0;">Codexへ知らせる</h3>
+                        </div>
+                        <p style="margin:0;">次の文章をコピーして、Codexの会話へ貼り付けてください。</p>
+                        <textarea id="ai-request-copy-text" rows="4" readonly>{{ session('ai_request_copy_text') }}</textarea>
+                        <div class="actions">
+                            <button type="button" data-copy-ai-request>文章をコピー</button>
+                            <span class="meta" data-copy-ai-result aria-live="polite"></span>
+                        </div>
+                    </section>
+                @endif
+
                 @if ($pendingAiProposals->isNotEmpty())
                     <section class="ai-drawer-section stack" style="border-color:#d8a092; background:#fff9f7;">
                         <div>
@@ -1021,6 +1036,25 @@
             document.querySelectorAll('[data-ai-drawer-close]').forEach(trigger => trigger.addEventListener('click', () => setOpen(false)));
             document.addEventListener('keydown', event => { if (event.key === 'Escape') setOpen(false); });
             if (drawer.classList.contains('is-open')) document.body.style.overflow = 'hidden';
+        })();
+
+        (() => {
+            const button = document.querySelector('[data-copy-ai-request]');
+            const source = document.getElementById('ai-request-copy-text');
+            const result = document.querySelector('[data-copy-ai-result]');
+            if (!button || !source) return;
+
+            button.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(source.value);
+                } catch (error) {
+                    source.focus();
+                    source.select();
+                    document.execCommand('copy');
+                }
+                button.textContent = 'コピーしました';
+                if (result) result.textContent = 'Codexの会話へ貼り付けてください。';
+            });
         })();
 
         (() => {

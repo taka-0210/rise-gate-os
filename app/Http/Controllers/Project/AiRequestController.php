@@ -121,7 +121,13 @@ class AiRequestController extends Controller
             }
         }
 
-        return back()->with('status', 'AIへの依頼を受け付けました。Codexが提案を返すまでお待ちください。');
+        $copyText = "RISE GATE OSにAI依頼「{$aiRequest->title}」を登録しました。"
+            .'未処理のAI依頼を確認し、この依頼を進めてください。';
+
+        return back()->with([
+            'status' => 'AIへの依頼を受け付けました。下の文章をコピーしてCodexへ送ってください。',
+            'ai_request_copy_text' => $copyText,
+        ]);
     }
 
     public function download(Request $request, Project $project, AiRequest $aiRequest, AiRequestAttachment $attachment): StreamedResponse

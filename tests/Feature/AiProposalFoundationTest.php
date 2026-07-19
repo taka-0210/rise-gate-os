@@ -53,6 +53,24 @@ class AiProposalFoundationTest extends TestCase
             ->assertHeader('content-disposition');
     }
 
+    public function test_ai_request_returns_copy_text_for_codex(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('copy-for-codex');
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->from(route('projects.show', $project))
+            ->post(route('projects.ai-requests.store', $project), [
+                'title' => '見積機能の続きを進める',
+                'instructions' => '登録済みの計画を確認して作業してください。',
+            ])
+            ->assertRedirect(route('projects.show', $project))
+            ->assertSessionHas('ai_request_copy_text', function (string $text): bool {
+                return str_contains($text, '見積機能の続きを進める')
+                    && str_contains($text, '未処理のAI依頼を確認');
+            });
+    }
+
     public function test_selected_internal_note_and_its_file_are_snapshotted_into_ai_request(): void
     {
         Storage::fake('local');
