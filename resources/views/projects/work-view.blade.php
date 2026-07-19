@@ -476,7 +476,7 @@
                                 <div class="internal-ai-references">
                                     <div class="meta">必要なものだけ選択してください。選択した内容は、このAI依頼の参照履歴として保存されます。</div>
                                     @foreach ($internalNotes as $internalNote)
-                                        <label><input type="checkbox" name="internal_note_ids[]" value="{{ $internalNote->id }}"><span>{{ Str::limit($internalNote->body ?: '添付資料のみ', 90) }}@if($internalNote->attachments->isNotEmpty())（資料 {{ $internalNote->attachments->count() }}件）@endif</span></label>
+                                        <label><input type="checkbox" name="internal_note_ids[]" value="{{ $internalNote->id }}"><span>{{ Str::limit($internalNote->body ?: '参考URL・添付資料のみ', 90) }}@if($internalNote->attachments->isNotEmpty())（資料 {{ $internalNote->attachments->count() }}件）@endif @if($internalNote->references->where('share_with_ai', true)->isNotEmpty())（参考URL {{ $internalNote->references->where('share_with_ai', true)->count() }}件）@endif</span></label>
                                     @endforeach
                                 </div>
                                 @error('internal_note_ids')<div class="error">{{ $message }}</div>@enderror
@@ -719,6 +719,16 @@
                     <form class="stack" method="POST" action="{{ route('projects.internal-notes.store', $project) }}" enctype="multipart/form-data">
                         @csrf
                         <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body')<div class="error">{{ $message }}</div>@enderror</div>
+                        <div class="card stack" style="background:#f7fafc;">
+                            <div><h3 style="margin:0;">参考Webページ</h3><p class="meta">Codexに見てほしいページと、参考にする箇所を具体的に登録します。</p></div>
+                            <div class="field"><label for="reference_url">URL</label><input id="reference_url" name="reference_url" type="url" inputmode="url" placeholder="https://example.com/" value="{{ old('reference_url') }}">@error('reference_url')<div class="error">{{ $message }}</div>@enderror</div>
+                            <div class="field"><label for="reference_title">ページ名（任意）</label><input id="reference_title" name="reference_title" placeholder="参考サイトのトップページ" value="{{ old('reference_title') }}"></div>
+                            <div class="grid two">
+                                <div class="field"><label for="reference_points">参考にする点</label><textarea id="reference_points" name="reference_points" rows="3" placeholder="余白、ファーストビュー、導線など">{{ old('reference_points') }}</textarea></div>
+                                <div class="field"><label for="reference_avoid_points">取り入れない点</label><textarea id="reference_avoid_points" name="reference_avoid_points" rows="3" placeholder="配色は模倣しない、文章は流用しないなど">{{ old('reference_avoid_points') }}</textarea></div>
+                            </div>
+                            <label class="actions"><input type="checkbox" name="reference_share_with_ai" value="1" style="width:auto;" @checked(old('reference_share_with_ai', true))> このURLをCodexへ共有する</label>
+                        </div>
                         <div class="field"><label for="internal_note_attachments">画像・社内資料（最大5ファイル・各10MB）</label><input id="internal_note_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx"><div class="meta">画像、PDF、Excel、CSV、Wordに対応。ファイルは非公開領域へ保存されます。</div>@error('attachments')<div class="error">{{ $message }}</div>@enderror @error('attachments.*')<div class="error">{{ $message }}</div>@enderror</div>
                         <div class="actions"><button type="submit">社内メモを追加</button></div>
                     </form>
@@ -731,6 +741,18 @@
                                 @if ($canCreateInternalNote)<form method="POST" action="{{ route('projects.internal-notes.destroy', [$project, $internalNote]) }}" onsubmit="return confirm('この社内メモを削除しますか？')">@csrf @method('DELETE')<button type="submit" class="secondary">削除</button></form>@endif
                             </div>
                             @if($internalNote->body)<p>{{ $internalNote->body }}</p>@endif
+                            @if($internalNote->references->isNotEmpty())
+                                <div class="stack">
+                                    @foreach($internalNote->references as $reference)
+                                        <div class="card" style="padding:14px;">
+                                            <div class="actions" style="justify-content:space-between;"><strong>{{ $reference->title ?: '参考Webページ' }}</strong><span class="badge">{{ $reference->share_with_ai ? 'Codexへ共有' : '社内のみ' }}</span></div>
+                                            <a href="{{ $reference->url }}" target="_blank" rel="noopener noreferrer">{{ $reference->url }}</a>
+                                            @if($reference->reference_points)<p><strong>参考にする点：</strong>{{ $reference->reference_points }}</p>@endif
+                                            @if($reference->avoid_points)<p><strong>取り入れない点：</strong>{{ $reference->avoid_points }}</p>@endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                             @if($internalNote->attachments->isNotEmpty())
                                 <div class="internal-attachments">
                                     @foreach($internalNote->attachments as $attachment)

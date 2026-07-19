@@ -93,6 +93,19 @@ class AiProposalFoundationTest extends TestCase
             'size_bytes' => 18,
             'sha256' => hash('sha256', "name,amount\nA,1000"),
         ]);
+        $note->references()->create([
+            'project_id' => $project->id,
+            'url' => 'https://example.com/reference-design',
+            'title' => '参考デザイン',
+            'reference_points' => 'ファーストビューの余白と導線',
+            'avoid_points' => '配色と文章は模倣しない',
+            'share_with_ai' => true,
+        ]);
+        $note->references()->create([
+            'project_id' => $project->id,
+            'url' => 'https://example.com/internal-only',
+            'share_with_ai' => false,
+        ]);
 
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
@@ -105,10 +118,39 @@ class AiProposalFoundationTest extends TestCase
         $aiRequest = AiRequest::with('attachments')->firstOrFail();
         $this->assertStringContainsString('給与計算の締日は毎月末日です。', $aiRequest->instructions);
         $this->assertStringContainsString('給与形式.csv', $aiRequest->instructions);
+        $this->assertStringContainsString('https://example.com/reference-design', $aiRequest->instructions);
+        $this->assertStringContainsString('ファーストビューの余白と導線', $aiRequest->instructions);
+        $this->assertStringContainsString('配色と文章は模倣しない', $aiRequest->instructions);
+        $this->assertStringNotContainsString('https://example.com/internal-only', $aiRequest->instructions);
         $this->assertCount(1, $aiRequest->attachments);
         $snapshot = $aiRequest->attachments->first();
         $this->assertNotSame('project-internal-notes/source/format.csv', $snapshot->stored_path);
         Storage::disk('local')->assertExists($snapshot->stored_path);
+    }
+
+    public function test_internal_note_can_store_a_structured_web_reference(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('web-reference');
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.internal-notes.store', $project), [
+                'reference_url' => 'https://example.com/inspiration',
+                'reference_title' => '参考トップページ',
+                'reference_points' => '余白とスクロール演出',
+                'reference_avoid_points' => 'ロゴと文章は使わない',
+                'reference_share_with_ai' => '1',
+            ])->assertRedirect(route('projects.show', $project));
+
+        $reference = $project->internalNotes()->firstOrFail()->references()->firstOrFail();
+        $this->assertSame('https://example.com/inspiration', $reference->url);
+        $this->assertSame('余白とスクロール演出', $reference->reference_points);
+        $this->assertTrue($reference->share_with_ai);
+
+        $this->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertSee('参考トップページ')
+            ->assertSee('Codexへ共有');
     }
 
     public function test_internal_note_image_is_private_and_viewable_only_by_internal_members(): void

@@ -39,7 +39,7 @@ class AiRequestController extends Controller
             abort_if($role === ProjectMember::ROLE_CLIENT, 403);
 
             $internalNotes = $project->internalNotes()
-                ->with(['user', 'attachments'])
+                ->with(['user', 'attachments', 'references'])
                 ->whereIn('id', $validated['internal_note_ids'])
                 ->get();
             if ($internalNotes->count() !== count($validated['internal_note_ids'])) {
@@ -65,6 +65,13 @@ class AiRequestController extends Controller
                 $instructions .= "\n".($note->body ?: '本文なし（添付資料のみ）');
                 if ($note->attachments->isNotEmpty()) {
                     $instructions .= "\n添付資料: ".$note->attachments->pluck('original_name')->join('、');
+                }
+                foreach ($note->references->where('share_with_ai', true) as $reference) {
+                    $instructions .= "\n参考URL: {$reference->url}";
+                    if ($reference->title) $instructions .= "\n名称: {$reference->title}";
+                    if ($reference->reference_points) $instructions .= "\n参考にする点: {$reference->reference_points}";
+                    if ($reference->avoid_points) $instructions .= "\n取り入れない点: {$reference->avoid_points}";
+                    $instructions .= "\n注意: そのまま模倣せず、このProjectの要件とブランドに合わせて再構成してください。";
                 }
             }
         }

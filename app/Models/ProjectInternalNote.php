@@ -24,4 +24,9 @@ class ProjectInternalNote extends Model
     {
         return $this->hasMany(ProjectInternalNoteAttachment::class)->oldest();
     }
+
+    public function references(): HasMany
+    {
+        return $this->hasMany(ProjectInternalNoteReference::class)->oldest();
+    }
 }
