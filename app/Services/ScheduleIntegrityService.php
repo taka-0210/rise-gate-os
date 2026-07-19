@@ -89,9 +89,15 @@ class ScheduleIntegrityService
             ->mapWithKeys(fn (string $type) => [$type => $items->unique()->filter(fn (string $key) => str_starts_with($key, $type.':'))->count()])
             ->all();
 
+        $invalidCount = $entities['invalid']->unique()->count();
+        $missingCount = $entities['missing']->unique()->count();
+        $remainingCount = $invalid->isNotEmpty() ? $invalidCount : $missingCount;
+
         return [
             'status' => $invalid->isNotEmpty() ? self::STATUS_INVALID : ($missing->isNotEmpty() ? self::STATUS_MISSING : self::STATUS_OK),
-            'label' => $invalid->isNotEmpty() ? '日程要再設定' : ($missing->isNotEmpty() ? '日程未設定' : '整合性OK'),
+            'label' => $invalid->isNotEmpty()
+                ? "日程要再設定：残り{$invalidCount}件"
+                : ($missing->isNotEmpty() ? "日程未設定：残り{$missingCount}件" : '整合性OK'),
             'missing' => $missing->unique()->values(),
             'invalid' => $invalid->unique()->values(),
             'unverifiable' => $unverifiable->unique()->values(),
@@ -101,6 +107,7 @@ class ScheduleIntegrityService
                 'invalid' => $counts($entities['invalid']),
                 'unverifiable' => $counts($entities['unverifiable']),
             ],
+            'remaining_count' => $remainingCount,
             'issue_count' => $entities['missing']->merge($entities['invalid'])->merge($entities['unverifiable'])->unique()->count(),
         ];
     }

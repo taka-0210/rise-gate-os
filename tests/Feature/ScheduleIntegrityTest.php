@@ -54,12 +54,15 @@ class ScheduleIntegrityTest extends TestCase
 
         $result = app(ScheduleIntegrityService::class)->inspect($project->fresh());
         $this->assertSame(ScheduleIntegrityService::STATUS_INVALID, $result['status']);
+        $this->assertSame('日程要再設定：残り1件', $result['label']);
+        $this->assertSame(1, $result['remaining_count']);
         $this->assertTrue($result['invalid']->contains(fn (string $issue) => str_contains($issue, '既存の期間外タスク')));
         $this->assertSame(1, $result['counts']['invalid']['task']);
 
         $improvement->update(['planned_start_date' => null, 'target_date' => null]);
         $result = app(ScheduleIntegrityService::class)->inspect($project->fresh());
         $this->assertSame(ScheduleIntegrityService::STATUS_MISSING, $result['status']);
+        $this->assertSame('日程未設定：残り1件', $result['label']);
         $this->assertSame(1, $result['counts']['missing']['improvement']);
         $this->assertSame(1, $result['counts']['unverifiable']['task']);
     }
