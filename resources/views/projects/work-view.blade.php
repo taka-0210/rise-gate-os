@@ -607,6 +607,7 @@
             const axisEnd = new Date(`${chart.dataset.axisEnd}T00:00:00`);
             const axisDays = Math.max(1, Math.round((axisEnd - axisStart) / 86400000));
             const csrf = @json(csrf_token());
+            const descendantResetAcknowledgedKey = @json('timeline-descendant-reset-acknowledged:'.$project->id);
             const parseDate = value => new Date(`${value}T00:00:00`);
             const formatDate = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
             const addDays = (date, days) => { const next = new Date(date); next.setDate(next.getDate() + days); return next; };
@@ -622,7 +623,10 @@
                 if (bar.dataset.entityType === 'task') return true;
                 const count = Number(bar.dataset.descendantCount || 0);
                 if (count === 0) return true;
-                return window.confirm(`この変更により、配下${count}件の日程が未設定に戻ります。続けますか？`);
+                if (sessionStorage.getItem(descendantResetAcknowledgedKey) === '1') return true;
+                const accepted = window.confirm(`この変更により、配下${count}件の日程が未設定に戻ります。続けますか？\n\nこの確認は、この画面を開いている間は一度だけ表示されます。`);
+                if (accepted) sessionStorage.setItem(descendantResetAcknowledgedKey, '1');
+                return accepted;
             };
 
             document.querySelectorAll('.time-bar.is-editable:not(.is-task)').forEach(bar => {
