@@ -141,6 +141,10 @@
         .time-resize-handle.is-end { right:-4px; }
         .time-save-status { position:fixed; z-index:80; right:20px; bottom:20px; max-width:420px; padding:12px 16px; border-radius:8px; background:#263f4d; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2); }
         .time-save-status.is-error { background:#a33f2d; }
+        .project-schedule-setup { display:grid; grid-template-columns:minmax(220px,1fr) minmax(160px,.6fr) minmax(160px,.6fr) auto; gap:14px; align-items:end; margin-bottom:16px; padding:18px; border:2px solid #3f69ac; border-radius:12px; background:#f5f8fd; }
+        .project-schedule-setup h2,.project-schedule-setup p { margin:0; }
+        .project-schedule-setup .field { margin:0; }
+        .project-schedule-setup .project-schedule-message { grid-column:1 / -1; margin:0; color:#a33f2d; font-weight:700; }
         .schedule-step-guide { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px; padding:14px 16px; border:2px solid #263f4d; border-radius:10px; background:#fff; }
         .schedule-step-guide strong { margin-right:auto; }
         .schedule-step-guide a,.schedule-step-guide span { padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:12px; }
@@ -192,6 +196,7 @@
             .focus-project { padding:14px; }
             .time-layer { padding:14px; }
             .time-layer-head { display:block; }
+            .project-schedule-setup { grid-template-columns:1fr; }
             .focus-project-head,.focus-footer { grid-template-columns:1fr; }
             .focus-summary { grid-template-columns:1fr 1fr; }
             .focus-roadmaps,.focus-improvements { grid-template-columns:1fr; }
@@ -233,6 +238,21 @@
         $projectDescendantCount = $roadmaps->filter(fn ($item) => $item->planned_start_date || $item->target_date)->count()
             + $project->improvements->filter(fn ($item) => $item->planned_start_date || $item->target_date)->count()
             + $allTasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
+        $descendantScheduleStarts = collect()
+            ->concat($roadmaps->pluck('planned_start_date'))
+            ->concat($project->improvements->pluck('planned_start_date'))
+            ->concat($allTasks->pluck('planned_start_date'))
+            ->filter();
+        $descendantScheduleEnds = collect()
+            ->concat($roadmaps->pluck('target_date'))
+            ->concat($project->improvements->pluck('target_date'))
+            ->concat($allTasks->pluck('due_date'))
+            ->filter();
+        $projectScheduleDefaultStart = $descendantScheduleStarts->min()?->copy()->startOfDay() ?: now()->startOfDay();
+        $projectScheduleDefaultEnd = $descendantScheduleEnds->max()?->copy()->startOfDay() ?: $projectScheduleDefaultStart->copy()->addDays(30);
+        if ($projectScheduleDefaultEnd->lt($projectScheduleDefaultStart)) {
+            $projectScheduleDefaultEnd = $projectScheduleDefaultStart->copy()->addDays(30);
+        }
         $timeRows->push([
             'type' => 'project',
             'id' => $project->id,
@@ -503,6 +523,24 @@
             @php
                 $scheduleStageLabels = ['project' => '1. プロジェクト期間', 'roadmap' => '2. ロードマップ期間', 'improvement' => '3. 取り組み期間', 'task' => '4. タスク期間', 'all' => '5. 全体確認'];
             @endphp
+            @if ((! $project->start_date || ! $project->due_date) && Gate::allows('update', $project))
+                <form class="project-schedule-setup" id="project-schedule-setup" data-schedule-url="{{ route('projects.timeline.update', [$project, 'project', $project->id]) }}">
+                    <div>
+                        <h2>Project期間を設定</h2>
+                        <p class="meta">ここで全体期間を決めると、時間表示にProjectのバーが現れます。</p>
+                    </div>
+                    <div class="field">
+                        <label for="project_schedule_start_date">開始予定日</label>
+                        <input id="project_schedule_start_date" name="start_date" type="date" value="{{ $projectScheduleDefaultStart->toDateString() }}" required>
+                    </div>
+                    <div class="field">
+                        <label for="project_schedule_end_date">終了予定日</label>
+                        <input id="project_schedule_end_date" name="end_date" type="date" value="{{ $projectScheduleDefaultEnd->toDateString() }}" required>
+                    </div>
+                    <button type="submit">Project期間を設定</button>
+                    <p class="project-schedule-message" hidden></p>
+                </form>
+            @endif
             <div class="schedule-step-guide">
                 <strong>現在の設定：{{ $scheduleStageLabels[$scheduleStage] }}</strong>
                 @foreach ($scheduleStageLabels as $stageKey => $stageLabel)
@@ -758,6 +796,41 @@
                 document.body.append(status);
                 setTimeout(() => status.remove(), 5000);
             };
+            const projectScheduleSetup = document.getElementById('project-schedule-setup');
+            projectScheduleSetup?.addEventListener('submit', async event => {
+                event.preventDefault();
+                const submit = projectScheduleSetup.querySelector('button[type="submit"]');
+                const message = projectScheduleSetup.querySelector('.project-schedule-message');
+                const startDate = projectScheduleSetup.elements.start_date.value;
+                const endDate = projectScheduleSetup.elements.end_date.value;
+                message.hidden = true;
+                if (endDate < startDate) {
+                    message.textContent = '終了予定日は開始予定日以降にしてください。';
+                    message.hidden = false;
+                    return;
+                }
+                submit.disabled = true;
+                submit.textContent = '設定中…';
+                try {
+                    const response = await fetch(projectScheduleSetup.dataset.scheduleUrl, {
+                        method: 'PATCH',
+                        headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf},
+                        body: JSON.stringify({start_date: startDate, end_date: endDate, reset_descendants: false}),
+                    });
+                    const body = await response.json();
+                    if (!response.ok) {
+                        const errorMessage = Object.values(body.errors || {}).flat()[0] || body.message || 'Project期間を設定できませんでした。';
+                        throw new Error(errorMessage);
+                    }
+                    notify('Project期間を設定しました。');
+                    window.location.reload();
+                } catch (error) {
+                    message.textContent = error.message;
+                    message.hidden = false;
+                    submit.disabled = false;
+                    submit.textContent = 'Project期間を設定';
+                }
+            });
             const confirmDescendantReset = bar => {
                 if (bar.dataset.entityType === 'task') return true;
                 const count = Number(bar.dataset.descendantCount || 0);

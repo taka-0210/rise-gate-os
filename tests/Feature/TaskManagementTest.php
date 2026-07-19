@@ -19,6 +19,33 @@ class TaskManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_unscheduled_project_can_set_its_period_from_the_time_view(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $task = $this->createTask($project, $owner);
+        $task->improvement->roadmap->update([
+            'planned_start_date' => '2026-08-03',
+            'target_date' => '2026-08-28',
+        ]);
+        $task->improvement->update([
+            'planned_start_date' => '2026-08-05',
+            'target_date' => '2026-08-20',
+        ]);
+        $task->update([
+            'planned_start_date' => '2026-08-07',
+            'due_date' => '2026-08-10',
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
+            ->assertOk()
+            ->assertSee('Project期間を設定')
+            ->assertSee('id="project-schedule-setup"', false)
+            ->assertSee('name="start_date" type="date" value="2026-08-03"', false)
+            ->assertSee('name="end_date" type="date" value="2026-08-28"', false);
+    }
+
     public function test_project_editor_can_view_edit_and_update_task(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

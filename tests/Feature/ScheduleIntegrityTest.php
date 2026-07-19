@@ -18,6 +18,26 @@ class ScheduleIntegrityTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_initial_project_period_can_be_set_without_clearing_existing_child_schedules(): void
+    {
+        [$user, $workspace, $project, $roadmap, $improvement] = $this->scheduledProject();
+        $project->update(['start_date' => null, 'due_date' => null]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.timeline.update', [$project, 'project', $project->id]), [
+                'start_date' => '2026-08-01',
+                'end_date' => '2026-08-31',
+                'reset_descendants' => false,
+            ])
+            ->assertOk();
+
+        $this->assertSame('2026-08-01', $project->fresh()->start_date->toDateString());
+        $this->assertSame('2026-08-31', $project->fresh()->due_date->toDateString());
+        $this->assertNotNull($roadmap->fresh()->planned_start_date);
+        $this->assertNotNull($improvement->fresh()->planned_start_date);
+    }
+
     public function test_task_due_date_must_be_within_parent_improvement_period(): void
     {
         [$user, $workspace, $project, $roadmap, $improvement] = $this->scheduledProject();
