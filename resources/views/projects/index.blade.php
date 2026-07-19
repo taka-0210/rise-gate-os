@@ -51,7 +51,10 @@
                     <div class="project-index-toolbar-title">フォーカスレイヤー</div>
                     <div class="project-index-path">PROJECT一覧</div>
                 </div>
-                <a class="button project-index-create" href="{{ route('projects.create') }}">新しいPROJECTを作成</a>
+                <div class="actions">
+                    <a class="button secondary project-index-create" href="{{ route('projects.schedule') }}">全体スケジュール</a>
+                    <a class="button project-index-create" href="{{ route('projects.create') }}">新しいPROJECTを作成</a>
+                </div>
             </div>
         </div>
 

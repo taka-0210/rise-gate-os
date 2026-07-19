@@ -18,6 +18,50 @@ class ProjectFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_workspace_member_can_view_cross_project_schedule_and_overlap(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $first = Project::create([
+            'organization_id' => $workspace->organization_id,
+            'owning_workspace_id' => $workspace->id,
+            'billing_workspace_id' => $workspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => '給与計算システム',
+            'start_date' => '2026-08-01',
+            'due_date' => '2026-08-20',
+        ]);
+        $second = Project::create([
+            'organization_id' => $workspace->organization_id,
+            'owning_workspace_id' => $workspace->id,
+            'billing_workspace_id' => $workspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'SNS投稿管理システム',
+            'start_date' => '2026-08-15',
+            'due_date' => '2026-08-31',
+        ]);
+        $unscheduled = Project::create([
+            'organization_id' => $workspace->organization_id,
+            'owning_workspace_id' => $workspace->id,
+            'billing_workspace_id' => $workspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => '日程未設定プロジェクト',
+        ]);
+        foreach ([$first, $second, $unscheduled] as $project) {
+            $this->addProjectMember($project, $owner, $workspace, 'owner', 'admin');
+        }
+
+        $this->actingAs($owner)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->get(route('projects.schedule'))
+            ->assertOk()
+            ->assertSee('全体スケジュール')
+            ->assertSee('給与計算システム')
+            ->assertSee('SNS投稿管理システム')
+            ->assertSee('1件と重複')
+            ->assertSee('日程未設定プロジェクト')
+            ->assertSee(route('projects.show', ['project' => $first, 'view' => 'time']), false);
+    }
+
     public function test_user_can_create_project_in_current_workspace(): void
     {
         [$user, $workspace] = $this->createWorkspaceOwner();

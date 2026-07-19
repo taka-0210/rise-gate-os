@@ -13,6 +13,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\ScheduleIntegrityService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,6 +24,67 @@ use Illuminate\View\View;
 
 class ProjectController extends Controller
 {
+    public function schedule(Request $request): View
+    {
+        $currentWorkspace = $request->attributes->get('currentWorkspace');
+        $projects = Project::query()
+            ->whereHas('members', function ($query) use ($request, $currentWorkspace): void {
+                $query->where('user_id', $request->user()->id)
+                    ->where('workspace_id', $currentWorkspace->id)
+                    ->where('status', ProjectMember::STATUS_ACTIVE);
+            })
+            ->with(['client', 'roadmaps.improvements.tasks', 'improvements.tasks'])
+            ->withCount(['tasks as open_tasks_count' => fn ($query) => $query->whereNotIn('status', [Task::STATUS_DONE, Task::STATUS_ARCHIVED])])
+            ->get();
+
+        $integrityService = app(ScheduleIntegrityService::class);
+        $integrity = $projects->mapWithKeys(fn (Project $project) => [$project->id => $integrityService->inspect($project)]);
+        $scheduled = $projects->filter(fn (Project $project) => $project->start_date && $project->due_date)
+            ->sortBy(fn (Project $project) => [$project->start_date->timestamp, $project->due_date->timestamp, $project->name])
+            ->values();
+        $unscheduled = $projects->reject(fn (Project $project) => $project->start_date && $project->due_date)
+            ->sortBy('name')->values();
+
+        $overlapCounts = $scheduled->mapWithKeys(function (Project $project) use ($scheduled): array {
+            $count = $scheduled->filter(fn (Project $other) => $other->id !== $project->id
+                && $project->start_date->lte($other->due_date)
+                && $project->due_date->gte($other->start_date))->count();
+
+            return [$project->id => $count];
+        });
+
+        $axisStart = ($scheduled->min(fn (Project $project) => $project->start_date)?->copy() ?? Carbon::today())->subDays(2);
+        $axisEnd = ($scheduled->max(fn (Project $project) => $project->due_date)?->copy() ?? Carbon::today()->addDays(28))->addDays(2);
+        $axisDays = max(1, $axisStart->diffInDays($axisEnd) + 1);
+        $timelineWidth = max(900, $axisDays * ($axisDays > 180 ? 7 : 12));
+
+        $months = collect();
+        $monthCursor = $axisStart->copy()->startOfMonth();
+        while ($monthCursor->lte($axisEnd)) {
+            $segmentStart = $monthCursor->copy()->max($axisStart);
+            $segmentEnd = $monthCursor->copy()->endOfMonth()->min($axisEnd);
+            $months->push([
+                'label' => $segmentStart->format('Y年n月'),
+                'left' => $axisStart->diffInDays($segmentStart) / $axisDays * 100,
+                'width' => ($segmentStart->diffInDays($segmentEnd) + 1) / $axisDays * 100,
+            ]);
+            $monthCursor->addMonth();
+        }
+
+        $ticks = collect();
+        for ($cursor = $axisStart->copy(); $cursor->lte($axisEnd); $cursor->addDays(7)) {
+            $ticks->push([
+                'label' => $cursor->format('n/j'),
+                'left' => $axisStart->diffInDays($cursor) / $axisDays * 100,
+            ]);
+        }
+
+        return view('projects.schedule', compact(
+            'scheduled', 'unscheduled', 'integrity', 'overlapCounts', 'axisStart', 'axisEnd',
+            'axisDays', 'timelineWidth', 'months', 'ticks', 'currentWorkspace'
+        ));
+    }
+
     public function index(Request $request): View
     {
         $currentWorkspace = $request->attributes->get('currentWorkspace');
