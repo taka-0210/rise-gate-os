@@ -18,6 +18,17 @@ class AiProposalItemReviewTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_review_form_is_rendered_inside_the_proposed_item_outline(): void
+    {
+        [$user, $workspace, $project, $proposal] = $this->fixture();
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.ai-proposals.show', [$project, $proposal]))
+            ->assertOk()
+            ->assertSeeInOrder(['注文一覧を作る', 'コメント・修正指示', 'この項目の指示を保存'])
+            ->assertSee('指摘内容でAIに再提案を依頼');
+    }
+
     public function test_member_can_save_item_instruction_and_unresolved_instruction_blocks_apply(): void
     {
         [$user, $workspace, $project, $proposal, $item] = $this->fixture();

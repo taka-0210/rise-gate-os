@@ -36,6 +36,12 @@
         .proposal-impact-delta.is-neutral { color:var(--muted); }
         .proposal-next-action { border:2px solid #79a991; background:#f5fcf8; }
         .proposal-next-action textarea { margin:0; background:#fff; }
+        .proposal-inline-review { margin-top:14px; padding:13px; border:1px solid rgba(44,62,80,.2); border-radius:8px; background:rgba(255,255,255,.82); }
+        .proposal-inline-review__fields { display:grid; grid-template-columns:minmax(150px,.55fr) minmax(280px,1.8fr) minmax(190px,.75fr); gap:10px; align-items:end; }
+        .proposal-inline-review label { margin:0; color:#263746; font-size:13px; font-weight:800; }
+        .proposal-inline-review select,.proposal-inline-review textarea { margin-top:5px; background:#fff; }
+        .proposal-inline-review__delete { margin-top:7px; }
+        @media (max-width:900px) { .proposal-inline-review__fields { grid-template-columns:1fr; } }
         @media (max-width:760px) { .proposal-impact-grid { grid-template-columns:1fr; } }
     </style>
     <section class="panel stack">
@@ -73,6 +79,8 @@
                         <span>ロードマップ {{ $roadmapIndex + 1 }}．{{ $roadmap['title'] }}</span>
                         <span class="proposal-operation-badge is-{{ $roadmap['operation'] }}">{{ match ($roadmap['operation']) { 'create' => '新設', 'update' => '既存・更新あり', 'delete' => '削除予定', default => '既存' } }}</span>
                     </h3>
+                    @php($reviewItem = $roadmap['item_id'] ? $proposal->items->firstWhere('id', $roadmap['item_id']) : null)
+                    @include('ai-proposals._inline-item-review', ['item' => $reviewItem])
                     <div class="proposal-improvements">
                     @forelse ($roadmap['improvements'] as $improvementIndex => $improvement)
                         <div class="proposal-improvement is-{{ $improvement['operation'] }}">
@@ -80,11 +88,15 @@
                                 <span>取り組み {{ $improvementIndex + 1 }}．{{ $improvement['title'] }}</span>
                                 <span class="proposal-operation-badge is-{{ $improvement['operation'] }}">{{ match ($improvement['operation']) { 'create' => '新設', 'update' => '既存・更新あり', 'delete' => '削除予定', default => '既存' } }}</span>
                             </h4>
+                            @php($reviewItem = $improvement['item_id'] ? $proposal->items->firstWhere('id', $improvement['item_id']) : null)
+                            @include('ai-proposals._inline-item-review', ['item' => $reviewItem])
                             @if ($improvement['tasks'])
                                 <ol class="proposal-tasks">
                                     @foreach ($improvement['tasks'] as $task)
                                         <li class="proposal-task is-{{ $task['operation'] }}">
                                             {{ $task['title'] }}
+                                            @php($reviewItem = $task['item_id'] ? $proposal->items->firstWhere('id', $task['item_id']) : null)
+                                            @include('ai-proposals._inline-item-review', ['item' => $reviewItem])
                                             <span class="proposal-operation-badge is-{{ $task['operation'] }}">{{ match ($task['operation']) { 'create' => '新設', 'update' => '既存・更新あり', 'delete' => '削除予定', default => '既存' } }}</span>
                                         </li>
                                     @endforeach
@@ -109,7 +121,7 @@
             <a class="button secondary" href="{{ route('projects.show', $project) }}">Projectへ戻る</a>
         </div>
 
-        @include('ai-proposals._item-reviews')
+        @include('ai-proposals._item-review-summary')
 
         @if ($canReview && $proposal->status === \App\Models\AiProposal::STATUS_PENDING)
             <div class="card stack">

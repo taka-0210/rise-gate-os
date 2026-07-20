@@ -24,7 +24,8 @@ class AiProposalOutlineBuilder
                 : null;
             $outline[$key] = $this->roadmapNode(
                 $item->attributes['title'] ?? $roadmap?->title ?? '名称未設定のロードマップ',
-                $item->operation
+                $item->operation,
+                $item->id
             );
         }
 
@@ -40,7 +41,8 @@ class AiProposalOutlineBuilder
             $outline[$roadmapKey] ??= $this->roadmapNode($roadmap?->title ?? 'ロードマップ未指定', 'context');
             $outline[$roadmapKey]['improvements'][$this->itemKey($item)] = $this->improvementNode(
                 $item->attributes['title'] ?? $improvement?->title ?? '名称未設定の取り組み',
-                $item->operation
+                $item->operation,
+                $item->id
             );
         }
 
@@ -70,6 +72,7 @@ class AiProposalOutlineBuilder
             $outline[$roadmapKey]['improvements'][$improvementKey]['tasks'][] = [
                 'title' => $item->attributes['title'] ?? $task?->title ?? '名称未設定のタスク',
                 'operation' => $item->operation,
+                'item_id' => $item->id,
             ];
         }
 
@@ -84,13 +87,13 @@ class AiProposalOutlineBuilder
         return $item->reference_key ? 'reference:'.$item->reference_key : ($item->target_public_id ?? 'item:'.$item->id);
     }
 
-    private function roadmapNode(string $title, string $operation): array
+    private function roadmapNode(string $title, string $operation, ?int $itemId = null): array
     {
-        return ['title' => $title, 'operation' => $operation, 'improvements' => []];
+        return ['title' => $title, 'operation' => $operation, 'item_id' => $itemId, 'improvements' => []];
     }
 
-    private function improvementNode(string $title, string $operation): array
+    private function improvementNode(string $title, string $operation, ?int $itemId = null): array
     {
-        return ['title' => $title, 'operation' => $operation, 'tasks' => []];
+        return ['title' => $title, 'operation' => $operation, 'item_id' => $itemId, 'tasks' => []];
     }
 }
