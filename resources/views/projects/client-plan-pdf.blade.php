@@ -1,3 +1,7 @@
+@php
+    $pdfFontPath = str_replace('\\', '/', resource_path('fonts/NotoSansCJKjp-Regular.otf'));
+    $pdfFontUri = 'file://'.(str_starts_with($pdfFontPath, '/') ? '' : '/').$pdfFontPath;
+@endphp
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -7,7 +11,7 @@
             font-family: "Noto Sans JP";
             font-style: normal;
             font-weight: 400;
-            src: url("file:///{{ str_replace('\\', '/', resource_path('fonts/NotoSansCJKjp-Regular.otf')) }}") format("opentype");
+            src: url("{{ $pdfFontUri }}") format("opentype");
         }
         @page { margin: 20mm 14mm 16mm; }
         * { box-sizing: border-box; }

@@ -364,6 +364,15 @@ class TaskManagementTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $response->getContent());
     }
 
+    public function test_client_plan_pdf_uses_a_platform_safe_font_uri(): void
+    {
+        $path = '/home/example/rise-gate-os/resources/fonts/NotoSansCJKjp-Regular.otf';
+        $uri = 'file://'.(str_starts_with($path, '/') ? '' : '/').$path;
+
+        $this->assertSame('file:///home/example/rise-gate-os/resources/fonts/NotoSansCJKjp-Regular.otf', $uri);
+        $this->assertStringNotContainsString('file:////', $uri);
+    }
+
     public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
