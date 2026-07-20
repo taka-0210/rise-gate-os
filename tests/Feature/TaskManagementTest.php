@@ -341,7 +341,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('印刷・PDF保存')
             ->assertSee('vendor/pagedjs/paged.polyfill.js', false)
             ->assertSee('size:297mm 210mm', false)
-            ->assertSee('preview(source, undefined, output)', false);
+            ->assertSee('preview(source, [pagedStylesheet], output)', false)
+            ->assertSee("source.classList.add('preview-fallback')", false);
     }
 
     public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void

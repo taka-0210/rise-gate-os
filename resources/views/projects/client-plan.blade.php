@@ -24,6 +24,8 @@
         .preview-status { display:none; width:100%; color:var(--muted); font-size:12px; }
         body.is-paginating .preview-status { display:block; }
         #print-source { position:absolute; left:-100000px; width:269mm; visibility:hidden; }
+        #print-source.preview-fallback { position:static; left:auto; width:297mm; margin:24px auto 60px; visibility:visible; }
+        #print-source.preview-fallback > section { min-height:210mm; margin-bottom:22px; padding:13mm 14mm 15mm; overflow:hidden; background:#fff; box-shadow:0 8px 30px rgba(28,50,64,.13); }
         #paged-output { padding:24px 0 60px; }
         .pagedjs_pages { display:flex; flex-direction:column; align-items:center; gap:22px; }
         .pagedjs_page { margin:0!important; background:#fff; box-shadow:0 8px 30px rgba(28,50,64,.13); }
@@ -84,7 +86,9 @@
         }
         @media print {
             body { background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-            .controls,#print-source { display:none!important; }
+            .controls,#print-source:not(.preview-fallback) { display:none!important; }
+            #print-source.preview-fallback { width:auto; margin:0; }
+            #print-source.preview-fallback > section { width:297mm; min-height:210mm; margin:0; box-shadow:none; }
             #paged-output { padding:0; }
             .pagedjs_pages { display:block; }
             .pagedjs_page { margin:0!important; box-shadow:none!important; }
@@ -94,6 +98,17 @@
             .pagedjs_pages { align-items:flex-start; }
         }
     </style>
+    <script id="paged-page-rules" type="text/plain">
+        @page {
+            size:297mm 210mm;
+            margin:13mm 14mm 15mm;
+            @bottom-left { content:"{{ $issuerName ?? '' }} / Confidential"; color:#7b8992; font-size:8pt; }
+            @bottom-center { content:"Ver. {{ $documentOptions['version'] ?: '1.0' }}　{{ \Carbon\Carbon::parse($documentOptions['prepared_on'])->format('Y/m/d') }}"; color:#7b8992; font-size:8pt; }
+            @bottom-right { content:counter(page) " / " counter(pages); color:#173f50; font-size:8pt; font-weight:700; }
+        }
+        .page-section { break-after:page; }
+        .detail-section { break-before:page; }
+    </script>
     <script>window.PagedConfig = { auto: false };</script>
     <script defer src="{{ asset('vendor/pagedjs/paged.polyfill.js') }}"></script>
 </head>
@@ -246,11 +261,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         if (document.fonts?.ready) await document.fonts.ready;
-        await window.PagedPolyfill.preview(source, undefined, output);
+        const pagedStylesheet = {};
+        pagedStylesheet[`${window.location.href}#paged-page-rules`] = document.getElementById('paged-page-rules').textContent;
+        await window.PagedPolyfill.preview(source, [pagedStylesheet], output);
         printButton.disabled = false;
     } catch (error) {
         console.error('印刷プレビューの生成に失敗しました。', error);
-        output.innerHTML = '<p style="margin:40px;text-align:center">印刷プレビューを生成できませんでした。画面を再読み込みしてください。</p>';
+        output.hidden = true;
+        source.classList.add('preview-fallback');
+        printButton.disabled = false;
     } finally {
         document.body.classList.remove('is-paginating');
     }
