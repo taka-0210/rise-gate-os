@@ -27,8 +27,8 @@
         #paged-output { padding:24px 0 60px; }
         .pagedjs_pages { display:flex; flex-direction:column; align-items:center; gap:22px; }
         .pagedjs_page { margin:0!important; background:#fff; box-shadow:0 8px 30px rgba(28,50,64,.13); }
-        .page-section { break-after:page; }
-        .page-section:last-child { break-after:auto; }
+        .page-section { break-after:page; page-break-after:always; }
+        .cover { break-after:page; page-break-after:always; }
         .cover { min-height:174mm; display:flex; flex-direction:column; justify-content:space-between; border-top:9px solid var(--navy); padding-top:12mm; }
         .logo { width:205px; height:auto; max-height:44mm; object-fit:contain; object-position:left center; }
         .issuer-name { color:var(--navy); font-size:23px; font-weight:900; }
@@ -76,7 +76,7 @@
         .status { display:inline-flex; margin-left:6px; padding:2px 7px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:10px; }
         .continued { color:var(--muted); font-size:12px; font-weight:500; }
         @page {
-            size:A4 landscape;
+            size:297mm 210mm;
             margin:13mm 14mm 15mm;
             @bottom-left { content:"{{ $issuerName ?? '' }} / Confidential"; color:#7b8992; font-size:8pt; }
             @bottom-center { content:"Ver. {{ $documentOptions['version'] ?: '1.0' }}　{{ \Carbon\Carbon::parse($documentOptions['prepared_on'])->format('Y/m/d') }}"; color:#7b8992; font-size:8pt; }
