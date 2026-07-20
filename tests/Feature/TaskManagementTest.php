@@ -415,6 +415,41 @@ class TaskManagementTest extends TestCase
             ->assertSee("source.classList.add('preview-fallback')", false);
     }
 
+    public function test_client_plan_uses_relative_days_when_project_has_no_start_date(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['start_date' => null, 'due_date' => null, 'duration_days' => 30]);
+        $task = $this->createTask($project, $owner);
+        $task->improvement->roadmap->update([
+            'planned_start_date' => null,
+            'target_date' => null,
+            'planned_start_day' => 2,
+            'target_day' => 20,
+        ]);
+        $task->improvement->update([
+            'visibility' => Improvement::VISIBILITY_CLIENT,
+            'planned_start_date' => null,
+            'target_date' => null,
+            'planned_start_day' => 3,
+            'target_day' => 18,
+        ]);
+        $task->update([
+            'planned_start_date' => null,
+            'due_date' => null,
+            'planned_start_day' => 4,
+            'due_day' => 12,
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.client-plan', ['project' => $project, 'show_tasks' => 1]))
+            ->assertOk()
+            ->assertSee('2～20日目')
+            ->assertSee('3～18日目')
+            ->assertSee('4～12日目')
+            ->assertDontSee('未設定 〜 未設定');
+    }
+
     public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

@@ -130,6 +130,16 @@
     $relativeSchedule = !$project->start_date && (int)$project->duration_days > 0;
     $relativeOrigin = collect()->concat($roadmaps->pluck('planned_start_date'))->concat($visibleImprovements->pluck('planned_start_date'))->concat($visibleTasks->pluck('planned_start_date'))->filter()->min();
     $relativeDay = fn($day,$date) => $day ?: ($relativeOrigin && $date ? $relativeOrigin->diffInDays($date)+1 : null);
+    $detailPeriod = function ($startDay, $endDay, $startDate, $endDate) use ($relativeSchedule, $relativeDay) {
+        if ($relativeSchedule) {
+            $start = $relativeDay($startDay, $startDate);
+            $end = $relativeDay($endDay, $endDate);
+
+            return $start && $end ? $start.'～'.$end.'日目' : '未設定';
+        }
+
+        return ($startDate?->format('Y年n月j日') ?? '未設定').' 〜 '.($endDate?->format('Y年n月j日') ?? '未設定');
+    };
     $periodText = $relativeSchedule
         ? '着手後 '.$project->duration_days.'日間（休日を含む）'
         : (($project->start_date?->format('Y年n月j日') ?? '未設定').' 〜 '.($project->due_date?->format('Y年n月j日') ?? '未設定'));
@@ -258,14 +268,14 @@
             <article class="roadmap-detail">
                 <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmap->title }} @if($showProgress)<span class="status">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span>@endif</h3>
                 @if($roadmap->purpose)<p>{{ $roadmap->purpose }}</p>@endif
-                <div class="period">{{ $roadmap->planned_start_date?->format('Y年n月j日') ?? '未設定' }} 〜 {{ $roadmap->target_date?->format('Y年n月j日') ?? '未設定' }}</div>
+                <div class="period">{{ $detailPeriod($roadmap->planned_start_day, $roadmap->target_day, $roadmap->planned_start_date, $roadmap->target_date) }}</div>
                 @foreach($roadmap->improvements as $improvement)
                     <section class="improvement-detail">
                         <h3>取り組み {{ $loop->iteration }}：{{ $improvement->title }} @if($showProgress)<span class="status">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}</span>@endif</h3>
                         @if($improvement->desired_state || $improvement->action)<p>{{ $improvement->desired_state ?: $improvement->action }}</p>@endif
-                        <div class="period">{{ $improvement->planned_start_date?->format('Y年n月j日') ?? '未設定' }} 〜 {{ $improvement->target_date?->format('Y年n月j日') ?? '未設定' }}</div>
+                        <div class="period">{{ $detailPeriod($improvement->planned_start_day, $improvement->target_day, $improvement->planned_start_date, $improvement->target_date) }}</div>
                         @if($showTasks && $improvement->tasks->isNotEmpty())
-                            <ol class="task-list">@foreach($improvement->tasks as $task)<li>{{ $task->title }} @if($showProgress)<span class="status">{{ $taskStatuses[$task->status] ?? $task->status }}</span>@endif <span class="period">{{ $task->planned_start_date?->format('Y/n/j') ?? '未設定' }}〜{{ $task->due_date?->format('Y/n/j') ?? '未設定' }}</span></li>@endforeach</ol>
+                            <ol class="task-list">@foreach($improvement->tasks as $task)<li>{{ $task->title }} @if($showProgress)<span class="status">{{ $taskStatuses[$task->status] ?? $task->status }}</span>@endif <span class="period">{{ $detailPeriod($task->planned_start_day, $task->due_day, $task->planned_start_date, $task->due_date) }}</span></li>@endforeach</ol>
                         @endif
                     </section>
                 @endforeach
