@@ -76,11 +76,6 @@ class WorkspaceBusinessProfileTest extends TestCase
             ->assertSee('RISE GATE')
             ->assertSee(route('projects.business-media', [$project, 'logo']), false);
 
-        $pdf = $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
-            ->get(route('projects.client-plan.pdf', $project));
-
-        $pdf->assertOk()->assertHeader('content-type', 'application/pdf');
-        $this->assertStringContainsString('/Subtype /Image', $pdf->getContent());
     }
 
     public function test_regular_workspace_member_cannot_update_issuer_profile(): void

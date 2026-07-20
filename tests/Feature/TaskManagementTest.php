@@ -346,30 +346,8 @@ class TaskManagementTest extends TestCase
             ->assertSee($task->improvement->roadmap->title)
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
-            ->assertSee('PDF保存');
-    }
-
-    public function test_client_plan_can_be_downloaded_as_a_pdf(): void
-    {
-        [$owner, $workspace, $project] = $this->createProjectOwner();
-        $this->createTask($project, $owner);
-
-        $response = $this->actingAs($owner)
-            ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.client-plan.pdf', $project));
-
-        $response->assertOk()
-            ->assertHeader('content-type', 'application/pdf');
-
-        $this->assertStringStartsWith('%PDF-', $response->getContent());
-        $this->assertStringContainsString('IPAexGothic', $response->getContent());
-        $this->assertStringNotContainsString('/BaseFont /Helvetica-Bold', $response->getContent());
-        $this->assertLessThanOrEqual(10, preg_match_all('/\/Type\s*\/Page\b/', $response->getContent()));
-    }
-
-    public function test_client_plan_pdf_font_is_available(): void
-    {
-        $this->assertFileExists(resource_path('fonts/ipaexg.ttf'));
+            ->assertSee('印刷・PDF保存')
+            ->assertSee('vendor/pagedjs/paged.polyfill.js', false);
     }
 
     public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void

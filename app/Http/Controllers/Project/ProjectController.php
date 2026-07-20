@@ -355,39 +355,6 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function clientPlanPdf(Request $request, Project $project)
-    {
-        $data = $this->clientPlan($request, $project)->getData();
-        $fileName = preg_replace('/[\\\\\/:*?"<>|]+/u', '-', $project->name).'_プロジェクト実施計画書.pdf';
-        $fontPath = str_replace('\\', '/', resource_path('fonts/ipaexg.ttf'));
-        $businessProfile = $project->owningWorkspace->businessProfile;
-        $logoPath = $businessProfile?->logo_path;
-        $data['logoDataUri'] = null;
-
-        if ($logoPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($logoPath)) {
-            $logoMime = \Illuminate\Support\Facades\Storage::disk('local')->mimeType($logoPath) ?: 'image/png';
-            $logoBytes = \Illuminate\Support\Facades\Storage::disk('local')->get($logoPath);
-            $data['logoDataUri'] = 'data:'.$logoMime.';base64,'.base64_encode($logoBytes);
-        }
-
-        \Illuminate\Support\Facades\File::ensureDirectoryExists(storage_path('fonts'));
-
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::setOption('isPhpEnabled', true)
-            ->setPaper('a4', 'landscape');
-        foreach (['normal', 'bold'] as $weight) {
-            $fontRegistered = $pdf->getDomPDF()->getFontMetrics()->registerFont([
-                'family' => 'IPAexGothic',
-                'weight' => $weight,
-                'style' => 'normal',
-            ], $fontPath);
-
-            throw_unless($fontRegistered, \RuntimeException::class, 'PDF用日本語フォントを登録できませんでした。');
-        }
-
-        return $pdf->loadView('projects.client-plan-pdf', $data)
-            ->download($fileName);
-    }
-
     public function legacy(Request $request, Project $project): View
     {
         return view('projects.show', $this->show($request, $project)->getData());
