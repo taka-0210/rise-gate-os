@@ -67,7 +67,16 @@ mkdir -p \
     "$app_root/storage/framework/cache/data" \
     "$app_root/storage/framework/sessions" \
     "$app_root/storage/framework/views" \
+    "$app_root/storage/fonts" \
     "$app_root/storage/logs" \
+    "$app_root/bootstrap/cache"
+
+chmod 775 \
+    "$app_root/storage/fonts" \
+    "$app_root/storage/logs" \
+    "$app_root/storage/framework/cache/data" \
+    "$app_root/storage/framework/sessions" \
+    "$app_root/storage/framework/views" \
     "$app_root/bootstrap/cache"
 
 rsync -a --delete \
