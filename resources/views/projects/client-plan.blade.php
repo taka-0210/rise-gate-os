@@ -136,8 +136,13 @@
     $ticks = collect(range(0,$axisDays,$tickStep))->push($axisDays)->unique()->sort()->values();
     $overviewChunks = collect();
     if ($roadmaps->isNotEmpty()) {
-        $overviewChunks->push($roadmaps->take(3));
-        foreach ($roadmaps->skip(3)->chunk(4) as $chunk) $overviewChunks->push($chunk);
+        $overviewChunks->push($roadmaps->take(2));
+        $remainingRoadmaps = $roadmaps->skip(2);
+        if ($remainingRoadmaps->isNotEmpty()) {
+            $remainingPageCount = (int) ceil($remainingRoadmaps->count() / 6);
+            $remainingChunkSize = (int) ceil($remainingRoadmaps->count() / $remainingPageCount);
+            foreach ($remainingRoadmaps->chunk($remainingChunkSize) as $chunk) $overviewChunks->push($chunk);
+        }
     }
     $scheduleChunks = $timelineRows->chunk(12);
 @endphp
@@ -185,7 +190,7 @@
     </section>
 
     @forelse($overviewChunks as $overviewChunk)
-        <section class="page-section">
+        <section class="page-section" data-overview-count="{{ $overviewChunk->count() }}">
             <h2>1. プロジェクト全体概要 @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
             @if($loop->first)
                 <h3>{{ $project->name }}</h3>

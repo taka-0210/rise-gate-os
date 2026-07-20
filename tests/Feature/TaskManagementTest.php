@@ -335,6 +335,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('お客さまへ提出する計画概要')
             ->assertSee($task->improvement->roadmap->title)
             ->assertSee('提出用ロードマップ8')
+            ->assertSee('data-overview-count="2"', false)
+            ->assertSee('data-overview-count="6"', false)
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
             ->assertSee('2. 全体スケジュール')
