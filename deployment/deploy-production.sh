@@ -62,6 +62,7 @@ rsync -a --delete \
     "$release_root/" "$app_root/"
 
 mkdir -p \
+    "$app_root/public" \
     "$app_root/storage/app/public" \
     "$app_root/storage/app/private" \
     "$app_root/storage/framework/cache/data" \
