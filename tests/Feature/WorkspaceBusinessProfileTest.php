@@ -74,6 +74,7 @@ class WorkspaceBusinessProfileTest extends TestCase
             ->get(route('projects.client-plan', $project))
             ->assertOk()
             ->assertSee('RISE GATE')
+            ->assertSee('class="issuer-block"', false)
             ->assertSee(route('projects.business-media', [$project, 'logo']), false);
 
     }

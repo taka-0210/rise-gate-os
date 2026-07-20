@@ -32,16 +32,19 @@
         .page-section { break-after:page; }
         .detail-section { break-before:page; }
         .cover { min-height:174mm; display:flex; flex-direction:column; justify-content:space-between; border-top:9px solid var(--navy); padding-top:12mm; }
-        .logo { width:205px; height:auto; max-height:44mm; object-fit:contain; object-position:left center; }
+        .cover-main { margin-top:30mm; }
+        .cover-bottom { display:grid; grid-template-columns:minmax(0,1fr) 78mm; gap:20mm; align-items:end; padding-top:12px; border-top:1px solid var(--line); }
+        .issuer-block { width:78mm; justify-self:end; text-align:right; }
+        .logo { display:block; width:205px; height:auto; max-height:38mm; margin-left:auto; object-fit:contain; object-position:right center; }
         .issuer-name { color:var(--navy); font-size:23px; font-weight:900; }
         .issuer-details { margin-top:8px; color:var(--muted); font-size:12px; line-height:1.6; }
-        .eyebrow { margin-top:20mm; color:var(--blue); font-weight:800; letter-spacing:.12em; }
+        .eyebrow { color:var(--blue); font-weight:800; letter-spacing:.12em; }
         h1 { margin:8px 0 12px; font-size:38px; line-height:1.25; }
         h2 { margin:0 0 18px; padding-bottom:9px; border-bottom:2px solid var(--navy); font-size:24px; }
         h3 { margin:0 0 8px; font-size:18px; }
         p { color:var(--muted); line-height:1.75; }
         .cover-client { font-size:20px; font-weight:800; }
-        .cover-meta { display:grid; grid-template-columns:150px 1fr; gap:7px 18px; padding-top:12px; border-top:1px solid var(--line); font-size:14px; }
+        .cover-meta { display:grid; grid-template-columns:150px 1fr; gap:7px 18px; margin:0; font-size:14px; }
         .cover-meta dt { color:var(--muted); }
         .cover-meta dd { margin:0; font-weight:700; }
         .lead { font-size:16px; color:#394a55; }
@@ -171,31 +174,35 @@
 
 <main id="print-source">
     <section class="page-section cover">
-        <div>
-            @if($businessProfile?->logo_path)
-                <img class="logo" src="{{ route('projects.business-media', [$project,'logo']) }}" alt="{{ $issuerName }}">
-            @else
-                <div class="issuer-name">{{ $issuerName }}</div>
-            @endif
-            @if($businessProfile)
-                <div class="issuer-details">
-                    @if($businessProfile->legal_name && $businessProfile->legal_name !== $issuerName)<div>{{ $businessProfile->legal_name }}</div>@endif
-                    @if($businessProfile->postal_code || $businessProfile->address_line1)<div>〒{{ $businessProfile->postal_code }} {{ $businessProfile->address_line1 }} {{ $businessProfile->address_line2 }}</div>@endif
-                    @if($businessProfile->phone)<div>TEL {{ $businessProfile->phone }}</div>@endif
-                </div>
-            @endif
+        <div class="cover-main">
             <div class="eyebrow">PROJECT IMPLEMENTATION PLAN</div>
             <h1>プロジェクト実施計画書</h1>
             <p class="cover-client">{{ $project->client?->name ?? 'クライアント未設定' }} 御中</p>
             <h2 style="border:0;padding:0;margin-top:28px;">{{ $project->name }}</h2>
         </div>
-        <dl class="cover-meta">
-            <dt>プロジェクト期間</dt><dd>{{ $periodText }}</dd>
-            <dt>作成日</dt><dd>{{ \Carbon\Carbon::parse($documentOptions['prepared_on'])->format('Y年n月j日') }}</dd>
-            <dt>作成者</dt><dd>{{ $documentOptions['prepared_by'] ?: '未設定' }}</dd>
-            <dt>版番号</dt><dd>Ver. {{ $documentOptions['version'] ?: '1.0' }}</dd>
-        </dl>
-</section>
+        <div class="cover-bottom">
+            <dl class="cover-meta">
+                <dt>プロジェクト期間</dt><dd>{{ $periodText }}</dd>
+                <dt>作成日</dt><dd>{{ \Carbon\Carbon::parse($documentOptions['prepared_on'])->format('Y年n月j日') }}</dd>
+                <dt>作成者</dt><dd>{{ $documentOptions['prepared_by'] ?: '未設定' }}</dd>
+                <dt>版番号</dt><dd>Ver. {{ $documentOptions['version'] ?: '1.0' }}</dd>
+            </dl>
+            <aside class="issuer-block">
+                @if($businessProfile?->logo_path)
+                    <img class="logo" src="{{ route('projects.business-media', [$project,'logo']) }}" alt="{{ $issuerName }}">
+                @else
+                    <div class="issuer-name">{{ $issuerName }}</div>
+                @endif
+                @if($businessProfile)
+                    <div class="issuer-details">
+                        @if($businessProfile->legal_name && $businessProfile->legal_name !== $issuerName)<div>{{ $businessProfile->legal_name }}</div>@endif
+                        @if($businessProfile->postal_code || $businessProfile->address_line1)<div>〒{{ $businessProfile->postal_code }} {{ $businessProfile->address_line1 }} {{ $businessProfile->address_line2 }}</div>@endif
+                        @if($businessProfile->phone)<div>TEL {{ $businessProfile->phone }}</div>@endif
+                    </div>
+                @endif
+            </aside>
+        </div>
+    </section>
 
     <section class="page-section">
         <h2>1. 現状と目指す未来のカタチ</h2>
