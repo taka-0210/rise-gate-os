@@ -85,14 +85,14 @@ class AiProposalApplier
         $attributes = $item->attributes;
 
         return match ($item->entity_type) {
-            'roadmap' => Roadmap::create(Arr::only($attributes, ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date']) + [
+            'roadmap' => Roadmap::create(Arr::only($attributes, ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day']) + [
                 'organization_id' => $proposal->organization_id,
                 'workspace_id' => $proposal->workspace_id,
                 'project_id' => $proposal->project_id,
                 'status' => $attributes['status'] ?? Roadmap::STATUS_DRAFT,
                 'created_by' => $reviewer->id,
             ]),
-            'improvement' => Improvement::create(Arr::only($attributes, ['title', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date']) + [
+            'improvement' => Improvement::create(Arr::only($attributes, ['title', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day']) + [
                 'organization_id' => $proposal->organization_id,
                 'workspace_id' => $proposal->workspace_id,
                 'project_id' => $proposal->project_id,
@@ -102,7 +102,7 @@ class AiProposalApplier
                 'proposed_by' => $reviewer->id,
                 'assigned_to' => $reviewer->id,
             ]),
-            'task' => Task::create(Arr::only($attributes, ['title', 'description', 'status', 'priority', 'planned_start_date', 'due_date']) + [
+            'task' => Task::create(Arr::only($attributes, ['title', 'description', 'status', 'priority', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day']) + [
                 'organization_id' => $proposal->organization_id,
                 'workspace_id' => $proposal->workspace_id,
                 'project_id' => $proposal->project_id,
@@ -125,9 +125,9 @@ class AiProposalApplier
         };
 
         $allowed = match ($item->entity_type) {
-            'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date'],
-            'improvement' => ['title', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date'],
-            'task' => ['title', 'description', 'status', 'priority', 'planned_start_date', 'due_date'],
+            'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
+            'improvement' => ['title', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
+            'task' => ['title', 'description', 'status', 'priority', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day'],
         };
         $model->update(Arr::only($attributes, $allowed));
 

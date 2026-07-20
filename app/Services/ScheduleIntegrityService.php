@@ -16,6 +16,10 @@ class ScheduleIntegrityService
     {
         $project->loadMissing(['roadmaps.improvements.tasks', 'improvements.tasks']);
 
+        if (! $project->start_date && $project->duration_days) {
+            return $this->inspectRelative($project);
+        }
+
         $missing = collect();
         $invalid = collect();
         $unverifiable = collect();
@@ -115,5 +119,54 @@ class ScheduleIntegrityService
     public function within(CarbonInterface $start, CarbonInterface $end, CarbonInterface $parentStart, CarbonInterface $parentEnd): bool
     {
         return $start->gte($parentStart) && $end->lte($parentEnd);
+    }
+
+    private function inspectRelative(Project $project): array
+    {
+        $missing = collect();
+        $invalid = collect();
+        $entities = ['missing' => collect(), 'invalid' => collect(), 'unverifiable' => collect()];
+        $check = function ($model, string $type, ?int $start, ?int $end, int $parentStart, int $parentEnd) use ($missing, $invalid, $entities): void {
+            $key = $type.':'.$model->id;
+            if (! $start || ! $end) {
+                $missing->push("{$model->title} の相対期間が未設定です。");
+                $entities['missing']->push($key);
+            } elseif ($start < $parentStart || $end > $parentEnd || $end < $start) {
+                $invalid->push("{$model->title} が上位項目の期間外です。");
+                $entities['invalid']->push($key);
+            }
+        };
+
+        foreach ($project->roadmaps as $roadmap) {
+            $check($roadmap, 'roadmap', $roadmap->planned_start_day, $roadmap->target_day, 1, $project->duration_days);
+            foreach ($roadmap->improvements as $improvement) {
+                $check($improvement, 'improvement', $improvement->planned_start_day, $improvement->target_day, $roadmap->planned_start_day ?? 1, $roadmap->target_day ?? $project->duration_days);
+                foreach ($improvement->tasks as $task) {
+                    $check($task, 'task', $task->planned_start_day, $task->due_day, $improvement->planned_start_day ?? 1, $improvement->target_day ?? $project->duration_days);
+                }
+            }
+        }
+
+        foreach ($project->improvements->whereNull('roadmap_id') as $improvement) {
+            $missing->push("{$improvement->title} にロードマップが設定されていません。");
+            $entities['missing']->push('improvement:'.$improvement->id);
+        }
+
+        $counts = fn (Collection $items) => collect(['project', 'roadmap', 'improvement', 'task'])
+            ->mapWithKeys(fn (string $type) => [$type => $items->unique()->filter(fn (string $key) => str_starts_with($key, $type.':'))->count()])->all();
+        $invalidCount = $entities['invalid']->unique()->count();
+        $missingCount = $entities['missing']->unique()->count();
+
+        return [
+            'status' => $invalid->isNotEmpty() ? self::STATUS_INVALID : ($missing->isNotEmpty() ? self::STATUS_MISSING : self::STATUS_OK),
+            'label' => $invalid->isNotEmpty() ? "期間外設定：残り{$invalidCount}件" : ($missing->isNotEmpty() ? "相対日程未設定：残り{$missingCount}件" : '整合性OK'),
+            'missing' => $missing->unique()->values(),
+            'invalid' => $invalid->unique()->values(),
+            'unverifiable' => collect(),
+            'entities' => collect($entities)->map(fn (Collection $items) => $items->unique()->values()),
+            'counts' => ['missing' => $counts($entities['missing']), 'invalid' => $counts($entities['invalid']), 'unverifiable' => $counts($entities['unverifiable'])],
+            'remaining_count' => $invalid->isNotEmpty() ? $invalidCount : $missingCount,
+            'issue_count' => $entities['missing']->merge($entities['invalid'])->unique()->count(),
+        ];
     }
 }

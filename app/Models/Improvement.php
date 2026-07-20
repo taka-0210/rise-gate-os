@@ -43,6 +43,8 @@ class Improvement extends Model
         'next_action',
         'planned_start_date',
         'target_date',
+        'planned_start_day',
+        'target_day',
         'completed_at',
         'status',
         'visibility',
@@ -65,6 +67,8 @@ class Improvement extends Model
             'implemented_at' => 'datetime',
             'planned_start_date' => 'date',
             'target_date' => 'date',
+            'planned_start_day' => 'integer',
+            'target_day' => 'integer',
             'completed_at' => 'date',
         ];
     }

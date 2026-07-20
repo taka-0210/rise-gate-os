@@ -36,6 +36,8 @@ class Task extends Model
         'created_by',
         'planned_start_date',
         'due_date',
+        'planned_start_day',
+        'due_day',
         'completed_at',
     ];
 
@@ -51,6 +53,8 @@ class Task extends Model
         return [
             'planned_start_date' => 'date',
             'due_date' => 'date',
+            'planned_start_day' => 'integer',
+            'due_day' => 'integer',
             'completed_at' => 'datetime',
         ];
     }

@@ -60,8 +60,13 @@
             </div>
 
             <div class="grid">
-                <div class="field"><label for="planned_start_date">開始予定日</label><input id="planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date', $improvement->planned_start_date?->format('Y-m-d')) }}">@error('planned_start_date') <div class="error">{{ $message }}</div> @enderror</div>
-                <div class="field"><label for="target_date">完了予定日</label><input id="target_date" name="target_date" type="date" value="{{ old('target_date', $improvement->target_date?->format('Y-m-d')) }}">@error('target_date') <div class="error">{{ $message }}</div> @enderror</div>
+                @if(!$project->start_date && $project->duration_days)
+                    <div class="field"><label for="planned_start_day">開始（着手後・日目）</label><input id="planned_start_day" name="planned_start_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('planned_start_day', $improvement->planned_start_day) }}">@error('planned_start_day') <div class="error">{{ $message }}</div> @enderror</div>
+                    <div class="field"><label for="target_day">完了（着手後・日目）</label><input id="target_day" name="target_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('target_day', $improvement->target_day) }}">@error('target_day') <div class="error">{{ $message }}</div> @enderror</div>
+                @else
+                    <div class="field"><label for="planned_start_date">開始予定日</label><input id="planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date', $improvement->planned_start_date?->format('Y-m-d')) }}">@error('planned_start_date') <div class="error">{{ $message }}</div> @enderror</div>
+                    <div class="field"><label for="target_date">完了予定日</label><input id="target_date" name="target_date" type="date" value="{{ old('target_date', $improvement->target_date?->format('Y-m-d')) }}">@error('target_date') <div class="error">{{ $message }}</div> @enderror</div>
+                @endif
                 <div class="field"><label for="completed_at">実際の完了日</label><input id="completed_at" name="completed_at" type="date" value="{{ old('completed_at', $improvement->completed_at?->format('Y-m-d')) }}">@error('completed_at') <div class="error">{{ $message }}</div> @enderror</div>
             </div>
 

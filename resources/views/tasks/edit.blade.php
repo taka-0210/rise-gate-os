@@ -12,6 +12,10 @@
             @csrf
             @method('PUT')
 
+            @if(!$project->start_date && $project->duration_days)
+            <div class="field"><label for="planned_start_day">開始（着手後・日目）</label><input id="planned_start_day" name="planned_start_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('planned_start_day', $task->planned_start_day) }}">@error('planned_start_day') <div class="error">{{ $message }}</div> @enderror</div>
+            <div class="field"><label for="due_day">完了（着手後・日目）</label><input id="due_day" name="due_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('due_day', $task->due_day) }}">@error('due_day') <div class="error">{{ $message }}</div> @enderror</div>
+            @else
             <div class="field">
                 <label for="improvement_id">所属する取り組み</label>
                 <select id="improvement_id" name="improvement_id" required>
@@ -23,6 +27,7 @@
                 </select>
                 @error('improvement_id') <div class="error">{{ $message }}</div> @enderror
             </div>
+            @endif
 
             <div class="field">
                 <label for="title">Task名</label>

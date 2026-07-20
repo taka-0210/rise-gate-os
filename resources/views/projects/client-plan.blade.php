@@ -127,22 +127,25 @@
 @php
     $showTasks = $documentOptions['show_tasks'];
     $showProgress = $documentOptions['show_progress'];
-    $periodText = ($project->start_date?->format('Y年n月j日') ?? '未設定').' 〜 '.($project->due_date?->format('Y年n月j日') ?? '未設定');
-    $timelineRows = collect([['type'=>'project','title'=>$project->name,'start'=>$project->start_date,'end'=>$project->due_date]]);
+    $relativeSchedule = !$project->start_date && (int)$project->duration_days > 0;
+    $periodText = $relativeSchedule
+        ? '着手後 '.$project->duration_days.'日間（休日を含む）'
+        : (($project->start_date?->format('Y年n月j日') ?? '未設定').' 〜 '.($project->due_date?->format('Y年n月j日') ?? '未設定'));
+    $timelineRows = collect([['type'=>'project','title'=>$project->name,'start'=>$relativeSchedule?1:$project->start_date,'end'=>$relativeSchedule?$project->duration_days:$project->due_date]]);
     foreach ($roadmaps as $roadmap) {
-        $timelineRows->push(['type'=>'roadmap','title'=>$roadmap->title,'start'=>$roadmap->planned_start_date,'end'=>$roadmap->target_date]);
+        $timelineRows->push(['type'=>'roadmap','title'=>$roadmap->title,'start'=>$relativeSchedule?$roadmap->planned_start_day:$roadmap->planned_start_date,'end'=>$relativeSchedule?$roadmap->target_day:$roadmap->target_date]);
         foreach ($roadmap->improvements as $improvement) {
-            $timelineRows->push(['type'=>'improvement','title'=>$improvement->title,'start'=>$improvement->planned_start_date,'end'=>$improvement->target_date]);
+            $timelineRows->push(['type'=>'improvement','title'=>$improvement->title,'start'=>$relativeSchedule?$improvement->planned_start_day:$improvement->planned_start_date,'end'=>$relativeSchedule?$improvement->target_day:$improvement->target_date]);
             if ($showTasks) foreach ($improvement->tasks as $task) {
-                $timelineRows->push(['type'=>'task','title'=>$task->title,'start'=>$task->planned_start_date,'end'=>$task->due_date]);
+                $timelineRows->push(['type'=>'task','title'=>$task->title,'start'=>$relativeSchedule?$task->planned_start_day:$task->planned_start_date,'end'=>$relativeSchedule?$task->due_day:$task->due_date]);
             }
         }
     }
     $dates = $timelineRows->flatMap(fn($row)=>[$row['start'],$row['end']])->filter();
-    $axisStart = $dates->min() ?: now()->startOfDay();
-    $axisEnd = $dates->max() ?: $axisStart->copy()->addMonth();
-    if ($axisEnd->lte($axisStart)) $axisEnd = $axisStart->copy()->addDays(14);
-    $axisDays = max(1,$axisStart->diffInDays($axisEnd));
+    $axisStart = $relativeSchedule ? 1 : ($dates->min() ?: now()->startOfDay());
+    $axisEnd = $relativeSchedule ? (int)$project->duration_days : ($dates->max() ?: $axisStart->copy()->addMonth());
+    if (!$relativeSchedule && $axisEnd->lte($axisStart)) $axisEnd = $axisStart->copy()->addDays(14);
+    $axisDays = $relativeSchedule ? max(1,$axisEnd-$axisStart) : max(1,$axisStart->diffInDays($axisEnd));
     $tickStep = max(1,(int)ceil($axisDays/8));
     $ticks = collect(range(0,$axisDays,$tickStep))->push($axisDays)->unique()->sort()->values();
     $overviewChunks = collect();
@@ -235,7 +238,7 @@
                     <article>
                         <h3>{{ $roadmaps->search(fn($item)=>$item->id===$roadmap->id)+1 }}. {{ $roadmap->title }}</h3>
                         @if($roadmap->purpose)<p>{{ $roadmap->purpose }}</p>@endif
-                        <div class="period">予定：{{ $roadmap->planned_start_date?->format('Y/n/j') ?? '未設定' }} 〜 {{ $roadmap->target_date?->format('Y/n/j') ?? '未設定' }} / 取り組み {{ $roadmap->improvements->count() }}件</div>
+                        <div class="period">予定：{{ $relativeSchedule ? (($roadmap->planned_start_day ? $roadmap->planned_start_day.'日目' : '未設定').' 〜 '.($roadmap->target_day ? $roadmap->target_day.'日目' : '未設定')) : (($roadmap->planned_start_date?->format('Y/n/j') ?? '未設定').' 〜 '.($roadmap->target_date?->format('Y/n/j') ?? '未設定')) }} / 取り組み {{ $roadmap->improvements->count() }}件</div>
                     </article>
                 @endforeach
             </div>
@@ -272,11 +275,11 @@
             <h2>4. 全体スケジュール @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
             <div class="legend"><span style="--color:var(--navy)">プロジェクト</span><span style="--color:var(--blue)">ロードマップ</span><span style="--color:var(--green)">取り組み</span>@if($showTasks)<span style="--color:var(--red)">タスク</span>@endif</div>
             <div class="schedule-wrap">
-                <div class="schedule-axis"><div class="schedule-label"><strong>計画項目</strong></div><div class="schedule-track">@foreach($ticks as $tick)<span class="schedule-date {{ $loop->first?'first':'' }} {{ $loop->last?'last':'' }}" style="left:{{ $tick/$axisDays*100 }}%">{{ $axisStart->copy()->addDays($tick)->format('n/j') }}</span>@endforeach</div></div>
+                <div class="schedule-axis"><div class="schedule-label"><strong>計画項目</strong></div><div class="schedule-track">@foreach($ticks as $tick)<span class="schedule-date {{ $loop->first?'first':'' }} {{ $loop->last?'last':'' }}" style="left:{{ $tick/$axisDays*100 }}%">{{ $relativeSchedule ? ($axisStart+$tick).'日目' : $axisStart->copy()->addDays($tick)->format('n/j') }}</span>@endforeach</div></div>
                 @foreach($scheduleChunk as $row)
                     @php
-                        $left=$row['start']?max(0,min(100,$axisStart->diffInDays($row['start'],false)/$axisDays*100)):0;
-                        $width=($row['start']&&$row['end'])?max(.7,$row['start']->diffInDays($row['end'])/$axisDays*100):0;
+                        $left=$row['start']?max(0,min(100,($relativeSchedule?($row['start']-$axisStart):$axisStart->diffInDays($row['start'],false))/$axisDays*100)):0;
+                        $width=($row['start']&&$row['end'])?max(.7,($relativeSchedule?($row['end']-$row['start']):$row['start']->diffInDays($row['end']))/$axisDays*100):0;
                     @endphp
                     <div class="schedule-row {{ $row['type'] }}"><div class="schedule-label"><strong>{{ $row['title'] }}</strong></div><div class="schedule-track">@if($row['start']&&$row['end'])<span class="schedule-bar {{ $row['type'] }}" style="left:{{ $left }}%;width:{{ $width }}%"></span>@endif</div></div>
                 @endforeach

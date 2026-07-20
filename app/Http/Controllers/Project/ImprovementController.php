@@ -189,6 +189,8 @@ class ImprovementController extends Controller
             'next_action' => ['nullable', 'string', 'max:10000'],
             'planned_start_date' => ['nullable', 'date'],
             'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
+            'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
+            'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'completed_at' => ['nullable', 'date'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::statuses()))],
             'visibility' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::visibilities()))],

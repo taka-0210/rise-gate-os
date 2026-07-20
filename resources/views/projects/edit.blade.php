@@ -85,13 +85,19 @@
 
             <div class="grid">
                 <div class="field">
-                    <label for="start_date">開始日</label>
+                    <label for="duration_days">期間（日）</label>
+                    <input id="duration_days" name="duration_days" type="number" min="1" max="3650" value="{{ old('duration_days', $project->duration_days) }}" placeholder="例：29">
+                    <div class="meta">休日を含む暦日です。開始日が未確定の場合は、この期間で計画します。</div>
+                    @error('duration_days') <div class="error">{{ $message }}</div> @enderror
+                </div>
+                <div class="field">
+                    <label for="start_date">開始日（決定後）</label>
                     <input id="start_date" name="start_date" type="date" value="{{ old('start_date', $project->start_date?->format('Y-m-d')) }}">
                     @error('start_date') <div class="error">{{ $message }}</div> @enderror
                 </div>
 
                 <div class="field">
-                    <label for="due_date">期限</label>
+                    <label for="due_date">終了日（決定後）</label>
                     <input id="due_date" name="due_date" type="date" value="{{ old('due_date', $project->due_date?->format('Y-m-d')) }}">
                     @error('due_date') <div class="error">{{ $message }}</div> @enderror
                 </div>

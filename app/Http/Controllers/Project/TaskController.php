@@ -101,6 +101,8 @@ class TaskController extends Controller
             'assigned_to' => ['nullable', Rule::in($assignableUserIds)],
             'planned_start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
+            'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:due_day'],
+            'due_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
         ]);
 
         $improvement = $project->improvements()->findOrFail($validated['improvement_id']);

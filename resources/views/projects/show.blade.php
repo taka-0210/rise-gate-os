@@ -292,6 +292,10 @@
                                 </select>
                             </div>
                             <div class="grid two">
+                                @if(!$project->start_date && $project->duration_days)
+                                <div class="field"><label for="roadmap_planned_start_day">開始（着手後・日目）</label><input id="roadmap_planned_start_day" name="planned_start_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('planned_start_day') }}">@error('planned_start_day') <div class="error">{{ $message }}</div> @enderror</div>
+                                <div class="field"><label for="roadmap_target_day">完了（着手後・日目）</label><input id="roadmap_target_day" name="target_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('target_day') }}">@error('target_day') <div class="error">{{ $message }}</div> @enderror</div>
+                                @else
                                 <div class="field">
                                     <label for="roadmap_planned_start_date">開始予定日</label>
                                     <input id="roadmap_planned_start_date" name="planned_start_date" type="date" value="{{ old('planned_start_date') }}">
@@ -302,6 +306,7 @@
                                     <input id="roadmap_target_date" name="target_date" type="date" value="{{ old('target_date') }}">
                                     @error('target_date') <div class="error">{{ $message }}</div> @enderror
                                 </div>
+                                @endif
                             </div>
                             <div class="field">
                                 <label for="roadmap_reached_at">実際の到達日</label>
@@ -505,6 +510,10 @@
                         @csrf
                         <h2>ProjectからTaskを登録</h2>
                         <p>通常作業として登録します。改善から生まれた作業は、Improvement詳細からTask化できます。</p>
+                        @if(!$project->start_date && $project->duration_days)
+                        <div class="field"><label for="task_planned_start_day">開始（着手後・日目）</label><input id="task_planned_start_day" name="planned_start_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('planned_start_day') }}">@error('planned_start_day') <div class="error">{{ $message }}</div> @enderror</div>
+                        <div class="field"><label for="task_due_day">完了（着手後・日目）</label><input id="task_due_day" name="due_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('due_day') }}">@error('due_day') <div class="error">{{ $message }}</div> @enderror</div>
+                        @else
                         <div class="field">
                             <label for="task_improvement_id">所属する取り組み</label>
                             <select id="task_improvement_id" name="improvement_id" required>
@@ -521,6 +530,7 @@
                             <label for="task_title">Task名</label>
                             <input id="task_title" name="title" value="{{ old('title') }}" required>
                         </div>
+                        @endif
                         <div class="field">
                             <label for="task_description">説明</label>
                             <textarea id="task_description" name="description" rows="3">{{ old('description') }}</textarea>

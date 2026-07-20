@@ -27,6 +27,8 @@ class Roadmap extends Model
         'purpose',
         'planned_start_date',
         'target_date',
+        'planned_start_day',
+        'target_day',
         'reached_at',
         'status',
         'sort_order',
@@ -38,6 +40,8 @@ class Roadmap extends Model
         return [
             'planned_start_date' => 'date',
             'target_date' => 'date',
+            'planned_start_day' => 'integer',
+            'target_day' => 'integer',
             'reached_at' => 'date',
         ];
     }

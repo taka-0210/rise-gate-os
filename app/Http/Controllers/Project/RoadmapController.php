@@ -26,6 +26,8 @@ class RoadmapController extends Controller
             'purpose' => ['nullable', 'string', 'max:5000'],
             'planned_start_date' => ['nullable', 'date'],
             'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
+            'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
+            'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'reached_at' => ['nullable', 'date'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Roadmap::statuses()))],
             'position_after_roadmap_id' => [
@@ -64,6 +66,8 @@ class RoadmapController extends Controller
                 'purpose' => $validated['purpose'] ?? null,
                 'planned_start_date' => $validated['planned_start_date'] ?? null,
                 'target_date' => $validated['target_date'] ?? null,
+                'planned_start_day' => $validated['planned_start_day'] ?? null,
+                'target_day' => $validated['target_day'] ?? null,
                 'reached_at' => $validated['reached_at'] ?? null,
                 'status' => $validated['status'],
                 'sort_order' => $insertIndex + 1,
@@ -98,6 +102,8 @@ class RoadmapController extends Controller
             'purpose' => ['nullable', 'string', 'max:5000'],
             'planned_start_date' => ['nullable', 'date'],
             'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
+            'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
+            'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'reached_at' => ['nullable', 'date'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Roadmap::statuses()))],
         ]);

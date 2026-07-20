@@ -41,6 +41,7 @@ class Project extends Model
         'priority',
         'start_date',
         'due_date',
+        'duration_days',
         'published_at',
         'completed_at',
     ];
@@ -57,6 +58,7 @@ class Project extends Model
         return [
             'start_date' => 'date',
             'due_date' => 'date',
+            'duration_days' => 'integer',
             'published_at' => 'datetime',
             'completed_at' => 'datetime',
         ];

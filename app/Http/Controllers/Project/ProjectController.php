@@ -13,6 +13,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\ScheduleIntegrityService;
+use App\Services\RelativeScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -165,6 +166,7 @@ class ProjectController extends Controller
         Gate::authorize('create', [Project::class, $currentWorkspace]);
 
         $validated = $this->validateProject($request, $currentWorkspace->id);
+        $validated = $this->normalizeProjectPeriod($validated);
         $starterMode = $request->validate([
             'starter_mode' => ['nullable', 'string', Rule::in(['blank', 'starter'])],
         ])['starter_mode'] ?? 'starter';
@@ -459,6 +461,7 @@ class ProjectController extends Controller
         Gate::authorize('update', $project);
 
         $validated = $this->validateProject($request, $project->owning_workspace_id);
+        $validated = $this->normalizeProjectPeriod($validated);
         if (! empty($validated['start_date']) && ! empty($validated['due_date'])) {
             $count = $project->roadmaps()
                 ->whereNotNull('planned_start_date')
@@ -473,7 +476,11 @@ class ProjectController extends Controller
                 ]);
             }
         }
+        $startWasUnset = ! $project->start_date;
         $project->update($validated);
+        if ($startWasUnset && $project->start_date) {
+            app(RelativeScheduleService::class)->anchor($project->fresh());
+        }
 
         return redirect()->route('projects.show', $project)->with('status', 'Projectを更新しました。');
     }
@@ -556,7 +563,26 @@ class ProjectController extends Controller
             'priority' => ['required', 'string', 'in:'.implode(',', array_keys(Project::priorities()))],
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'duration_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
         ]);
+    }
+
+    private function normalizeProjectPeriod(array $attributes): array
+    {
+        if (empty($attributes['duration_days']) && empty($attributes['start_date']) && empty($attributes['due_date'])) {
+            $attributes['duration_days'] = 30;
+        }
+
+        if (! empty($attributes['start_date']) && ! empty($attributes['duration_days'])) {
+            $attributes['due_date'] = Carbon::parse($attributes['start_date'])
+                ->addDays((int) $attributes['duration_days'] - 1)
+                ->toDateString();
+        } elseif (! empty($attributes['start_date']) && ! empty($attributes['due_date'])) {
+            $attributes['duration_days'] = Carbon::parse($attributes['start_date'])
+                ->diffInDays(Carbon::parse($attributes['due_date'])) + 1;
+        }
+
+        return $attributes;
     }
 
     private function workspaceClients(int $workspaceId)
