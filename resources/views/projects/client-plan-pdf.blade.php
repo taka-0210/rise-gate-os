@@ -3,12 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { margin: 20mm 14mm 16mm; }
+        @page { margin: 12mm 14mm 16mm; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #18232c; font-family: "IPAexGothic", sans-serif; font-size: 10px; line-height: 1.55; }
-        .header { position: fixed; top: -14mm; left: 0; right: 0; height: 9mm; border-bottom: 1px solid #d7e0e6; color: #687985; font-size: 8px; }
-        .header .title { float: left; }
-        .header .project { float: right; color: #173f50; font-weight: bold; }
         .footer { position: fixed; bottom: -11mm; left: 0; right: 0; height: 7mm; border-top: 1px solid #d7e0e6; color: #75858f; font-size: 8px; padding-top: 2mm; }
         .footer .issuer { float: left; }
         .footer .meta { float: right; padding-right: 20mm; }
@@ -43,6 +40,22 @@
         .kind-roadmap { color: #386cab; }
         .kind-improvement { color: #3e8665; }
         .kind-task { color: #ad5947; }
+        .gantt { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7px; }
+        .gantt thead { display: table-header-group; }
+        .gantt tr { page-break-inside: avoid; }
+        .gantt th, .gantt td { border: 1px solid #d7e0e6; }
+        .gantt .gantt-label { width: 39%; padding: 1.4mm 2mm; text-align: left; }
+        .gantt .gantt-date { height: 9mm; padding: .5mm 0; background: #f2f5f7; color: #60717e; font-size: 6px; text-align: center; vertical-align: middle; }
+        .gantt .gantt-slot { height: 5.5mm; padding: 0; background: #fff; }
+        .gantt .gantt-slot.active-roadmap { background: #4f82c4; }
+        .gantt .gantt-slot.active-improvement { background: #56a27e; }
+        .gantt .gantt-slot.active-task { background: #c7735f; }
+        .gantt .label-roadmap { color: #386cab; font-weight: bold; }
+        .gantt .label-improvement { padding-left: 4mm; color: #3e8665; }
+        .gantt .label-task { padding-left: 8mm; color: #ad5947; }
+        .gantt-legend { margin-bottom: 2mm; color: #60717e; font-size: 8px; text-align: right; }
+        .gantt-legend span { display: inline-block; margin-left: 4mm; }
+        .gantt-legend i { display: inline-block; width: 5mm; height: 2mm; margin-right: 1mm; vertical-align: middle; }
         .detail-kind { width: 18%; font-weight: bold; }
         .detail-item { width: 30%; }
         .detail-description { width: 32%; color: #60717e; }
@@ -58,9 +71,32 @@
     $showTasks = $documentOptions['show_tasks'];
     $showProgress = $documentOptions['show_progress'];
     $formatDate = fn ($date) => $date?->format('Y年n月j日') ?? '未設定';
+    $ganttRows = collect();
+    foreach ($roadmaps as $roadmap) {
+        $ganttRows->push(['type' => 'roadmap', 'title' => $roadmap->title, 'start' => $roadmap->planned_start_date, 'end' => $roadmap->target_date]);
+        foreach ($roadmap->improvements as $improvement) {
+            $ganttRows->push(['type' => 'improvement', 'title' => $improvement->title, 'start' => $improvement->planned_start_date, 'end' => $improvement->target_date]);
+            if ($showTasks) {
+                foreach ($improvement->tasks as $task) {
+                    $ganttRows->push(['type' => 'task', 'title' => $task->title, 'start' => $task->planned_start_date, 'end' => $task->due_date]);
+                }
+            }
+        }
+    }
+    $ganttDates = $ganttRows->flatMap(fn ($row) => [$row['start'], $row['end']])->filter();
+    $ganttStart = ($ganttDates->min() ?: $project->start_date ?: now())->copy()->startOfDay();
+    $ganttEnd = ($ganttDates->max() ?: $project->due_date ?: $ganttStart->copy()->addDays(27))->copy()->startOfDay();
+    if ($ganttEnd->lt($ganttStart)) $ganttEnd = $ganttStart->copy();
+    $ganttTotalDays = $ganttStart->diffInDays($ganttEnd) + 1;
+    $ganttSlotDays = max(1, (int) ceil($ganttTotalDays / 28));
+    $ganttSlots = collect();
+    for ($offset = 0; $offset < $ganttTotalDays; $offset += $ganttSlotDays) {
+        $slotStart = $ganttStart->copy()->addDays($offset);
+        $slotEnd = $slotStart->copy()->addDays($ganttSlotDays - 1)->min($ganttEnd);
+        $ganttSlots->push(['start' => $slotStart, 'end' => $slotEnd]);
+    }
 @endphp
 
-<div class="header"><span class="title">プロジェクト実施計画書</span><span class="project">{{ $project->name }}</span></div>
 <div class="footer"><span class="issuer">{{ $issuerName }} / Confidential</span><span class="meta">Ver. {{ $documentOptions['version'] ?: '1.0' }}　{{ \Carbon\Carbon::parse($documentOptions['prepared_on'])->format('Y/m/d') }}</span></div>
 <div class="page-number"></div>
 
@@ -108,20 +144,25 @@
 
 <section class="page-break">
     <h2>2. 全体スケジュール</h2>
-    <table class="schedule">
-        <thead><tr><th class="kind">区分</th><th class="item">計画項目</th><th class="date">開始</th><th class="date">完了</th><th>進捗</th></tr></thead>
-        <tbody>
-        @foreach($roadmaps as $roadmap)
-            <tr><td class="kind-roadmap">ロードマップ</td><td><strong>{{ $roadmap->title }}</strong></td><td>{{ $formatDate($roadmap->planned_start_date) }}</td><td>{{ $formatDate($roadmap->target_date) }}</td><td>{{ $showProgress ? ($roadmapStatuses[$roadmap->status] ?? $roadmap->status) : '―' }}</td></tr>
-            @foreach($roadmap->improvements as $improvement)
-                <tr><td class="kind-improvement">取り組み</td><td>　{{ $improvement->title }}</td><td>{{ $formatDate($improvement->planned_start_date) }}</td><td>{{ $formatDate($improvement->target_date) }}</td><td>{{ $showProgress ? ($improvementStatuses[$improvement->status] ?? $improvement->status) : '―' }}</td></tr>
-                @if($showTasks) @foreach($improvement->tasks as $task)
-                    <tr><td class="kind-task">タスク</td><td>　　{{ $task->title }}</td><td>{{ $formatDate($task->planned_start_date) }}</td><td>{{ $formatDate($task->due_date) }}</td><td>{{ $showProgress ? ($taskStatuses[$task->status] ?? $task->status) : '―' }}</td></tr>
-                @endforeach @endif
+    <div class="gantt-legend"><span><i style="background:#4f82c4"></i>ロードマップ</span><span><i style="background:#56a27e"></i>取り組み</span>@if($showTasks)<span><i style="background:#c7735f"></i>タスク</span>@endif</div>
+    @if($ganttRows->isEmpty())
+        <div class="empty">掲載対象のスケジュールはありません。</div>
+    @else
+        <table class="gantt">
+            <thead><tr><th class="gantt-label">計画項目</th>@foreach($ganttSlots as $slot)<th class="gantt-date">{{ $slot['start']->format('n/j') }}@if($ganttSlotDays > 1)<br>～{{ $slot['end']->format('n/j') }}@endif</th>@endforeach</tr></thead>
+            <tbody>
+            @foreach($ganttRows as $row)
+                <tr>
+                    <td class="gantt-label label-{{ $row['type'] }}">{{ $row['title'] }}</td>
+                    @foreach($ganttSlots as $slot)
+                        @php $active = $row['start'] && $row['end'] && $row['start']->lte($slot['end']) && $row['end']->gte($slot['start']); @endphp
+                        <td class="gantt-slot {{ $active ? 'active-'.$row['type'] : '' }}"></td>
+                    @endforeach
+                </tr>
             @endforeach
-        @endforeach
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    @endif
 </section>
 
 <section class="page-break">
