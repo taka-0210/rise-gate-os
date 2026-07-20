@@ -362,15 +362,12 @@ class TaskManagementTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
 
         $this->assertStringStartsWith('%PDF-', $response->getContent());
+        $this->assertStringContainsString('IPAexGothic', $response->getContent());
     }
 
-    public function test_client_plan_pdf_uses_a_platform_safe_font_uri(): void
+    public function test_client_plan_pdf_font_is_available(): void
     {
-        $path = '/home/example/rise-gate-os/resources/fonts/NotoSansCJKjp-Regular.otf';
-        $uri = 'file://'.(str_starts_with($path, '/') ? '' : '/').$path;
-
-        $this->assertSame('file:///home/example/rise-gate-os/resources/fonts/NotoSansCJKjp-Regular.otf', $uri);
-        $this->assertStringNotContainsString('file:////', $uri);
+        $this->assertFileExists(resource_path('fonts/ipaexg.ttf'));
     }
 
     public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void

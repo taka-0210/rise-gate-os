@@ -359,10 +359,21 @@ class ProjectController extends Controller
     {
         $data = $this->clientPlan($request, $project)->getData();
         $fileName = preg_replace('/[\\\\\/:*?"<>|]+/u', '-', $project->name).'_プロジェクト実施計画書.pdf';
+        $fontPath = str_replace('\\', '/', resource_path('fonts/ipaexg.ttf'));
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('projects.client-plan-pdf', $data)
-            ->setOption('isPhpEnabled', true)
-            ->setPaper('a4', 'landscape')
+        \Illuminate\Support\Facades\File::ensureDirectoryExists(storage_path('fonts'));
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::setOption('isPhpEnabled', true)
+            ->setPaper('a4', 'landscape');
+        $fontRegistered = $pdf->getDomPDF()->getFontMetrics()->registerFont([
+            'family' => 'IPAexGothic',
+            'weight' => 'normal',
+            'style' => 'normal',
+        ], $fontPath);
+
+        throw_unless($fontRegistered, \RuntimeException::class, 'PDF用日本語フォントを登録できませんでした。');
+
+        return $pdf->loadView('projects.client-plan-pdf', $data)
             ->download($fileName);
     }
 

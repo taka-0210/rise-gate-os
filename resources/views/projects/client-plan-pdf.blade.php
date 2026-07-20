@@ -1,21 +1,11 @@
-@php
-    $pdfFontPath = str_replace('\\', '/', resource_path('fonts/NotoSansCJKjp-Regular.otf'));
-    $pdfFontUri = 'file://'.(str_starts_with($pdfFontPath, '/') ? '' : '/').$pdfFontPath;
-@endphp
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <style>
-        @font-face {
-            font-family: "Noto Sans JP";
-            font-style: normal;
-            font-weight: 400;
-            src: url("{{ $pdfFontUri }}") format("opentype");
-        }
         @page { margin: 20mm 14mm 16mm; }
         * { box-sizing: border-box; }
-        body { margin: 0; color: #18232c; font-family: "Noto Sans JP", sans-serif; font-size: 10px; line-height: 1.55; }
+        body { margin: 0; color: #18232c; font-family: "IPAexGothic", sans-serif; font-size: 10px; line-height: 1.55; }
         .header { position: fixed; top: -14mm; left: 0; right: 0; height: 9mm; border-bottom: 1px solid #d7e0e6; color: #687985; font-size: 8px; }
         .header .title { float: left; }
         .header .project { float: right; color: #173f50; font-weight: bold; }
@@ -156,7 +146,7 @@
 
 <script type="text/php">
     if (isset($pdf)) {
-        $font = $fontMetrics->get_font('Noto Sans JP', 'normal');
+        $font = $fontMetrics->get_font('IPAexGothic', 'normal');
         $pdf->page_text(744, 568, '{PAGE_NUM} / {PAGE_COUNT}', $font, 8, [0.09, 0.25, 0.31]);
     }
 </script>
