@@ -365,13 +365,15 @@ class ProjectController extends Controller
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::setOption('isPhpEnabled', true)
             ->setPaper('a4', 'landscape');
-        $fontRegistered = $pdf->getDomPDF()->getFontMetrics()->registerFont([
-            'family' => 'IPAexGothic',
-            'weight' => 'normal',
-            'style' => 'normal',
-        ], $fontPath);
+        foreach (['normal', 'bold'] as $weight) {
+            $fontRegistered = $pdf->getDomPDF()->getFontMetrics()->registerFont([
+                'family' => 'IPAexGothic',
+                'weight' => $weight,
+                'style' => 'normal',
+            ], $fontPath);
 
-        throw_unless($fontRegistered, \RuntimeException::class, 'PDF用日本語フォントを登録できませんでした。');
+            throw_unless($fontRegistered, \RuntimeException::class, 'PDF用日本語フォントを登録できませんでした。');
+        }
 
         return $pdf->loadView('projects.client-plan-pdf', $data)
             ->download($fileName);
