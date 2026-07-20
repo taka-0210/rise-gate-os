@@ -25,8 +25,31 @@ class AiProposalItemReviewTest extends TestCase
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.ai-proposals.show', [$project, $proposal]))
             ->assertOk()
-            ->assertSeeInOrder(['注文一覧を作る', 'コメント・修正指示', 'この項目の指示を保存'])
+            ->assertSeeInOrder(['注文一覧を作る', '編集', 'コメント・修正指示', 'このロードマップを一括保存'])
             ->assertSee('指摘内容でAIに再提案を依頼');
+    }
+
+    public function test_roadmap_editor_saves_multiple_item_reviews_at_once(): void
+    {
+        [$user, $workspace, $project, $proposal, $task] = $this->fixture();
+        $secondTask = $proposal->items()->create([
+            'operation' => 'create',
+            'entity_type' => 'task',
+            'attributes' => ['title' => '発送一覧を作る'],
+            'validation_status' => 'valid',
+            'sort_order' => 20,
+        ]);
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.roadmap-reviews.store', [$project, $proposal]), [
+                'reviews' => [
+                    $task->id => ['action' => 'revise', 'comment' => '名称を変更する'],
+                    $secondTask->id => ['action' => 'exclude', 'comment' => 'このタスクは不要'],
+                ],
+            ])->assertRedirect();
+
+        $this->assertDatabaseHas('ai_proposal_item_reviews', ['ai_proposal_item_id' => $task->id, 'action' => 'revise']);
+        $this->assertDatabaseHas('ai_proposal_item_reviews', ['ai_proposal_item_id' => $secondTask->id, 'action' => 'exclude']);
     }
 
     public function test_member_can_save_item_instruction_and_unresolved_instruction_blocks_apply(): void

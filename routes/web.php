@@ -108,6 +108,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/reject', [AiProposalController::class, 'reject'])->name('projects.ai-proposals.reject');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/handoff', [AiProposalController::class, 'handoff'])->name('projects.ai-proposals.handoff');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/items/{item}/review', [AiProposalItemReviewController::class, 'store'])->name('projects.ai-proposals.items.review.store');
+        Route::post('/projects/{project}/ai-proposals/{aiProposal}/roadmap-reviews', [AiProposalItemReviewController::class, 'storeRoadmap'])->name('projects.ai-proposals.roadmap-reviews.store');
         Route::delete('/projects/{project}/ai-proposals/{aiProposal}/items/{item}/review', [AiProposalItemReviewController::class, 'destroy'])->name('projects.ai-proposals.items.review.destroy');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/request-revision', [AiProposalItemReviewController::class, 'requestRevision'])->name('projects.ai-proposals.request-revision');
         Route::post('/projects/{project}/ai-requests', [AiRequestController::class, 'store'])->name('projects.ai-requests.store');

@@ -17,6 +17,64 @@ use Illuminate\Validation\ValidationException;
 
 class AiProposalItemReviewController extends Controller
 {
+    public function storeRoadmap(Request $request, Project $project, AiProposal $aiProposal): RedirectResponse
+    {
+        $this->authorizeProposal($request, $project, $aiProposal);
+        $validated = $request->validate([
+            'reviews' => ['required', 'array', 'min:1', 'max:100'],
+            'reviews.*.action' => ['required', Rule::in(array_keys(AiProposalItemReview::actions()))],
+            'reviews.*.comment' => ['nullable', 'string', 'max:2000'],
+            'reviews.*.merge_target_item_id' => ['nullable', 'integer'],
+        ]);
+
+        $items = $aiProposal->items()->whereIn('id', array_keys($validated['reviews']))->get()->keyBy('id');
+        if ($items->count() !== count($validated['reviews'])) {
+            throw ValidationException::withMessages(['reviews' => '提案に含まれない項目が指定されています。']);
+        }
+
+        DB::transaction(function () use ($request, $aiProposal, $items, $validated): void {
+            foreach ($validated['reviews'] as $itemId => $reviewInput) {
+                $item = $items->get((int) $itemId);
+                $action = $reviewInput['action'];
+                $comment = trim((string) ($reviewInput['comment'] ?? ''));
+                if ($action !== AiProposalItemReview::ACTION_KEEP && $comment === '') {
+                    throw ValidationException::withMessages([
+                        "reviews.{$itemId}.comment" => '修正・除外・統合にはコメントを入力してください。',
+                    ]);
+                }
+
+                $mergeTargetId = null;
+                if ($action === AiProposalItemReview::ACTION_MERGE) {
+                    $mergeTargetId = (int) ($reviewInput['merge_target_item_id'] ?? 0);
+                    $mergeTarget = $aiProposal->items()
+                        ->whereKey($mergeTargetId)
+                        ->where('entity_type', $item->entity_type)
+                        ->first();
+                    if (! $mergeTarget || $mergeTarget->is($item)) {
+                        throw ValidationException::withMessages([
+                            "reviews.{$itemId}.merge_target_item_id" => '同じ提案内の別の同種項目を選択してください。',
+                        ]);
+                    }
+                }
+
+                if ($action === AiProposalItemReview::ACTION_KEEP && $comment === '' && ! $mergeTargetId) {
+                    $item->review()->delete();
+                    continue;
+                }
+
+                $item->review()->updateOrCreate([], [
+                    'reviewed_by' => $request->user()->id,
+                    'action' => $action,
+                    'comment' => $comment ?: null,
+                    'merge_target_item_id' => $mergeTargetId,
+                    'resolved_at' => $action === AiProposalItemReview::ACTION_KEEP ? now() : null,
+                ]);
+            }
+        });
+
+        return back()->with('status', 'ロードマップ配下のレビュー指示を一括保存しました。');
+    }
+
     public function store(Request $request, Project $project, AiProposal $aiProposal, AiProposalItem $item): RedirectResponse
     {
         $this->authorizeProposal($request, $project, $aiProposal, $item);
