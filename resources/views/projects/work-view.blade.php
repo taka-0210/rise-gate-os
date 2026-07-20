@@ -322,6 +322,9 @@
         $axisDays = max(1, $axisStart->diffInDays($axisEnd));
         $axisStep = $axisDays <= 45 ? max(1, (int) ceil($axisDays / 8)) : max(7, (int) ceil($axisDays / 8 / 7) * 7);
         $axisTicks = collect(range(0, $axisDays, $axisStep))->push($axisDays)->unique()->sort()->values();
+        if ($axisTicks->count() >= 2 && $axisDays - $axisTicks->get($axisTicks->count() - 2) < max(2, $axisStep * .6)) {
+            $axisTicks->splice($axisTicks->count() - 2, 1);
+        }
         $todayLeft = max(0, min(100, $axisStart->diffInDays(now()->startOfDay(), false) / $axisDays * 100));
     @endphp
 

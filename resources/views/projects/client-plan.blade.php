@@ -150,6 +150,9 @@
     $axisDays = $relativeSchedule ? max(1,$axisEnd-$axisStart) : max(1,$axisStart->diffInDays($axisEnd));
     $tickStep = max(1,(int)ceil($axisDays/8));
     $ticks = collect(range(0,$axisDays,$tickStep))->push($axisDays)->unique()->sort()->values();
+    if ($ticks->count() >= 2 && $axisDays-$ticks->get($ticks->count()-2) < max(2,$tickStep*.6)) {
+        $ticks->splice($ticks->count()-2,1);
+    }
     $overviewChunks = collect();
     if ($roadmaps->isNotEmpty()) {
         $overviewChunks->push($roadmaps->take(2));
