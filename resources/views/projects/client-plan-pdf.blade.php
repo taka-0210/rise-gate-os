@@ -19,6 +19,7 @@
         h3 { margin: 0 0 2mm; font-size: 13px; }
         p { margin: 1.5mm 0; color: #60717e; }
         .cover { height: 160mm; border-top: 7px solid #173f50; padding: 16mm 14mm 8mm; }
+        .logo { display: block; width: auto; max-width: 58mm; height: auto; max-height: 20mm; margin-bottom: 3mm; }
         .issuer-name { color: #173f50; font-size: 17px; font-weight: bold; }
         .issuer-details { margin-top: 2mm; color: #60717e; }
         .eyebrow { margin-top: 25mm; color: #4f82c4; font-size: 11px; font-weight: bold; letter-spacing: 2px; }
@@ -34,6 +35,7 @@
         .period { color: #60717e; font-size: 8px; }
         .schedule { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .schedule th, .schedule td { padding: 2mm; border: 1px solid #d7e0e6; vertical-align: middle; }
+        .schedule tr { page-break-inside: avoid; }
         .schedule th { background: #f2f5f7; color: #173f50; }
         .schedule .item { width: 39%; }
         .schedule .date { width: 16%; white-space: nowrap; }
@@ -41,10 +43,10 @@
         .kind-roadmap { color: #386cab; }
         .kind-improvement { color: #3e8665; }
         .kind-task { color: #ad5947; }
-        .roadmap-detail { margin-bottom: 5mm; padding: 4mm; border: 1px solid #bfd1e8; page-break-inside: avoid; }
-        .improvement { margin-top: 3mm; padding: 3mm 4mm; border-left: 4px solid #56a27e; background: #f5faf7; page-break-inside: avoid; }
-        .tasks { margin: 2mm 0 0; padding-left: 6mm; }
-        .tasks li { margin: 1.5mm 0; }
+        .detail-kind { width: 18%; font-weight: bold; }
+        .detail-item { width: 30%; }
+        .detail-description { width: 32%; color: #60717e; }
+        .detail-period { width: 20%; white-space: nowrap; }
         .status { display: inline-block; margin-left: 2mm; padding: .3mm 2mm; border: 1px solid #cbd5dc; border-radius: 8px; color: #60717e; font-size: 7px; }
         .empty { padding: 8mm; background: #f5f8fa; text-align: center; }
     </style>
@@ -63,7 +65,8 @@
 <div class="page-number"></div>
 
 <section class="cover">
-    <div class="issuer-name">{{ $issuerName }}</div>
+    @if($logoDataUri)<img class="logo" src="{{ $logoDataUri }}" alt="{{ $issuerName }}">@endif
+    @unless($logoDataUri)<div class="issuer-name">{{ $issuerName }}</div>@endunless
     @if($businessProfile)
         <div class="issuer-details">
             @if($businessProfile->legal_name && $businessProfile->legal_name !== $issuerName)<div>{{ $businessProfile->legal_name }}</div>@endif
@@ -123,25 +126,31 @@
 
 <section class="page-break">
     <h2>3. ロードマップ詳細</h2>
-    @forelse($roadmaps as $roadmap)
-        <article class="roadmap-detail">
-            <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmap->title }} @if($showProgress)<span class="status">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span>@endif</h3>
-            @if($roadmap->purpose)<p>{{ $roadmap->purpose }}</p>@endif
-            <div class="period">{{ $formatDate($roadmap->planned_start_date) }} ～ {{ $formatDate($roadmap->target_date) }}</div>
-            @foreach($roadmap->improvements as $improvement)
-                <div class="improvement">
-                    <h3>取り組み {{ $loop->iteration }}：{{ $improvement->title }} @if($showProgress)<span class="status">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}</span>@endif</h3>
-                    @if($improvement->desired_state || $improvement->action)<p>{{ $improvement->desired_state ?: $improvement->action }}</p>@endif
-                    <div class="period">{{ $formatDate($improvement->planned_start_date) }} ～ {{ $formatDate($improvement->target_date) }}</div>
-                    @if($showTasks && $improvement->tasks->isNotEmpty())
-                        <ol class="tasks">@foreach($improvement->tasks as $task)<li>{{ $task->title }} @if($showProgress)<span class="status">{{ $taskStatuses[$task->status] ?? $task->status }}</span>@endif <span class="period">{{ $formatDate($task->planned_start_date) }}～{{ $formatDate($task->due_date) }}</span></li>@endforeach</ol>
-                    @endif
-                </div>
-            @endforeach
-        </article>
-    @empty
+    @if($roadmaps->isEmpty())
         <div class="empty">掲載対象のロードマップはありません。</div>
-    @endforelse
+    @else
+        <table class="schedule">
+            <thead><tr><th class="detail-kind">区分</th><th class="detail-item">項目</th><th class="detail-description">目的・内容</th><th class="detail-period">期間・進捗</th></tr></thead>
+            <tbody>
+            @foreach($roadmaps as $roadmap)
+                <tr>
+                    <td class="detail-kind kind-roadmap">ロードマップ {{ $loop->iteration }}</td>
+                    <td><strong>{{ $roadmap->title }}</strong></td>
+                    <td class="detail-description">{{ $roadmap->purpose ?: '―' }}</td>
+                    <td class="detail-period">{{ $formatDate($roadmap->planned_start_date) }} ～ {{ $formatDate($roadmap->target_date) }}@if($showProgress)<br>{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}@endif</td>
+                </tr>
+                @foreach($roadmap->improvements as $improvement)
+                    <tr>
+                        <td class="detail-kind kind-improvement">取り組み {{ $loop->iteration }}</td>
+                        <td>{{ $improvement->title }}</td>
+                        <td class="detail-description">{{ $improvement->desired_state ?: ($improvement->action ?: '―') }}</td>
+                        <td class="detail-period">{{ $formatDate($improvement->planned_start_date) }} ～ {{ $formatDate($improvement->target_date) }}@if($showProgress)<br>{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}@endif</td>
+                    </tr>
+                @endforeach
+            @endforeach
+            </tbody>
+        </table>
+    @endif
 </section>
 
 <script type="text/php">

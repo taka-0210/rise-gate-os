@@ -58,7 +58,7 @@ class WorkspaceBusinessProfileTest extends TestCase
             'logo_path' => 'workspace-business/test/logo.png',
             'logo_original_name' => 'logo.png',
         ]);
-        Storage::disk('local')->put($profile->logo_path, 'image');
+        Storage::disk('local')->put($profile->logo_path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='));
         $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => '提出先']);
         $project = Project::create([
             'organization_id' => $workspace->organization_id,
@@ -75,6 +75,12 @@ class WorkspaceBusinessProfileTest extends TestCase
             ->assertOk()
             ->assertSee('RISE GATE')
             ->assertSee(route('projects.business-media', [$project, 'logo']), false);
+
+        $pdf = $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
+            ->get(route('projects.client-plan.pdf', $project));
+
+        $pdf->assertOk()->assertHeader('content-type', 'application/pdf');
+        $this->assertStringContainsString('/Subtype /Image', $pdf->getContent());
     }
 
     public function test_regular_workspace_member_cannot_update_issuer_profile(): void

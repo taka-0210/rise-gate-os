@@ -364,6 +364,7 @@ class TaskManagementTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $response->getContent());
         $this->assertStringContainsString('IPAexGothic', $response->getContent());
         $this->assertStringNotContainsString('/BaseFont /Helvetica-Bold', $response->getContent());
+        $this->assertLessThanOrEqual(10, preg_match_all('/\/Type\s*\/Page\b/', $response->getContent()));
     }
 
     public function test_client_plan_pdf_font_is_available(): void
