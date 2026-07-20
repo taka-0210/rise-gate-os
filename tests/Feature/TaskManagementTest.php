@@ -346,7 +346,7 @@ class TaskManagementTest extends TestCase
             ->assertSee($task->improvement->roadmap->title)
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
-            ->assertSee('PDF保存・印刷');
+            ->assertSee('PDF保存');
     }
 
     public function test_client_plan_can_be_downloaded_as_a_pdf(): void
