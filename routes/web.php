@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EstimateController;
 use App\Http\Controllers\Project\AiProposalController;
+use App\Http\Controllers\Project\AiProposalItemReviewController;
 use App\Http\Controllers\Project\AiRequestController;
 use App\Http\Controllers\Project\ImprovementController;
 use App\Http\Controllers\Project\ImprovementOutputController;
@@ -106,6 +107,9 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/apply', [AiProposalController::class, 'apply'])->name('projects.ai-proposals.apply');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/reject', [AiProposalController::class, 'reject'])->name('projects.ai-proposals.reject');
         Route::post('/projects/{project}/ai-proposals/{aiProposal}/handoff', [AiProposalController::class, 'handoff'])->name('projects.ai-proposals.handoff');
+        Route::post('/projects/{project}/ai-proposals/{aiProposal}/items/{item}/review', [AiProposalItemReviewController::class, 'store'])->name('projects.ai-proposals.items.review.store');
+        Route::delete('/projects/{project}/ai-proposals/{aiProposal}/items/{item}/review', [AiProposalItemReviewController::class, 'destroy'])->name('projects.ai-proposals.items.review.destroy');
+        Route::post('/projects/{project}/ai-proposals/{aiProposal}/request-revision', [AiProposalItemReviewController::class, 'requestRevision'])->name('projects.ai-proposals.request-revision');
         Route::post('/projects/{project}/ai-requests', [AiRequestController::class, 'store'])->name('projects.ai-requests.store');
         Route::get('/projects/{project}/ai-requests/{aiRequest}/attachments/{attachment}', [AiRequestController::class, 'download'])->name('projects.ai-requests.attachments.download');
         Route::get('/projects/{project}/manage', [ProjectController::class, 'legacy'])->name('projects.legacy');

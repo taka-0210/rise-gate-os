@@ -109,6 +109,8 @@
             <a class="button secondary" href="{{ route('projects.show', $project) }}">Projectへ戻る</a>
         </div>
 
+        @include('ai-proposals._item-reviews')
+
         @if ($canReview && $proposal->status === \App\Models\AiProposal::STATUS_PENDING)
             <div class="card stack">
                 <h2>確認と反映</h2>
@@ -120,7 +122,7 @@
                 <div class="actions">
                     <form method="POST" action="{{ route('projects.ai-proposals.apply', [$project, $proposal]) }}">
                         @csrf
-                        <button type="submit" @disabled($itemCounts['invalid'] > 0)>承認して反映</button>
+                        <button type="submit" @disabled($itemCounts['invalid'] > 0 || $unresolvedReviewCount > 0)>承認して反映</button>
                     </form>
                     <form method="POST" action="{{ route('projects.ai-proposals.reject', [$project, $proposal]) }}">
                         @csrf

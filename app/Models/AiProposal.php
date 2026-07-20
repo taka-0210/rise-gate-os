@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -49,6 +50,11 @@ class AiProposal extends Model
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
     public function items(): HasMany { return $this->hasMany(AiProposalItem::class)->orderBy('sort_order')->orderBy('id'); }
     public function aiRequest() { return $this->hasOne(AiRequest::class); }
+
+    public function itemReviews(): HasManyThrough
+    {
+        return $this->hasManyThrough(AiProposalItemReview::class, AiProposalItem::class);
+    }
 
     public static function statuses(): array
     {

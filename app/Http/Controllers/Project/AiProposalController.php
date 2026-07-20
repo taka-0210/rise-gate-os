@@ -37,7 +37,7 @@ class AiProposalController extends Controller
         $this->authorizeWorkspaceProject($request, $project);
         abort_unless($aiProposal->project_id === $project->id, 404);
 
-        $aiProposal->load(['items', 'requester', 'reviewer']);
+        $aiProposal->load(['items.review.mergeTarget', 'items.review.reviewer', 'requester', 'reviewer']);
         $proposalOutline = $outlineBuilder->build($project, $aiProposal);
 
         $itemCounts = [
@@ -82,6 +82,8 @@ class AiProposalController extends Controller
             'canReview' => Gate::allows('update', $project),
             'proposalOutline' => $proposalOutline,
             'impactCounts' => $impactCounts,
+            'reviewActions' => \App\Models\AiProposalItemReview::actions(),
+            'unresolvedReviewCount' => $aiProposal->items->pluck('review')->filter()->whereNull('resolved_at')->count(),
         ]);
     }
 
@@ -90,6 +92,12 @@ class AiProposalController extends Controller
         $this->authorizeWorkspaceProject($request, $project);
         Gate::authorize('update', $project);
         abort_unless($aiProposal->project_id === $project->id, 404);
+
+        if ($aiProposal->items()->whereHas('review', fn ($query) => $query->whereNull('resolved_at'))->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'reviews' => '未対応の項目別レビューがあります。AIに再提案を依頼してから承認してください。',
+            ]);
+        }
 
         $applier->apply($aiProposal, $request->user());
 
