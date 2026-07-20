@@ -119,12 +119,6 @@
                     @error('start_date') <div class="error">{{ $message }}</div> @enderror
                 </div>
 
-                <div class="field">
-                    <label for="due_date">終了日（決定後）</label>
-                    <input id="due_date" name="due_date" type="date" value="{{ old('due_date') }}">
-                    @error('due_date') <div class="error">{{ $message }}</div> @enderror
-                </div>
-
                 <div></div>
             </div>
 

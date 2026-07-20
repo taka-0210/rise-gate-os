@@ -128,16 +128,18 @@
     $showTasks = $documentOptions['show_tasks'];
     $showProgress = $documentOptions['show_progress'];
     $relativeSchedule = !$project->start_date && (int)$project->duration_days > 0;
+    $relativeOrigin = collect()->concat($roadmaps->pluck('planned_start_date'))->concat($visibleImprovements->pluck('planned_start_date'))->concat($visibleTasks->pluck('planned_start_date'))->filter()->min();
+    $relativeDay = fn($day,$date) => $day ?: ($relativeOrigin && $date ? $relativeOrigin->diffInDays($date)+1 : null);
     $periodText = $relativeSchedule
         ? '着手後 '.$project->duration_days.'日間（休日を含む）'
         : (($project->start_date?->format('Y年n月j日') ?? '未設定').' 〜 '.($project->due_date?->format('Y年n月j日') ?? '未設定'));
     $timelineRows = collect([['type'=>'project','title'=>$project->name,'start'=>$relativeSchedule?1:$project->start_date,'end'=>$relativeSchedule?$project->duration_days:$project->due_date]]);
     foreach ($roadmaps as $roadmap) {
-        $timelineRows->push(['type'=>'roadmap','title'=>$roadmap->title,'start'=>$relativeSchedule?$roadmap->planned_start_day:$roadmap->planned_start_date,'end'=>$relativeSchedule?$roadmap->target_day:$roadmap->target_date]);
+        $timelineRows->push(['type'=>'roadmap','title'=>$roadmap->title,'start'=>$relativeSchedule?$relativeDay($roadmap->planned_start_day,$roadmap->planned_start_date):$roadmap->planned_start_date,'end'=>$relativeSchedule?$relativeDay($roadmap->target_day,$roadmap->target_date):$roadmap->target_date]);
         foreach ($roadmap->improvements as $improvement) {
-            $timelineRows->push(['type'=>'improvement','title'=>$improvement->title,'start'=>$relativeSchedule?$improvement->planned_start_day:$improvement->planned_start_date,'end'=>$relativeSchedule?$improvement->target_day:$improvement->target_date]);
+            $timelineRows->push(['type'=>'improvement','title'=>$improvement->title,'start'=>$relativeSchedule?$relativeDay($improvement->planned_start_day,$improvement->planned_start_date):$improvement->planned_start_date,'end'=>$relativeSchedule?$relativeDay($improvement->target_day,$improvement->target_date):$improvement->target_date]);
             if ($showTasks) foreach ($improvement->tasks as $task) {
-                $timelineRows->push(['type'=>'task','title'=>$task->title,'start'=>$relativeSchedule?$task->planned_start_day:$task->planned_start_date,'end'=>$relativeSchedule?$task->due_day:$task->due_date]);
+                $timelineRows->push(['type'=>'task','title'=>$task->title,'start'=>$relativeSchedule?$relativeDay($task->planned_start_day,$task->planned_start_date):$task->planned_start_date,'end'=>$relativeSchedule?$relativeDay($task->due_day,$task->due_date):$task->due_date]);
             }
         }
     }

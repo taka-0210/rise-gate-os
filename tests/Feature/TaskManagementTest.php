@@ -22,6 +22,7 @@ class TaskManagementTest extends TestCase
     public function test_unscheduled_project_can_set_its_period_from_the_time_view(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['duration_days' => 30]);
         $task = $this->createTask($project, $owner);
         $task->improvement->roadmap->update([
             'planned_start_date' => '2026-08-03',
@@ -43,7 +44,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('Project期間を設定')
             ->assertSee('id="project-schedule-setup"', false)
             ->assertSee('name="start_date" type="date" value="2026-08-03"', false)
-            ->assertSee('name="end_date" type="date" value="2026-08-28"', false);
+            ->assertDontSee('name="end_date"', false)
+            ->assertSee('1日目');
     }
 
     public function test_project_editor_can_view_edit_and_update_task(): void

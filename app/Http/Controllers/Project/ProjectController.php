@@ -569,7 +569,7 @@ class ProjectController extends Controller
 
     private function normalizeProjectPeriod(array $attributes): array
     {
-        if (empty($attributes['duration_days']) && empty($attributes['start_date']) && empty($attributes['due_date'])) {
+        if (empty($attributes['duration_days']) && empty($attributes['start_date'])) {
             $attributes['duration_days'] = 30;
         }
 
@@ -578,8 +578,9 @@ class ProjectController extends Controller
                 ->addDays((int) $attributes['duration_days'] - 1)
                 ->toDateString();
         } elseif (! empty($attributes['start_date']) && ! empty($attributes['due_date'])) {
-            $attributes['duration_days'] = Carbon::parse($attributes['start_date'])
-                ->diffInDays(Carbon::parse($attributes['due_date'])) + 1;
+            $attributes['duration_days'] = Carbon::parse($attributes['start_date'])->diffInDays(Carbon::parse($attributes['due_date'])) + 1;
+        } elseif (empty($attributes['start_date'])) {
+            $attributes['due_date'] = null;
         }
 
         return $attributes;
