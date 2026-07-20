@@ -249,7 +249,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-focus-task="'.$task->id.'"', false)
             ->assertSee('いま行うこと')
             ->assertSee($task->title)
-            ->assertSee('管理詳細を見る');
+            ->assertSee('メンバー・詳細管理');
     }
 
     public function test_time_view_only_marks_started_overdue_tasks_as_delayed(): void
