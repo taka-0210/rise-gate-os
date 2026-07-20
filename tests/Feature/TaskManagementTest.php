@@ -339,8 +339,13 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-overview-count="6"', false)
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
-            ->assertSee('2. 全体スケジュール')
+            ->assertSeeInOrder([
+                '1. プロジェクト全体概要（目指す未来とロードマップ）',
+                '2. 取り組み、タスク詳細',
+                '3. 全体スケジュール',
+            ])
             ->assertSee('印刷・PDF保存')
+            ->assertSee('name="show_progress" value="1" >進捗を掲載', false)
             ->assertSee('vendor/pagedjs/paged.polyfill.js', false)
             ->assertSee('size:297mm 210mm', false)
             ->assertSee('preview(source, [pagedStylesheet], output)', false)

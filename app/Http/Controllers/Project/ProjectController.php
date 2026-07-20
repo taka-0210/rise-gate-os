@@ -315,7 +315,7 @@ class ProjectController extends Controller
         Gate::authorize('view', $project);
 
         $showTasks = $request->boolean('show_tasks', true);
-        $showProgress = $request->boolean('show_progress', true);
+        $showProgress = $request->boolean('show_progress', false);
 
         $project->load(['client', 'owner', 'owningWorkspace.businessProfile', 'owningWorkspace.bankAccounts']);
         $roadmaps = $project->roadmaps()

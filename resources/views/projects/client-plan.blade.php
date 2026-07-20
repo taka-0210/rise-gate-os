@@ -191,7 +191,7 @@
 
     @forelse($overviewChunks as $overviewChunk)
         <section class="page-section" data-overview-count="{{ $overviewChunk->count() }}">
-            <h2>1. プロジェクト全体概要 @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
+            <h2>1. プロジェクト全体概要（目指す未来とロードマップ） @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
             @if($loop->first)
                 <h3>{{ $project->name }}</h3>
                 <p class="lead">{{ $project->summary ?: 'プロジェクト概要は現在整理中です。' }}</p>
@@ -212,28 +212,11 @@
             </div>
         </section>
     @empty
-        <section class="page-section"><h2>1. プロジェクト全体概要</h2><p>掲載対象のロードマップはありません。</p></section>
+        <section class="page-section"><h2>1. プロジェクト全体概要（目指す未来とロードマップ）</h2><p>掲載対象のロードマップはありません。</p></section>
     @endforelse
 
-    @foreach($scheduleChunks as $scheduleChunk)
-        <section class="page-section">
-            <h2>2. 全体スケジュール @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
-            <div class="legend"><span style="--color:var(--navy)">プロジェクト</span><span style="--color:var(--blue)">ロードマップ</span><span style="--color:var(--green)">取り組み</span>@if($showTasks)<span style="--color:var(--red)">タスク</span>@endif</div>
-            <div class="schedule-wrap">
-                <div class="schedule-axis"><div class="schedule-label"><strong>計画項目</strong></div><div class="schedule-track">@foreach($ticks as $tick)<span class="schedule-date {{ $loop->first?'first':'' }} {{ $loop->last?'last':'' }}" style="left:{{ $tick/$axisDays*100 }}%">{{ $axisStart->copy()->addDays($tick)->format('n/j') }}</span>@endforeach</div></div>
-                @foreach($scheduleChunk as $row)
-                    @php
-                        $left=$row['start']?max(0,min(100,$axisStart->diffInDays($row['start'],false)/$axisDays*100)):0;
-                        $width=($row['start']&&$row['end'])?max(.7,$row['start']->diffInDays($row['end'])/$axisDays*100):0;
-                    @endphp
-                    <div class="schedule-row {{ $row['type'] }}"><div class="schedule-label"><strong>{{ $row['title'] }}</strong></div><div class="schedule-track">@if($row['start']&&$row['end'])<span class="schedule-bar {{ $row['type'] }}" style="left:{{ $left }}%;width:{{ $width }}%"></span>@endif</div></div>
-                @endforeach
-            </div>
-        </section>
-    @endforeach
-
-    <section class="detail-section">
-        <h2>3. ロードマップ詳細</h2>
+    <section class="page-section detail-section">
+        <h2>2. 取り組み、タスク詳細</h2>
         @forelse($roadmaps as $roadmap)
             <article class="roadmap-detail">
                 <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmap->title }} @if($showProgress)<span class="status">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span>@endif</h3>
@@ -254,6 +237,23 @@
             <p>掲載対象のロードマップはありません。</p>
         @endforelse
     </section>
+
+    @foreach($scheduleChunks as $scheduleChunk)
+        <section class="page-section">
+            <h2>3. 全体スケジュール @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
+            <div class="legend"><span style="--color:var(--navy)">プロジェクト</span><span style="--color:var(--blue)">ロードマップ</span><span style="--color:var(--green)">取り組み</span>@if($showTasks)<span style="--color:var(--red)">タスク</span>@endif</div>
+            <div class="schedule-wrap">
+                <div class="schedule-axis"><div class="schedule-label"><strong>計画項目</strong></div><div class="schedule-track">@foreach($ticks as $tick)<span class="schedule-date {{ $loop->first?'first':'' }} {{ $loop->last?'last':'' }}" style="left:{{ $tick/$axisDays*100 }}%">{{ $axisStart->copy()->addDays($tick)->format('n/j') }}</span>@endforeach</div></div>
+                @foreach($scheduleChunk as $row)
+                    @php
+                        $left=$row['start']?max(0,min(100,$axisStart->diffInDays($row['start'],false)/$axisDays*100)):0;
+                        $width=($row['start']&&$row['end'])?max(.7,$row['start']->diffInDays($row['end'])/$axisDays*100):0;
+                    @endphp
+                    <div class="schedule-row {{ $row['type'] }}"><div class="schedule-label"><strong>{{ $row['title'] }}</strong></div><div class="schedule-track">@if($row['start']&&$row['end'])<span class="schedule-bar {{ $row['type'] }}" style="left:{{ $left }}%;width:{{ $width }}%"></span>@endif</div></div>
+                @endforeach
+            </div>
+        </section>
+    @endforeach
 </main>
 <div id="paged-output" aria-live="polite"></div>
 
