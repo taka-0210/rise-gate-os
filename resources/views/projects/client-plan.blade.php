@@ -124,7 +124,7 @@
         <label>作成者<input name="prepared_by" value="{{ $documentOptions['prepared_by'] }}"></label>
         <label>作成日<input type="date" name="prepared_on" value="{{ $documentOptions['prepared_on'] }}"></label>
         <button type="submit">プレビューを更新</button>
-        <button type="button" onclick="window.print()">PDF保存・印刷</button>
+        <a class="button" href="{{ route('projects.client-plan.pdf', ['project' => $project, 'show_tasks' => $showTasks ? 1 : 0, 'show_progress' => $showProgress ? 1 : 0, 'version' => $documentOptions['version'], 'prepared_by' => $documentOptions['prepared_by'], 'prepared_on' => $documentOptions['prepared_on']]) }}">PDF保存</a>
     </div>
 </form>
 

@@ -349,6 +349,21 @@ class TaskManagementTest extends TestCase
             ->assertSee('PDF保存・印刷');
     }
 
+    public function test_client_plan_can_be_downloaded_as_a_pdf(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $this->createTask($project, $owner);
+
+        $response = $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.client-plan.pdf', $project));
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
     public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

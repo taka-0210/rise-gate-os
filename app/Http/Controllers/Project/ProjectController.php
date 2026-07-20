@@ -355,6 +355,17 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function clientPlanPdf(Request $request, Project $project)
+    {
+        $data = $this->clientPlan($request, $project)->getData();
+        $fileName = preg_replace('/[\\\\\/:*?"<>|]+/u', '-', $project->name).'_プロジェクト実施計画書.pdf';
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('projects.client-plan-pdf', $data)
+            ->setOption('isPhpEnabled', true)
+            ->setPaper('a4', 'landscape')
+            ->download($fileName);
+    }
+
     public function legacy(Request $request, Project $project): View
     {
         return view('projects.show', $this->show($request, $project)->getData());

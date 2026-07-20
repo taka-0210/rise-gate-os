@@ -96,6 +96,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/schedule', [ProjectController::class, 'schedule'])->name('projects.schedule');
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::get('/projects/{project}/client-plan', [ProjectController::class, 'clientPlan'])->name('projects.client-plan');
+        Route::get('/projects/{project}/client-plan.pdf', [ProjectController::class, 'clientPlanPdf'])->name('projects.client-plan.pdf');
         Route::get('/projects/{project}/business-media/{type}', [WorkspaceBusinessProfileController::class, 'projectMedia'])->name('projects.business-media');
         Route::post('/projects/{project}/internal-notes', [ProjectInternalNoteController::class, 'store'])->name('projects.internal-notes.store');
         Route::delete('/projects/{project}/internal-notes/{internalNote}', [ProjectInternalNoteController::class, 'destroy'])->name('projects.internal-notes.destroy');
