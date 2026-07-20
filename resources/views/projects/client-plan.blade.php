@@ -63,16 +63,21 @@
         .task-list { margin:9px 0 0; padding-left:22px; }
         .task-list li { margin:6px 0; }
         .status { display:inline-flex; margin-left:6px; padding:2px 7px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:10px; }
-        .confidential { position:absolute; right:17mm; bottom:8mm; color:#8a969e; font-size:10px; }
+        .confidential { display:none; }
+        .print-page-header { position:absolute; top:7mm; right:17mm; left:17mm; display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:3mm; border-bottom:1px solid var(--line); color:#6e7d87; font-size:10px; letter-spacing:.04em; }
+        .print-page-header strong { overflow:hidden; color:var(--navy); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+        .print-page-footer { position:absolute; right:17mm; bottom:6mm; left:17mm; display:grid; grid-template-columns:1fr auto 54px; align-items:center; gap:14px; padding-top:3mm; border-top:1px solid var(--line); color:#7b8992; font-size:9px; }
+        .print-page-footer span:nth-child(2) { text-align:center; }
+        .print-page-footer span:last-child { color:var(--navy); font-weight:800; text-align:right; }
         .notice { margin:0 0 16px; padding:10px 12px; border:1px solid #e2c88b; border-radius:7px; background:#fffaf0; color:#735718; font-size:12px; }
         @page { size:A4 landscape; margin:0; }
         @media print {
             body { background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
             .controls { display:none!important; }
             .document { width:auto; margin:0; }
-            .sheet { width:297mm; min-height:210mm; margin:0; padding:15mm 17mm; box-shadow:none; page-break-after:always; }
+            .sheet { width:297mm; min-height:210mm; margin:0; padding:18mm 17mm 15mm; box-shadow:none; page-break-after:always; }
             .sheet:last-child { page-break-after:auto; }
-            .cover { min-height:210mm; }
+            .cover { min-height:210mm; padding-top:15mm; }
         }
         @media (max-width:760px) {
             .sheet { padding:24px; }
@@ -107,6 +112,7 @@
     $axisDays = max(1, $axisStart->diffInDays($axisEnd));
     $tickStep = max(1, (int) ceil($axisDays / 8));
     $ticks = collect(range(0, $axisDays, $tickStep))->push($axisDays)->unique()->sort()->values();
+    $totalPages = 4;
 @endphp
 
 <form class="controls" method="GET" action="{{ route('projects.client-plan', $project) }}">
@@ -148,7 +154,7 @@
             <dt>作成者</dt><dd>{{ $documentOptions['prepared_by'] ?: '未設定' }}</dd>
             <dt>版番号</dt><dd>Ver. {{ $documentOptions['version'] ?: '1.0' }}</dd>
         </dl>
-        <span class="confidential">{{ $issuerName }} / Confidential</span>
+        @include('projects._client-plan-page-chrome', ['page' => 1, 'totalPages' => $totalPages, 'showHeader' => false])
     </section>
 
     <section class="sheet">
@@ -171,7 +177,7 @@
                 <p>掲載対象のロードマップはありません。</p>
             @endforelse
         </div>
-        <span class="confidential">{{ $issuerName }} / Confidential</span>
+        @include('projects._client-plan-page-chrome', ['page' => 2, 'totalPages' => $totalPages])
     </section>
 
     <section class="sheet">
@@ -187,7 +193,7 @@
                 <div class="schedule-row {{ $row['type'] }}"><div class="schedule-label"><strong>{{ $row['title'] }}</strong></div><div class="schedule-track">@if($row['start']&&$row['end'])<span class="schedule-bar {{ $row['type'] }}" style="left:{{ $left }}%;width:{{ $width }}%"></span>@endif</div></div>
             @endforeach
         </div>
-        <span class="confidential">{{ $issuerName }} / Confidential</span>
+        @include('projects._client-plan-page-chrome', ['page' => 3, 'totalPages' => $totalPages])
     </section>
 
     <section class="sheet">
@@ -211,7 +217,7 @@
         @empty
             <p>掲載対象のロードマップはありません。</p>
         @endforelse
-        <span class="confidential">{{ $issuerName }} / Confidential</span>
+        @include('projects._client-plan-page-chrome', ['page' => 4, 'totalPages' => $totalPages])
     </section>
 </main>
 </body>
