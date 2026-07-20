@@ -80,6 +80,35 @@ class TaskManagementTest extends TestCase
         $this->assertNotNull($task->completed_at);
     }
 
+    public function test_relative_timeline_periods_can_be_edited_within_their_parent(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['duration_days' => 30]);
+        $task = $this->createTask($project, $owner);
+        $roadmap = $task->improvement->roadmap;
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), [
+                'start_day' => 2,
+                'end_day' => 20,
+            ])->assertOk();
+
+        $this->patchJson(route('projects.timeline.update', [$project, 'improvement', $task->improvement_id]), [
+            'start_day' => 1,
+            'end_day' => 10,
+        ])->assertUnprocessable();
+
+        $this->patchJson(route('projects.timeline.update', [$project, 'improvement', $task->improvement_id]), [
+            'start_day' => 3,
+            'end_day' => 10,
+        ])->assertOk();
+
+        $this->assertSame(2, $roadmap->fresh()->planned_start_day);
+        $this->assertSame(20, $roadmap->fresh()->target_day);
+        $this->assertSame(3, $task->improvement->fresh()->planned_start_day);
+    }
+
     public function test_view_only_member_can_view_but_cannot_edit_task(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

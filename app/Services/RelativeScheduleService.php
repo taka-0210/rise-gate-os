@@ -7,6 +7,28 @@ use Illuminate\Support\Facades\DB;
 
 class RelativeScheduleService
 {
+    public function capture(Project $project): void
+    {
+        $project->loadMissing(['roadmaps.improvements.tasks']);
+        $origin = collect()
+            ->concat($project->roadmaps->pluck('planned_start_date'))
+            ->concat($project->improvements->pluck('planned_start_date'))
+            ->concat($project->tasks->pluck('planned_start_date'))
+            ->filter()->min();
+        if (! $origin) return;
+
+        $day = fn ($date) => $date ? $origin->diffInDays($date) + 1 : null;
+        foreach ($project->roadmaps as $roadmap) {
+            $roadmap->update(['planned_start_day' => $roadmap->planned_start_day ?: $day($roadmap->planned_start_date), 'target_day' => $roadmap->target_day ?: $day($roadmap->target_date)]);
+            foreach ($roadmap->improvements as $improvement) {
+                $improvement->update(['planned_start_day' => $improvement->planned_start_day ?: $day($improvement->planned_start_date), 'target_day' => $improvement->target_day ?: $day($improvement->target_date)]);
+                foreach ($improvement->tasks as $task) {
+                    $task->update(['planned_start_day' => $task->planned_start_day ?: $day($task->planned_start_date), 'due_day' => $task->due_day ?: $day($task->due_date)]);
+                }
+            }
+        }
+    }
+
     public function anchor(Project $project): void
     {
         if (! $project->start_date) {

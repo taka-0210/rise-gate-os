@@ -248,7 +248,7 @@
             'overdue' => $project->due_date && !$project->completed_at && $project->due_date->isPast(),
             'reached' => $project->completed_at,
             'schedule_issue' => $scheduleIssueFor('project', $project->id),
-            'editable' => ! $isRelativeTimeline && Gate::allows('update', $project),
+            'editable' => Gate::allows('update', $project),
             'update_url' => route('projects.timeline.update', [$project, 'project', $project->id]),
             'descendant_count' => $projectDescendantCount,
         ]);
@@ -271,7 +271,7 @@
             $roadmapEnd = $isRelativeTimeline ? $relativeDate($relativeDay($roadmap->target_day, $roadmap->target_date)) : ($roadmap->target_date ?: ($roadmapEnds->max() ?: $project->due_date));
             $roadmapDescendantCount = $timelineImprovements->filter(fn ($item) => $item->planned_start_date || $item->target_date)->count()
                 + $roadmapTasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
-            $timeRows->push(['type' => 'roadmap', 'id' => $roadmap->id, 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => !$isRelativeTimeline && $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $roadmap->reached_at, 'schedule_issue' => $scheduleIssueFor('roadmap', $roadmap->id), 'editable' => !$isRelativeTimeline && Gate::allows('update', $roadmap), 'update_url' => route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), 'descendant_count' => $roadmapDescendantCount]);
+            $timeRows->push(['type' => 'roadmap', 'id' => $roadmap->id, 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => !$isRelativeTimeline && $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $roadmap->reached_at, 'schedule_issue' => $scheduleIssueFor('roadmap', $roadmap->id), 'editable' => Gate::allows('update', $roadmap), 'update_url' => route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), 'descendant_count' => $roadmapDescendantCount]);
             foreach ($timelineImprovements as $improvement) {
                 $initiativeStarts = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[0])->filter();
                 $initiativeEnds = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[1])->filter();
@@ -279,7 +279,7 @@
                 $initiativeStart = $isRelativeTimeline ? $relativeDate($relativeDay($improvement->planned_start_day, $improvement->planned_start_date)) : ($improvement->planned_start_date ?: ($initiativeStarts->min() ?: $roadmap->planned_start_date));
                 $initiativeEnd = $isRelativeTimeline ? $relativeDate($relativeDay($improvement->target_day, $improvement->target_date)) : ($improvement->target_date ?: ($initiativeEnds->max() ?: $roadmap->target_date));
                 $improvementDescendantCount = $improvement->tasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
-                $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => !$isRelativeTimeline && $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => !$isRelativeTimeline && Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id]), 'descendant_count' => $improvementDescendantCount]);
+                $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => !$isRelativeTimeline && $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id]), 'descendant_count' => $improvementDescendantCount]);
                 $timelineTasks = $improvement->tasks->sortBy(fn ($task) => [
                     $task->due_date?->timestamp ?? PHP_INT_MAX,
                     $task->id,
@@ -289,7 +289,7 @@
                     $taskHasPlan = $isRelativeTimeline ? ($task->planned_start_day && $task->due_day) : ($task->planned_start_date && $task->due_date);
                     $taskStart ??= $isRelativeTimeline ? $relativeDate($improvement->planned_start_day) : $improvement->planned_start_date;
                     $taskEnd ??= $isRelativeTimeline ? $relativeDate($improvement->target_day) : $improvement->target_date;
-                $timeRows->push(['type' => 'task', 'id' => $task->id, 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => ! $taskHasPlan, 'overdue' => !$isRelativeTimeline && $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null, 'schedule_issue' => $scheduleIssueFor('task', $task->id), 'editable' => !$isRelativeTimeline && Gate::allows('update', $task) && $task->status !== \App\Models\Task::STATUS_DONE, 'update_url' => route('projects.timeline.update', [$project, 'task', $task->id]), 'descendant_count' => 0]);
+                $timeRows->push(['type' => 'task', 'id' => $task->id, 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => ! $taskHasPlan, 'overdue' => !$isRelativeTimeline && $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null, 'schedule_issue' => $scheduleIssueFor('task', $task->id), 'editable' => Gate::allows('update', $task) && $task->status !== \App\Models\Task::STATUS_DONE, 'update_url' => route('projects.timeline.update', [$project, 'task', $task->id]), 'descendant_count' => 0]);
                 }
             }
         }
@@ -557,7 +557,7 @@
                                 @if (!$isRelativeTimeline && $includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
                                     <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" data-descendant-count="{{ $row['descendant_count'] ?? 0 }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $isRelativeTimeline ? ($axisStart->diffInDays($barStart)+1).'日目〜'.($axisStart->diffInDays($barEnd)+1).'日目' : $barStart->format('Y/m/d').'〜'.$barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
-                                        @if ($row['editable'])<i class="time-resize-handle is-start" data-resize="start" title="開始日を変更"></i>@endif
+                                        @if ($row['editable'] && !($isRelativeTimeline && $row['type'] === 'project'))<i class="time-resize-handle is-start" data-resize="start" title="開始日を変更"></i>@endif
                                         @if ($row['editable'])<i class="time-resize-handle is-end" data-resize="end" title="{{ $row['type'] === 'task' ? '期限を変更' : '終了日を変更' }}"></i>@endif
                                     </span>
                                 @else
@@ -791,10 +791,14 @@
             const axisEnd = new Date(`${chart.dataset.axisEnd}T00:00:00`);
             const axisDays = Math.max(1, Math.round((axisEnd - axisStart) / 86400000));
             const csrf = @json(csrf_token());
+            const isRelativeTimeline = @json($isRelativeTimeline);
             const descendantResetAcknowledgedKey = @json('timeline-descendant-reset-acknowledged:'.$project->id);
             const parseDate = value => new Date(`${value}T00:00:00`);
             const formatDate = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
             const addDays = (date, days) => { const next = new Date(date); next.setDate(next.getDate() + days); return next; };
+            const schedulePayload = (start, end, extra = {}) => isRelativeTimeline
+                ? {start_day: Math.round((start - axisStart) / 86400000) + 1, end_day: Math.round((end - axisStart) / 86400000) + 1}
+                : {start_date: formatDate(start), end_date: formatDate(end), ...extra};
             const notify = (message, error = false) => {
                 document.querySelector('.time-save-status')?.remove();
                 const status = document.createElement('div');
@@ -836,6 +840,7 @@
                 }
             });
             const confirmDescendantReset = bar => {
+                if (isRelativeTimeline) return true;
                 if (bar.dataset.entityType === 'task') return true;
                 const count = Number(bar.dataset.descendantCount || 0);
                 if (count === 0) return true;
@@ -847,6 +852,7 @@
 
             document.querySelectorAll('.time-bar.is-editable:not(.is-task)').forEach(bar => {
                 bar.addEventListener('pointerdown', event => {
+                    if (isRelativeTimeline && bar.dataset.entityType === 'project') return;
                     if (event.target.closest('.time-resize-handle')) return;
                     event.preventDefault();
                     if (!confirmDescendantReset(bar)) return;
@@ -879,11 +885,7 @@
                             const response = await fetch(bar.dataset.scheduleUrl, {
                                 method: 'PATCH',
                                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf},
-                                body: JSON.stringify({
-                                    start_date: formatDate(nextStart),
-                                    end_date: formatDate(nextEnd),
-                                    reset_descendants: true,
-                                }),
+                                body: JSON.stringify(schedulePayload(nextStart, nextEnd, {reset_descendants: true})),
                             });
                             const body = await response.json();
                             if (!response.ok) {
@@ -952,11 +954,7 @@
                             const response = await fetch(bar.dataset.scheduleUrl, {
                                 method: 'PATCH',
                                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf},
-                                body: JSON.stringify({
-                                    start_date: formatDate(nextStart),
-                                    end_date: formatDate(nextEnd),
-                                    reset_descendants: bar.dataset.entityType !== 'task',
-                                }),
+                                body: JSON.stringify(schedulePayload(nextStart, nextEnd, {reset_descendants: bar.dataset.entityType !== 'task'})),
                             });
                             const body = await response.json();
                             if (!response.ok) {

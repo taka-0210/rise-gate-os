@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Roadmap;
 use App\Models\Task;
 use App\Services\ScheduleIntegrityService;
+use App\Services\RelativeScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,10 @@ class TimelineScheduleController extends Controller
             'task' => $project->tasks()->findOrFail($entity),
         };
         Gate::authorize('update', $model);
+
+        if (! $project->start_date && $project->duration_days) {
+            return $this->updateRelative($request, $project, $type, $model);
+        }
 
         $attributes = match ($type) {
             'project', 'roadmap', 'improvement' => $request->validate([
@@ -114,6 +119,53 @@ class TimelineScheduleController extends Controller
         });
 
         return response()->json(['message' => '日程を更新しました。', 'integrity' => $integrity]);
+    }
+
+    private function updateRelative(Request $request, Project $project, string $type, Project|Roadmap|Improvement|Task $model): JsonResponse
+    {
+        app(RelativeScheduleService::class)->capture($project);
+        $project->refresh();
+        $model->refresh();
+        $attributes = $request->validate([
+            'start_day' => ['required', 'integer', 'min:1'],
+            'end_day' => ['required', 'integer', 'gte:start_day', 'max:3650'],
+        ]);
+        $start = (int) $attributes['start_day'];
+        $end = (int) $attributes['end_day'];
+
+        DB::transaction(function () use ($project, $type, $model, $start, $end): void {
+            [$parentStart, $parentEnd] = match ($type) {
+                'project' => [1, $end],
+                'roadmap' => [1, $project->duration_days],
+                'improvement' => [$model->roadmap?->planned_start_day ?? 1, $model->roadmap?->target_day ?? $project->duration_days],
+                'task' => [$model->improvement?->planned_start_day ?? 1, $model->improvement?->target_day ?? $project->duration_days],
+            };
+
+            if (($type === 'project' && $start !== 1) || $start < $parentStart || $end > $parentEnd) {
+                throw ValidationException::withMessages(['schedule' => "期間は上位要素の{$parentStart}日目〜{$parentEnd}日目の範囲内で設定してください。"]);
+            }
+
+            $childrenOutside = match ($type) {
+                'project' => $project->roadmaps()->where(fn ($query) => $query->where('planned_start_day', '<', $start)->orWhere('target_day', '>', $end))->exists(),
+                'roadmap' => $model->improvements()->where(fn ($query) => $query->where('planned_start_day', '<', $start)->orWhere('target_day', '>', $end))->exists(),
+                'improvement' => $model->tasks()->where(fn ($query) => $query->where('planned_start_day', '<', $start)->orWhere('due_day', '>', $end))->exists(),
+                'task' => false,
+            };
+            if ($childrenOutside) {
+                throw ValidationException::withMessages(['schedule' => '配下の期間を含むように設定してください。先に配下の期間を調整できます。']);
+            }
+
+            $model->update(match ($type) {
+                'project' => ['duration_days' => $end, 'due_date' => null],
+                'roadmap', 'improvement' => ['planned_start_day' => $start, 'target_day' => $end],
+                'task' => ['planned_start_day' => $start, 'due_day' => $end],
+            });
+        });
+
+        return response()->json([
+            'message' => '相対期間を更新しました。',
+            'integrity' => app(ScheduleIntegrityService::class)->inspect($project->fresh()),
+        ]);
     }
 
     private function moveDescendants(string $type, Project|Roadmap|Improvement $model, int $dayDelta): void
