@@ -96,6 +96,17 @@
             </div>
         </div>
 
+        <div class="grid">
+            <article class="panel">
+                <h2>現状</h2>
+                <p>{{ $project->current_state ?: '現在の業務や課題はまだ登録されていません。' }}</p>
+            </article>
+            <article class="panel" style="border-color:#b7dbc9;background:linear-gradient(145deg,#f8fffb,#eaf7f0);">
+                <h2 style="color:#2f7f5a;">✦ 目指す未来のカタチ</h2>
+                <p>{{ $project->desired_future_state ?: '実現したい未来のカタチはまだ登録されていません。' }}</p>
+            </article>
+        </div>
+
         @if (session('status'))
             <div class="panel" style="border-color:#b7d8c2; background:#f3fbf6;">
                 {{ session('status') }}

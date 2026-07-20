@@ -293,6 +293,8 @@ class TaskManagementTest extends TestCase
         $project->update([
             'client_id' => $client->id,
             'summary' => 'お客さまへ提出する計画概要',
+            'current_state' => '注文情報が複数の台帳に分かれている。',
+            'desired_future_state' => '注文から発送まで、迷わずひとつの流れで進められる。',
             'start_date' => '2026-08-01',
             'due_date' => '2026-08-31',
         ]);
@@ -333,6 +335,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('プロジェクト実施計画書')
             ->assertSee('提出先株式会社 御中')
             ->assertSee('お客さまへ提出する計画概要')
+            ->assertSee('注文情報が複数の台帳に分かれている。')
+            ->assertSee('注文から発送まで、迷わずひとつの流れで進められる。')
             ->assertSee($task->improvement->roadmap->title)
             ->assertSee('提出用ロードマップ8')
             ->assertSee('data-overview-count="2"', false)
@@ -340,9 +344,10 @@ class TaskManagementTest extends TestCase
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
             ->assertSeeInOrder([
-                '1. プロジェクト全体概要（目指す未来とロードマップ）',
-                '2. 取り組み、タスク詳細',
-                '3. 全体スケジュール',
+                '1. 現状と目指す未来のカタチ',
+                '2. プロジェクト概要',
+                '3. 取り組み、タスク詳細',
+                '4. 全体スケジュール',
             ])
             ->assertSee('印刷・PDF保存')
             ->assertSee('name="show_progress" value="1" >進捗を掲載', false)

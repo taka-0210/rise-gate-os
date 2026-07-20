@@ -550,6 +550,8 @@ class ProjectController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:80'],
             'summary' => ['nullable', 'string', 'max:5000'],
+            'current_state' => ['nullable', 'string', 'max:5000'],
+            'desired_future_state' => ['nullable', 'string', 'max:5000'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Project::statuses()))],
             'priority' => ['required', 'string', 'in:'.implode(',', array_keys(Project::priorities()))],
             'start_date' => ['nullable', 'date'],

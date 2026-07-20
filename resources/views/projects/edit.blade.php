@@ -1,6 +1,10 @@
 ﻿@extends('layouts.app', ['title' => 'Projectを編集 - '.$project->name])
 
 @section('content')
+    <style>
+        .future-field { padding:16px; border:1px solid #b7dbc9; border-radius:10px; background:linear-gradient(145deg,#f8fffb,#eaf7f0); }
+        .future-field label::before { content:"✦"; margin-right:7px; color:#3d966d; }
+    </style>
     <section class="panel stack">
         <div>
             <h1>Projectを編集</h1>
@@ -37,7 +41,22 @@
             <div class="field">
                 <label for="summary">概要</label>
                 <textarea id="summary" name="summary" rows="5">{{ old('summary', $project->summary) }}</textarea>
+                <div class="meta">このプロジェクトが依頼に至った経緯や背景を記録します。</div>
                 @error('summary') <div class="error">{{ $message }}</div> @enderror
+            </div>
+
+            <div class="field">
+                <label for="current_state">現状</label>
+                <textarea id="current_state" name="current_state" rows="5">{{ old('current_state', $project->current_state) }}</textarea>
+                <div class="meta">現在の業務、運用方法、困りごとや課題を記録します。</div>
+                @error('current_state') <div class="error">{{ $message }}</div> @enderror
+            </div>
+
+            <div class="field future-field">
+                <label for="desired_future_state">目指す未来のカタチ</label>
+                <textarea id="desired_future_state" name="desired_future_state" rows="5">{{ old('desired_future_state', $project->desired_future_state) }}</textarea>
+                <div class="meta">プロジェクト完了後に実現したい状態を記録します。</div>
+                @error('desired_future_state') <div class="error">{{ $message }}</div> @enderror
             </div>
 
             <div class="grid">

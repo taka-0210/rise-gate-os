@@ -75,6 +75,8 @@ class ProjectFoundationTest extends TestCase
                 'name' => 'Website Improvement Project',
                 'code' => 'RG-001',
                 'summary' => 'The first project centered on improvement.',
+                'current_state' => 'Orders are managed in separate spreadsheets.',
+                'desired_future_state' => 'Everyone can see and process the same order information.',
                 'status' => 'active',
                 'priority' => 'high',
                 'start_date' => '2026-07-13',
@@ -93,6 +95,8 @@ class ProjectFoundationTest extends TestCase
         $this->assertSame($workspace->id, $project->billing_workspace_id);
         $this->assertSame($workspace->organization_id, $project->organization_id);
         $this->assertSame($user->id, $project->owner_user_id);
+        $this->assertSame('Orders are managed in separate spreadsheets.', $project->current_state);
+        $this->assertSame('Everyone can see and process the same order information.', $project->desired_future_state);
         $this->assertDatabaseHas('project_members', [
             'project_id' => $project->id,
             'user_id' => $user->id,
@@ -207,6 +211,8 @@ class ProjectFoundationTest extends TestCase
                 'name' => 'Updated Project',
                 'code' => 'UP-001',
                 'summary' => 'Updated summary for operation.',
+                'current_state' => 'Current work is fragmented.',
+                'desired_future_state' => 'The team works from one shared flow.',
                 'status' => 'on_hold',
                 'priority' => 'high',
                 'start_date' => '2026-07-14',
@@ -219,6 +225,8 @@ class ProjectFoundationTest extends TestCase
         $this->assertSame('UP-001', $project->code);
         $this->assertSame('on_hold', $project->status);
         $this->assertSame('high', $project->priority);
+        $this->assertSame('Current work is fragmented.', $project->current_state);
+        $this->assertSame('The team works from one shared flow.', $project->desired_future_state);
     }
 
     public function test_view_only_project_member_cannot_update_project(): void

@@ -35,6 +35,8 @@ class Project extends Model
         'name',
         'code',
         'summary',
+        'current_state',
+        'desired_future_state',
         'status',
         'priority',
         'start_date',

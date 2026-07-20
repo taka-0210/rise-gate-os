@@ -45,6 +45,14 @@
         .cover-meta dt { color:var(--muted); }
         .cover-meta dd { margin:0; font-weight:700; }
         .lead { font-size:16px; color:#394a55; }
+        .vision-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+        .vision-card { min-height:128mm; padding:22px; border:1px solid var(--line); border-top:7px solid var(--blue); border-radius:8px; background:#f8fafc; }
+        .vision-card.future { position:relative; overflow:hidden; border-color:#b7dbc9; border-top-color:var(--green); background:linear-gradient(145deg,#f8fffb 0%,#eef9f3 62%,#e5f4ec 100%); box-shadow:0 10px 28px rgba(55,137,98,.10); }
+        .vision-card.future::after { content:""; position:absolute; right:-28mm; bottom:-34mm; width:92mm; height:92mm; border-radius:50%; background:radial-gradient(circle,rgba(86,162,126,.20),rgba(86,162,126,0) 68%); }
+        .vision-card.future h3::before { content:"✦"; margin-right:8px; color:#3d966d; }
+        .vision-card.future h3,.vision-card.future p { position:relative; z-index:1; }
+        .vision-card h3 { color:var(--navy); font-size:21px; }
+        .vision-card p { margin-top:18px; color:#394a55; font-size:16px; white-space:pre-line; }
         .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0 28px; }
         .stat { padding:16px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; }
         .stat strong { display:block; color:var(--navy); font-size:30px; }
@@ -144,7 +152,7 @@
             foreach ($remainingRoadmaps->chunk($remainingChunkSize) as $chunk) $overviewChunks->push($chunk);
         }
     }
-    $scheduleChunks = $timelineRows->chunk(12);
+    $scheduleChunks = $timelineRows->chunk(15);
 @endphp
 
 <form class="controls" method="GET" action="{{ route('projects.client-plan', $project) }}">
@@ -187,11 +195,25 @@
             <dt>作成者</dt><dd>{{ $documentOptions['prepared_by'] ?: '未設定' }}</dd>
             <dt>版番号</dt><dd>Ver. {{ $documentOptions['version'] ?: '1.0' }}</dd>
         </dl>
+</section>
+
+    <section class="page-section">
+        <h2>1. 現状と目指す未来のカタチ</h2>
+        <div class="vision-grid">
+            <article class="vision-card">
+                <h3>現状</h3>
+                <p>{{ $project->current_state ?: '現在の業務や課題は、これから整理していきます。' }}</p>
+            </article>
+            <article class="vision-card future">
+                <h3>目指す未来のカタチ</h3>
+                <p>{{ $project->desired_future_state ?: 'プロジェクトを通じて実現する未来のカタチは、これから整理していきます。' }}</p>
+            </article>
+        </div>
     </section>
 
     @forelse($overviewChunks as $overviewChunk)
         <section class="page-section" data-overview-count="{{ $overviewChunk->count() }}">
-            <h2>1. プロジェクト全体概要（目指す未来とロードマップ） @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
+            <h2>2. プロジェクト概要 @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
             @if($loop->first)
                 <h3>{{ $project->name }}</h3>
                 <p class="lead">{{ $project->summary ?: 'プロジェクト概要は現在整理中です。' }}</p>
@@ -212,11 +234,11 @@
             </div>
         </section>
     @empty
-        <section class="page-section"><h2>1. プロジェクト全体概要（目指す未来とロードマップ）</h2><p>掲載対象のロードマップはありません。</p></section>
+        <section class="page-section"><h2>2. プロジェクト概要</h2><p>掲載対象のロードマップはありません。</p></section>
     @endforelse
 
     <section class="page-section detail-section">
-        <h2>2. 取り組み、タスク詳細</h2>
+        <h2>3. 取り組み、タスク詳細</h2>
         @forelse($roadmaps as $roadmap)
             <article class="roadmap-detail">
                 <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmap->title }} @if($showProgress)<span class="status">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span>@endif</h3>
@@ -240,7 +262,7 @@
 
     @foreach($scheduleChunks as $scheduleChunk)
         <section class="page-section">
-            <h2>3. 全体スケジュール @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
+            <h2>4. 全体スケジュール @if(!$loop->first)<span class="continued">（続き）</span>@endif</h2>
             <div class="legend"><span style="--color:var(--navy)">プロジェクト</span><span style="--color:var(--blue)">ロードマップ</span><span style="--color:var(--green)">取り組み</span>@if($showTasks)<span style="--color:var(--red)">タスク</span>@endif</div>
             <div class="schedule-wrap">
                 <div class="schedule-axis"><div class="schedule-label"><strong>計画項目</strong></div><div class="schedule-track">@foreach($ticks as $tick)<span class="schedule-date {{ $loop->first?'first':'' }} {{ $loop->last?'last':'' }}" style="left:{{ $tick/$axisDays*100 }}%">{{ $axisStart->copy()->addDays($tick)->format('n/j') }}</span>@endforeach</div></div>
