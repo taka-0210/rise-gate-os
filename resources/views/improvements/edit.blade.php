@@ -111,5 +111,10 @@
                 <a href="{{ route('projects.improvements.show', [$project, $improvement]) }}">キャンセル</a>
             </div>
         </form>
+        <form method="POST" action="{{ route('projects.improvements.destroy',[$project,$improvement]) }}" onsubmit="return confirm('この取り組みを削除しますか？');">
+            @csrf @method('DELETE')
+            @error('delete')<div class="error">{{ $message }}</div>@enderror
+            <button type="submit" class="secondary">取り組みを削除</button>
+        </form>
     </section>
 @endsection

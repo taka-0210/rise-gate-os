@@ -16,6 +16,14 @@ use Illuminate\View\View;
 
 class RoadmapController extends Controller
 {
+    public function create(Project $project): View
+    {
+        Gate::authorize('view', $project);
+        Gate::authorize('create', [Roadmap::class, $project]);
+
+        return view('roadmaps.create', ['project' => $project, 'statuses' => Roadmap::statuses()]);
+    }
+
     public function store(Request $request, Project $project): RedirectResponse
     {
         Gate::authorize('view', $project);
@@ -115,6 +123,18 @@ class RoadmapController extends Controller
         return redirect()->route('projects.show', $project)->with('status', 'Roadmapを更新しました。');
     }
 
+    public function destroy(Project $project, Roadmap $roadmap): RedirectResponse
+    {
+        $this->authorizeProjectRoadmap($project, $roadmap);
+        Gate::authorize('delete', $roadmap);
+        if ($roadmap->improvements()->exists()) {
+            return back()->withErrors(['delete' => '配下に取り組みがあるため削除できません。先に取り組みを移動または削除してください。']);
+        }
+        $roadmap->delete();
+
+        return redirect()->route('projects.show', $project)->with('status', 'ロードマップを削除しました。');
+    }
+
     public function assignImprovement(Request $request, Project $project, Improvement $improvement): RedirectResponse
     {
         $this->authorizeProjectImprovement($project, $improvement);
@@ -182,6 +202,12 @@ class RoadmapController extends Controller
 
     private function ensureWithinProject(Project $project, array $attributes): void
     {
+        if (! $project->start_date && $project->duration_days && ! empty($attributes['planned_start_day']) && ! empty($attributes['target_day'])) {
+            if ($attributes['planned_start_day'] < 1 || $attributes['target_day'] > $project->duration_days) {
+                throw ValidationException::withMessages(['planned_start_day' => "ロードマップ期間はProjectの1日目〜{$project->duration_days}日目の範囲内で設定してください。"]);
+            }
+            return;
+        }
         if (! $project->start_date || ! $project->due_date || empty($attributes['planned_start_date']) || empty($attributes['target_date'])) {
             return;
         }
@@ -195,6 +221,15 @@ class RoadmapController extends Controller
 
     private function ensureImprovementsRemainWithin(Roadmap $roadmap, array $attributes): void
     {
+        if (! empty($attributes['planned_start_day']) && ! empty($attributes['target_day'])) {
+            $count = $roadmap->improvements()->where(fn ($query) => $query
+                ->where('planned_start_day', '<', $attributes['planned_start_day'])
+                ->orWhere('target_day', '>', $attributes['target_day']))->count();
+            if ($count > 0) {
+                throw ValidationException::withMessages(['planned_start_day' => "この変更により、取り組み{$count}件がロードマップ期間外になります。"]);
+            }
+            return;
+        }
         if (empty($attributes['planned_start_date']) || empty($attributes['target_date'])) {
             return;
         }

@@ -16,6 +16,21 @@ use Illuminate\View\View;
 
 class TaskController extends Controller
 {
+    public function create(Request $request, Project $project): View
+    {
+        Gate::authorize('view', $project);
+        Gate::authorize('create', [Task::class, $project]);
+
+        return view('tasks.create', [
+            'project' => $project,
+            'statuses' => Task::statuses(),
+            'priorities' => Task::priorities(),
+            'assignableUsers' => $this->assignableUsers($project),
+            'initiatives' => $this->assignableInitiatives($request, $project),
+            'selectedImprovementId' => $request->integer('improvement') ?: null,
+        ]);
+    }
+
     public function show(Project $project, Task $task): View
     {
         $this->authorizeProjectTask($project, $task);
@@ -83,6 +98,15 @@ class TaskController extends Controller
         return redirect()->route('projects.tasks.show', [$project, $task])->with('status', 'Taskを更新しました。');
     }
 
+    public function destroy(Project $project, Task $task): RedirectResponse
+    {
+        $this->authorizeProjectTask($project, $task);
+        Gate::authorize('delete', $task);
+        $task->delete();
+
+        return redirect()->route('projects.show', $project)->with('status', 'タスクを削除しました。');
+    }
+
     private function validateTask(Request $request, Project $project): array
     {
         $assignableUserIds = $this->assignableUsers($project)->pluck('id')->all();
@@ -113,6 +137,12 @@ class TaskController extends Controller
             throw ValidationException::withMessages([
                 'planned_start_date' => "タスクの期間は、取り組みの予定期間（{$improvement->planned_start_date->format('Y/m/d')}〜{$improvement->target_date->format('Y/m/d')}）内で設定してください。",
             ]);
+        }
+        if (! $project->start_date && ! empty($validated['planned_start_day']) && ! empty($validated['due_day'])) {
+            if ($validated['planned_start_day'] < ($improvement->planned_start_day ?? 1)
+                || $validated['due_day'] > ($improvement->target_day ?? $project->duration_days)) {
+                throw ValidationException::withMessages(['planned_start_day' => 'タスク期間は所属する取り組みの期間内で設定してください。']);
+            }
         }
 
         return $validated;

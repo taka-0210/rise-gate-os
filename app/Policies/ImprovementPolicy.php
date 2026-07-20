@@ -52,4 +52,9 @@ class ImprovementPolicy
             ])
             ->exists();
     }
+
+    public function delete(User $user, Improvement $improvement): bool
+    {
+        return $this->update($user, $improvement);
+    }
 }

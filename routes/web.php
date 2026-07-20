@@ -116,13 +116,15 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/{project}/manage', [ProjectController::class, 'legacy'])->name('projects.legacy');
         Route::post('/projects/{project}/move', [ProjectController::class, 'move'])->name('projects.move');
         Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
-        Route::resource('projects.improvements', ImprovementController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+        Route::resource('projects.improvements', ImprovementController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
         Route::post('/projects/{project}/roadmaps', [RoadmapController::class, 'store'])->name('projects.roadmaps.store');
+        Route::get('/projects/{project}/roadmaps/create', [RoadmapController::class, 'create'])->name('projects.roadmaps.create');
         Route::get('/projects/{project}/roadmaps/{roadmap}/edit', [RoadmapController::class, 'edit'])->name('projects.roadmaps.edit');
         Route::put('/projects/{project}/roadmaps/{roadmap}', [RoadmapController::class, 'update'])->name('projects.roadmaps.update');
+        Route::delete('/projects/{project}/roadmaps/{roadmap}', [RoadmapController::class, 'destroy'])->name('projects.roadmaps.destroy');
         Route::post('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'assignImprovement'])->name('projects.improvements.roadmap.assign');
         Route::delete('/projects/{project}/improvements/{improvement}/roadmap', [RoadmapController::class, 'removeImprovement'])->name('projects.improvements.roadmap.remove');
-        Route::resource('projects.tasks', TaskController::class)->only(['store', 'show', 'edit', 'update']);
+        Route::resource('projects.tasks', TaskController::class)->only(['create', 'store', 'show', 'edit', 'update', 'destroy']);
         Route::patch('/projects/{project}/timeline/{type}/{entity}', [TimelineScheduleController::class, 'update'])->name('projects.timeline.update');
         Route::post('/projects/{project}/improvements/{improvement}/outputs/tasks', [ImprovementOutputController::class, 'storeTask'])->name('projects.improvements.outputs.tasks.store');
         Route::post('/projects/{project}/improvements/{improvement}/outputs/projects', [ImprovementOutputController::class, 'storeProject'])->name('projects.improvements.outputs.projects.store');

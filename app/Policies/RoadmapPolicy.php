@@ -40,4 +40,9 @@ class RoadmapPolicy
             ])
             ->exists();
     }
+
+    public function delete(User $user, Roadmap $roadmap): bool
+    {
+        return $this->update($user, $roadmap);
+    }
 }

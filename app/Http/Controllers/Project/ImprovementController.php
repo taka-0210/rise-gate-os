@@ -140,6 +140,18 @@ class ImprovementController extends Controller
         return redirect()->route('projects.improvements.show', [$project, $improvement])->with('status', '改善を更新しました。');
     }
 
+    public function destroy(Project $project, Improvement $improvement): RedirectResponse
+    {
+        $this->authorizeProjectImprovement($project, $improvement);
+        Gate::authorize('delete', $improvement);
+        if ($improvement->tasks()->exists()) {
+            return back()->withErrors(['delete' => '配下にタスクがあるため削除できません。先にタスクを削除してください。']);
+        }
+        $improvement->delete();
+
+        return redirect()->route('projects.show', $project)->with('status', '取り組みを削除しました。');
+    }
+
     protected function visibleImprovementsQuery(Request $request, Project $project)
     {
         $member = $project->members()
@@ -209,6 +221,13 @@ class ImprovementController extends Controller
             ]);
         }
 
+        if (! $project->start_date && ! empty($validated['planned_start_day']) && ! empty($validated['target_day'])) {
+            if ($validated['planned_start_day'] < ($roadmap->planned_start_day ?? 1)
+                || $validated['target_day'] > ($roadmap->target_day ?? $project->duration_days)) {
+                throw ValidationException::withMessages(['planned_start_day' => '取り組み期間は所属ロードマップの期間内で設定してください。']);
+            }
+        }
+
         if ($request->route('improvement') && ! empty($validated['planned_start_date']) && ! empty($validated['target_date'])) {
             $count = $request->route('improvement')->tasks()
                 ->whereNotNull('due_date')
@@ -220,6 +239,14 @@ class ImprovementController extends Controller
                 throw ValidationException::withMessages([
                     'planned_start_date' => "この変更により、タスク{$count}件が取り組みの期間外になります。先にタスクの期限を調整してください。",
                 ]);
+            }
+        }
+        if ($request->route('improvement') && ! empty($validated['planned_start_day']) && ! empty($validated['target_day'])) {
+            $count = $request->route('improvement')->tasks()->where(fn ($query) => $query
+                ->where('planned_start_day', '<', $validated['planned_start_day'])
+                ->orWhere('due_day', '>', $validated['target_day']))->count();
+            if ($count > 0) {
+                throw ValidationException::withMessages(['planned_start_day' => "この変更により、タスク{$count}件が取り組み期間外になります。"]);
             }
         }
 

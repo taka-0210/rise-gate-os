@@ -27,5 +27,10 @@
             </div>
             <div class="actions"><button type="submit">Roadmapを更新</button><a class="button secondary" href="{{ route('projects.show', $project) }}">戻る</a></div>
         </form>
+        <form method="POST" action="{{ route('projects.roadmaps.destroy',[$project,$roadmap]) }}" onsubmit="return confirm('このロードマップを削除しますか？');">
+            @csrf @method('DELETE')
+            @error('delete')<div class="error">{{ $message }}</div>@enderror
+            <button type="submit" class="secondary">ロードマップを削除</button>
+        </form>
     </section>
 @endsection

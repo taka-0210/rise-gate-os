@@ -109,6 +109,33 @@ class TaskManagementTest extends TestCase
         $this->assertSame(3, $task->improvement->fresh()->planned_start_day);
     }
 
+    public function test_manual_plan_management_is_available_from_the_project_and_deletes_safely(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $task = $this->createTask($project, $owner);
+        $improvement = $task->improvement;
+        $roadmap = $improvement->roadmap;
+
+        $this->actingAs($owner)->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertSee(route('projects.roadmaps.create', $project), false)
+            ->assertSee(route('projects.tasks.create', [$project, 'improvement' => $improvement->id]), false);
+
+        $this->delete(route('projects.roadmaps.destroy', [$project, $roadmap]))
+            ->assertSessionHasErrors('delete');
+        $this->delete(route('projects.improvements.destroy', [$project, $improvement]))
+            ->assertSessionHasErrors('delete');
+
+        $this->delete(route('projects.tasks.destroy', [$project, $task]))->assertRedirect(route('projects.show', $project));
+        $this->delete(route('projects.improvements.destroy', [$project, $improvement]))->assertRedirect(route('projects.show', $project));
+        $this->delete(route('projects.roadmaps.destroy', [$project, $roadmap]))->assertRedirect(route('projects.show', $project));
+
+        $this->assertSoftDeleted($task);
+        $this->assertSoftDeleted($improvement);
+        $this->assertSoftDeleted($roadmap);
+    }
+
     public function test_view_only_member_can_view_but_cannot_edit_task(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

@@ -353,7 +353,7 @@
                         <a href="{{ route('projects.client-plan', $project) }}" target="_blank" rel="noopener">お客さま提出資料</a>
                     @endif
                 </div>
-                <a class="button secondary focus-manage-link" href="{{ route('projects.legacy', $project) }}">管理詳細を見る</a>
+                <a class="button secondary focus-manage-link" href="{{ route('projects.legacy', $project) }}">メンバー・詳細管理</a>
             </div>
         </div>
 
@@ -583,7 +583,10 @@
                     <h1>{{ $project->name }}</h1>
                     <p>{{ $project->summary ?: 'このProjectの目的から、具体的な行動までを内側へたどります。' }}</p>
                 </div>
-                @if ($canEditProject)<a class="button" href="{{ route('projects.edit', $project) }}">Projectを編集</a>@endif
+                <div class="actions">
+                    @if($canCreateRoadmap)<a class="button" href="{{ route('projects.roadmaps.create',$project) }}">ロードマップを登録</a>@endif
+                    @if ($canEditProject)<a class="button secondary" href="{{ route('projects.edit', $project) }}">Projectを編集</a>@endif
+                </div>
             </div>
 
             @php($sourceImprovement = $project->sourceImprovementOutput?->improvement)
@@ -644,6 +647,7 @@
                                         <div class="focus-improvement-body">
                                             <div class="actions" style="justify-content:flex-end;margin-bottom:10px;">
                                                 <a class="button secondary" href="{{ route('projects.improvements.edit', [$project, $improvement]) }}">取り組みを編集</a>
+                                                @if($canCreateTask)<a class="button" href="{{ route('projects.tasks.create',[$project,'improvement'=>$improvement->id]) }}">タスクを登録</a>@endif
                                             </div>
                                             <div class="focus-tasks" data-tasks-for="{{ $improvement->id }}">
                                                 @forelse ($improvement->tasks as $task)

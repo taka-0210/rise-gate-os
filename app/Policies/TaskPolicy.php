@@ -42,4 +42,9 @@ class TaskPolicy
             ])
             ->exists();
     }
+
+    public function delete(User $user, Task $task): bool
+    {
+        return $this->update($user, $task);
+    }
 }
