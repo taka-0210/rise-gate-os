@@ -27,8 +27,8 @@
         #paged-output { padding:24px 0 60px; }
         .pagedjs_pages { display:flex; flex-direction:column; align-items:center; gap:22px; }
         .pagedjs_page { margin:0!important; background:#fff; box-shadow:0 8px 30px rgba(28,50,64,.13); }
-        .page-section { break-after:page; page-break-after:always; }
-        .cover { break-after:page; page-break-after:always; }
+        .page-section { break-after:page; }
+        .detail-section { break-before:page; }
         .cover { min-height:174mm; display:flex; flex-direction:column; justify-content:space-between; border-top:9px solid var(--navy); padding-top:12mm; }
         .logo { width:205px; height:auto; max-height:44mm; object-fit:contain; object-position:left center; }
         .issuer-name { color:var(--navy); font-size:23px; font-weight:900; }
@@ -119,8 +119,12 @@
     $axisDays = max(1,$axisStart->diffInDays($axisEnd));
     $tickStep = max(1,(int)ceil($axisDays/8));
     $ticks = collect(range(0,$axisDays,$tickStep))->push($axisDays)->unique()->sort()->values();
-    $overviewChunks = $roadmaps->chunk(5);
-    $scheduleChunks = $timelineRows->chunk(18);
+    $overviewChunks = collect();
+    if ($roadmaps->isNotEmpty()) {
+        $overviewChunks->push($roadmaps->take(3));
+        foreach ($roadmaps->skip(3)->chunk(4) as $chunk) $overviewChunks->push($chunk);
+    }
+    $scheduleChunks = $timelineRows->chunk(12);
 @endphp
 
 <form class="controls" method="GET" action="{{ route('projects.client-plan', $project) }}">
@@ -208,7 +212,7 @@
         </section>
     @endforeach
 
-    <section>
+    <section class="detail-section">
         <h2>3. ロードマップ詳細</h2>
         @forelse($roadmaps as $roadmap)
             <article class="roadmap-detail">
@@ -242,7 +246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         if (document.fonts?.ready) await document.fonts.ready;
-        await window.PagedPolyfill.preview(source, [], output);
+        await window.PagedPolyfill.preview(source, undefined, output);
         printButton.disabled = false;
     } catch (error) {
         console.error('印刷プレビューの生成に失敗しました。', error);

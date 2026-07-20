@@ -282,34 +282,6 @@ class TaskManagementTest extends TestCase
             ], false);
     }
 
-    public function test_time_view_has_a_print_layout_with_project_summary_and_counts(): void
-    {
-        [$owner, $workspace, $project] = $this->createProjectOwner();
-        $client = Client::create([
-            'organization_id' => $project->organization_id,
-            'workspace_id' => $workspace->id,
-            'name' => '印刷確認クライアント',
-        ]);
-        $project->update([
-            'client_id' => $client->id,
-            'summary' => '印刷用のプロジェクト概要です。',
-            'start_date' => '2026-08-01',
-            'due_date' => '2026-08-31',
-        ]);
-        $this->createTask($project, $owner);
-
-        $this->actingAs($owner)
-            ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'print' => 1]))
-            ->assertOk()
-            ->assertSee('クライアント：印刷確認クライアント')
-            ->assertSee('印刷用のプロジェクト概要です。')
-            ->assertSee('ロードマップ 1件')
-            ->assertSee('取り組み 1件')
-            ->assertSee('タスク 1件')
-            ->assertSee("window.addEventListener('load', () => window.print()", false);
-    }
-
     public function test_project_member_can_preview_a_client_facing_project_plan(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
@@ -335,6 +307,24 @@ class TaskManagementTest extends TestCase
             'target_date' => '2026-08-25',
         ]);
         $task->update(['planned_start_date' => '2026-08-03', 'due_date' => '2026-08-10']);
+        foreach (range(2, 8) as $sortOrder) {
+            Roadmap::create([
+                'organization_id' => $project->organization_id,
+                'workspace_id' => $workspace->id,
+                'project_id' => $project->id,
+                'title' => '提出用ロードマップ'.$sortOrder,
+                'status' => Roadmap::STATUS_DRAFT,
+                'sort_order' => $sortOrder,
+                'created_by' => $owner->id,
+            ]);
+        }
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
+            ->assertOk()
+            ->assertSee('お客さま提出資料')
+            ->assertDontSee('社内用印刷');
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
@@ -344,10 +334,14 @@ class TaskManagementTest extends TestCase
             ->assertSee('提出先株式会社 御中')
             ->assertSee('お客さまへ提出する計画概要')
             ->assertSee($task->improvement->roadmap->title)
+            ->assertSee('提出用ロードマップ8')
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
+            ->assertSee('2. 全体スケジュール')
             ->assertSee('印刷・PDF保存')
-            ->assertSee('vendor/pagedjs/paged.polyfill.js', false);
+            ->assertSee('vendor/pagedjs/paged.polyfill.js', false)
+            ->assertSee('size:297mm 210mm', false)
+            ->assertSee('preview(source, undefined, output)', false);
     }
 
     public function test_internal_note_is_visible_in_project_but_never_in_client_plan(): void
