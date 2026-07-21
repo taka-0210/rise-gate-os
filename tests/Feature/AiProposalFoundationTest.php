@@ -69,7 +69,9 @@ class AiProposalFoundationTest extends TestCase
             ->assertSessionHas('ai_request_copy_text', function (string $text) use ($project): bool {
                 return str_contains($text, "プロジェクト「{$project->name}」")
                     && str_contains($text, '見積機能の続きを進める')
-                    && str_contains($text, '未処理のAI依頼を確認');
+                    && str_contains($text, '未処理のAI依頼を確認')
+                    && str_contains($text, 'UTF-8')
+                    && str_contains($text, '文字化け');
             });
     }
 

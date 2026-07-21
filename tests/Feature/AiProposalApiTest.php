@@ -76,6 +76,21 @@ class AiProposalApiTest extends TestCase
         $this->assertNull($project->desired_future_state);
     }
 
+    public function test_api_rejects_mojibake_before_saving_a_proposal(): void
+    {
+        [$workspace, $project] = $this->workspaceProject('mojibake');
+        $payload = $this->payload($project);
+        $payload['title'] = 'Project???????';
+        $payload['items'][0]['attributes']['title'] = '文字化け????';
+
+        $this->withToken($this->accessKey($workspace))
+            ->postJson('/api/v1/ai/proposals', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('proposal');
+
+        $this->assertDatabaseCount('ai_proposals', 0);
+    }
+
     public function test_same_idempotency_key_returns_existing_proposal_without_duplication(): void
     {
         [$workspace, $project] = $this->workspaceProject('internal');
@@ -236,7 +251,9 @@ class AiProposalApiTest extends TestCase
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
             'jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize',
             'params' => ['protocolVersion' => '2025-06-18', 'capabilities' => [], 'clientInfo' => ['name' => 'Codex', 'version' => 'test']],
-        ])->assertOk()->assertJsonPath('result.serverInfo.name', 'rise-gate-os');
+        ])->assertOk()
+            ->assertJsonPath('result.serverInfo.name', 'rise-gate-os')
+            ->assertJsonPath('result.instructions', fn (string $text): bool => str_contains($text, 'UTF-8'));
 
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
             'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list', 'params' => new \stdClass,
@@ -287,6 +304,17 @@ class AiProposalApiTest extends TestCase
         ])->assertOk()->assertJsonPath('result.isError', true);
 
         $arguments = $this->payload($project) + ['ai_request_public_id' => $aiRequest->public_id];
+        $brokenArguments = $arguments;
+        $brokenArguments['idempotency_key'] = 'mojibake-mcp-001';
+        $brokenArguments['summary'] = 'Web????????????????';
+        $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
+            'jsonrpc' => '2.0', 'id' => 35, 'method' => 'tools/call',
+            'params' => ['name' => 'submit_proposal', 'arguments' => $brokenArguments],
+        ])->assertOk()
+            ->assertJsonPath('result.isError', true)
+            ->assertJsonPath('result.content.0.text', fn (string $text): bool => str_contains($text, '文字化け'));
+        $this->assertDatabaseCount('ai_proposals', 0);
+
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
             'jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/call',
             'params' => ['name' => 'submit_proposal', 'arguments' => $arguments],

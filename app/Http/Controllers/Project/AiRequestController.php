@@ -129,7 +129,7 @@ class AiRequestController extends Controller
         }
 
         $copyText = "RISE GATE OSのプロジェクト「{$project->name}」にAI依頼「{$aiRequest->title}」を登録しました。"
-            .'未処理のAI依頼を確認し、この依頼を進めてください。';
+            .'未処理のAI依頼を確認し、この依頼を進めてください。日本語はUTF-8のまま保持し、文字化けや疑問符への置換がないことを確認してから提案を送信してください。';
 
         return back()->with([
             'status' => 'AIへの依頼を受け付けました。下の文章をコピーしてCodexへ送ってください。',

@@ -105,7 +105,7 @@ class AiProposalItemReviewTest extends TestCase
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.ai-proposals.request-revision', [$project, $proposal]))
             ->assertRedirect()
-            ->assertSessionHas('ai_request_copy_text');
+            ->assertSessionHas('ai_request_copy_text', fn (string $text): bool => str_contains($text, 'UTF-8') && str_contains($text, '文字化け'));
 
         $aiRequest = AiRequest::latest('id')->firstOrFail();
         $this->assertSame(AiRequest::STATUS_PENDING, $aiRequest->status);

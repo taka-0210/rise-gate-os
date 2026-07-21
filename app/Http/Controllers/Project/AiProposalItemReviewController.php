@@ -148,7 +148,7 @@ class AiProposalItemReviewController extends Controller
             ]);
         });
 
-        $copyText = "RISE GATE OSのプロジェクト「{$project->name}」にAI修正依頼「{$aiRequest->title}」を登録しました。未処理のAI依頼を確認し、提案全体と項目別のレビュー指示を反映した新しい提案を作成してください。";
+        $copyText = "RISE GATE OSのプロジェクト「{$project->name}」にAI修正依頼「{$aiRequest->title}」を登録しました。未処理のAI依頼を確認し、提案全体と項目別のレビュー指示を反映した新しい提案を作成してください。日本語はUTF-8のまま保持し、文字化けや疑問符への置換がないことを確認してから提案を送信してください。";
 
         return back()->with([
             'status' => '提案全体と項目別のレビューをまとめたAI修正依頼を登録しました。',

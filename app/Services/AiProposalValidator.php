@@ -8,6 +8,7 @@ use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\Roadmap;
 use App\Models\Task;
+use App\Support\AiTextIntegrity;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -44,6 +45,10 @@ class AiProposalValidator
         $allowed = self::ALLOWED_ATTRIBUTES[$item->entity_type] ?? [];
         $unknown = array_diff(array_keys($attributes), $allowed);
         $errors = [];
+
+        if (AiTextIntegrity::containsMojibake($attributes)) {
+            $errors[] = AiTextIntegrity::ERROR_MESSAGE;
+        }
 
         if ($unknown !== []) {
             $errors[] = '許可されていない項目: '.implode(', ', $unknown);

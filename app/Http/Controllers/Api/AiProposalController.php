@@ -8,10 +8,12 @@ use App\Models\AiProposal;
 use App\Models\AiProposalItem;
 use App\Models\Project;
 use App\Services\AiProposalValidator;
+use App\Support\AiTextIntegrity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AiProposalController extends Controller
 {
@@ -33,6 +35,14 @@ class AiProposalController extends Controller
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
             'items.*.attributes' => ['present', 'array'],
         ]);
+
+        if (AiTextIntegrity::containsMojibake([
+            $validated['title'],
+            $validated['summary'] ?? null,
+            array_column($validated['items'], 'attributes'),
+        ])) {
+            throw ValidationException::withMessages(['proposal' => AiTextIntegrity::ERROR_MESSAGE]);
+        }
 
         $project = Project::query()
             ->where('public_id', $validated['project_public_id'])

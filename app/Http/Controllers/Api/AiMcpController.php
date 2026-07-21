@@ -8,6 +8,7 @@ use App\Models\AiAuditLog;
 use App\Models\AiProposal;
 use App\Models\Project;
 use App\Services\AiMcpToolService;
+use App\Support\AiTextIntegrity;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class AiMcpController extends Controller
                 'protocolVersion' => self::PROTOCOL_VERSION,
                 'capabilities' => ['tools' => ['listChanged' => false]],
                 'serverInfo' => ['name' => 'rise-gate-os', 'version' => '0.1.0'],
-                'instructions' => '参加中Projectの計画を読み、変更は必ず承認待ち提案として送信してください。',
+                'instructions' => '参加中Projectの計画を読み、変更は必ず承認待ち提案として送信してください。日本語はUTF-8のまま保持し、文字化けや疑問符への置換がないことを送信前に確認してください。',
             ]),
             'ping' => $this->result($id, (object) []),
             'tools/list' => $this->result($id, ['tools' => $this->toolDefinitions()]),
@@ -162,6 +163,14 @@ class AiMcpController extends Controller
             'items.*.attributes' => ['present', 'array'],
         ]);
 
+        if (AiTextIntegrity::containsMojibake([
+            $validated['title'],
+            $validated['summary'] ?? null,
+            array_column($validated['items'], 'attributes'),
+        ])) {
+            throw ValidationException::withMessages(['proposal' => AiTextIntegrity::ERROR_MESSAGE]);
+        }
+
         return $tools->submitProposal($key, $validated);
     }
 
@@ -200,7 +209,7 @@ class AiMcpController extends Controller
             [
                 'name' => 'submit_proposal',
                 'title' => '承認待ち提案を送信',
-                'description' => '計画の追加や進捗更新を本データへ直接反映せず、承認待ち提案として送信します。',
+                'description' => '計画の追加や進捗更新を本データへ直接反映せず、承認待ち提案として送信します。日本語はUTF-8のまま保持し、文字化けや疑問符への置換がないことを送信前に確認してください。文字化けを検出した提案は受け付けません。',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
