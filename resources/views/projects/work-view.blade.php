@@ -721,6 +721,7 @@
                 @forelse ($roadmaps as $roadmap)
                     @php
                         $roadmapProgress = $roadmap->taskProgress();
+                        $formatRoadmapEffort = fn (float $value) => rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
                     @endphp
                     <article class="focus-roadmap" data-roadmap="{{ $roadmap->id }}" data-title="{{ $roadmap->title }}">
                         <button type="button" class="focus-roadmap-trigger" data-focus-roadmap="{{ $roadmap->id }}">
@@ -729,7 +730,7 @@
                             <p>{{ $roadmap->purpose ?: 'この道筋を、具体的な取り組みによって前へ進めます。' }}</p>
                             <div class="meta">取り組み {{ $roadmap->improvements->count() }}件</div>
                             <div class="focus-progress {{ $roadmapProgress['key'] === 'completed' ? 'is-completed' : '' }}">
-                                <div class="focus-progress-head"><span>{{ $roadmapProgress['label'] }}（{{ $roadmapProgress['completed'] }}/{{ $roadmapProgress['total'] }}タスク）</span><strong>{{ $roadmapProgress['percentage'] }}%</strong></div>
+                                <div class="focus-progress-head"><span>{{ $roadmapProgress['label'] }}（{{ $formatRoadmapEffort($roadmapProgress['completed']) }}/{{ $formatRoadmapEffort($roadmapProgress['total']) }}人日）</span><strong>{{ $roadmapProgress['percentage'] }}%</strong></div>
                                 <div class="focus-progress-track" role="progressbar" aria-label="{{ $roadmap->title }}の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $roadmapProgress['percentage'] }}"><span style="width:{{ $roadmapProgress['percentage'] }}%"></span></div>
                             </div>
                         </button>

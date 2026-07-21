@@ -22,7 +22,7 @@
                 @endif
             </div>
             <div class="field"><label for="reached_at">実際の到達日</label><input id="reached_at" name="reached_at" type="date" value="{{ old('reached_at', $roadmap->reached_at?->format('Y-m-d')) }}">@error('reached_at') <div class="error">{{ $message }}</div> @enderror</div>
-            <div class="meta">進捗は、配下のタスクの完了状況から自動計算されます。</div>
+            <div class="meta">進捗は、配下の取り組みの予定工数とタスクの完了状況から自動計算されます。</div>
             <div class="actions"><button type="submit">Roadmapを更新</button><a class="button secondary" href="{{ route('projects.show', $project) }}">戻る</a></div>
         </form>
         <form method="POST" action="{{ route('projects.roadmaps.destroy',[$project,$roadmap]) }}" onsubmit="return confirm('このロードマップを削除しますか？');">
