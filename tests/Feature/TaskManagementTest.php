@@ -340,6 +340,46 @@ class TaskManagementTest extends TestCase
             ], false);
     }
 
+    public function test_time_view_and_client_plan_order_improvements_by_relative_start_day(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['start_date' => null, 'due_date' => null, 'duration_days' => 30]);
+        $task = $this->createTask($project, $owner);
+        $roadmap = $task->improvement->roadmap;
+        $roadmap->update(['planned_start_day' => 25, 'target_day' => 30]);
+        $task->improvement->update([
+            'title' => 'General test later',
+            'visibility' => Improvement::VISIBILITY_CLIENT,
+            'roadmap_sort_order' => 1,
+            'planned_start_day' => 27,
+            'target_day' => 30,
+        ]);
+        Improvement::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'roadmap_id' => $roadmap->id,
+            'roadmap_sort_order' => 99,
+            'title' => 'Migration first',
+            'status' => Improvement::STATUS_PLANNED,
+            'visibility' => Improvement::VISIBILITY_CLIENT,
+            'planned_start_day' => 25,
+            'target_day' => 27,
+            'proposed_by' => $owner->id,
+        ]);
+
+        foreach ([
+            route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all']),
+            route('projects.client-plan', $project),
+        ] as $url) {
+            $this->actingAs($owner)
+                ->withSession(['current_workspace_id' => $workspace->id])
+                ->get($url)
+                ->assertOk()
+                ->assertSeeInOrder(['Migration first', 'General test later']);
+        }
+    }
+
     public function test_project_member_can_preview_a_client_facing_project_plan(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
@@ -446,7 +486,7 @@ class TaskManagementTest extends TestCase
             ->assertOk()
             ->assertSee('2～20日目')
             ->assertSee('3～18日目')
-            ->assertSee('4～12日目')
+            ->assertDontSee('4～12日目')
             ->assertDontSee('未設定 〜 未設定');
     }
 

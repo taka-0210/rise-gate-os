@@ -275,7 +275,7 @@
                         @if($improvement->desired_state || $improvement->action)<p>{{ $improvement->desired_state ?: $improvement->action }}</p>@endif
                         <div class="period">{{ $detailPeriod($improvement->planned_start_day, $improvement->target_day, $improvement->planned_start_date, $improvement->target_date) }}</div>
                         @if($showTasks && $improvement->tasks->isNotEmpty())
-                            <ol class="task-list">@foreach($improvement->tasks as $task)<li>{{ $task->title }} @if($showProgress)<span class="status">{{ $taskStatuses[$task->status] ?? $task->status }}</span>@endif <span class="period">{{ $detailPeriod($task->planned_start_day, $task->due_day, $task->planned_start_date, $task->due_date) }}</span></li>@endforeach</ol>
+                            <ol class="task-list">@foreach($improvement->tasks as $task)<li>{{ $task->title }} @if($showProgress)<span class="status">{{ $taskStatuses[$task->status] ?? $task->status }}</span>@endif</li>@endforeach</ol>
                         @endif
                     </section>
                 @endforeach

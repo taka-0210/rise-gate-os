@@ -258,9 +258,30 @@ class ProjectController extends Controller
         $roadmaps = $project->roadmaps()
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->with(['improvements' => function ($query) use ($visibleImprovementScope): void {
+            ->with(['improvements' => function ($query) use ($visibleImprovementScope, $project): void {
                 $visibleImprovementScope($query);
-                $query->with(['assignee', 'proposer', 'tasks.assignee']);
+                $query->reorder();
+                if (! $project->start_date && $project->duration_days) {
+                    $query->orderByRaw('CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END')
+                        ->orderBy('planned_start_day')->orderBy('target_day');
+                } else {
+                    $query->orderByRaw('CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                        ->orderBy('planned_start_date')->orderBy('target_date');
+                }
+                $query->orderBy('roadmap_sort_order')->orderBy('id')->with([
+                    'assignee',
+                    'proposer',
+                    'tasks' => function ($tasks) use ($project): void {
+                        if (! $project->start_date && $project->duration_days) {
+                            $tasks->orderByRaw('CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END')
+                                ->orderBy('planned_start_day')->orderBy('due_day');
+                        } else {
+                            $tasks->orderByRaw('CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                                ->orderBy('planned_start_date')->orderBy('due_date');
+                        }
+                        $tasks->orderBy('id')->with('assignee');
+                    },
+                ]);
             }])
             ->get();
         $projectTimeline = $this->buildProjectTimeline($project, $allTasks, $allImprovements, $roadmaps);
@@ -323,16 +344,46 @@ class ProjectController extends Controller
         $roadmaps = $project->roadmaps()
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->with(['improvements' => function ($query): void {
-                $query->orderBy('roadmap_sort_order')->orderBy('id')->with(['tasks' => fn ($tasks) => $tasks->orderBy('planned_start_date')->orderBy('due_date')->orderBy('id')]);
+            ->with(['improvements' => function ($query) use ($project): void {
+                $query->reorder();
+                if (! $project->start_date && $project->duration_days) {
+                    $query->orderByRaw('CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END')
+                        ->orderBy('planned_start_day')->orderBy('target_day');
+                } else {
+                    $query->orderByRaw('CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                        ->orderBy('planned_start_date')->orderBy('target_date');
+                }
+                $query->orderBy('roadmap_sort_order')->orderBy('id')->with(['tasks' => function ($tasks) use ($project): void {
+                    if (! $project->start_date && $project->duration_days) {
+                        $tasks->orderByRaw('CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END')
+                            ->orderBy('planned_start_day')->orderBy('due_day');
+                    } else {
+                        $tasks->orderByRaw('CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                            ->orderBy('planned_start_date')->orderBy('due_date');
+                    }
+                    $tasks->orderBy('id');
+                }]);
             }])
             ->get();
 
         $unclassifiedImprovements = $project->improvements()
             ->whereNull('roadmap_id')
-            ->orderBy('planned_start_date')
+            ->when(! $project->start_date && $project->duration_days, fn ($query) => $query
+                ->orderByRaw('CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('planned_start_day')->orderBy('target_day'), fn ($query) => $query
+                ->orderByRaw('CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('planned_start_date')->orderBy('target_date'))
             ->orderBy('id')
-            ->with(['tasks' => fn ($tasks) => $tasks->orderBy('planned_start_date')->orderBy('due_date')->orderBy('id')])
+            ->with(['tasks' => function ($tasks) use ($project): void {
+                if (! $project->start_date && $project->duration_days) {
+                    $tasks->orderByRaw('CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END')
+                        ->orderBy('planned_start_day')->orderBy('due_day');
+                } else {
+                    $tasks->orderByRaw('CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                        ->orderBy('planned_start_date')->orderBy('due_date');
+                }
+                $tasks->orderBy('id');
+            }])
             ->get();
 
         $visibleImprovements = $roadmaps->flatMap->improvements->concat($unclassifiedImprovements);
