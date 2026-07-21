@@ -35,7 +35,7 @@
         .project-card-actions { display:flex; flex:0 0 auto; align-items:center; gap:7px; }
         .project-client { margin:7px 0 0; color:var(--muted); }
         .project-summary { min-height:3em; }
-        .project-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin-top:14px; }
+        .project-counts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-top:14px; }
         .project-counts div { padding:9px; border:1px solid var(--line); border-radius:7px; background:#fff; text-align:center; }
         .project-counts strong { display:block; color:var(--accent-dark); font-size:20px; }
         .origin-project-badge { margin-top:10px; }
@@ -50,6 +50,7 @@
             .project-index-head { grid-template-columns:1fr; }
             .project-filters { grid-template-columns:1fr 1fr; }
             .project-focus-grid { grid-template-columns:1fr; }
+            .project-counts { grid-template-columns:1fr 1fr; }
         }
     </style>
 
@@ -114,6 +115,12 @@
             @else
                 <div class="project-focus-grid">
                     @foreach ($projects as $project)
+                        @php
+                            $projectTasks = $project->tasks->where('status', '!=', \App\Models\Task::STATUS_ARCHIVED);
+                            $projectCompletedTasks = $projectTasks->where('status', \App\Models\Task::STATUS_DONE);
+                            $projectEffortProgress = \App\Support\EffortProgress::calculate($project->improvements);
+                            $formatProjectEffort = fn (float $value) => rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+                        @endphp
                         <article class="project-focus-card status-{{ $project->status }}">
                             <a class="project-focus-link" href="{{ route('projects.show', $project) }}">
                                 <div class="project-index-label">PROJECT・何を実現するか</div>
@@ -139,7 +146,8 @@
                                 <div class="project-counts">
                                     <div><strong>{{ $project->roadmaps_count }}</strong><span>Roadmap</span></div>
                                     <div><strong>{{ $project->improvements_count }}</strong><span>取り組み</span></div>
-                                    <div><strong>{{ $project->tasks_count }}</strong><span>Task</span></div>
+                                    <div><strong>{{ $projectCompletedTasks->count() }}/{{ $projectTasks->count() }}</strong><span>完了／タスク</span></div>
+                                    <div><strong>{{ $formatProjectEffort($projectEffortProgress['completed']) }}/{{ $formatProjectEffort($projectEffortProgress['total']) }}</strong><span>進捗／工数</span></div>
                                 </div>
                             </a>
                         </article>

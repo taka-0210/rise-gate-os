@@ -85,7 +85,17 @@ class TaskManagementTest extends TestCase
             ->get(route('projects.show', $project))
             ->assertOk()
             ->assertSee('2.5/2.5')
-            ->assertSee('進捗／予定工数（人日）');
+            ->assertSee('完了／タスク')
+            ->assertSee('進捗／工数');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.index'))
+            ->assertOk()
+            ->assertSee('1/1')
+            ->assertSee('2.5/2.5')
+            ->assertSee('完了／タスク')
+            ->assertSee('進捗／工数');
     }
 
     public function test_relative_timeline_periods_can_be_edited_within_their_parent(): void

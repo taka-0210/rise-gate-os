@@ -21,7 +21,7 @@
         .focus-roadmap-label { color:#245ca6; }
         .focus-improvement-label { color:#23845c; }
         .focus-task-label { color:#b5523d; }
-        .focus-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
+        .focus-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
         .focus-summary div { padding:12px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; text-align:center; }
         .focus-summary strong { display:block; color:var(--accent-dark); font-size:24px; }
         .focus-roadmaps { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
@@ -703,18 +703,15 @@
 
             <div class="focus-summary">
                 @php
-                    $plannedEffortDays = (float) $allImprovements->sum(fn ($improvement) => (float) ($improvement->planned_effort_days ?? 0));
-                    $completedEffortDays = (float) $allImprovements->sum(function ($improvement) {
-                        $progress = $improvement->taskProgress();
-                        return (float) ($improvement->planned_effort_days ?? 0) * ($progress['percentage'] / 100);
-                    });
+                    $projectEffortProgress = \App\Support\EffortProgress::calculate($allImprovements);
+                    $projectSummaryTasks = $allTasks->where('status', '!=', \App\Models\Task::STATUS_ARCHIVED);
+                    $projectSummaryCompletedTasks = $projectSummaryTasks->where('status', \App\Models\Task::STATUS_DONE);
                     $formatEffort = fn (float $value) => rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
                 @endphp
                 <div><strong>{{ $roadmaps->count() }}</strong><span>Roadmap</span></div>
                 <div><strong>{{ $allImprovements->count() }}</strong><span>取り組み</span></div>
-                <div><strong>{{ $allTasks->count() }}</strong><span>Task</span></div>
-                <div><strong>{{ $completedTasks->count() }}/{{ $allTasks->count() }}</strong><span>完了</span></div>
-                <div><strong>{{ $formatEffort($completedEffortDays) }}/{{ $formatEffort($plannedEffortDays) }}</strong><span>進捗／予定工数（人日）</span></div>
+                <div><strong>{{ $projectSummaryCompletedTasks->count() }}/{{ $projectSummaryTasks->count() }}</strong><span>完了／タスク</span></div>
+                <div><strong>{{ $formatEffort($projectEffortProgress['completed']) }}/{{ $formatEffort($projectEffortProgress['total']) }}</strong><span>進捗／工数</span></div>
             </div>
 
             <div class="focus-roadmaps" id="focus-roadmaps">
