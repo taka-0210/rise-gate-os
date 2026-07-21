@@ -15,6 +15,7 @@ class Project extends Model
     use HasFactory, SoftDeletes;
 
     public const STATUS_DRAFT = 'draft';
+    public const STATUS_PROPOSED = 'proposed';
     public const STATUS_ACTIVE = 'active';
     public const STATUS_ON_HOLD = 'on_hold';
     public const STATUS_COMPLETED = 'completed';
@@ -139,6 +140,7 @@ class Project extends Model
     {
         return [
             self::STATUS_DRAFT => '準備中',
+            self::STATUS_PROPOSED => '提案済み',
             self::STATUS_ACTIVE => '進行中',
             self::STATUS_ON_HOLD => '保留',
             self::STATUS_COMPLETED => 'ひと区切り',

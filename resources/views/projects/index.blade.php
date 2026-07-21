@@ -18,12 +18,21 @@
         .project-filters select { margin-top:5px; }
         .project-filter-clear { grid-column:1/-1; font-size:13px; }
         .project-focus-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-        .project-focus-card { min-width:0; padding:16px; border:2px solid #66717a; border-radius:10px; background:#fafbfc; transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
+        .project-focus-card { --status-color:#7b8790; min-width:0; padding:16px; border:2px solid #66717a; border-left:7px solid var(--status-color); border-radius:10px; background:#fafbfc; transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
+        .project-focus-card.status-draft { --status-color:#7b8790; }
+        .project-focus-card.status-proposed { --status-color:#4f82c4; }
+        .project-focus-card.status-active { --status-color:#3f956f; }
+        .project-focus-card.status-on_hold { --status-color:#c58a22; }
+        .project-focus-card.status-completed { --status-color:#745da8; }
+        .project-focus-card.status-archived { --status-color:#566d78; }
         .project-focus-card:hover { transform:translateY(-2px); border-color:var(--accent-dark); box-shadow:0 10px 28px rgba(20,60,90,.10); }
         .project-focus-link { display:block; color:inherit; text-decoration:none; }
         .project-focus-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
         .project-focus-head h2 { margin:0; }
         .project-open-hint { flex:0 0 auto; padding:5px 8px; border-radius:999px; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:800; }
+        .project-card-status { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid color-mix(in srgb,var(--status-color) 45%,#fff); border-radius:999px; background:color-mix(in srgb,var(--status-color) 13%,#fff); color:var(--status-color); font-size:12px; font-weight:900; white-space:nowrap; }
+        .project-card-status::before { content:''; width:8px; height:8px; border-radius:50%; background:currentColor; }
+        .project-card-actions { display:flex; flex:0 0 auto; align-items:center; gap:7px; }
         .project-client { margin:7px 0 0; color:var(--muted); }
         .project-summary { min-height:3em; }
         .project-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin-top:14px; }
@@ -105,14 +114,14 @@
             @else
                 <div class="project-focus-grid">
                     @foreach ($projects as $project)
-                        <article class="project-focus-card">
+                        <article class="project-focus-card status-{{ $project->status }}">
                             <a class="project-focus-link" href="{{ route('projects.show', $project) }}">
                                 <div class="project-index-label">PROJECT・何を実現するか</div>
                                 <div class="project-focus-head">
                                     <h2>{{ $project->name }}</h2>
-                                    <span class="project-open-hint">この中を見る</span>
+                                    <span class="project-card-actions"><span class="project-card-status">{{ $statuses[$project->status] ?? $project->status }}</span><span class="project-open-hint">この中を見る</span></span>
                                 </div>
-                                <p class="project-client">{{ $project->client?->name ?? 'クライアント未設定' }} / {{ $statuses[$project->status] ?? $project->status }} / {{ $priorities[$project->priority] ?? $project->priority }}</p>
+                                <p class="project-client">{{ $project->client?->name ?? 'クライアント未設定' }} / {{ $priorities[$project->priority] ?? $project->priority }}</p>
                                 @php($integrity = $scheduleIntegrity[$project->id])
                                 @if ($integrity['status'] !== \App\Services\ScheduleIntegrityService::STATUS_OK)
                                     <span class="schedule-badge is-{{ $integrity['status'] }}">{{ $integrity['label'] }}</span>

@@ -226,6 +226,28 @@ class ClientFoundationTest extends TestCase
             ->assertDontSee('Wrong Priority Project');
     }
 
+    public function test_project_can_be_marked_as_proposed_and_list_card_shows_its_status(): void
+    {
+        [$user, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Proposal Client']);
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])->post('/projects', [
+            'client_id' => $client->id,
+            'name' => 'Proposed Project',
+            'status' => Project::STATUS_PROPOSED,
+            'priority' => Project::PRIORITY_NORMAL,
+        ])->assertRedirect();
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.index', ['status' => Project::STATUS_PROPOSED]))
+            ->assertOk()
+            ->assertSee('Proposed Project')
+            ->assertSee('提案済み')
+            ->assertSee('status-proposed', false)
+            ->assertSee('project-card-status', false);
+    }
+
     public function test_project_cannot_use_client_from_other_workspace(): void
     {
         [$user, $workspace] = $this->createWorkspaceOwner();
