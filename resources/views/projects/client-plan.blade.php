@@ -73,13 +73,13 @@
         .schedule-row:last-child { border-bottom:0; }
         .schedule-row.improvement .schedule-label { padding-left:22px; }
         .schedule-row.task .schedule-label { padding-left:36px; }
-        .schedule-bar { position:absolute; top:10px; height:14px; min-width:5px; border-radius:999px; }
+        .schedule-bar { position:absolute; top:10px; height:14px; min-width:5px; border-radius:3px; }
         .schedule-bar.project { background:var(--navy); }
         .schedule-bar.roadmap { background:var(--blue); }
         .schedule-bar.improvement { background:var(--green); }
         .schedule-bar.task { background:var(--red); }
         .legend { display:flex; justify-content:flex-end; gap:12px; margin:0 0 8px; color:var(--muted); font-size:11px; }
-        .legend span::before { content:""; display:inline-block; width:18px; height:7px; margin-right:5px; border-radius:999px; background:var(--color); }
+        .legend span::before { content:""; display:inline-block; width:18px; height:7px; margin-right:5px; border-radius:2px; background:var(--color); }
         .roadmap-detail { margin-bottom:18px; padding:16px; border:1px solid #c8d9ed; border-left:5px solid var(--blue); border-radius:0 8px 8px 0; break-inside:avoid; }
         .improvement-detail { margin-top:12px; padding:12px 14px; border-left:5px solid var(--green); background:#f5faf7; break-inside:avoid; }
         .task-detail { margin-top:14px; padding-left:14px; border-left:5px solid var(--red); }
