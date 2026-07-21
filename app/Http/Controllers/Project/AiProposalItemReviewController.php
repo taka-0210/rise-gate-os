@@ -121,21 +121,25 @@ class AiProposalItemReviewController extends Controller
     public function requestRevision(Request $request, Project $project, AiProposal $aiProposal): RedirectResponse
     {
         $this->authorizeProposal($request, $project, $aiProposal);
+        $validated = $request->validate([
+            'overall_feedback' => ['nullable', 'string', 'max:5000'],
+        ]);
+        $overallFeedback = trim((string) ($validated['overall_feedback'] ?? ''));
         $aiProposal->load(['items.review.mergeTarget']);
         $reviews = $aiProposal->items->pluck('review')->filter()
             ->whereNull('resolved_at')
             ->values();
 
-        if ($reviews->isEmpty()) {
+        if ($reviews->isEmpty() && $overallFeedback === '') {
             throw ValidationException::withMessages([
-                'reviews' => '修正・除外・統合の未対応指示を1件以上登録してください。',
+                'overall_feedback' => '提案全体への追加指示を入力するか、項目別レビューを1件以上登録してください。',
             ]);
         }
 
-        $instructions = $this->revisionInstructions($aiProposal);
+        $instructions = $this->revisionInstructions($aiProposal, $overallFeedback);
         $aiRequest = DB::transaction(function () use ($request, $project, $aiProposal, $instructions): AiRequest {
             return $project->aiRequests()->create([
-                'title' => 'AI提案「'.$aiProposal->title.'」の項目別修正',
+                'title' => 'AI提案「'.$aiProposal->title.'」のレビュー反映',
                 'instructions' => $instructions,
                 'organization_id' => $project->organization_id,
                 'workspace_id' => $project->owning_workspace_id,
@@ -144,23 +148,30 @@ class AiProposalItemReviewController extends Controller
             ]);
         });
 
-        $copyText = "RISE GATE OSのプロジェクト「{$project->name}」にAI修正依頼「{$aiRequest->title}」を登録しました。未処理のAI依頼を確認し、項目別レビュー指示を反映した新しい提案を作成してください。";
+        $copyText = "RISE GATE OSのプロジェクト「{$project->name}」にAI修正依頼「{$aiRequest->title}」を登録しました。未処理のAI依頼を確認し、提案全体と項目別のレビュー指示を反映した新しい提案を作成してください。";
 
         return back()->with([
-            'status' => '項目別レビューをまとめたAI修正依頼を登録しました。',
+            'status' => '提案全体と項目別のレビューをまとめたAI修正依頼を登録しました。',
             'ai_request_copy_text' => $copyText,
         ]);
     }
 
-    private function revisionInstructions(AiProposal $proposal): string
+    private function revisionInstructions(AiProposal $proposal, string $overallFeedback = ''): string
     {
         $lines = [
-            '元のAI提案を、以下の項目別レビュー指示に従って修正し、新しい提案として再提出してください。',
+            '元のAI提案を、以下のレビュー指示に従って修正し、新しい提案として再提出してください。',
             '元提案ID: '.$proposal->public_id,
             '元提案名: '.$proposal->title,
-            '',
-            '【項目別レビュー指示】',
         ];
+
+        if ($overallFeedback !== '') {
+            $lines[] = '';
+            $lines[] = '【提案全体への追加指示】';
+            $lines[] = $overallFeedback;
+        }
+
+        $lines[] = '';
+        $lines[] = '【項目別レビュー指示】';
 
         foreach ($proposal->items as $item) {
             $review = $item->review;

@@ -11,8 +11,14 @@
     @if ($canReview && $proposal->status === \App\Models\AiProposal::STATUS_PENDING)
         <form method="POST" action="{{ route('projects.ai-proposals.request-revision', [$project, $proposal]) }}" class="stack">
             @csrf
-            <button type="submit" @disabled($unresolvedReviewCount === 0)>指摘内容でAIに再提案を依頼</button>
-            <p class="meta">「修正・除外・統合」の指示がある項目だけをAIへ返し、指示のない項目は維持します。</p>
+            <div class="field">
+                <label for="overall_feedback">提案全体への追加指示</label>
+                <textarea id="overall_feedback" name="overall_feedback" rows="6" maxlength="5000" placeholder="例：管理画面の作り込みについて、取り組みとタスクを追加してください。元の提案にない観点や、全体の進め方に関する要望を自由に入力できます。">{{ old('overall_feedback') }}</textarea>
+                @error('overall_feedback')<div class="error">{{ $message }}</div>@enderror
+                <p class="meta">元の提案に存在しない内容も、ここからAIへ追加指示できます。項目別レビューがない場合でも、この欄だけで再提案を依頼できます。</p>
+            </div>
+            <button type="submit">全体・項目別の指示でAIに再提案を依頼</button>
+            <p class="meta">全体への追加指示と、保存済みの項目別レビューをまとめてAIへ返します。指示のない項目は維持します。</p>
         </form>
     @endif
     @if (session('ai_request_copy_text'))

@@ -26,7 +26,7 @@ class AiProposalItemReviewTest extends TestCase
             ->get(route('projects.ai-proposals.show', [$project, $proposal]))
             ->assertOk()
             ->assertSeeInOrder(['注文一覧を作る', '編集', 'コメント・修正指示', 'このロードマップを一括保存'])
-            ->assertSee('指摘内容でAIに再提案を依頼');
+            ->assertSee('全体・項目別の指示でAIに再提案を依頼');
     }
 
     public function test_roadmap_editor_saves_multiple_item_reviews_at_once(): void
@@ -112,6 +112,33 @@ class AiProposalItemReviewTest extends TestCase
         $this->assertStringContainsString('このタスクは不要', $aiRequest->instructions);
         $this->assertStringContainsString('提案から外す', $aiRequest->instructions);
         $this->assertStringContainsString($proposal->public_id, $aiRequest->instructions);
+    }
+
+    public function test_overall_feedback_can_request_revision_without_item_reviews(): void
+    {
+        [$user, $workspace, $project, $proposal] = $this->fixture();
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.request-revision', [$project, $proposal]), [
+                'overall_feedback' => '管理画面の作り込みについて、取り組みとタスクを追加してください。',
+            ])->assertRedirect()
+            ->assertSessionHas('ai_request_copy_text');
+
+        $aiRequest = AiRequest::latest('id')->firstOrFail();
+        $this->assertSame(AiRequest::STATUS_PENDING, $aiRequest->status);
+        $this->assertStringContainsString('【提案全体への追加指示】', $aiRequest->instructions);
+        $this->assertStringContainsString('管理画面の作り込みについて、取り組みとタスクを追加してください。', $aiRequest->instructions);
+    }
+
+    public function test_revision_requires_overall_feedback_or_an_item_review(): void
+    {
+        [$user, $workspace, $project, $proposal] = $this->fixture();
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.request-revision', [$project, $proposal]))
+            ->assertSessionHasErrors('overall_feedback');
+
+        $this->assertDatabaseCount('ai_requests', 0);
     }
 
     private function fixture(): array
