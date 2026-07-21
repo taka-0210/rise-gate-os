@@ -297,6 +297,8 @@ class TaskManagementTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'include_today' => '0', 'schedule_step' => 'all']))
             ->assertOk()
+            ->assertSee('<span>取り組み</span>', false)
+            ->assertSee('text-align:center', false)
             ->assertSee('data-axis-start="'.$projectStart->copy()->subDays(2)->toDateString().'"', false)
             ->assertSee('data-axis-end="'.$projectEnd->copy()->addDays(2)->toDateString().'"', false)
             ->assertSee('data-bar-start="'.$improvementStart->toDateString().'"', false)
