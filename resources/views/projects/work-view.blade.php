@@ -104,7 +104,7 @@
         .focus-page.time-view .time-layer { display:block; }
         .focus-page.time-view > .focus-project,.focus-page.time-view > .focus-footer { display:none; }
         .time-layer-head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:18px; }
-        .time-legend { display:flex; flex-wrap:wrap; gap:12px; color:var(--muted); font-size:12px; }
+        .time-legend { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:12px; margin:0 0 10px; color:var(--muted); font-size:12px; }
         .time-legend span { display:inline-flex; align-items:center; gap:5px; }
         .time-legend label { display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
         .time-legend input { width:auto; margin:0; }
@@ -113,8 +113,7 @@
         .time-legend .is-roadmap { background:#4f82c4; }
         .time-legend .is-improvement { background:#56a27e; }
         .time-legend .is-task { background:#b5523d; }
-        .time-legend .is-inferred { background:transparent; border:2px dashed #66717a; }
-        .time-legend .is-overdue { background:repeating-linear-gradient(135deg,#e3a11d 0,#e3a11d 5px,#9f6810 5px,#9f6810 9px); }
+        .time-legend .is-overdue { background:#c58a22; box-shadow:inset 0 0 0 1px #8d6117; }
         .time-legend .is-reached { height:14px; background:#fff; border:2px solid #245ca6; }
         .time-chart-scroll { overflow-x:auto; padding-bottom:8px; }
         .time-chart { min-width:820px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
@@ -157,11 +156,7 @@
         .schedule-step-guide strong { margin-right:auto; }
         .schedule-step-guide a,.schedule-step-guide span { padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:12px; }
         .schedule-step-guide .is-current { border-color:#263f4d; background:#263f4d; color:#fff; font-weight:900; }
-        .time-bar.is-inferred { background:rgba(255,255,255,.72); border:2px dashed currentColor; }
-        .time-bar.is-project.is-inferred { color:#263f4d; }
-        .time-bar.is-roadmap.is-inferred { color:#4f82c4; }
-        .time-bar.is-improvement.is-inferred { color:#56a27e; }
-        .time-bar.is-overdue { background:repeating-linear-gradient(135deg,#e3a11d 0,#e3a11d 7px,#9f6810 7px,#9f6810 12px); }
+        .time-bar.is-overdue { background:#c58a22; box-shadow:inset 0 0 0 1px #8d6117; }
         .time-reached-marker { position:absolute; z-index:2; top:10px; width:10px; height:24px; border:2px solid #245ca6; border-radius:999px; background:#fff; transform:translateX(-50%); }
         .time-today { position:absolute; z-index:2; top:0; bottom:0; left:var(--today-left); width:2px; background:#d24b3b; pointer-events:none; }
         .time-unscheduled { display:inline-flex; margin:11px 12px; padding:3px 8px; border:1px dashed var(--line); border-radius:999px; color:var(--muted); font-size:11px; }
@@ -511,10 +506,6 @@
                     <h1>{{ $project->name }}</h1>
                     <p>ROADMAP・取り組み・TASKを、ひとつの時間軸で確認します。</p>
                 </div>
-                <div class="time-legend">
-                    <span><i class="is-project"></i>プロジェクト</span><span><i class="is-roadmap"></i>ロードマップ</span><span><i class="is-improvement"></i>取り組み</span><span><i class="is-task"></i>タスク</span><span><i class="is-inferred"></i>配下から自動算出</span><span><i class="is-overdue"></i>進行中かつ期限超過</span><span><i class="is-reached"></i>実際の完了・到達日</span>
-                    @if(!$isRelativeTimeline)<label><input id="time-today-toggle" type="checkbox" @checked($includeTodayInTimeline)>今日を時間軸に含める</label>@endif
-                </div>
             </div>
             @php
                 $scheduleStageLabels = ['project' => '1. プロジェクト期間', 'roadmap' => '2. ロードマップ期間', 'improvement' => '3. 取り組み期間', 'task' => '4. タスク期間', 'all' => '5. 全体確認'];
@@ -540,6 +531,10 @@
                 @endforeach
                 <span>未設定を埋めると次の段階へ自動で進みます</span>
             </div>
+            <div class="time-legend">
+                <span><i class="is-project"></i>プロジェクト</span><span><i class="is-roadmap"></i>ロードマップ</span><span><i class="is-improvement"></i>取り組み</span><span><i class="is-task"></i>タスク</span><span><i class="is-overdue"></i>進行中かつ期限超過</span><span><i class="is-reached"></i>実際の完了・到達日</span>
+                @if(!$isRelativeTimeline)<label><input id="time-today-toggle" type="checkbox" @checked($includeTodayInTimeline)>今日を時間軸に含める</label>@endif
+            </div>
             <div class="time-chart-scroll">
                 <div class="time-chart" data-axis-start="{{ $axisStart->toDateString() }}" data-axis-end="{{ $axisEnd->toDateString() }}" style="--time-grid:{{ $axisStep / $axisDays * 100 }}%; --today-left:{{ $todayLeft }}%;">
                     <div class="time-axis">
@@ -562,7 +557,7 @@
                             <div class="time-row-track">
                                 @if (!$isRelativeTimeline && $includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
-                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['inferred'] ? 'is-inferred' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" data-descendant-count="{{ $row['descendant_count'] ?? 0 }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $isRelativeTimeline ? ($axisStart->diffInDays($barStart)+1).'日目〜'.($axisStart->diffInDays($barEnd)+1).'日目' : $barStart->format('Y/m/d').'〜'.$barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
+                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" data-descendant-count="{{ $row['descendant_count'] ?? 0 }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $isRelativeTimeline ? ($axisStart->diffInDays($barStart)+1).'日目〜'.($axisStart->diffInDays($barEnd)+1).'日目' : $barStart->format('Y/m/d').'〜'.$barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
                                         @if ($row['editable'] && !($isRelativeTimeline && $row['type'] === 'project'))<i class="time-resize-handle is-start" data-resize="start" title="開始日を変更"></i>@endif
                                         @if ($row['editable'])<i class="time-resize-handle is-end" data-resize="end" title="{{ $row['type'] === 'task' ? '期限を変更' : '終了日を変更' }}"></i>@endif
                                     </span>

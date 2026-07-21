@@ -236,6 +236,14 @@ class TaskManagementTest extends TestCase
             ->assertSee('今日を時間軸に含める')
             ->assertSee('id="time-today-toggle"', false)
             ->assertSee('進行中かつ期限超過')
+            ->assertDontSee('配下から自動算出')
+            ->assertDontSee('background:repeating-linear-gradient(135deg,#e3a11d', false)
+            ->assertSee('.time-legend .is-overdue { background:#c58a22;', false)
+            ->assertSeeInOrder([
+                'class="schedule-step-guide"',
+                'class="time-legend"',
+                'class="time-chart-scroll"',
+            ], false)
             ->assertSee('未着手')
             ->assertSee('AIアシスタント')
             ->assertSee('aria-label="承認待ち 1件"', false)
