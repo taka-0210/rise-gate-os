@@ -21,7 +21,7 @@ class RoadmapController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('create', [Roadmap::class, $project]);
 
-        return view('roadmaps.create', ['project' => $project, 'statuses' => Roadmap::statuses()]);
+        return view('roadmaps.create', ['project' => $project]);
     }
 
     public function store(Request $request, Project $project): RedirectResponse
@@ -37,7 +37,6 @@ class RoadmapController extends Controller
             'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
             'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'reached_at' => ['nullable', 'date'],
-            'status' => ['required', 'string', 'in:'.implode(',', array_keys(Roadmap::statuses()))],
             'position_after_roadmap_id' => [
                 'nullable',
                 Rule::exists('roadmaps', 'id')
@@ -77,7 +76,6 @@ class RoadmapController extends Controller
                 'planned_start_day' => $validated['planned_start_day'] ?? null,
                 'target_day' => $validated['target_day'] ?? null,
                 'reached_at' => $validated['reached_at'] ?? null,
-                'status' => $validated['status'],
                 'sort_order' => $insertIndex + 1,
                 'created_by' => $request->user()->id,
             ]);
@@ -95,7 +93,6 @@ class RoadmapController extends Controller
         return view('roadmaps.edit', [
             'project' => $project,
             'roadmap' => $roadmap,
-            'statuses' => Roadmap::statuses(),
         ]);
     }
 
@@ -113,7 +110,6 @@ class RoadmapController extends Controller
             'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
             'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'reached_at' => ['nullable', 'date'],
-            'status' => ['required', 'string', 'in:'.implode(',', array_keys(Roadmap::statuses()))],
         ]);
 
         $this->ensureWithinProject($project, $validated);

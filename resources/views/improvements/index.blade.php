@@ -29,10 +29,13 @@
         @else
             <div class="grid">
                 @foreach ($improvements as $improvement)
+                    @php
+                        $taskProgress = $improvement->taskProgress();
+                    @endphp
                     <article class="card stack">
                         <div>
                             <div class="meta">
-                                {{ $statuses[$improvement->status] ?? $improvement->status }} / {{ $visibilities[$improvement->visibility] ?? $improvement->visibility }}
+                                {{ $taskProgress['label'] }}・{{ $taskProgress['percentage'] }}% / {{ $visibilities[$improvement->visibility] ?? $improvement->visibility }}
                             </div>
                             <h2><a href="{{ route('projects.improvements.show', [$project, $improvement]) }}">{{ $improvement->title }}</a></h2>
                             <p>{{ Str::limit($improvement->problem ?: $improvement->current_state ?: '問題や現状はまだ記録されていません。', 140) }}</p>

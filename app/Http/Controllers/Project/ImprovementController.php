@@ -24,14 +24,13 @@ class ImprovementController extends Controller
         Gate::authorize('view', $project);
 
         $improvements = $this->visibleImprovementsQuery($request, $project)
-            ->with(['proposer', 'assignee', 'implementer'])
+            ->with(['proposer', 'assignee', 'implementer', 'tasks'])
             ->latest()
             ->paginate(12);
 
         return view('improvements.index', [
             'project' => $project,
             'improvements' => $improvements,
-            'statuses' => Improvement::statuses(),
             'visibilities' => Improvement::visibilities(),
             'canCreateImprovement' => Gate::allows('create', [Improvement::class, $project]),
         ]);
@@ -44,7 +43,6 @@ class ImprovementController extends Controller
 
         return view('improvements.create', [
             'project' => $project,
-            'statuses' => Improvement::statuses(),
             'visibilities' => Improvement::visibilities(),
             'assignableUsers' => $this->assignableUsers($project),
             'roadmaps' => $project->roadmaps()->orderBy('sort_order')->orderBy('id')->get(),
@@ -77,7 +75,7 @@ class ImprovementController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('view', $improvement);
 
-        $improvement->load(['proposer', 'assignee', 'implementer', 'outputs']);
+        $improvement->load(['proposer', 'assignee', 'implementer', 'outputs', 'tasks']);
 
         $taskOutputIds = $improvement->outputs
             ->where('output_type', ImprovementOutput::TYPE_TASK)
@@ -91,7 +89,6 @@ class ImprovementController extends Controller
         return view('improvements.show', [
             'project' => $project,
             'improvement' => $improvement,
-            'statuses' => Improvement::statuses(),
             'visibilities' => Improvement::visibilities(),
             'taskOutputs' => Task::query()->whereIn('id', $taskOutputIds)->with(['assignee'])->latest()->get(),
             'projectOutputs' => Project::query()->whereIn('id', $projectOutputIds)->latest()->get(),
@@ -117,7 +114,6 @@ class ImprovementController extends Controller
         return view('improvements.edit', [
             'project' => $project,
             'improvement' => $improvement,
-            'statuses' => Improvement::statuses(),
             'visibilities' => Improvement::visibilities(),
             'assignableUsers' => $this->assignableUsers($project),
             'roadmaps' => $project->roadmaps()->orderBy('sort_order')->orderBy('id')->get(),
@@ -204,7 +200,6 @@ class ImprovementController extends Controller
             'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
             'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'completed_at' => ['nullable', 'date'],
-            'status' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::statuses()))],
             'visibility' => ['required', 'string', 'in:'.implode(',', array_keys(Improvement::visibilities()))],
             'assigned_to' => ['nullable', Rule::in($assignableUserIds)],
             'implemented_by' => ['nullable', Rule::in($assignableUserIds)],

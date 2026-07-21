@@ -29,15 +29,7 @@
             </div>
 
             <div class="grid">
-                <div class="field">
-                    <label for="status">進行状況</label>
-                    <select id="status" name="status">
-                        @foreach ($statuses as $value => $label)
-                            <option value="{{ $value }}" @selected(old('status', $improvement->status) === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    @error('status') <div class="error">{{ $message }}</div> @enderror
-                </div>
+                <div class="field"><label>進行状況</label><div class="meta">配下のタスクから自動計算されます。</div></div>
                 <div class="field">
                     <label for="visibility">公開範囲</label>
                     <select id="visibility" name="visibility">

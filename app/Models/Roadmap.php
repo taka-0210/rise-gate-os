@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use App\Support\TaskProgress;
 
 class Roadmap extends Model
 {
@@ -76,6 +77,18 @@ class Roadmap extends Model
     public function improvements(): HasMany
     {
         return $this->hasMany(Improvement::class)->orderBy('roadmap_sort_order')->latest();
+    }
+
+    public function taskProgress(): array
+    {
+        $improvements = $this->relationLoaded('improvements')
+            ? $this->improvements
+            : $this->improvements()->with('tasks')->get();
+        $tasks = $improvements->flatMap(function (Improvement $improvement) {
+            return $improvement->relationLoaded('tasks') ? $improvement->tasks : $improvement->tasks()->get();
+        });
+
+        return TaskProgress::calculate($tasks);
     }
 
     public static function statuses(): array

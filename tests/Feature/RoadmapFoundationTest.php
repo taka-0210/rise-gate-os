@@ -154,7 +154,7 @@ class RoadmapFoundationTest extends TestCase
         $this->assertSame('2026-07-01', $roadmap->planned_start_date->format('Y-m-d'));
         $this->assertSame('2026-07-17', $roadmap->target_date->format('Y-m-d'));
         $this->assertSame('2026-07-18', $roadmap->reached_at->format('Y-m-d'));
-        $this->assertSame(Roadmap::STATUS_COMPLETED, $roadmap->status);
+        $this->assertSame(Roadmap::STATUS_ACTIVE, $roadmap->status, '進行状況はフォームから手動変更しない');
     }
 
     public function test_view_only_project_member_cannot_create_or_assign_roadmap(): void

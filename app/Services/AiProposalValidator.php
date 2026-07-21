@@ -19,8 +19,8 @@ class AiProposalValidator
 
     private const ALLOWED_ATTRIBUTES = [
         'project' => ['summary', 'current_state', 'desired_future_state'],
-        'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
-        'improvement' => ['title', 'roadmap_public_id', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
+        'roadmap' => ['title', 'purpose', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
+        'improvement' => ['title', 'roadmap_public_id', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
         'task' => ['title', 'improvement_public_id', 'description', 'status', 'priority', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day'],
     ];
 
@@ -106,7 +106,6 @@ class AiProposalValidator
             'roadmap' => [
                 'title' => $titleRule,
                 'purpose' => ['nullable', 'string'],
-                'status' => ['sometimes', Rule::in(array_keys(Roadmap::statuses()))],
                 'sort_order' => ['sometimes', 'integer', 'min:0'],
                 'planned_start_date' => ['nullable', 'date'],
                 'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
@@ -124,7 +123,6 @@ class AiProposalValidator
                 'result' => ['nullable', 'string'],
                 'impact' => ['nullable', 'string'],
                 'next_action' => ['nullable', 'string'],
-                'status' => ['sometimes', Rule::in(array_keys(Improvement::statuses()))],
                 'visibility' => ['sometimes', Rule::in(array_keys(Improvement::visibilities()))],
                 'planned_start_date' => ['nullable', 'date'],
                 'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],

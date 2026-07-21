@@ -29,6 +29,12 @@
         .focus-roadmap-trigger,.focus-improvement-trigger,.focus-task-trigger { display:block; width:100%; padding:0; border:0; border-radius:0; background:transparent; color:inherit; text-align:left; font-weight:inherit; }
         .focus-trigger-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
         .focus-open-hint { flex:0 0 auto; padding:5px 8px; border-radius:999px; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:800; }
+        .focus-progress { display:grid; gap:6px; margin-top:12px; }
+        .focus-progress-head { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:12px; font-weight:800; }
+        .focus-progress-track { height:10px; overflow:hidden; border-radius:999px; background:#dfe7ec; }
+        .focus-progress-track span { display:block; height:100%; border-radius:inherit; background:#4f82c4; }
+        .focus-improvement .focus-progress-track span { background:#56a27e; }
+        .focus-progress.is-completed .focus-progress-head { color:#16704b; }
         .focus-roadmap-body { display:none; margin-top:14px; }
         .focus-roadmap.is-focused { grid-column:1/-1; padding:20px; box-shadow:0 10px 30px rgba(20,60,90,.10); }
         .focus-roadmap.is-focused .focus-roadmap-body { display:block; }
@@ -587,7 +593,9 @@
                 </div>
             </div>
 
-            @php($sourceImprovement = $project->sourceImprovementOutput?->improvement)
+            @php
+                $sourceImprovement = $project->sourceImprovementOutput?->improvement;
+            @endphp
             @if ($project->sourceImprovementOutput)
                 <div class="card stack origin-panel" style="margin-bottom:18px;">
                     <div>
@@ -616,12 +624,19 @@
 
             <div class="focus-roadmaps" id="focus-roadmaps">
                 @forelse ($roadmaps as $roadmap)
+                    @php
+                        $roadmapProgress = $roadmap->taskProgress();
+                    @endphp
                     <article class="focus-roadmap" data-roadmap="{{ $roadmap->id }}" data-title="{{ $roadmap->title }}">
                         <button type="button" class="focus-roadmap-trigger" data-focus-roadmap="{{ $roadmap->id }}">
                             <div class="focus-layer-label focus-roadmap-label">ROADMAP・実現までの道筋</div>
                             <div class="focus-trigger-head"><h2>{{ $roadmap->title }}</h2><span class="focus-open-hint">この中を見る</span></div>
                             <p>{{ $roadmap->purpose ?: 'この道筋を、具体的な取り組みによって前へ進めます。' }}</p>
                             <div class="meta">取り組み {{ $roadmap->improvements->count() }}件</div>
+                            <div class="focus-progress {{ $roadmapProgress['key'] === 'completed' ? 'is-completed' : '' }}">
+                                <div class="focus-progress-head"><span>{{ $roadmapProgress['label'] }}（{{ $roadmapProgress['completed'] }}/{{ $roadmapProgress['total'] }}タスク）</span><strong>{{ $roadmapProgress['percentage'] }}%</strong></div>
+                                <div class="focus-progress-track" role="progressbar" aria-label="{{ $roadmap->title }}の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $roadmapProgress['percentage'] }}"><span style="width:{{ $roadmapProgress['percentage'] }}%"></span></div>
+                            </div>
                         </button>
 
                         <div class="focus-roadmap-body">
@@ -633,6 +648,9 @@
                             @endif
                             <div class="focus-improvements" data-improvements-for="{{ $roadmap->id }}">
                                 @forelse ($roadmap->improvements as $improvement)
+                                    @php
+                                        $improvementProgress = $improvement->taskProgress();
+                                    @endphp
                                     <article class="focus-improvement" data-improvement="{{ $improvement->id }}" data-title="{{ $improvement->title }}">
                                         <button type="button" class="focus-improvement-trigger" data-focus-improvement="{{ $improvement->id }}">
                                             <div class="focus-layer-label focus-improvement-label">取り組み・道筋を前へ進める</div>
@@ -640,6 +658,10 @@
                                             <p>{{ Str::limit($improvement->next_action ?: $improvement->problem ?: '改善内容を具体的なTaskへつなげます。', 120) }}</p>
                                             <div class="meta">予定 {{ $improvement->planned_start_date?->format('Y/m/d') ?? '未設定' }}〜{{ $improvement->target_date?->format('Y/m/d') ?? '未設定' }} / 完了 {{ $improvement->completed_at?->format('Y/m/d') ?? '未完了' }}</div>
                                             <div class="meta">Task {{ $improvement->tasks->count() }}件</div>
+                                            <div class="focus-progress {{ $improvementProgress['key'] === 'completed' ? 'is-completed' : '' }}">
+                                                <div class="focus-progress-head"><span>{{ $improvementProgress['label'] }}（{{ $improvementProgress['completed'] }}/{{ $improvementProgress['total'] }}タスク）</span><strong>{{ $improvementProgress['percentage'] }}%</strong></div>
+                                                <div class="focus-progress-track" role="progressbar" aria-label="{{ $improvement->title }}の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $improvementProgress['percentage'] }}"><span style="width:{{ $improvementProgress['percentage'] }}%"></span></div>
+                                            </div>
                                         </button>
 
                                         <div class="focus-improvement-body">

@@ -213,7 +213,7 @@ class ImprovementFoundationTest extends TestCase
         $response->assertRedirect(route('projects.improvements.show', [$project, $improvement]));
         $improvement->refresh();
         $this->assertSame('Updated improvement', $improvement->title);
-        $this->assertSame('implemented', $improvement->status);
+        $this->assertSame('proposed', $improvement->status, '進行状況はフォームから手動変更しない');
         $this->assertSame('Result was recorded.', $improvement->result);
         $this->assertSame('Impact was recorded.', $improvement->impact);
         $this->assertSame('Create the next improvement.', $improvement->next_action);

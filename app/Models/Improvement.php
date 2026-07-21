@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use App\Support\TaskProgress;
 
 class Improvement extends Model
 {
@@ -111,6 +112,13 @@ class Improvement extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    public function taskProgress(): array
+    {
+        $tasks = $this->relationLoaded('tasks') ? $this->tasks : $this->tasks()->get();
+
+        return TaskProgress::calculate($tasks);
     }
 
     public function outputs(): HasMany

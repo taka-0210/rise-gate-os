@@ -21,10 +21,8 @@
                     <div class="field"><label for="target_date">到達予定日</label><input id="target_date" name="target_date" type="date" value="{{ old('target_date', $roadmap->target_date?->format('Y-m-d')) }}">@error('target_date') <div class="error">{{ $message }}</div> @enderror</div>
                 @endif
             </div>
-            <div class="grid two">
-                <div class="field"><label for="reached_at">実際の到達日</label><input id="reached_at" name="reached_at" type="date" value="{{ old('reached_at', $roadmap->reached_at?->format('Y-m-d')) }}">@error('reached_at') <div class="error">{{ $message }}</div> @enderror</div>
-                <div class="field"><label for="status">進行状況</label><select id="status" name="status" required>@foreach ($statuses as $value => $label)<option value="{{ $value }}" @selected(old('status', $roadmap->status) === $value)>{{ $label }}</option>@endforeach</select>@error('status') <div class="error">{{ $message }}</div> @enderror</div>
-            </div>
+            <div class="field"><label for="reached_at">実際の到達日</label><input id="reached_at" name="reached_at" type="date" value="{{ old('reached_at', $roadmap->reached_at?->format('Y-m-d')) }}">@error('reached_at') <div class="error">{{ $message }}</div> @enderror</div>
+            <div class="meta">進捗は、配下のタスクの完了状況から自動計算されます。</div>
             <div class="actions"><button type="submit">Roadmapを更新</button><a class="button secondary" href="{{ route('projects.show', $project) }}">戻る</a></div>
         </form>
         <form method="POST" action="{{ route('projects.roadmaps.destroy',[$project,$roadmap]) }}" onsubmit="return confirm('このロードマップを削除しますか？');">

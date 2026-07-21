@@ -1,10 +1,13 @@
 @extends('layouts.app', ['title' => $improvement->title.' - 改善'])
 
 @section('content')
+    @php
+        $taskProgress = $improvement->taskProgress();
+    @endphp
     <section class="stack">
         <div class="actions" style="justify-content: space-between; align-items: flex-start;">
             <div>
-                <div class="meta">改善 / {{ $statuses[$improvement->status] ?? $improvement->status }}</div>
+                <div class="meta">改善 / {{ $taskProgress['label'] }}・{{ $taskProgress['percentage'] }}%</div>
                 <h1>{{ $improvement->title }}</h1>
                 <p>Project: <a href="{{ route('projects.show', $project) }}">{{ $project->name }}</a></p>
             </div>
@@ -14,7 +17,8 @@
         <div class="grid">
             <div class="card">
                 <h2>進行状況</h2>
-                <p>{{ $statuses[$improvement->status] ?? $improvement->status }}</p>
+                <p>{{ $taskProgress['label'] }}（{{ $taskProgress['completed'] }}/{{ $taskProgress['total'] }}タスク）・{{ $taskProgress['percentage'] }}%</p>
+                <div style="height:10px;overflow:hidden;border-radius:999px;background:#dfe7ec;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $taskProgress['percentage'] }}"><span style="display:block;width:{{ $taskProgress['percentage'] }}%;height:100%;border-radius:inherit;background:#56a27e;"></span></div>
             </div>
             <div class="card">
                 <h2>公開範囲</h2>

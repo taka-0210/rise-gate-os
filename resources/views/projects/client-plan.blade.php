@@ -256,12 +256,18 @@
         <h2>3. 取り組み、タスク詳細</h2>
         @forelse($roadmaps as $roadmap)
             <article class="roadmap-detail">
-                <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmapDisplayTitle($roadmap->title) }} @if($showProgress)<span class="status">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span>@endif</h3>
+                @php
+                    $roadmapProgress = $roadmap->taskProgress();
+                @endphp
+                <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmapDisplayTitle($roadmap->title) }} @if($showProgress)<span class="status">{{ $roadmapProgress['label'] }}・{{ $roadmapProgress['percentage'] }}%</span>@endif</h3>
                 @if($roadmap->purpose)<p>{{ $roadmap->purpose }}</p>@endif
                 <div class="period">{{ $detailPeriod($roadmap->planned_start_day, $roadmap->target_day, $roadmap->planned_start_date, $roadmap->target_date) }}</div>
                 @foreach($roadmap->improvements as $improvement)
                     <section class="improvement-detail">
-                        <h3>取り組み {{ $loop->iteration }}：{{ $improvement->title }} @if($showProgress)<span class="status">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}</span>@endif</h3>
+                        @php
+                            $improvementProgress = $improvement->taskProgress();
+                        @endphp
+                        <h3>取り組み {{ $loop->iteration }}：{{ $improvement->title }} @if($showProgress)<span class="status">{{ $improvementProgress['label'] }}・{{ $improvementProgress['percentage'] }}%</span>@endif</h3>
                         @if($improvement->desired_state || $improvement->action)<p>{{ $improvement->desired_state ?: $improvement->action }}</p>@endif
                         <div class="period">{{ $detailPeriod($improvement->planned_start_day, $improvement->target_day, $improvement->planned_start_date, $improvement->target_date) }}</div>
                         @if($showTasks && $improvement->tasks->isNotEmpty())
