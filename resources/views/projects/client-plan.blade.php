@@ -82,6 +82,7 @@
         .legend span::before { content:""; display:inline-block; width:18px; height:7px; margin-right:5px; border-radius:999px; background:var(--color); }
         .roadmap-detail { margin-bottom:18px; padding:16px; border:1px solid #c8d9ed; border-radius:8px; break-inside:avoid; }
         .improvement-detail { margin-top:12px; padding:12px 14px; border-left:5px solid var(--green); background:#f5faf7; break-inside:avoid; }
+        .task-list-title { margin:14px 0 5px; color:var(--ink); text-align:center; font-weight:800; }
         .task-list { margin:9px 0 0; padding-left:22px; }
         .task-list li { margin:6px 0; }
         .status { display:inline-flex; margin-left:6px; padding:2px 7px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:10px; }
@@ -263,6 +264,7 @@
                         @if($improvement->desired_state || $improvement->action)<p>{{ $improvement->desired_state ?: $improvement->action }}</p>@endif
                         <div class="period">{{ $detailPeriod($improvement->planned_start_day, $improvement->target_day, $improvement->planned_start_date, $improvement->target_date) }}</div>
                         @if($showTasks && $improvement->tasks->isNotEmpty())
+                            <div class="task-list-title">タスク</div>
                             <ol class="task-list">@foreach($improvement->tasks as $task)<li>{{ $task->title }} @if($showProgress)<span class="status">{{ $taskStatuses[$task->status] ?? $task->status }}</span>@endif</li>@endforeach</ol>
                         @endif
                     </section>

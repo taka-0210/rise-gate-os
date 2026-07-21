@@ -445,6 +445,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-overview-count="6"', false)
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
+            ->assertSee('<div class="task-list-title">タスク</div>', false)
             ->assertSeeInOrder([
                 '1. 現状と目指す未来のカタチ',
                 '2. プロジェクト概要',
