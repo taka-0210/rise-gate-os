@@ -76,9 +76,9 @@ class WorkspaceBusinessProfileTest extends TestCase
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
             ->get(route('projects.client-plan', $project))
             ->assertOk()
-            ->assertSee('株式会社 ライズゲート')
             ->assertSee('class="issuer-block"', false)
             ->assertSee(route('projects.business-media', [$project, 'logo']), false)
+            ->assertDontSee('株式会社 ライズゲート')
             ->assertDontSee('表示しない住所')
             ->assertDontSee('000-0000-0000');
 

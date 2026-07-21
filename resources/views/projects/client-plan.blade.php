@@ -36,7 +36,6 @@
         .cover-bottom { display:grid; grid-template-columns:minmax(0,1fr) 78mm; gap:20mm; align-items:end; padding-top:12px; border-top:1px solid var(--line); }
         .issuer-block { width:78mm; justify-self:end; text-align:right; }
         .logo { display:block; width:205px; height:auto; max-height:38mm; margin-left:auto; object-fit:contain; object-position:right center; }
-        .issuer-company { margin-top:9px; color:var(--navy); font-size:15px; font-weight:800; }
         .eyebrow { color:var(--blue); font-weight:800; letter-spacing:.12em; }
         h1 { margin:8px 0 12px; font-size:38px; line-height:1.25; }
         h2 { margin:0 0 18px; padding-bottom:9px; border-bottom:2px solid var(--navy); font-size:24px; }
@@ -91,7 +90,6 @@
             size:297mm 210mm;
             margin:13mm 14mm 15mm;
             @bottom-left { content:"{{ $issuerName ?? '' }} / Confidential"; color:#7b8992; font-size:8pt; }
-            @bottom-center { content:"Ver. {{ $documentOptions['version'] ?: '1.0' }}　{{ \Carbon\Carbon::parse($documentOptions['prepared_on'])->format('Y/m/d') }}"; color:#7b8992; font-size:8pt; }
             @bottom-right { content:counter(page) " / " counter(pages); color:#173f50; font-size:8pt; font-weight:700; }
         }
         @media print {
@@ -113,7 +111,6 @@
             size:297mm 210mm;
             margin:13mm 14mm 15mm;
             @bottom-left { content:"{{ $issuerName ?? '' }} / Confidential"; color:#7b8992; font-size:8pt; }
-            @bottom-center { content:"Ver. {{ $documentOptions['version'] ?: '1.0' }}　{{ \Carbon\Carbon::parse($documentOptions['prepared_on'])->format('Y/m/d') }}"; color:#7b8992; font-size:8pt; }
             @bottom-right { content:counter(page) " / " counter(pages); color:#173f50; font-size:8pt; font-weight:700; }
         }
         .page-section { break-after:page; }
@@ -209,7 +206,6 @@
                 @if($businessProfile?->logo_path)
                     <img class="logo" src="{{ route('projects.business-media', [$project,'logo']) }}" alt="{{ $issuerName }}">
                 @endif
-                <div class="issuer-company">{{ $businessProfile?->legal_name ?: $issuerName }}</div>
             </aside>
         </div>
     </section>

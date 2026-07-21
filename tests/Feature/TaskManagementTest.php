@@ -455,6 +455,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('name="show_progress" value="1" >進捗を掲載', false)
             ->assertSee('vendor/pagedjs/paged.polyfill.js', false)
             ->assertSee('size:297mm 210mm', false)
+            ->assertDontSee('@bottom-center', false)
             ->assertSee('preview(source, [pagedStylesheet], output)', false)
             ->assertSee("source.classList.add('preview-fallback')", false);
     }
