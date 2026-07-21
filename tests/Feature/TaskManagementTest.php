@@ -53,6 +53,7 @@ class TaskManagementTest extends TestCase
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $task = $this->createTask($project, $owner);
         $initiative = $task->improvement;
+        $initiative->update(['planned_effort_days' => 2.5]);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
@@ -69,7 +70,6 @@ class TaskManagementTest extends TestCase
                 'description' => '更新した説明',
                 'status' => Task::STATUS_DONE,
                 'priority' => Task::PRIORITY_HIGH,
-                'planned_effort_days' => 2.5,
                 'assigned_to' => $owner->id,
                 'due_date' => '2026-07-17',
             ])
@@ -78,7 +78,6 @@ class TaskManagementTest extends TestCase
         $task->refresh();
         $this->assertSame('更新したTask', $task->title);
         $this->assertSame(Task::STATUS_DONE, $task->status);
-        $this->assertSame('2.50', $task->planned_effort_days);
         $this->assertNotNull($task->completed_at);
 
         $this->actingAs($owner)
@@ -86,7 +85,7 @@ class TaskManagementTest extends TestCase
             ->get(route('projects.show', $project))
             ->assertOk()
             ->assertSee('2.5/2.5')
-            ->assertSee('工数（人日）');
+            ->assertSee('進捗／予定工数（人日）');
     }
 
     public function test_relative_timeline_periods_can_be_edited_within_their_parent(): void

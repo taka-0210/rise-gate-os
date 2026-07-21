@@ -51,6 +51,13 @@
                 </div>
             </div>
 
+            <div class="field" style="max-width:320px;">
+                <label for="planned_effort_days">予定工数（人日）</label>
+                <input id="planned_effort_days" name="planned_effort_days" type="number" min="0.25" max="999.99" step="0.25" value="{{ old('planned_effort_days') }}" placeholder="例：3">
+                <div class="meta">この取り組み全体に必要と見込む作業量を入力します。</div>
+                @error('planned_effort_days') <div class="error">{{ $message }}</div> @enderror
+            </div>
+
             <div class="grid">
                 @if(!$project->start_date && $project->duration_days)
                     <div class="field"><label for="planned_start_day">開始（着手後・日目）</label><input id="planned_start_day" name="planned_start_day" type="number" min="1" max="{{ $project->duration_days }}" value="{{ old('planned_start_day') }}">@error('planned_start_day') <div class="error">{{ $message }}</div> @enderror</div>

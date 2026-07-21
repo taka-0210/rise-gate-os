@@ -617,15 +617,18 @@
 
             <div class="focus-summary">
                 @php
-                    $plannedEffortDays = (float) $allTasks->sum(fn ($task) => (float) ($task->planned_effort_days ?? 0));
-                    $completedEffortDays = (float) $completedTasks->sum(fn ($task) => (float) ($task->planned_effort_days ?? 0));
+                    $plannedEffortDays = (float) $allImprovements->sum(fn ($improvement) => (float) ($improvement->planned_effort_days ?? 0));
+                    $completedEffortDays = (float) $allImprovements->sum(function ($improvement) {
+                        $progress = $improvement->taskProgress();
+                        return (float) ($improvement->planned_effort_days ?? 0) * ($progress['percentage'] / 100);
+                    });
                     $formatEffort = fn (float $value) => rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
                 @endphp
                 <div><strong>{{ $roadmaps->count() }}</strong><span>Roadmap</span></div>
                 <div><strong>{{ $allImprovements->count() }}</strong><span>取り組み</span></div>
                 <div><strong>{{ $allTasks->count() }}</strong><span>Task</span></div>
                 <div><strong>{{ $completedTasks->count() }}/{{ $allTasks->count() }}</strong><span>完了</span></div>
-                <div><strong>{{ $formatEffort($completedEffortDays) }}/{{ $formatEffort($plannedEffortDays) }}</strong><span>工数（人日）</span></div>
+                <div><strong>{{ $formatEffort($completedEffortDays) }}/{{ $formatEffort($plannedEffortDays) }}</strong><span>進捗／予定工数（人日）</span></div>
             </div>
 
             <div class="focus-roadmaps" id="focus-roadmaps">
@@ -664,6 +667,7 @@
                                             <p>{{ Str::limit($improvement->next_action ?: $improvement->problem ?: '改善内容を具体的なTaskへつなげます。', 120) }}</p>
                                             <div class="meta">予定 {{ $improvement->planned_start_date?->format('Y/m/d') ?? '未設定' }}〜{{ $improvement->target_date?->format('Y/m/d') ?? '未設定' }} / 完了 {{ $improvement->completed_at?->format('Y/m/d') ?? '未完了' }}</div>
                                             <div class="meta">Task {{ $improvement->tasks->count() }}件</div>
+                                            <div class="meta">予定工数 {{ $improvement->planned_effort_days !== null ? rtrim(rtrim(number_format((float) $improvement->planned_effort_days, 2, '.', ''), '0'), '.').'人日' : '未設定' }}</div>
                                             <div class="focus-progress {{ $improvementProgress['key'] === 'completed' ? 'is-completed' : '' }}">
                                                 <div class="focus-progress-head"><span>{{ $improvementProgress['label'] }}（{{ $improvementProgress['completed'] }}/{{ $improvementProgress['total'] }}タスク）</span><strong>{{ $improvementProgress['percentage'] }}%</strong></div>
                                                 <div class="focus-progress-track" role="progressbar" aria-label="{{ $improvement->title }}の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $improvementProgress['percentage'] }}"><span style="width:{{ $improvementProgress['percentage'] }}%"></span></div>

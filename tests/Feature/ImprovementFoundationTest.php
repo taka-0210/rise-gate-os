@@ -203,6 +203,7 @@ class ImprovementFoundationTest extends TestCase
                 'result' => 'Result was recorded.',
                 'impact' => 'Impact was recorded.',
                 'next_action' => 'Create the next improvement.',
+                'planned_effort_days' => 2.5,
                 'status' => 'implemented',
                 'visibility' => 'internal',
                 'assigned_to' => $owner->id,
@@ -217,6 +218,7 @@ class ImprovementFoundationTest extends TestCase
         $this->assertSame('Result was recorded.', $improvement->result);
         $this->assertSame('Impact was recorded.', $improvement->impact);
         $this->assertSame('Create the next improvement.', $improvement->next_action);
+        $this->assertSame('2.50', $improvement->planned_effort_days);
     }
 
     public function test_view_only_project_member_cannot_update_improvement(): void

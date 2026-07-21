@@ -32,7 +32,6 @@ class Task extends Model
         'description',
         'status',
         'priority',
-        'planned_effort_days',
         'assigned_to',
         'created_by',
         'planned_start_date',
@@ -57,7 +56,6 @@ class Task extends Model
             'planned_start_day' => 'integer',
             'due_day' => 'integer',
             'completed_at' => 'datetime',
-            'planned_effort_days' => 'decimal:2',
         ];
     }
 

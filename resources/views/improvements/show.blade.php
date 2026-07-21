@@ -25,6 +25,10 @@
                 <p>{{ $visibilities[$improvement->visibility] ?? $improvement->visibility }}</p>
             </div>
             <div class="card">
+                <h2>予定工数</h2>
+                <p>{{ $improvement->planned_effort_days !== null ? rtrim(rtrim(number_format((float) $improvement->planned_effort_days, 2, '.', ''), '0'), '.').'人日' : '未設定' }}</p>
+            </div>
+            <div class="card">
                 <h2>提案者</h2>
                 <p>{{ $improvement->proposer?->name ?? '未設定' }}</p>
             </div>

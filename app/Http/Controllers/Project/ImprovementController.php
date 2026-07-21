@@ -195,6 +195,7 @@ class ImprovementController extends Controller
             'result' => ['nullable', 'string', 'max:10000'],
             'impact' => ['nullable', 'string', 'max:10000'],
             'next_action' => ['nullable', 'string', 'max:10000'],
+            'planned_effort_days' => ['nullable', 'numeric', 'min:0.25', 'max:999.99'],
             'planned_start_date' => ['nullable', 'date'],
             'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
             'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],

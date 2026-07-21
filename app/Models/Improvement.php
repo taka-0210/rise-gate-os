@@ -42,6 +42,7 @@ class Improvement extends Model
         'result',
         'impact',
         'next_action',
+        'planned_effort_days',
         'planned_start_date',
         'target_date',
         'planned_start_day',
@@ -71,6 +72,7 @@ class Improvement extends Model
             'planned_start_day' => 'integer',
             'target_day' => 'integer',
             'completed_at' => 'date',
+            'planned_effort_days' => 'decimal:2',
         ];
     }
 

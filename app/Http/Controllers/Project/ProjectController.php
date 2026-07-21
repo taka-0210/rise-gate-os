@@ -238,7 +238,7 @@ class ProjectController extends Controller
 
         $allImprovements = $project->improvements()
             ->when($currentMember?->project_role === ProjectMember::ROLE_CLIENT, fn ($query) => $query->where('visibility', Improvement::VISIBILITY_CLIENT))
-            ->with(['proposer', 'assignee', 'roadmap'])
+            ->with(['proposer', 'assignee', 'roadmap', 'tasks'])
             ->latest()
             ->get();
         $improvements = $allImprovements->take(6);

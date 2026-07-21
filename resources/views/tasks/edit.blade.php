@@ -39,13 +39,6 @@
                 @error('description') <div class="error">{{ $message }}</div> @enderror
             </div>
 
-            <div class="field" style="max-width:320px;">
-                <label for="planned_effort_days">予定工数（人日）</label>
-                <input id="planned_effort_days" name="planned_effort_days" type="number" min="0.25" max="999.99" step="0.25" value="{{ old('planned_effort_days', $task->planned_effort_days ?? 1) }}">
-                <div class="meta">期間とは別に、実際に必要と見込む作業量を入力します。</div>
-                @error('planned_effort_days') <div class="error">{{ $message }}</div> @enderror
-            </div>
-
             <div class="grid">
                 <div class="field">
                     <label for="status">進行状況</label>

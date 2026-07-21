@@ -122,17 +122,12 @@ class TaskController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'status' => ['required', 'string', 'in:'.implode(',', array_keys(Task::statuses()))],
             'priority' => ['required', 'string', 'in:'.implode(',', array_keys(Task::priorities()))],
-            'planned_effort_days' => ['nullable', 'numeric', 'min:0.25', 'max:999.99'],
             'assigned_to' => ['nullable', Rule::in($assignableUserIds)],
             'planned_start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
             'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:due_day'],
             'due_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
         ]);
-
-        if (! isset($validated['planned_effort_days'])) {
-            $validated['planned_effort_days'] = $this->suggestedEffortDays($validated);
-        }
 
         $improvement = $project->improvements()->findOrFail($validated['improvement_id']);
         if (! empty($validated['planned_start_date']) && ! empty($validated['due_date'])
@@ -151,18 +146,6 @@ class TaskController extends Controller
         }
 
         return $validated;
-    }
-
-    private function suggestedEffortDays(array $attributes): float
-    {
-        if (! empty($attributes['planned_start_day']) && ! empty($attributes['due_day'])) {
-            return (float) ($attributes['due_day'] - $attributes['planned_start_day'] + 1);
-        }
-        if (! empty($attributes['planned_start_date']) && ! empty($attributes['due_date'])) {
-            return (float) (\Carbon\Carbon::parse($attributes['planned_start_date'])->diffInDays(\Carbon\Carbon::parse($attributes['due_date'])) + 1);
-        }
-
-        return 1.0;
     }
 
     private function assignableUsers(Project $project)
