@@ -20,6 +20,10 @@
                 <div class="meta">担当者</div>
                 <h2>{{ $task->assignee?->name ?? '未設定' }}</h2>
             </div>
+            <div class="card stack">
+                <div class="meta">予定工数</div>
+                <h2>{{ number_format((float) ($task->planned_effort_days ?? 0), 2, '.', '') + 0 }}人日</h2>
+            </div>
         </div>
 
         <div class="card stack">

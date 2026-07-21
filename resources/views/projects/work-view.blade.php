@@ -21,7 +21,7 @@
         .focus-roadmap-label { color:#245ca6; }
         .focus-improvement-label { color:#23845c; }
         .focus-task-label { color:#b5523d; }
-        .focus-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
+        .focus-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
         .focus-summary div { padding:12px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; text-align:center; }
         .focus-summary strong { display:block; color:var(--accent-dark); font-size:24px; }
         .focus-roadmaps { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
@@ -616,10 +616,16 @@
             @endif
 
             <div class="focus-summary">
+                @php
+                    $plannedEffortDays = (float) $allTasks->sum(fn ($task) => (float) ($task->planned_effort_days ?? 0));
+                    $completedEffortDays = (float) $completedTasks->sum(fn ($task) => (float) ($task->planned_effort_days ?? 0));
+                    $formatEffort = fn (float $value) => rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+                @endphp
                 <div><strong>{{ $roadmaps->count() }}</strong><span>Roadmap</span></div>
                 <div><strong>{{ $allImprovements->count() }}</strong><span>取り組み</span></div>
                 <div><strong>{{ $allTasks->count() }}</strong><span>Task</span></div>
                 <div><strong>{{ $completedTasks->count() }}/{{ $allTasks->count() }}</strong><span>完了</span></div>
+                <div><strong>{{ $formatEffort($completedEffortDays) }}/{{ $formatEffort($plannedEffortDays) }}</strong><span>工数（人日）</span></div>
             </div>
 
             <div class="focus-roadmaps" id="focus-roadmaps">

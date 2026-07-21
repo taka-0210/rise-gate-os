@@ -82,6 +82,7 @@ class AiProjectController extends Controller
                             'description' => $task->description,
                             'status' => $task->status,
                             'priority' => $task->priority,
+                            'planned_effort_days' => $task->planned_effort_days !== null ? (float) $task->planned_effort_days : null,
                             'planned_start_date' => $task->planned_start_date?->toDateString(),
                             'due_date' => $task->due_date?->toDateString(),
                             'planned_start_day' => $task->planned_start_day,

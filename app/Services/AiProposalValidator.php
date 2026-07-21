@@ -21,7 +21,7 @@ class AiProposalValidator
         'project' => ['summary', 'current_state', 'desired_future_state'],
         'roadmap' => ['title', 'purpose', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
         'improvement' => ['title', 'roadmap_public_id', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
-        'task' => ['title', 'improvement_public_id', 'description', 'status', 'priority', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day'],
+        'task' => ['title', 'improvement_public_id', 'description', 'status', 'priority', 'planned_effort_days', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day'],
     ];
 
     public function validate(AiProposal $proposal): AiProposal
@@ -135,6 +135,7 @@ class AiProposalValidator
                 'description' => ['nullable', 'string'],
                 'status' => ['sometimes', Rule::in(array_keys(Task::statuses()))],
                 'priority' => ['sometimes', Rule::in(array_keys(Task::priorities()))],
+                'planned_effort_days' => ['sometimes', 'nullable', 'numeric', 'min:0.25', 'max:999.99'],
                 'planned_start_date' => ['nullable', 'date'],
                 'due_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
                 'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:due_day'],
