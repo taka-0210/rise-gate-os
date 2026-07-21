@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
+use App\Models\Improvement;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectMember;
@@ -15,6 +16,33 @@ use Tests\TestCase;
 class EstimateFoundationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_estimate_form_can_prefill_improvement_effort_and_daily_rate(): void
+    {
+        [$user, $workspace, $project] = $this->project();
+        $improvement = Improvement::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '管理画面を開発する',
+            'planned_effort_days' => 4.5,
+            'status' => Improvement::STATUS_PROPOSED,
+            'visibility' => Improvement::VISIBILITY_INTERNAL,
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
+            ->get(route('projects.estimates.create', ['project' => $project, 'source' => 'effort']))
+            ->assertOk()
+            ->assertSee('工数から見積書を作成')
+            ->assertSee('4.5人日')
+            ->assertSee('基準人日単価')
+            ->assertSee('name="items[1][quantity]" value="4.5"', false)
+            ->assertSee('name="items[1][unit]" value="人日"', false)
+            ->assertSee('name="items[1][unit_price]" value="50000"', false)
+            ->assertSee('name="items[1][selected]" value="1" checked', false);
+    }
 
     public function test_project_owner_can_create_a_snapshot_estimate_from_a_roadmap(): void
     {

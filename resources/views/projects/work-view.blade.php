@@ -367,7 +367,7 @@
                     </div>
                 </div>
                 <div class="focus-view-switch">
-                    <a href="{{ route('projects.estimates.create', $project) }}">帳票</a>
+                    <a href="{{ route('projects.estimates.create', ['project' => $project, 'source' => 'effort']) }}">見積書を作成</a>
                     <button type="button" class="focus-ai-trigger" data-ai-drawer-open aria-controls="ai-assistant-drawer" aria-expanded="false">
                         AIアシスタント
                         @if ($pendingAiProposalCount > 0)<span class="focus-ai-count" aria-label="承認待ち {{ $pendingAiProposalCount }}件">{{ $pendingAiProposalCount }}</span>@endif
@@ -546,6 +546,7 @@
                     </div>
                     @if($canCreateImprovement)
                         <button type="button" class="secondary effort-editor-toggle" data-effort-editor-toggle aria-expanded="{{ request()->boolean('effort_editor') || $errors->has('efforts') || $errors->has('efforts.*') ? 'true' : 'false' }}">工数を一括入力</button>
+                        <a class="button" href="{{ route('projects.estimates.create', ['project' => $project, 'source' => 'effort']) }}">見積書を作成</a>
                     @endif
                 </div>
             </div>
