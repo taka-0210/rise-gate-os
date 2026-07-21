@@ -45,6 +45,37 @@ class AiProposalApiTest extends TestCase
         $this->assertDatabaseCount('tasks', 0);
     }
 
+    public function test_api_accepts_project_metadata_update_as_a_pending_proposal(): void
+    {
+        [$workspace, $project] = $this->workspaceProject('project-metadata');
+        $payload = [
+            'project_public_id' => $project->public_id,
+            'idempotency_key' => 'project-metadata-001',
+            'title' => 'Project基本情報の更新',
+            'items' => [[
+                'operation' => 'update',
+                'entity_type' => 'project',
+                'target_public_id' => $project->public_id,
+                'attributes' => [
+                    'summary' => 'AIが提案した概要',
+                    'current_state' => 'AIが整理した現状',
+                    'desired_future_state' => 'AIが描いた未来のカタチ',
+                ],
+            ]],
+        ];
+
+        $this->withToken($this->accessKey($workspace))
+            ->postJson('/api/v1/ai/proposals', $payload)
+            ->assertCreated()
+            ->assertJsonPath('valid_items_count', 1)
+            ->assertJsonPath('invalid_items_count', 0);
+
+        $project->refresh();
+        $this->assertNull($project->summary);
+        $this->assertNull($project->current_state);
+        $this->assertNull($project->desired_future_state);
+    }
+
     public function test_same_idempotency_key_returns_existing_proposal_without_duplication(): void
     {
         [$workspace, $project] = $this->workspaceProject('internal');

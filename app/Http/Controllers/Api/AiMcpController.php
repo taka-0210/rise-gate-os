@@ -155,7 +155,7 @@ class AiMcpController extends Controller
             'ai_request_public_id' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*.operation' => ['required', Rule::in(['create', 'update', 'delete'])],
-            'items.*.entity_type' => ['required', Rule::in(['roadmap', 'improvement', 'task'])],
+            'items.*.entity_type' => ['required', Rule::in(['project', 'roadmap', 'improvement', 'task'])],
             'items.*.target_public_id' => ['nullable', 'string'],
             'items.*.reference_key' => ['nullable', 'string', 'max:120'],
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
@@ -214,7 +214,7 @@ class AiMcpController extends Controller
                             'type' => 'object',
                             'properties' => [
                                 'operation' => ['type' => 'string', 'enum' => ['create', 'update', 'delete']],
-                                'entity_type' => ['type' => 'string', 'enum' => ['roadmap', 'improvement', 'task']],
+                                'entity_type' => ['type' => 'string', 'enum' => ['project', 'roadmap', 'improvement', 'task']],
                                 'target_public_id' => ['type' => ['string', 'null']],
                                 'reference_key' => ['type' => ['string', 'null']],
                                 'parent_reference' => ['type' => ['string', 'null']],

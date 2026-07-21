@@ -396,6 +396,46 @@ class AiProposalFoundationTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_project_admin_can_preview_and_apply_project_metadata_proposal(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('project-metadata');
+        $proposal = AiProposal::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'source' => 'codex',
+            'idempotency_key' => 'project-metadata-apply-001',
+            'title' => 'Project基本情報を整える',
+            'status' => AiProposal::STATUS_PENDING,
+        ]);
+        $proposal->items()->create([
+            'operation' => 'update',
+            'entity_type' => 'project',
+            'target_public_id' => $project->public_id,
+            'attributes' => [
+                'summary' => '事業の全体像を伝えるWebサイト構築プロジェクト。',
+                'current_state' => '情報発信をSNSに依存している。',
+                'desired_future_state' => '自社サイトと管理画面を継続運用できる。',
+            ],
+        ]);
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.ai-proposals.show', [$project, $proposal]))
+            ->assertOk()
+            ->assertSee('Project基本情報・AI連携提案')
+            ->assertSee('情報発信をSNSに依存している。')
+            ->assertSee('自社サイトと管理画面を継続運用できる。');
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
+
+        $project->refresh();
+        $this->assertSame('事業の全体像を伝えるWebサイト構築プロジェクト。', $project->summary);
+        $this->assertSame('情報発信をSNSに依存している。', $project->current_state);
+        $this->assertSame('自社サイトと管理画面を継続運用できる。', $project->desired_future_state);
+    }
+
     public function test_invalid_proposal_cannot_be_applied(): void
     {
         [$user, $workspace, $project] = $this->projectOwner('internal');

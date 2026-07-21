@@ -119,12 +119,14 @@ class AiProposalApplier
     {
         $attributes = $item->attributes;
         $model = match ($item->entity_type) {
+            'project' => $proposal->project,
             'roadmap' => $proposal->project->roadmaps()->where('public_id', $item->target_public_id)->firstOrFail(),
             'improvement' => $proposal->project->improvements()->where('public_id', $item->target_public_id)->firstOrFail(),
             'task' => $proposal->project->tasks()->where('public_id', $item->target_public_id)->firstOrFail(),
         };
 
         $allowed = match ($item->entity_type) {
+            'project' => ['summary', 'current_state', 'desired_future_state'],
             'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
             'improvement' => ['title', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
             'task' => ['title', 'description', 'status', 'priority', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day'],

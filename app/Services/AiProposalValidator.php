@@ -17,6 +17,7 @@ class AiProposalValidator
     public const STATUS_INVALID = 'invalid';
 
     private const ALLOWED_ATTRIBUTES = [
+        'project' => ['summary', 'current_state', 'desired_future_state'],
         'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
         'improvement' => ['title', 'roadmap_public_id', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'status', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
         'task' => ['title', 'improvement_public_id', 'description', 'status', 'priority', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day'],
@@ -46,6 +47,15 @@ class AiProposalValidator
 
         if ($unknown !== []) {
             $errors[] = '許可されていない項目: '.implode(', ', $unknown);
+        }
+
+        if ($item->entity_type === 'project') {
+            if ($item->operation !== AiProposalItem::OPERATION_UPDATE) {
+                $errors[] = 'Project基本情報は更新提案だけを受け付けます。';
+            }
+            if (array_intersect(array_keys($attributes), self::ALLOWED_ATTRIBUTES['project']) === []) {
+                $errors[] = '概要・現状・目指す未来のカタチのいずれかを指定してください。';
+            }
         }
 
         if (in_array($item->operation, [AiProposalItem::OPERATION_UPDATE, AiProposalItem::OPERATION_DELETE], true) && ! $this->targetExists($project, $item)) {
@@ -83,6 +93,11 @@ class AiProposalValidator
         $titleRule = $item->operation === AiProposalItem::OPERATION_CREATE ? ['required', 'string', 'max:255'] : ['sometimes', 'string', 'max:255'];
 
         return match ($item->entity_type) {
+            'project' => [
+                'summary' => ['sometimes', 'nullable', 'string', 'max:5000'],
+                'current_state' => ['sometimes', 'nullable', 'string', 'max:5000'],
+                'desired_future_state' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            ],
             'roadmap' => [
                 'title' => $titleRule,
                 'purpose' => ['nullable', 'string'],
@@ -161,6 +176,7 @@ class AiProposalValidator
         }
 
         return match ($item->entity_type) {
+            'project' => hash_equals($project->public_id, $item->target_public_id),
             'roadmap' => $project->roadmaps()->where('public_id', $item->target_public_id)->exists(),
             'improvement' => $project->improvements()->where('public_id', $item->target_public_id)->exists(),
             'task' => $project->tasks()->where('public_id', $item->target_public_id)->exists(),

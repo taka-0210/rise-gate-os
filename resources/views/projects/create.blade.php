@@ -10,6 +10,7 @@
         .project-start-option span { display:block; margin:8px 0 0 26px; color:var(--muted); }
         .future-field { padding:16px; border:1px solid #b7dbc9; border-radius:10px; background:linear-gradient(145deg,#f8fffb,#eaf7f0); }
         .future-field label::before { content:"✦"; margin-right:7px; color:#3d966d; }
+        .ai-enabled-badge { display:inline-flex; margin-left:8px; padding:3px 7px; border-radius:999px; background:#e8f4f2; color:var(--accent-dark); font-size:11px; font-weight:800; vertical-align:middle; }
         @media (max-width:700px) { .project-start-options { grid-template-columns:1fr; } }
     </style>
     <section class="panel stack">
@@ -45,21 +46,21 @@
             </div>
 
             <div class="field">
-                <label for="summary">概要</label>
+                <label for="summary">概要 <span class="ai-enabled-badge">AI連携対応</span></label>
                 <textarea id="summary" name="summary" rows="5">{{ old('summary') }}</textarea>
                 <div class="meta">このプロジェクトが依頼に至った経緯や背景を記録します。</div>
                 @error('summary') <div class="error">{{ $message }}</div> @enderror
             </div>
 
             <div class="field">
-                <label for="current_state">現状</label>
+                <label for="current_state">現状 <span class="ai-enabled-badge">AI連携対応</span></label>
                 <textarea id="current_state" name="current_state" rows="5">{{ old('current_state') }}</textarea>
                 <div class="meta">現在の業務、運用方法、困りごとや課題を記録します。</div>
                 @error('current_state') <div class="error">{{ $message }}</div> @enderror
             </div>
 
             <div class="field future-field">
-                <label for="desired_future_state">目指す未来のカタチ</label>
+                <label for="desired_future_state">目指す未来のカタチ <span class="ai-enabled-badge">AI連携対応</span></label>
                 <textarea id="desired_future_state" name="desired_future_state" rows="5">{{ old('desired_future_state') }}</textarea>
                 <div class="meta">プロジェクト完了後に実現したい状態を記録します。</div>
                 @error('desired_future_state') <div class="error">{{ $message }}</div> @enderror

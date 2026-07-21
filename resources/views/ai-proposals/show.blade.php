@@ -48,8 +48,16 @@
         .proposal-review-field__inputs { display:grid; grid-template-columns:minmax(140px,.55fr) minmax(280px,1.8fr) minmax(180px,.75fr); gap:10px; align-items:end; }
         .proposal-review-field label { margin:0; font-size:13px; font-weight:800; }
         .proposal-review-field select,.proposal-review-field textarea { margin-top:5px; background:#fff; }
+        .proposal-project-metadata { border:2px solid #7963b8; background:#faf8ff; }
+        .proposal-metadata-grid { display:grid; gap:12px; }
+        .proposal-metadata-change { padding:14px; border:1px solid #d9d1ef; border-radius:8px; background:#fff; }
+        .proposal-metadata-change h3 { margin:0 0 10px; color:#574195; }
+        .proposal-metadata-values { display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:start; }
+        .proposal-metadata-values div { min-width:0; }
+        .proposal-metadata-values p { margin:5px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+        .proposal-metadata-arrow { padding-top:25px; color:#7963b8; font-weight:900; }
         @media (max-width:900px) { .proposal-review-field__inputs { grid-template-columns:1fr; } .proposal-review-field--improvement,.proposal-review-field--task { margin-left:0; } }
-        @media (max-width:760px) { .proposal-impact-grid { grid-template-columns:1fr; } }
+        @media (max-width:760px) { .proposal-impact-grid,.proposal-metadata-values { grid-template-columns:1fr; } .proposal-metadata-arrow { padding:0; transform:rotate(90deg); width:max-content; } }
     </style>
     <section class="panel stack">
         @if ($errors->any())
@@ -73,6 +81,51 @@
             <h1>{{ $proposal->title }}</h1>
             <p>{{ $proposal->summary ?: '概要はありません。' }}</p>
         </div>
+
+        @if ($projectMetadataItem)
+            @php($metadataLabels = ['summary' => '概要', 'current_state' => '現状', 'desired_future_state' => '目指す未来のカタチ'])
+            <div class="card stack proposal-project-metadata">
+                <div>
+                    <div class="eyebrow">Project基本情報・AI連携提案</div>
+                    <h2>概要・現状・目指す未来のカタチ</h2>
+                    <p>承認すると、下記の内容でProject基本情報を更新します。</p>
+                </div>
+                <div class="proposal-metadata-grid">
+                    @foreach ($metadataLabels as $attribute => $label)
+                        @if (array_key_exists($attribute, $projectMetadataItem->attributes))
+                            <section class="proposal-metadata-change">
+                                <h3>{{ $label }}</h3>
+                                <div class="proposal-metadata-values">
+                                    <div><span class="meta">現在</span><p>{{ $project->{$attribute} ?: '未入力' }}</p></div>
+                                    <span class="proposal-metadata-arrow">→</span>
+                                    <div><span class="meta">承認後</span><p>{{ $projectMetadataItem->attributes[$attribute] ?: '未入力' }}</p></div>
+                                </div>
+                            </section>
+                        @endif
+                    @endforeach
+                </div>
+                @if ($canReview && $proposal->status === \App\Models\AiProposal::STATUS_PENDING)
+                    <form method="POST" action="{{ route('projects.ai-proposals.items.review.store', [$project, $proposal, $projectMetadataItem]) }}" class="stack">
+                        @csrf
+                        <div class="grid">
+                            <label>対応
+                                <select name="action" required>
+                                    @foreach ($reviewActions as $value => $label)
+                                        @if ($value !== \App\Models\AiProposalItemReview::ACTION_MERGE)
+                                            <option value="{{ $value }}" @selected(($projectMetadataItem->review?->action ?? 'keep') === $value)>{{ $label }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label style="grid-column:span 2;">コメント・修正指示
+                                <textarea name="comment" rows="3" maxlength="2000" placeholder="例：現状はもう少し簡潔にする／採用への活用も追加する">{{ $projectMetadataItem->review?->comment }}</textarea>
+                            </label>
+                        </div>
+                        <div class="actions"><button type="submit">Project基本情報のレビューを保存</button></div>
+                    </form>
+                @endif
+            </div>
+        @endif
 
         <div class="card stack">
             <div>

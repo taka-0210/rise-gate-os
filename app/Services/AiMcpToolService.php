@@ -48,6 +48,8 @@ class AiMcpToolService
             'public_id' => $project->public_id,
             'name' => $project->name,
             'summary' => $project->summary,
+            'current_state' => $project->current_state,
+            'desired_future_state' => $project->desired_future_state,
             'status' => $project->status,
             'priority' => $project->priority,
             'start_date' => $project->start_date?->toDateString(),

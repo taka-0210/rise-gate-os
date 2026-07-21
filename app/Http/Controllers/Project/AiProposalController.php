@@ -46,6 +46,7 @@ class AiProposalController extends Controller
             'delete' => $aiProposal->items->where('operation', 'delete')->count(),
             'valid' => $aiProposal->items->where('validation_status', 'valid')->count(),
             'invalid' => $aiProposal->items->where('validation_status', 'invalid')->count(),
+            'project' => $aiProposal->items->where('entity_type', 'project')->count(),
             'roadmap' => count($proposalOutline),
             'improvement' => collect($proposalOutline)->sum(fn (array $roadmap) => count($roadmap['improvements'])),
             'task' => collect($proposalOutline)->sum(fn (array $roadmap) => collect($roadmap['improvements'])->sum(fn (array $improvement) => count($improvement['tasks']))),
@@ -84,6 +85,7 @@ class AiProposalController extends Controller
             'impactCounts' => $impactCounts,
             'reviewActions' => \App\Models\AiProposalItemReview::actions(),
             'unresolvedReviewCount' => $aiProposal->items->pluck('review')->filter()->whereNull('resolved_at')->count(),
+            'projectMetadataItem' => $aiProposal->items->firstWhere('entity_type', 'project'),
         ]);
     }
 
