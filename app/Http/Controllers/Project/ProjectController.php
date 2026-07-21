@@ -290,7 +290,7 @@ class ProjectController extends Controller
         $unclassifiedImprovements = $project->improvements()
             ->whereNull('roadmap_id')
             ->tap($visibleImprovementScope)
-            ->with(['assignee', 'proposer'])
+            ->with(['assignee', 'proposer', 'tasks'])
             ->latest()
             ->get();
 

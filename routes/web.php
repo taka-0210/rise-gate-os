@@ -11,6 +11,7 @@ use App\Http\Controllers\Project\AiProposalController;
 use App\Http\Controllers\Project\AiProposalItemReviewController;
 use App\Http\Controllers\Project\AiRequestController;
 use App\Http\Controllers\Project\ImprovementController;
+use App\Http\Controllers\Project\ImprovementEffortController;
 use App\Http\Controllers\Project\ImprovementOutputController;
 use App\Http\Controllers\Project\ProjectController;
 use App\Http\Controllers\Project\ProjectInternalNoteController;
@@ -117,6 +118,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/projects/{project}/move', [ProjectController::class, 'move'])->name('projects.move');
         Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
         Route::resource('projects.improvements', ImprovementController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+        Route::patch('/projects/{project}/improvement-efforts', [ImprovementEffortController::class, 'update'])->name('projects.improvement-efforts.update');
         Route::post('/projects/{project}/roadmaps', [RoadmapController::class, 'store'])->name('projects.roadmaps.store');
         Route::get('/projects/{project}/roadmaps/create', [RoadmapController::class, 'create'])->name('projects.roadmaps.create');
         Route::get('/projects/{project}/roadmaps/{roadmap}/edit', [RoadmapController::class, 'edit'])->name('projects.roadmaps.edit');

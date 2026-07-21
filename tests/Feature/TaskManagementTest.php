@@ -117,6 +117,28 @@ class TaskManagementTest extends TestCase
         $this->assertSame(3, $task->improvement->fresh()->planned_start_day);
     }
 
+    public function test_improvement_efforts_can_be_entered_together_from_time_view(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $task = $this->createTask($project, $owner);
+        $improvement = $task->improvement;
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
+            ->assertOk()
+            ->assertSee('工数を一括入力')
+            ->assertSee('data-effort-editor', false)
+            ->assertSee('name="efforts['.$improvement->id.']"', false)
+            ->assertSee('未設定のみ表示');
+
+        $this->patch(route('projects.improvement-efforts.update', $project), [
+            'efforts' => [$improvement->id => 4.5],
+        ])->assertRedirect(route('projects.show', ['project' => $project, 'view' => 'time', 'effort_editor' => 1]));
+
+        $this->assertSame('4.50', $improvement->fresh()->planned_effort_days);
+    }
+
     public function test_manual_plan_management_is_available_from_the_project_and_deletes_safely(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

@@ -122,6 +122,22 @@
         .time-legend .is-overdue { background:#c58a22; box-shadow:inset 0 0 0 1px #8d6117; }
         .time-legend .is-reached { height:14px; background:#fff; border:2px solid #245ca6; }
         .time-chart-scroll { overflow-x:auto; padding-bottom:8px; }
+        .effort-editor-toggle { flex:0 0 auto; }
+        .effort-editor { display:none; margin-top:18px; padding:18px; border:2px solid #56a27e; border-radius:10px; background:#f6fcf8; }
+        .effort-editor.is-open { display:grid; gap:16px; }
+        .effort-editor-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+        .effort-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+        .effort-summary div { padding:10px; border:1px solid #b8d9c8; border-radius:8px; background:#fff; text-align:center; }
+        .effort-summary strong { display:block; color:#16704b; font-size:22px; }
+        .effort-roadmap-group { display:grid; gap:8px; }
+        .effort-roadmap-group h3 { margin:0; color:#245ca6; }
+        .effort-row { display:grid; grid-template-columns:minmax(220px,1fr) 150px minmax(220px,auto); gap:10px; align-items:center; padding:10px; border:1px solid #d6e7de; border-radius:8px; background:#fff; }
+        .effort-row.is-filtered { display:none; }
+        .effort-input { display:flex; align-items:center; gap:6px; }
+        .effort-input input { min-width:0; }
+        .effort-presets { display:flex; flex-wrap:wrap; gap:5px; }
+        .effort-presets button { padding:5px 7px; border:1px solid var(--line); background:#fff; color:var(--accent-dark); font-size:11px; }
+        @media (max-width:700px) { .effort-summary { grid-template-columns:1fr; } .effort-row { grid-template-columns:1fr; } }
         .time-chart { min-width:820px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
         .time-axis,.time-row { display:grid; grid-template-columns:260px minmax(540px,1fr); }
         .time-axis { position:sticky; top:0; z-index:3; background:#f8fafb; border-bottom:1px solid var(--line); }
@@ -512,6 +528,9 @@
                     <h1>{{ $project->name }}</h1>
                     <p>ROADMAP・取り組み・TASKを、ひとつの時間軸で確認します。</p>
                 </div>
+                @if($canCreateImprovement)
+                    <button type="button" class="secondary effort-editor-toggle" data-effort-editor-toggle aria-expanded="{{ request()->boolean('effort_editor') || $errors->has('efforts') || $errors->has('efforts.*') ? 'true' : 'false' }}">工数を一括入力</button>
+                @endif
             </div>
             @php
                 $scheduleStageLabels = ['project' => '1. プロジェクト期間', 'roadmap' => '2. ロードマップ期間', 'improvement' => '3. 取り組み期間', 'task' => '4. タスク期間', 'all' => '5. 全体確認'];
@@ -578,6 +597,55 @@
                     @endforelse
                 </div>
             </div>
+            @if($canCreateImprovement)
+                <form class="effort-editor {{ request()->boolean('effort_editor') || $errors->has('efforts') || $errors->has('efforts.*') ? 'is-open' : '' }}" method="POST" action="{{ route('projects.improvement-efforts.update', $project) }}" data-effort-editor>
+                    @csrf
+                    @method('PATCH')
+                    <div class="effort-editor-head">
+                        <div><h2>取り組みの工数を一括入力</h2><p class="meta">期間グラフと見比べながら、各取り組み全体の予定工数を人日で入力します。</p></div>
+                        <label><input type="checkbox" data-effort-unset-filter style="width:auto;"> 未設定のみ表示</label>
+                    </div>
+                    <div class="effort-summary">
+                        <div><strong data-effort-total>0</strong><span>予定工数（人日）</span></div>
+                        <div><strong data-effort-earned>0</strong><span>現在の進捗工数</span></div>
+                        <div><strong data-effort-missing>0</strong><span>未設定の取り組み</span></div>
+                    </div>
+                    @error('efforts')<div class="error">{{ $message }}</div>@enderror
+                    @foreach($roadmaps as $roadmap)
+                        <section class="effort-roadmap-group">
+                            <h3>{{ $roadmap->title }}</h3>
+                            @forelse($roadmap->improvements as $improvement)
+                                @php
+                                    $effortProgress = $improvement->taskProgress();
+                                @endphp
+                                <div class="effort-row" data-effort-row data-progress="{{ $effortProgress['percentage'] }}">
+                                    <div><strong>{{ $improvement->title }}</strong><div class="meta">{{ $effortProgress['label'] }}・{{ $effortProgress['percentage'] }}% / Task {{ $effortProgress['completed'] }}/{{ $effortProgress['total'] }}</div></div>
+                                    <label class="effort-input"><input name="efforts[{{ $improvement->id }}]" data-effort-input type="number" min="0.25" max="999.99" step="0.25" value="{{ old('efforts.'.$improvement->id, $improvement->planned_effort_days) }}" placeholder="未設定"><span>人日</span></label>
+                                    <div class="effort-presets">@foreach([0.5,1,2,3,5,8] as $preset)<button type="button" data-effort-preset="{{ $preset }}">{{ $preset }}</button>@endforeach<button type="button" data-effort-clear>クリア</button><a href="{{ route('projects.improvements.edit', [$project, $improvement]) }}">個別編集</a></div>
+                                </div>
+                            @empty
+                                <div class="focus-empty">取り組みはまだありません。</div>
+                            @endforelse
+                        </section>
+                    @endforeach
+                    @if($unclassifiedImprovements->isNotEmpty())
+                        <section class="effort-roadmap-group">
+                            <h3>未分類の取り組み</h3>
+                            @foreach($unclassifiedImprovements as $improvement)
+                                @php
+                                    $effortProgress = $improvement->taskProgress();
+                                @endphp
+                                <div class="effort-row" data-effort-row data-progress="{{ $effortProgress['percentage'] }}">
+                                    <div><strong>{{ $improvement->title }}</strong><div class="meta">{{ $effortProgress['label'] }}・{{ $effortProgress['percentage'] }}% / Task {{ $effortProgress['completed'] }}/{{ $effortProgress['total'] }}</div></div>
+                                    <label class="effort-input"><input name="efforts[{{ $improvement->id }}]" data-effort-input type="number" min="0.25" max="999.99" step="0.25" value="{{ old('efforts.'.$improvement->id, $improvement->planned_effort_days) }}" placeholder="未設定"><span>人日</span></label>
+                                    <div class="effort-presets">@foreach([0.5,1,2,3,5,8] as $preset)<button type="button" data-effort-preset="{{ $preset }}">{{ $preset }}</button>@endforeach<button type="button" data-effort-clear>クリア</button><a href="{{ route('projects.improvements.edit', [$project, $improvement]) }}">個別編集</a></div>
+                                </div>
+                            @endforeach
+                        </section>
+                    @endif
+                    <div class="actions"><button type="submit">工数を一括保存</button><button type="button" class="secondary" data-effort-editor-close>閉じる</button></div>
+                </form>
+            @endif
         </div>
 
         <div class="focus-project">
@@ -1038,6 +1106,57 @@
                 url.searchParams.set('include_today', toggle.checked ? '1' : '0');
                 window.location.assign(url);
             });
+        })();
+
+        (() => {
+            const editor = document.querySelector('[data-effort-editor]');
+            const toggle = document.querySelector('[data-effort-editor-toggle]');
+            if (!editor || !toggle) return;
+            const inputs = [...editor.querySelectorAll('[data-effort-input]')];
+            const filter = editor.querySelector('[data-effort-unset-filter]');
+            const format = value => Number(value.toFixed(2)).toString();
+
+            const render = () => {
+                let total = 0;
+                let earned = 0;
+                let missing = 0;
+                editor.querySelectorAll('[data-effort-row]').forEach(row => {
+                    const input = row.querySelector('[data-effort-input]');
+                    const value = input.value === '' ? null : Number(input.value);
+                    if (value === null || Number.isNaN(value)) missing += 1;
+                    else {
+                        total += value;
+                        earned += value * (Number(row.dataset.progress || 0) / 100);
+                    }
+                    row.classList.toggle('is-filtered', Boolean(filter?.checked) && value !== null && !Number.isNaN(value));
+                });
+                editor.querySelector('[data-effort-total]').textContent = format(total);
+                editor.querySelector('[data-effort-earned]').textContent = format(earned);
+                editor.querySelector('[data-effort-missing]').textContent = String(missing);
+            };
+
+            const setOpen = open => {
+                editor.classList.toggle('is-open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) {
+                    render();
+                    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            };
+            toggle.addEventListener('click', () => setOpen(!editor.classList.contains('is-open')));
+            editor.querySelector('[data-effort-editor-close]')?.addEventListener('click', () => setOpen(false));
+            inputs.forEach(input => input.addEventListener('input', render));
+            filter?.addEventListener('change', render);
+            editor.addEventListener('click', event => {
+                const row = event.target.closest('[data-effort-row]');
+                if (!row) return;
+                const input = row.querySelector('[data-effort-input]');
+                const preset = event.target.closest('[data-effort-preset]');
+                if (preset) input.value = preset.dataset.effortPreset;
+                if (event.target.closest('[data-effort-clear]')) input.value = '';
+                if (preset || event.target.closest('[data-effort-clear]')) render();
+            });
+            render();
         })();
 
         (() => {
