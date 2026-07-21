@@ -447,7 +447,11 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-overview-count="6"', false)
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
+            ->assertSee('<div class="task-detail">', false)
             ->assertSee('<div class="task-list-title">タスク</div>', false)
+            ->assertSee('border-left:5px solid var(--blue)', false)
+            ->assertSee('border-left:5px solid var(--green)', false)
+            ->assertSee('border-left:5px solid var(--red)', false)
             ->assertSee('background:#f8fafb; text-align:center;', false)
             ->assertSee('text-align:left; font-weight:800;', false)
             ->assertSeeInOrder([
