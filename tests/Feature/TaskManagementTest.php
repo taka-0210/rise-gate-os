@@ -450,6 +450,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('<div class="task-detail">', false)
             ->assertSee('<div class="task-list-title">タスク</div>', false)
             ->assertSee('border-left:5px solid var(--blue)', false)
+            ->assertSee('border-radius:0 8px 8px 0', false)
             ->assertSee('border-left:5px solid var(--green)', false)
             ->assertSee('border-left:5px solid var(--red)', false)
             ->assertSee('background:#f8fafb; text-align:center;', false)

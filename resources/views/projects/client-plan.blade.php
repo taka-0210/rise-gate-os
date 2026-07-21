@@ -80,7 +80,7 @@
         .schedule-bar.task { background:var(--red); }
         .legend { display:flex; justify-content:flex-end; gap:12px; margin:0 0 8px; color:var(--muted); font-size:11px; }
         .legend span::before { content:""; display:inline-block; width:18px; height:7px; margin-right:5px; border-radius:999px; background:var(--color); }
-        .roadmap-detail { margin-bottom:18px; padding:16px; border:1px solid #c8d9ed; border-left:5px solid var(--blue); border-radius:8px; break-inside:avoid; }
+        .roadmap-detail { margin-bottom:18px; padding:16px; border:1px solid #c8d9ed; border-left:5px solid var(--blue); border-radius:0 8px 8px 0; break-inside:avoid; }
         .improvement-detail { margin-top:12px; padding:12px 14px; border-left:5px solid var(--green); background:#f5faf7; break-inside:avoid; }
         .task-detail { margin-top:14px; padding-left:14px; border-left:5px solid var(--red); }
         .task-list-title { margin:0 0 5px; color:var(--ink); text-align:left; font-weight:800; }
