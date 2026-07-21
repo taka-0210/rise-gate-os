@@ -448,6 +448,8 @@ class TaskManagementTest extends TestCase
             ->assertSee($task->improvement->title)
             ->assertSee($task->title)
             ->assertSee('<div class="task-list-title">タスク</div>', false)
+            ->assertSee('background:#f8fafb; text-align:center;', false)
+            ->assertSee('text-align:left; font-weight:800;', false)
             ->assertSeeInOrder([
                 '1. 現状と目指す未来のカタチ',
                 '2. プロジェクト概要',

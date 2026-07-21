@@ -55,7 +55,7 @@
         .vision-card h3 { color:var(--navy); font-size:21px; }
         .vision-card p { margin-top:18px; color:#394a55; font-size:16px; white-space:pre-line; }
         .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0 28px; }
-        .stat { padding:16px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; }
+        .stat { padding:16px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; text-align:center; }
         .stat strong { display:block; color:var(--navy); font-size:30px; }
         .roadmap-overview { display:grid; gap:11px; }
         .roadmap-overview article { padding:14px 16px; border-left:6px solid var(--blue); background:#f5f8fc; break-inside:avoid; }
@@ -82,7 +82,7 @@
         .legend span::before { content:""; display:inline-block; width:18px; height:7px; margin-right:5px; border-radius:999px; background:var(--color); }
         .roadmap-detail { margin-bottom:18px; padding:16px; border:1px solid #c8d9ed; border-radius:8px; break-inside:avoid; }
         .improvement-detail { margin-top:12px; padding:12px 14px; border-left:5px solid var(--green); background:#f5faf7; break-inside:avoid; }
-        .task-list-title { margin:14px 0 5px; color:var(--ink); text-align:center; font-weight:800; }
+        .task-list-title { margin:14px 0 5px; color:var(--ink); text-align:left; font-weight:800; }
         .task-list { margin:9px 0 0; padding-left:22px; }
         .task-list li { margin:6px 0; }
         .status { display:inline-flex; margin-left:6px; padding:2px 7px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:10px; }
