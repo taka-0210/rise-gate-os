@@ -53,8 +53,11 @@ class WorkspaceBusinessProfileTest extends TestCase
         Storage::fake('local');
         [$user, $workspace] = $this->workspace('owner');
         $profile = $workspace->businessProfile()->create([
-            'legal_name' => '株式会社ライズアップ',
+            'legal_name' => '株式会社 ライズゲート',
             'trade_name' => 'RISE GATE',
+            'postal_code' => '000-0000',
+            'address_line1' => '表示しない住所',
+            'phone' => '000-0000-0000',
             'logo_path' => 'workspace-business/test/logo.png',
             'logo_original_name' => 'logo.png',
         ]);
@@ -73,9 +76,11 @@ class WorkspaceBusinessProfileTest extends TestCase
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id, 'access_mode' => 'workspace'])
             ->get(route('projects.client-plan', $project))
             ->assertOk()
-            ->assertSee('RISE GATE')
+            ->assertSee('株式会社 ライズゲート')
             ->assertSee('class="issuer-block"', false)
-            ->assertSee(route('projects.business-media', [$project, 'logo']), false);
+            ->assertSee(route('projects.business-media', [$project, 'logo']), false)
+            ->assertDontSee('表示しない住所')
+            ->assertDontSee('000-0000-0000');
 
     }
 

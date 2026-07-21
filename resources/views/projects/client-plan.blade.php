@@ -36,8 +36,7 @@
         .cover-bottom { display:grid; grid-template-columns:minmax(0,1fr) 78mm; gap:20mm; align-items:end; padding-top:12px; border-top:1px solid var(--line); }
         .issuer-block { width:78mm; justify-self:end; text-align:right; }
         .logo { display:block; width:205px; height:auto; max-height:38mm; margin-left:auto; object-fit:contain; object-position:right center; }
-        .issuer-name { color:var(--navy); font-size:23px; font-weight:900; }
-        .issuer-details { margin-top:8px; color:var(--muted); font-size:12px; line-height:1.6; }
+        .issuer-company { margin-top:9px; color:var(--navy); font-size:15px; font-weight:800; }
         .eyebrow { color:var(--blue); font-weight:800; letter-spacing:.12em; }
         h1 { margin:8px 0 12px; font-size:38px; line-height:1.25; }
         h2 { margin:0 0 18px; padding-bottom:9px; border-bottom:2px solid var(--navy); font-size:24px; }
@@ -130,6 +129,7 @@
     $relativeSchedule = !$project->start_date && (int)$project->duration_days > 0;
     $relativeOrigin = collect()->concat($roadmaps->pluck('planned_start_date'))->concat($visibleImprovements->pluck('planned_start_date'))->concat($visibleTasks->pluck('planned_start_date'))->filter()->min();
     $relativeDay = fn($day,$date) => $day ?: ($relativeOrigin && $date ? $relativeOrigin->diffInDays($date)+1 : null);
+    $roadmapDisplayTitle = fn($title) => preg_replace('/^\s*\d+\s*[.．、:：]\s*/u', '', (string) $title);
     $detailPeriod = function ($startDay, $endDay, $startDate, $endDate) use ($relativeSchedule, $relativeDay) {
         if ($relativeSchedule) {
             $start = $relativeDay($startDay, $startDate);
@@ -208,16 +208,8 @@
             <aside class="issuer-block">
                 @if($businessProfile?->logo_path)
                     <img class="logo" src="{{ route('projects.business-media', [$project,'logo']) }}" alt="{{ $issuerName }}">
-                @else
-                    <div class="issuer-name">{{ $issuerName }}</div>
                 @endif
-                @if($businessProfile)
-                    <div class="issuer-details">
-                        @if($businessProfile->legal_name && $businessProfile->legal_name !== $issuerName)<div>{{ $businessProfile->legal_name }}</div>@endif
-                        @if($businessProfile->postal_code || $businessProfile->address_line1)<div>〒{{ $businessProfile->postal_code }} {{ $businessProfile->address_line1 }} {{ $businessProfile->address_line2 }}</div>@endif
-                        @if($businessProfile->phone)<div>TEL {{ $businessProfile->phone }}</div>@endif
-                    </div>
-                @endif
+                <div class="issuer-company">{{ $businessProfile?->legal_name ?: $issuerName }}</div>
             </aside>
         </div>
     </section>
@@ -251,7 +243,7 @@
             <div class="roadmap-overview">
                 @foreach($overviewChunk as $roadmap)
                     <article>
-                        <h3>{{ $roadmaps->search(fn($item)=>$item->id===$roadmap->id)+1 }}. {{ $roadmap->title }}</h3>
+                        <h3>{{ $roadmaps->search(fn($item)=>$item->id===$roadmap->id)+1 }}. {{ $roadmapDisplayTitle($roadmap->title) }}</h3>
                         @if($roadmap->purpose)<p>{{ $roadmap->purpose }}</p>@endif
                         <div class="period">予定：{{ $relativeSchedule ? (($roadmap->planned_start_day ? $roadmap->planned_start_day.'日目' : '未設定').' 〜 '.($roadmap->target_day ? $roadmap->target_day.'日目' : '未設定')) : (($roadmap->planned_start_date?->format('Y/n/j') ?? '未設定').' 〜 '.($roadmap->target_date?->format('Y/n/j') ?? '未設定')) }} / 取り組み {{ $roadmap->improvements->count() }}件</div>
                     </article>
@@ -266,7 +258,7 @@
         <h2>3. 取り組み、タスク詳細</h2>
         @forelse($roadmaps as $roadmap)
             <article class="roadmap-detail">
-                <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmap->title }} @if($showProgress)<span class="status">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span>@endif</h3>
+                <h3>ロードマップ {{ $loop->iteration }}：{{ $roadmapDisplayTitle($roadmap->title) }} @if($showProgress)<span class="status">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span>@endif</h3>
                 @if($roadmap->purpose)<p>{{ $roadmap->purpose }}</p>@endif
                 <div class="period">{{ $detailPeriod($roadmap->planned_start_day, $roadmap->target_day, $roadmap->planned_start_date, $roadmap->target_date) }}</div>
                 @foreach($roadmap->improvements as $improvement)

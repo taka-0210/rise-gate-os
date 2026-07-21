@@ -465,6 +465,7 @@ class TaskManagementTest extends TestCase
         $project->update(['start_date' => null, 'due_date' => null, 'duration_days' => 30]);
         $task = $this->createTask($project, $owner);
         $task->improvement->roadmap->update([
+            'title' => '1. Current analysis',
             'planned_start_date' => null,
             'target_date' => null,
             'planned_start_day' => 2,
@@ -491,6 +492,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('2～20日目')
             ->assertSee('3～18日目')
             ->assertDontSee('4～12日目')
+            ->assertDontSee('1. 1. Current analysis')
+            ->assertDontSee('ロードマップ 1：1. Current analysis')
             ->assertDontSee('未設定 〜 未設定');
     }
 
