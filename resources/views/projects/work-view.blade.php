@@ -122,6 +122,11 @@
         .time-legend .is-overdue { background:#c58a22; box-shadow:inset 0 0 0 1px #8d6117; }
         .time-legend .is-reached { height:14px; background:#fff; border:2px solid #245ca6; }
         .time-chart-scroll { overflow-x:auto; padding-bottom:8px; }
+        .time-effort-actions { display:flex; align-items:stretch; gap:10px; flex:0 0 auto; }
+        .time-effort-current { display:grid; align-content:center; min-width:150px; padding:9px 14px; border:1px solid #b8d9c8; border-radius:9px; background:#f6fcf8; text-align:center; }
+        .time-effort-current strong { color:#16704b; font-size:22px; line-height:1.15; }
+        .time-effort-current span { color:var(--muted); font-size:11px; }
+        .time-effort-current small { margin-top:2px; color:#a46116; font-size:10px; }
         .effort-editor-toggle { flex:0 0 auto; }
         .effort-editor { display:none; margin-top:18px; padding:18px; border:2px solid #56a27e; border-radius:10px; background:#f6fcf8; }
         .effort-editor.is-open { display:grid; gap:16px; }
@@ -137,7 +142,7 @@
         .effort-input input { min-width:0; }
         .effort-presets { display:flex; flex-wrap:wrap; gap:5px; }
         .effort-presets button { padding:5px 7px; border:1px solid var(--line); background:#fff; color:var(--accent-dark); font-size:11px; }
-        @media (max-width:700px) { .effort-summary { grid-template-columns:1fr; } .effort-row { grid-template-columns:1fr; } }
+        @media (max-width:700px) { .time-layer-head { display:grid; } .time-effort-actions { width:100%; } .time-effort-current,.effort-editor-toggle { flex:1 1 0; } .effort-summary { grid-template-columns:1fr; } .effort-row { grid-template-columns:1fr; } }
         .time-chart { min-width:820px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
         .time-axis,.time-row { display:grid; grid-template-columns:260px minmax(540px,1fr); }
         .time-axis { position:sticky; top:0; z-index:3; background:#f8fafb; border-bottom:1px solid var(--line); }
@@ -528,9 +533,21 @@
                     <h1>{{ $project->name }}</h1>
                     <p>ROADMAP・取り組み・TASKを、ひとつの時間軸で確認します。</p>
                 </div>
-                @if($canCreateImprovement)
-                    <button type="button" class="secondary effort-editor-toggle" data-effort-editor-toggle aria-expanded="{{ request()->boolean('effort_editor') || $errors->has('efforts') || $errors->has('efforts.*') ? 'true' : 'false' }}">工数を一括入力</button>
-                @endif
+                @php
+                    $timePlannedEffortDays = (float) $allImprovements->sum(fn ($improvement) => (float) ($improvement->planned_effort_days ?? 0));
+                    $timeUnsetEffortCount = $allImprovements->whereNull('planned_effort_days')->count();
+                    $timeFormatEffort = fn (float $value) => rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+                @endphp
+                <div class="time-effort-actions">
+                    <div class="time-effort-current" aria-label="現在の予定工数">
+                        <strong>{{ $timeFormatEffort($timePlannedEffortDays) }}人日</strong>
+                        <span>現在の予定工数</span>
+                        @if($timeUnsetEffortCount > 0)<small>未設定 {{ $timeUnsetEffortCount }}件</small>@endif
+                    </div>
+                    @if($canCreateImprovement)
+                        <button type="button" class="secondary effort-editor-toggle" data-effort-editor-toggle aria-expanded="{{ request()->boolean('effort_editor') || $errors->has('efforts') || $errors->has('efforts.*') ? 'true' : 'false' }}">工数を一括入力</button>
+                    @endif
+                </div>
             </div>
             @php
                 $scheduleStageLabels = ['project' => '1. プロジェクト期間', 'roadmap' => '2. ロードマップ期間', 'improvement' => '3. 取り組み期間', 'task' => '4. タスク期間', 'all' => '5. 全体確認'];

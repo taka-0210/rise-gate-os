@@ -122,12 +122,15 @@ class TaskManagementTest extends TestCase
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $task = $this->createTask($project, $owner);
         $improvement = $task->improvement;
+        $improvement->update(['planned_effort_days' => 4.5]);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
             ->assertOk()
             ->assertSee('工数を一括入力')
+            ->assertSee('4.5人日')
+            ->assertSee('現在の予定工数')
             ->assertSee('data-effort-editor', false)
             ->assertSee('name="efforts['.$improvement->id.']"', false)
             ->assertSee('未設定のみ表示');
