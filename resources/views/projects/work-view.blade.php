@@ -253,13 +253,15 @@
             'descendant_count' => $projectDescendantCount,
         ]);
         $timelineRoadmaps = $roadmaps->sortBy(fn ($roadmap) => [
-            $roadmap->planned_start_date?->timestamp ?? PHP_INT_MAX,
+            $isRelativeTimeline ? ($roadmap->planned_start_day ?? PHP_INT_MAX) : ($roadmap->planned_start_date?->timestamp ?? PHP_INT_MAX),
+            $isRelativeTimeline ? ($roadmap->target_day ?? PHP_INT_MAX) : ($roadmap->target_date?->timestamp ?? PHP_INT_MAX),
             $roadmap->sort_order ?? PHP_INT_MAX,
             $roadmap->id,
         ])->values();
         foreach ($timelineRoadmaps as $roadmap) {
             $timelineImprovements = $roadmap->improvements->sortBy(fn ($improvement) => [
-                $improvement->planned_start_date?->timestamp ?? PHP_INT_MAX,
+                $isRelativeTimeline ? ($improvement->planned_start_day ?? PHP_INT_MAX) : ($improvement->planned_start_date?->timestamp ?? PHP_INT_MAX),
+                $isRelativeTimeline ? ($improvement->target_day ?? PHP_INT_MAX) : ($improvement->target_date?->timestamp ?? PHP_INT_MAX),
                 $improvement->roadmap_sort_order ?? PHP_INT_MAX,
                 $improvement->id,
             ])->values();
@@ -281,7 +283,8 @@
                 $improvementDescendantCount = $improvement->tasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
                 $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => !$isRelativeTimeline && $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id]), 'descendant_count' => $improvementDescendantCount]);
                 $timelineTasks = $improvement->tasks->sortBy(fn ($task) => [
-                    $task->due_date?->timestamp ?? PHP_INT_MAX,
+                    $isRelativeTimeline ? ($task->planned_start_day ?? PHP_INT_MAX) : ($task->planned_start_date?->timestamp ?? PHP_INT_MAX),
+                    $isRelativeTimeline ? ($task->due_day ?? PHP_INT_MAX) : ($task->due_date?->timestamp ?? PHP_INT_MAX),
                     $task->id,
                 ])->values();
                 foreach ($timelineTasks as $task) {

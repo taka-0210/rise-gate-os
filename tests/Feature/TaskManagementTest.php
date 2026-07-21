@@ -368,16 +368,20 @@ class TaskManagementTest extends TestCase
             'proposed_by' => $owner->id,
         ]);
 
-        foreach ([
-            route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all']),
-            route('projects.client-plan', $project),
-        ] as $url) {
-            $this->actingAs($owner)
-                ->withSession(['current_workspace_id' => $workspace->id])
-                ->get($url)
-                ->assertOk()
-                ->assertSeeInOrder(['Migration first', 'General test later']);
-        }
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all']))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'data-time-row-title="Migration first"',
+                'data-time-row-title="General test later"',
+            ], false);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.client-plan', $project))
+            ->assertOk()
+            ->assertSeeInOrder(['Migration first', 'General test later']);
     }
 
     public function test_project_member_can_preview_a_client_facing_project_plan(): void
