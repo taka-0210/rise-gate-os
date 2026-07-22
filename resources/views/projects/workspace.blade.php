@@ -21,6 +21,16 @@
     .explorer-tab { padding:14px 10px; border:0; border-radius:0; color:#526771; background:transparent; font-size:14px; font-weight:800; }
     .explorer-tab.is-current { color:#173f4a; background:#fff; box-shadow:inset 0 -2px #4f8994; }
     .workbench-main { background:#fff; }
+    .workspace-tabs { position:sticky; top:0; z-index:5; display:flex; gap:2px; min-height:42px; padding:5px 7px 0; overflow-x:auto; border-bottom:1px solid var(--wb-line); background:#f5f8f9; scrollbar-width:thin; }
+    .workspace-tab { flex:0 0 auto; gap:7px; max-width:230px; padding:8px 10px; border:1px solid transparent; border-bottom:0; border-radius:6px 6px 0 0; color:#61737c; background:transparent; font-size:11px; font-weight:700; }
+    .workspace-tab.is-current { color:#183f4a; border-color:var(--wb-line); background:#fff; }
+    .workspace-tab__label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .workspace-tab__close { color:#819099; font-size:14px; line-height:1; }
+    .workspace-tab--roadmap { box-shadow:inset 0 3px #75a7ca; }
+    .workspace-tab--improvement { box-shadow:inset 0 3px #79b493; }
+    .workspace-tab--task { box-shadow:inset 0 3px #cb8d89; }
+    .workspace-tab--file { box-shadow:inset 0 3px #98a7af; }
+    .workspace-tab--browser { box-shadow:inset 0 3px #60abb6; }
     .workbench-ai { border-left:1px solid var(--wb-line); background:#fafcfc; }
     .pane-resizer { position:absolute; z-index:8; top:0; bottom:0; width:9px; padding:0; border:0; border-radius:0; background:transparent; cursor:col-resize; transform:translateX(-50%); touch-action:none; }
     .pane-resizer::after { content:""; position:absolute; top:0; bottom:0; left:4px; width:1px; background:transparent; }
@@ -53,6 +63,9 @@
     .tree-item--task { border-left:3px solid #cb8d89; color:#704340; background:#f5e3e2; }
     .tree-item--task .tree-icon { color:#aa6662; }
     .tree-item--task:hover, .tree-item--task.is-current { color:#613733; background:#efd2d0; }
+    .tree-item[draggable="true"] { cursor:grab; }
+    .tree-item.is-dragging { opacity:.45; }
+    .tree-item.is-drop-target { outline:2px solid #69a0aa; outline-offset:-2px; }
     .file-repository { padding:11px 12px; border-bottom:1px solid var(--wb-line); color:#40545e; background:#fff; font-size:12px; font-weight:800; }
     .file-repository span { display:block; margin-top:2px; color:#7b8b93; font-size:10px; font-weight:500; }
     .file-item { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; }
@@ -138,7 +151,7 @@
     }
 </style>
 
-<section class="company-workbench" data-workbench>
+<section class="company-workbench" data-workbench data-order-url="{{ route('projects.workspace.order', $project) }}">
     <header class="workbench-bar">
         <div class="workbench-bar__identity">
             <span class="workbench-mode">3ペイン表示</span>
@@ -167,13 +180,13 @@
                     <div class="tree-group">
                         <div class="tree-group__label">Roadmaps</div>
                         @forelse($roadmaps as $roadmap)
-                            <button class="tree-item tree-item--roadmap" type="button" data-document="roadmap-{{ $roadmap->id }}" data-tree-toggle="roadmap-{{ $roadmap->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $roadmap->title }}<span class="tree-count">{{ $roadmap->improvements->count() }}</span></button>
+                            <button class="tree-item tree-item--roadmap" type="button" @can('update',$roadmap) draggable="true" @endcan data-reorder-type="roadmap" data-reorder-id="{{ $roadmap->id }}" data-reorder-parent="project" data-document="roadmap-{{ $roadmap->id }}" data-tree-toggle="roadmap-{{ $roadmap->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $roadmap->title }}<span class="tree-count">{{ $roadmap->improvements->count() }}</span></button>
                             <div class="tree-branch" data-tree-branch="roadmap-{{ $roadmap->id }}" hidden>
                                 @foreach($roadmap->improvements as $improvement)
-                                    <button class="tree-item tree-item--grandchild tree-item--improvement" type="button" data-document="improvement-{{ $improvement->id }}" data-tree-toggle="improvement-{{ $improvement->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $improvement->title }}<span class="tree-count">{{ $improvement->tasks->count() }}</span></button>
+                                    <button class="tree-item tree-item--grandchild tree-item--improvement" type="button" @can('update',$improvement) draggable="true" @endcan data-reorder-type="improvement" data-reorder-id="{{ $improvement->id }}" data-reorder-parent="{{ $roadmap->id }}" data-document="improvement-{{ $improvement->id }}" data-tree-toggle="improvement-{{ $improvement->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $improvement->title }}<span class="tree-count">{{ $improvement->tasks->count() }}</span></button>
                                     <div class="tree-branch" data-tree-branch="improvement-{{ $improvement->id }}" hidden>
                                         @foreach($improvement->tasks as $task)
-                                            <button class="tree-item tree-item--task-child tree-item--task" type="button" data-document="task-{{ $task->id }}"><span class="tree-icon">✓</span>{{ $task->title }}</button>
+                                            <button class="tree-item tree-item--task-child tree-item--task" type="button" @can('update',$task) draggable="true" @endcan data-reorder-type="task" data-reorder-id="{{ $task->id }}" data-reorder-parent="{{ $improvement->id }}" data-document="task-{{ $task->id }}"><span class="tree-icon">✓</span>{{ $task->title }}</button>
                                         @endforeach
                                     </div>
                                 @endforeach
@@ -210,6 +223,7 @@
         <button class="pane-resizer pane-resizer--explorer" type="button" data-pane-resizer="explorer" aria-label="WORKとFILESの幅を変更"></button>
 
         <section class="workbench-pane workbench-main is-mobile-current" data-pane="main">
+            <div class="workspace-tabs" data-workspace-tabs><button class="workspace-tab is-current" type="button" data-workspace-tab="project" data-tab-kind="document" data-tab-key="project"><span class="workspace-tab__label">Project Overview</span></button></div>
             <div class="viewer-panel is-current" data-viewer-panel="document">
             <article class="workbench-document is-current" data-document-panel="project">
                 <div class="document-kicker">Project Overview</div>
@@ -435,6 +449,33 @@
     const showViewer = name => {
         workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
     };
+    const tabs = workbench.querySelector('[data-workspace-tabs]');
+    const tabType = key => key.startsWith('roadmap-') ? 'roadmap' : key.startsWith('improvement-') ? 'improvement' : key.startsWith('task-') ? 'task' : 'document';
+    const ensureTab = ({id, kind, key, label, content = '', url = ''}) => {
+        let tab = tabs.querySelector(`[data-workspace-tab="${CSS.escape(id)}"]`);
+        if (!tab) {
+            tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = `workspace-tab workspace-tab--${kind === 'document' ? tabType(key) : kind}`;
+            tab.dataset.workspaceTab = id;
+            tab.dataset.tabKind = kind;
+            tab.dataset.tabKey = key;
+            tab.dataset.tabContent = content;
+            tab.dataset.tabUrl = url;
+            const labelNode = document.createElement('span');
+            labelNode.className = 'workspace-tab__label';
+            labelNode.textContent = label;
+            const close = document.createElement('span');
+            close.className = 'workspace-tab__close';
+            close.dataset.closeWorkspaceTab = id;
+            close.textContent = '×';
+            tab.append(labelNode, close);
+            tabs.append(tab);
+        }
+        tabs.querySelectorAll('[data-workspace-tab]').forEach(item => item.classList.toggle('is-current', item === tab));
+        tab.scrollIntoView({inline:'nearest', block:'nearest'});
+        return tab;
+    };
     const openDocument = key => {
         const panel = workbench.querySelector(`[data-document-panel="${CSS.escape(key)}"]`);
         if (!panel) return;
@@ -446,6 +487,7 @@
         workbench.querySelector('[data-ai-context]').textContent = contextLabel;
         workbench.querySelector('[data-chat-context-key]').value = key;
         workbench.querySelector('[data-chat-context-label]').value = contextLabel;
+        ensureTab({id:key, kind:'document', key, label:title});
         showViewer('document');
         workbench.querySelector('[data-pane="main"]').scrollTop = 0;
         if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
@@ -457,6 +499,35 @@
     workbench.addEventListener('click', event => {
         const documentButton = event.target.closest('[data-document]');
         if (documentButton) openDocument(documentButton.dataset.document);
+        const closeTab = event.target.closest('[data-close-workspace-tab]');
+        if (closeTab) {
+            event.stopPropagation();
+            const tab = closeTab.closest('[data-workspace-tab]');
+            const wasCurrent = tab.classList.contains('is-current');
+            const next = tab.previousElementSibling || tab.nextElementSibling;
+            tab.remove();
+            if (wasCurrent) next?.click();
+            return;
+        }
+        const workspaceTab = event.target.closest('[data-workspace-tab]');
+        if (workspaceTab && !event.target.closest('[data-close-workspace-tab]')) {
+            const kind = workspaceTab.dataset.tabKind;
+            if (kind === 'document') openDocument(workspaceTab.dataset.tabKey);
+            else {
+                ensureTab({id:workspaceTab.dataset.workspaceTab, kind, key:workspaceTab.dataset.tabKey, label:workspaceTab.querySelector('.workspace-tab__label').textContent, content:workspaceTab.dataset.tabContent, url:workspaceTab.dataset.tabUrl});
+                if (kind === 'browser') {
+                    const frame = workbench.querySelector('[data-browser-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('browser');
+                } else {
+                    workbench.querySelector('[data-file-title]').textContent = workspaceTab.dataset.tabKey;
+                    workbench.querySelector('[data-file-content]').textContent = workspaceTab.dataset.tabContent;
+                    showViewer('file');
+                }
+                const contextLabel = `${@json($project->name)} / File / ${workspaceTab.dataset.tabKey}`;
+                workbench.querySelector('[data-ai-context]').textContent = contextLabel;
+                workbench.querySelector('[data-chat-context-key]').value = `file:${workspaceTab.dataset.tabKey}`;
+                workbench.querySelector('[data-chat-context-label]').value = contextLabel;
+            }
+        }
         const paneButton = event.target.closest('[data-mobile-pane]');
         if (paneButton) showMobilePane(paneButton.dataset.mobilePane);
         const explorerTab = event.target.closest('[data-explorer-tab]');
@@ -493,6 +564,7 @@
             workbench.querySelector('[data-file-title]').textContent = fileButton.dataset.fileName;
             workbench.querySelector('[data-file-content]').textContent = fileButton.dataset.fileCopy;
             const opensInBrowser = fileButton.dataset.fileView === 'browser' || /(^|\/)index\.html?$/i.test(fileButton.dataset.fileName);
+            ensureTab({id:`file:${fileButton.dataset.fileName}`, kind:opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:fileButton.dataset.previewUrl || ''});
             if (opensInBrowser) {
                 const frame = workbench.querySelector('[data-browser-frame]');
                 frame.src = fileButton.dataset.previewUrl;
@@ -515,6 +587,52 @@
             const text = document.getElementById('workspace-ai-copy')?.value || '';
             navigator.clipboard.writeText(text).then(() => workbench.querySelector('[data-copy-result]').textContent = 'コピーしました');
         }
+    });
+
+    let draggedTreeItem = null;
+    workbench.addEventListener('dragstart', event => {
+        const item = event.target.closest('[data-reorder-type]');
+        if (!item) return;
+        draggedTreeItem = item;
+        item.classList.add('is-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+    });
+    workbench.addEventListener('dragover', event => {
+        const target = event.target.closest('[data-reorder-type]');
+        if (!draggedTreeItem || !target || target === draggedTreeItem) return;
+        if (target.dataset.reorderType !== draggedTreeItem.dataset.reorderType || target.dataset.reorderParent !== draggedTreeItem.dataset.reorderParent) return;
+        event.preventDefault();
+        target.classList.add('is-drop-target');
+    });
+    workbench.addEventListener('dragleave', event => event.target.closest('[data-reorder-type]')?.classList.remove('is-drop-target'));
+    workbench.addEventListener('drop', async event => {
+        const target = event.target.closest('[data-reorder-type]');
+        workbench.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
+        if (!draggedTreeItem || !target || target === draggedTreeItem) return;
+        if (target.dataset.reorderType !== draggedTreeItem.dataset.reorderType || target.dataset.reorderParent !== draggedTreeItem.dataset.reorderParent) return;
+        event.preventDefault();
+        const branch = draggedTreeItem.nextElementSibling?.classList.contains('tree-branch') ? draggedTreeItem.nextElementSibling : null;
+        target.before(draggedTreeItem);
+        if (branch) draggedTreeItem.after(branch);
+        const type = draggedTreeItem.dataset.reorderType;
+        const parent = draggedTreeItem.dataset.reorderParent;
+        const ids = [...workbench.querySelectorAll(`[data-reorder-type="${type}"][data-reorder-parent="${CSS.escape(parent)}"]`)].map(item => Number(item.dataset.reorderId));
+        try {
+            const response = await fetch(workbench.dataset.orderUrl, {
+                method:'PATCH',
+                headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
+                body:JSON.stringify({type, parent_id:parent === 'project' ? null : Number(parent), ids}),
+            });
+            if (!response.ok) throw new Error((await response.json()).message || '表示順を保存できませんでした。');
+        } catch (error) {
+            alert(error.message);
+            window.location.reload();
+        }
+    });
+    workbench.addEventListener('dragend', () => {
+        draggedTreeItem?.classList.remove('is-dragging');
+        workbench.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
+        draggedTreeItem = null;
     });
 
     workbench.querySelectorAll('[data-workspace-form]').forEach(form => {

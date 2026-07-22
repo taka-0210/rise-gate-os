@@ -347,6 +347,11 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-pane-resizer="explorer"', false)
             ->assertSee('data-pane-resizer="ai"', false)
             ->assertSee('data-workspace-form', false)
+            ->assertSee('data-workspace-tabs', false)
+            ->assertSee('data-reorder-type="roadmap"', false)
+            ->assertSee('data-reorder-type="improvement"', false)
+            ->assertSee('data-reorder-type="task"', false)
+            ->assertSee(route('projects.workspace.order', $project), false)
             ->assertSee('data-inline-editor="improvement-edit-'.$task->improvement_id.'"', false)
             ->assertSee('data-inline-editor="roadmap-edit-'.$roadmap->id.'"', false)
             ->assertSee('data-inline-editor="task-create-'.$task->improvement_id.'"', false)
@@ -357,6 +362,40 @@ class TaskManagementTest extends TestCase
             ->assertSee('tree-item--roadmap', false)
             ->assertSee('tree-item--improvement', false)
             ->assertSee('tree-item--task', false);
+    }
+
+    public function test_workspace_reorders_tasks_within_the_same_improvement_without_changing_schedule(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $first = $this->createTask($project, $owner);
+        $first->update(['sort_order' => 1, 'planned_start_day' => 3, 'due_day' => 5]);
+        $second = Task::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'improvement_id' => $first->improvement_id,
+            'title' => '並び替えるTask',
+            'status' => Task::STATUS_TODO,
+            'priority' => Task::PRIORITY_NORMAL,
+            'created_by' => $owner->id,
+            'sort_order' => 2,
+            'planned_start_day' => 6,
+            'due_day' => 8,
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.workspace.order', $project), [
+                'type' => 'task',
+                'parent_id' => $first->improvement_id,
+                'ids' => [$second->id, $first->id],
+            ])
+            ->assertOk();
+
+        $this->assertSame(2, $first->fresh()->sort_order);
+        $this->assertSame(1, $second->fresh()->sort_order);
+        $this->assertSame(3, $first->fresh()->planned_start_day);
+        $this->assertSame(8, $second->fresh()->due_day);
     }
 
     public function test_time_view_only_marks_started_overdue_tasks_as_delayed(): void

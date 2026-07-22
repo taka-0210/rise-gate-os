@@ -71,11 +71,13 @@ class TaskController extends Controller
         Gate::authorize('view', $project);
         Gate::authorize('create', [Task::class, $project]);
 
-        Task::create($this->validateTask($request, $project) + [
+        $validated = $this->validateTask($request, $project);
+        Task::create($validated + [
             'organization_id' => $project->organization_id,
             'workspace_id' => $project->owning_workspace_id,
             'project_id' => $project->id,
             'created_by' => $request->user()->id,
+            'sort_order' => (int) Task::where('improvement_id', $validated['improvement_id'])->max('sort_order') + 1,
         ]);
 
         return redirect()->route('projects.show', $project)->with('status', 'Task created.');

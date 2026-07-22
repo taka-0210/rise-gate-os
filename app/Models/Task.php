@@ -28,6 +28,7 @@ class Task extends Model
         'workspace_id',
         'project_id',
         'improvement_id',
+        'sort_order',
         'title',
         'description',
         'status',
@@ -55,6 +56,7 @@ class Task extends Model
             'due_date' => 'date',
             'planned_start_day' => 'integer',
             'due_day' => 'integer',
+            'sort_order' => 'integer',
             'completed_at' => 'datetime',
         ];
     }

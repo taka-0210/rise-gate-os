@@ -412,6 +412,12 @@ class ProjectController extends Controller
     public function workspace(Request $request, Project $project): View
     {
         $data = $this->show($request, $project)->getData();
+        $data['roadmaps'] = $data['roadmaps']->sortBy([['sort_order', 'asc'], ['id', 'asc']])->values();
+        $data['roadmaps']->each(function ($roadmap): void {
+            $improvements = $roadmap->improvements->sortBy([['roadmap_sort_order', 'asc'], ['id', 'asc']])->values();
+            $improvements->each(fn ($improvement) => $improvement->setRelation('tasks', $improvement->tasks->sortBy([['sort_order', 'asc'], ['id', 'asc']])->values()));
+            $roadmap->setRelation('improvements', $improvements);
+        });
         $thread = AiChatThread::query()
             ->where('project_id', $project->id)
             ->where('user_id', $request->user()->id)
