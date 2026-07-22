@@ -73,6 +73,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
 
     Route::middleware(['workspace-mode', 'workspace'])->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
+        Route::view('/development-guide', 'guides.development')->name('development-guide');
         Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
         Route::get('/estimates', [EstimateController::class, 'index'])->name('estimates.index');
         Route::get('/projects/{project}/estimates/create', [EstimateController::class, 'create'])->name('projects.estimates.create');
