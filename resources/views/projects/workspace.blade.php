@@ -58,6 +58,26 @@
     .ai-history article { padding:10px; border:1px solid var(--wb-line); border-radius:7px; }
     .ai-history strong { display:block; font-size:12px; }
     .ai-history .meta { font-size:10px; }
+    .ai-chat-summary { display:flex; align-items:center; justify-content:space-between; gap:10px; color:#647680; font-size:10px; }
+    .ai-chat-status { display:inline-flex; align-items:center; gap:6px; }
+    .ai-chat-status::before { content:""; width:7px; height:7px; border-radius:50%; background:#43a690; }
+    .ai-chat-status.is-off::before { background:#b37b64; }
+    .ai-chat-messages { display:grid; align-content:start; gap:10px; min-height:180px; max-height:calc(100vh - 560px); overflow:auto; padding:2px; scroll-behavior:smooth; }
+    .ai-chat-empty { padding:18px 12px; border:1px dashed #cbd6dc; border-radius:9px; color:#647680; text-align:center; font-size:12px; line-height:1.7; }
+    .ai-message { display:grid; gap:5px; max-width:92%; }
+    .ai-message--user { justify-self:end; }
+    .ai-message--assistant { justify-self:start; }
+    .ai-message__bubble { padding:10px 12px; border-radius:11px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.65; }
+    .ai-message--user .ai-message__bubble { color:#fff; background:#155566; border-bottom-right-radius:3px; }
+    .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
+    .ai-message__meta { color:#7d8c94; font-size:9px; }
+    .ai-message--user .ai-message__meta { text-align:right; }
+    .ai-message.is-pending .ai-message__bubble { color:#61737c; background:#edf2f4; }
+    .ai-chat-error { padding:9px 10px; border:1px solid #dfb5ad; border-radius:7px; color:#8a4338; background:#fff6f4; font-size:11px; }
+    .ai-chat-form { display:grid; gap:8px; position:sticky; bottom:0; padding-top:4px; background:#fafcfc; }
+    .ai-chat-form textarea { min-height:88px; max-height:220px; resize:vertical; }
+    .ai-chat-form__actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .ai-chat-form__actions button { padding:9px 13px; }
     .mobile-pane-switch { display:none; }
     @media (max-width:1050px) {
         .company-workbench { grid-template-rows:auto auto minmax(620px,calc(100vh - 190px)); }
@@ -168,6 +188,36 @@
             <div class="pane-head"><strong>AI PARTNER</strong><span>開いている仕事について相談する</span></div>
             <div class="ai-body">
                 <div class="ai-context"><strong>参照中のコンテキスト</strong><p data-ai-context>{{ $project->name }} / Project Overview</p></div>
+                <div class="ai-chat-summary">
+                    <span class="ai-chat-status {{ (!$aiChatEnabled || !$aiChatConfigured) ? 'is-off' : '' }}">{{ $aiChatEnabled && $aiChatConfigured ? '読み取り専用AI：接続可能' : 'AIチャット：利用準備が必要' }}</span>
+                    <span data-chat-cost>推定累計 ${{ number_format($aiChatEstimatedCostMicrousd / 1_000_000, 4) }}</span>
+                </div>
+                <section class="ai-chat-messages" data-chat-messages aria-live="polite">
+                    @forelse($aiChatMessages as $chatMessage)
+                        <article class="ai-message ai-message--{{ $chatMessage->role }}">
+                            <div class="ai-message__bubble">{{ $chatMessage->content }}</div>
+                            <div class="ai-message__meta">
+                                {{ $chatMessage->created_at->format('m/d H:i') }}
+                                @if($chatMessage->role === \App\Models\AiChatMessage::ROLE_ASSISTANT && $chatMessage->input_tokens !== null)
+                                    ・{{ number_format($chatMessage->input_tokens + $chatMessage->output_tokens) }} tokens
+                                    ・約${{ number_format($chatMessage->estimated_cost_microusd / 1_000_000, 4) }}
+                                @endif
+                            </div>
+                        </article>
+                    @empty
+                        <div class="ai-chat-empty" data-chat-empty>このProjectについてAIと会話できます。<br>AIは情報を読み取りますが、データを変更することはありません。</div>
+                    @endforelse
+                </section>
+                <div class="ai-chat-error" data-chat-error hidden></div>
+                <form class="ai-chat-form" data-chat-form data-chat-url="{{ route('projects.ai-chat.messages.store', $project) }}">
+                    <textarea name="content" rows="3" maxlength="4000" placeholder="このProjectについて質問する…" @disabled(!$aiChatEnabled || !$aiChatConfigured) required></textarea>
+                    <input type="hidden" name="context_key" value="project" data-chat-context-key>
+                    <input type="hidden" name="context_label" value="{{ $project->name }} / Project Overview" data-chat-context-label>
+                    <div class="ai-chat-form__actions">
+                        <span class="meta">AIは提案のみ・自動変更なし</span>
+                        <button type="submit" @disabled(!$aiChatEnabled || !$aiChatConfigured)>送信</button>
+                    </div>
+                </form>
                 @if(session('ai_request_copy_text'))
                     <section class="ai-card stack" style="border-color:#79a991;background:#f5fcf8">
                         <div><h3>AI依頼を登録しました</h3><p>次の文章をコピーしてCodexへ送ってください。</p></div>
@@ -179,7 +229,9 @@
                 @if($pendingAiProposalCount)
                     <section class="ai-card"><h3>承認待ちの提案 {{ $pendingAiProposalCount }}件</h3><div class="ai-history">@foreach($pendingAiProposals as $proposal)<article><strong>{{ $proposal->title }}</strong><div class="meta">{{ $proposal->created_at->format('Y/m/d H:i') }}</div><a href="{{ route('projects.ai-proposals.show', [$project,$proposal]) }}">内容を確認する →</a></article>@endforeach</div></section>
                 @endif
-                <section class="ai-card stack">
+                <details class="ai-card">
+                    <summary style="cursor:pointer;font-weight:700">Codexへ長い作業を依頼する</summary>
+                    <div class="stack" style="margin-top:14px">
                     <div><h2>AIに依頼する</h2><p>依頼は承認待ちの提案として届きます。AIが直接データを変更することはありません。</p></div>
                     <form method="POST" action="{{ route('projects.ai-requests.store', $project) }}" enctype="multipart/form-data" class="stack">
                         @csrf
@@ -189,8 +241,9 @@
                         <div class="field"><label for="workspace_ai_files">参考資料</label><input id="workspace_ai_files" type="file" name="attachments[]" multiple></div>
                         <button type="submit">AIへ依頼を登録</button>
                     </form>
-                </section>
-                <section class="ai-card"><h3>最近の依頼</h3><div class="ai-history">@forelse($aiRequests->take(5) as $aiRequest)<article><strong>{{ $aiRequest->title }}</strong><div class="meta">{{ $aiRequest->created_at->format('Y/m/d H:i') }} / {{ $aiRequest->status }}</div></article>@empty<p>AIへの依頼はまだありません。</p>@endforelse</div></section>
+                    </div>
+                </details>
+                <details class="ai-card"><summary style="cursor:pointer;font-weight:700">最近のCodex依頼</summary><div class="ai-history" style="margin-top:12px">@forelse($aiRequests->take(5) as $aiRequest)<article><strong>{{ $aiRequest->title }}</strong><div class="meta">{{ $aiRequest->created_at->format('Y/m/d H:i') }} / {{ $aiRequest->status }}</div></article>@empty<p>AIへの依頼はまだありません。</p>@endforelse</div></details>
             </div>
         </aside>
     </div>
@@ -207,7 +260,10 @@
         workbench.querySelectorAll('[data-document]').forEach(item => item.classList.toggle('is-current', item.dataset.document === key));
         const title = panel.querySelector('.document-title')?.textContent.trim() || key;
         const kicker = panel.querySelector('.document-kicker')?.textContent.trim() || '';
-        workbench.querySelector('[data-ai-context]').textContent = `${@json($project->name)} / ${kicker} / ${title}`;
+        const contextLabel = `${@json($project->name)} / ${kicker} / ${title}`;
+        workbench.querySelector('[data-ai-context]').textContent = contextLabel;
+        workbench.querySelector('[data-chat-context-key]').value = key;
+        workbench.querySelector('[data-chat-context-label]').value = contextLabel;
         workbench.querySelector('[data-pane="main"]').scrollTop = 0;
         if (matchMedia('(max-width:1050px)').matches) showMobilePane('main');
     };
@@ -223,6 +279,66 @@
         if (event.target.closest('[data-copy-request]')) {
             const text = document.getElementById('workspace-ai-copy')?.value || '';
             navigator.clipboard.writeText(text).then(() => workbench.querySelector('[data-copy-result]').textContent = 'コピーしました');
+        }
+    });
+
+    const chatForm = workbench.querySelector('[data-chat-form]');
+    const chatMessages = workbench.querySelector('[data-chat-messages]');
+    const chatError = workbench.querySelector('[data-chat-error]');
+    const appendMessage = (role, content, meta = '', pending = false) => {
+        workbench.querySelector('[data-chat-empty]')?.remove();
+        const article = document.createElement('article');
+        article.className = `ai-message ai-message--${role}${pending ? ' is-pending' : ''}`;
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-message__bubble';
+        bubble.textContent = content;
+        const metadata = document.createElement('div');
+        metadata.className = 'ai-message__meta';
+        metadata.textContent = meta;
+        article.append(bubble, metadata);
+        chatMessages.append(article);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return article;
+    };
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatForm?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const textarea = chatForm.elements.content;
+        const content = textarea.value.trim();
+        if (!content) return;
+        const submit = chatForm.querySelector('button[type="submit"]');
+        chatError.hidden = true;
+        appendMessage('user', content, '送信中');
+        const pending = appendMessage('assistant', '考えています…', '', true);
+        textarea.value = '';
+        submit.disabled = true;
+        try {
+            const response = await fetch(chatForm.dataset.chatUrl, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
+                body: JSON.stringify({
+                    content,
+                    context_key: chatForm.elements.context_key.value,
+                    context_label: chatForm.elements.context_label.value,
+                }),
+            });
+            const body = await response.json();
+            if (!response.ok) throw new Error(body.message || 'AIから回答を取得できませんでした。');
+            const message = body.message;
+            pending.remove();
+            const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
+            appendMessage('assistant', message.content, `${tokens.toLocaleString()} tokens ・ 約$${Number(message.estimated_cost_usd || 0).toFixed(4)}`);
+            const currentCost = Number(workbench.dataset.chatCost || @json($aiChatEstimatedCostMicrousd / 1_000_000));
+            const nextCost = currentCost + Number(message.estimated_cost_usd || 0);
+            workbench.dataset.chatCost = nextCost;
+            workbench.querySelector('[data-chat-cost]').textContent = `推定累計 $${nextCost.toFixed(4)}`;
+        } catch (error) {
+            pending.remove();
+            chatError.textContent = error.message;
+            chatError.hidden = false;
+        } finally {
+            submit.disabled = false;
+            textarea.focus();
         }
     });
 })();

@@ -10,6 +10,7 @@ use App\Http\Controllers\EstimateController;
 use App\Http\Controllers\Project\AiProposalController;
 use App\Http\Controllers\Project\AiProposalItemReviewController;
 use App\Http\Controllers\Project\AiRequestController;
+use App\Http\Controllers\Project\AiChatController;
 use App\Http\Controllers\Project\ImprovementController;
 use App\Http\Controllers\Project\ImprovementEffortController;
 use App\Http\Controllers\Project\ImprovementOutputController;
@@ -98,6 +99,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/schedule', [ProjectController::class, 'schedule'])->name('projects.schedule');
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::get('/projects/{project}/workspace', [ProjectController::class, 'workspace'])->name('projects.workspace');
+        Route::post('/projects/{project}/ai-chat/messages', [AiChatController::class, 'store'])->middleware('throttle:20,1')->name('projects.ai-chat.messages.store');
         Route::get('/projects/{project}/client-plan', [ProjectController::class, 'clientPlan'])->name('projects.client-plan');
         Route::get('/projects/{project}/business-media/{type}', [WorkspaceBusinessProfileController::class, 'projectMedia'])->name('projects.business-media');
         Route::post('/projects/{project}/internal-notes', [ProjectInternalNoteController::class, 'store'])->name('projects.internal-notes.store');

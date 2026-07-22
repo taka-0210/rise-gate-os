@@ -90,4 +90,9 @@ class Workspace extends Model
     {
         return $this->hasMany(Estimate::class);
     }
+
+    public function aiChatThreads(): HasMany
+    {
+        return $this->hasMany(AiChatThread::class);
+    }
 }

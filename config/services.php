@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'chat_model' => env('OPENAI_CHAT_MODEL', 'gpt-5.6-terra'),
+        'input_usd_per_million' => env('OPENAI_INPUT_USD_PER_MILLION', 2.50),
+        'output_usd_per_million' => env('OPENAI_OUTPUT_USD_PER_MILLION', 15.00),
+    ],
+
 ];

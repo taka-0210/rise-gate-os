@@ -125,6 +125,11 @@ class Project extends Model
         return $this->hasMany(AiRequest::class)->latest();
     }
 
+    public function aiChatThreads(): HasMany
+    {
+        return $this->hasMany(AiChatThread::class);
+    }
+
     public function internalNotes(): HasMany
     {
         return $this->hasMany(ProjectInternalNote::class)->latest();

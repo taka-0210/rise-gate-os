@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Project;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\AiProposal;
+use App\Models\AiChatThread;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
@@ -410,7 +411,20 @@ class ProjectController extends Controller
 
     public function workspace(Request $request, Project $project): View
     {
-        return view('projects.workspace', $this->show($request, $project)->getData());
+        $data = $this->show($request, $project)->getData();
+        $thread = AiChatThread::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $request->user()->id)
+            ->with(['messages' => fn ($query) => $query->latest()->limit(50)])
+            ->first();
+
+        return view('projects.workspace', [
+            ...$data,
+            'aiChatMessages' => $thread?->messages->sortBy('created_at')->values() ?? collect(),
+            'aiChatEnabled' => (bool) $project->owningWorkspace?->aiSetting?->enabled,
+            'aiChatConfigured' => (string) config('services.openai.api_key') !== '',
+            'aiChatEstimatedCostMicrousd' => $thread?->messages->sum('estimated_cost_microusd') ?? 0,
+        ]);
     }
 
     public function legacy(Request $request, Project $project): View
