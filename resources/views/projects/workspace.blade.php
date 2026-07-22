@@ -230,8 +230,17 @@
                     <div class="document-kicker">Roadmap</div><h1 class="document-title">{{ $roadmap->title }}</h1><p class="document-summary">{{ $roadmap->purpose ?: 'このロードマップの目的はまだ登録されていません。' }}</p>
                     <div class="document-meta"><span class="badge">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span><span class="badge">改善 {{ $roadmap->improvements->count() }}件</span></div>
                     <div class="document-list">@foreach($roadmap->improvements as $improvement)<button class="tree-item document-row" type="button" data-document="improvement-{{ $improvement->id }}"><strong>{{ $improvement->title }}</strong><span class="meta">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }} / タスク {{ $improvement->tasks->count() }}件</span></button>@endforeach</div>
+                    <div class="actions" style="margin-top:20px">@can('update',$roadmap)<button class="secondary" type="button" data-inline-editor-toggle="roadmap-edit-{{ $roadmap->id }}">編集</button>@endcan @if($canCreateImprovement)<button type="button" data-inline-editor-toggle="roadmap-create-{{ $roadmap->id }}">取組みを追加</button>@endif</div>
+                    @can('update',$roadmap)
+                        <form class="inline-editor stack" data-inline-editor="roadmap-edit-{{ $roadmap->id }}" data-workspace-form data-update-panel hidden method="POST" action="{{ route('projects.roadmaps.update', [$project,$roadmap]) }}">
+                            @csrf @method('PUT')
+                            <input type="hidden" name="planned_start_date" value="{{ $roadmap->planned_start_date?->format('Y-m-d') }}"><input type="hidden" name="target_date" value="{{ $roadmap->target_date?->format('Y-m-d') }}"><input type="hidden" name="planned_start_day" value="{{ $roadmap->planned_start_day }}"><input type="hidden" name="target_day" value="{{ $roadmap->target_day }}"><input type="hidden" name="reached_at" value="{{ $roadmap->reached_at?->format('Y-m-d') }}">
+                            <div class="field"><label for="workspace_roadmap_title_{{ $roadmap->id }}">ロードマップ名</label><input id="workspace_roadmap_title_{{ $roadmap->id }}" name="title" value="{{ $roadmap->title }}" required></div>
+                            <div class="field"><label for="workspace_roadmap_purpose_{{ $roadmap->id }}">目的</label><textarea id="workspace_roadmap_purpose_{{ $roadmap->id }}" name="purpose" rows="4">{{ $roadmap->purpose }}</textarea></div>
+                            <div class="actions"><button type="submit">保存する</button><button class="secondary" type="button" data-inline-editor-close="roadmap-edit-{{ $roadmap->id }}">閉じる</button></div><div class="inline-editor__status" data-inline-editor-status></div>
+                        </form>
+                    @endcan
                     @if($canCreateImprovement)
-                        <div class="actions" style="margin-top:20px"><button type="button" data-inline-editor-toggle="roadmap-create-{{ $roadmap->id }}">取組みを追加</button></div>
                         <form class="inline-editor stack" data-inline-editor="roadmap-create-{{ $roadmap->id }}" data-workspace-form data-reload-after-save hidden method="POST" action="{{ route('projects.improvements.store', $project) }}">
                             @csrf
                             <input type="hidden" name="roadmap_id" value="{{ $roadmap->id }}"><input type="hidden" name="visibility" value="{{ \App\Models\Improvement::VISIBILITY_INTERNAL }}">
@@ -247,7 +256,7 @@
                         <div class="document-kicker">Improvement</div><h1 class="document-title">{{ $improvement->title }}</h1><p class="document-summary">{{ $improvement->desired_state ?: $improvement->description ?: '改善内容はまだ整理されていません。' }}</p>
                         <div class="document-meta"><span class="badge">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}</span><span class="badge">{{ $improvementVisibilities[$improvement->visibility] ?? $improvement->visibility }}</span></div>
                         <div class="document-list">@forelse($improvement->tasks as $task)<button class="tree-item document-row" type="button" data-document="task-{{ $task->id }}"><strong>{{ $task->title }}</strong><span class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / {{ $task->assignee?->name ?? '担当未設定' }}</span></button>@empty<p>タスクはまだありません。</p>@endforelse</div>
-                        <div class="actions" style="margin-top:20px">@can('update',$improvement)<button class="secondary" type="button" data-inline-editor-toggle="improvement-edit-{{ $improvement->id }}">ここで編集</button>@endcan @if($canCreateTask)<button type="button" data-inline-editor-toggle="task-create-{{ $improvement->id }}">タスクを追加</button>@endif</div>
+                        <div class="actions" style="margin-top:20px">@can('update',$improvement)<button class="secondary" type="button" data-inline-editor-toggle="improvement-edit-{{ $improvement->id }}">編集</button>@endcan @if($canCreateTask)<button type="button" data-inline-editor-toggle="task-create-{{ $improvement->id }}">タスクを追加</button>@endif</div>
                         @can('update',$improvement)
                             <form class="inline-editor stack" data-inline-editor="improvement-edit-{{ $improvement->id }}" data-workspace-form data-update-panel hidden method="POST" action="{{ route('projects.improvements.update', [$project,$improvement]) }}">
                                 @csrf @method('PUT')
@@ -279,7 +288,7 @@
                     <p class="document-summary">{{ $task->description ?: 'タスクの詳細はまだ登録されていません。' }}</p>
                     <div class="document-meta"><span class="badge">{{ $taskStatuses[$task->status] ?? $task->status }}</span><span class="badge">{{ $task->assignee?->name ?? '担当未設定' }}</span>@if($task->due_date)<span class="badge">期限 {{ $task->due_date->format('Y/m/d') }}</span>@endif</div>
                     @can('update', $task)
-                        <div class="actions" style="margin-top:20px"><button class="secondary" type="button" data-inline-editor-toggle="task-{{ $task->id }}">ここで編集する</button></div>
+                        <div class="actions" style="margin-top:20px"><button class="secondary" type="button" data-inline-editor-toggle="task-{{ $task->id }}">編集</button></div>
                         <form class="inline-editor stack" data-inline-editor="task-{{ $task->id }}" data-workspace-form data-update-panel hidden method="POST" action="{{ route('projects.tasks.update', [$project,$task]) }}">
                             @csrf @method('PUT')
                             <input type="hidden" name="improvement_id" value="{{ $task->improvement_id }}">
@@ -528,7 +537,7 @@
                 }
                 const panel = form.closest('[data-document-panel]');
                 panel.querySelector('.document-title').textContent = form.elements.title.value;
-                const summary = form.elements.description?.value || form.elements.desired_state?.value || form.elements.current_state?.value || '';
+                const summary = form.elements.description?.value || form.elements.purpose?.value || form.elements.desired_state?.value || form.elements.current_state?.value || '';
                 panel.querySelector('.document-summary').textContent = summary || '詳細はまだ登録されていません。';
                 status.textContent = '保存しました。';
             } catch (error) {

@@ -348,6 +348,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-pane-resizer="ai"', false)
             ->assertSee('data-workspace-form', false)
             ->assertSee('data-inline-editor="improvement-edit-'.$task->improvement_id.'"', false)
+            ->assertSee('data-inline-editor="roadmap-edit-'.$roadmap->id.'"', false)
             ->assertSee('data-inline-editor="task-create-'.$task->improvement_id.'"', false)
             ->assertDontSee('href="'.route('projects.improvements.show', [$project, $task->improvement]).'"', false)
             ->assertDontSee('href="'.route('projects.tasks.create', ['project' => $project, 'improvement' => $task->improvement_id]).'"', false)
