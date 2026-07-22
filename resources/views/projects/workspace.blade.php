@@ -5,8 +5,8 @@
     $activeTasks = $allTasks->whereNotIn('status', [\App\Models\Task::STATUS_DONE, \App\Models\Task::STATUS_ARCHIVED]);
 @endphp
 <style>
-    .main:has(.company-workbench) { width: min(1680px, calc(100% - 24px)); padding: 18px 0 24px; }
-    .company-workbench { --wb-line:#d5dde3; --wb-soft:#f3f6f8; display:grid; grid-template-rows:auto minmax(680px, calc(100vh - 150px)); border:1px solid var(--wb-line); border-radius:12px; overflow:hidden; background:#fff; box-shadow:0 16px 45px rgba(20,42,55,.09); }
+    .main:has(.company-workbench) { width:100%; padding:0; }
+    .company-workbench { --wb-line:#d5dde3; --wb-soft:#f3f6f8; height:calc(100vh - 69px); display:grid; grid-template-rows:auto minmax(0,1fr); border-block:1px solid var(--wb-line); overflow:hidden; background:#fff; }
     .workbench-bar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 14px; border-bottom:1px solid var(--wb-line); background:#f8fafb; }
     .workbench-bar__identity { min-width:0; display:flex; align-items:center; gap:12px; }
     .workbench-bar__identity strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -36,18 +36,11 @@
     .file-item { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; }
     .file-item--nested { padding-left:27px; }
     .file-note { margin:12px 10px; padding:10px; border:1px dashed #c7d3d9; border-radius:7px; color:#6a7b84; background:#fff; font-size:10px; line-height:1.55; }
-    .viewer-tabs { position:sticky; top:0; z-index:3; display:flex; align-items:center; gap:4px; padding:8px 10px; border-bottom:1px solid var(--wb-line); background:#f8fafb; }
-    .viewer-tab { padding:7px 11px; border:1px solid transparent; border-radius:6px; color:#5e7079; background:transparent; font-size:11px; font-weight:700; cursor:pointer; }
-    .viewer-tab.is-current { color:#0f4c5c; border-color:#cbdadd; background:#fff; }
-    .viewer-panel { display:none; min-height:calc(100% - 48px); }
+    .viewer-panel { display:none; min-height:100%; }
     .viewer-panel.is-current { display:block; }
-    .browser-toolbar { display:flex; gap:7px; padding:10px; border-bottom:1px solid var(--wb-line); }
-    .browser-toolbar input { min-width:0; flex:1; padding:8px 10px; font-size:12px; }
-    .browser-toolbar button { padding:8px 12px; }
-    .browser-frame { width:100%; min-height:calc(100vh - 260px); border:0; background:#fff; }
-    .browser-empty { display:grid; place-items:center; min-height:520px; padding:30px; color:#6c7c84; text-align:center; }
+    .browser-frame { width:100%; height:100%; min-height:calc(100vh - 126px); border:0; background:#fff; }
     .usage-card[hidden] { display:none; }
-    .usage-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+    .usage-grid { display:grid; margin-top:10px; }
     .usage-grid div { padding:10px; border-radius:7px; background:#f3f7f8; }
     .usage-grid strong, .usage-grid span { display:block; }
     .usage-grid span { color:#71818a; font-size:10px; }
@@ -101,7 +94,7 @@
     .ai-chat-form__actions button { padding:9px 13px; }
     .mobile-pane-switch { display:none; }
     @media (max-width:1250px) {
-        .company-workbench { grid-template-rows:auto auto minmax(620px,calc(100vh - 190px)); }
+        .company-workbench { min-height:720px; height:calc(100vh - 69px); grid-template-rows:auto auto minmax(0,1fr); }
         .mobile-pane-switch { display:flex; gap:6px; padding:8px; border-bottom:1px solid var(--wb-line); background:#f8fafb; }
         .mobile-pane-switch button { flex:1; padding:8px; border:1px solid var(--wb-line); color:#425863; background:#fff; font-size:12px; }
         .mobile-pane-switch button.is-current { color:#fff; border-color:var(--accent-dark); background:var(--accent-dark); }
@@ -176,7 +169,7 @@
                 <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/01-requirements.md" data-file-copy="Webサイトの要件定義です。"><span class="tree-icon">◇</span>01-requirements.md</button>
                 <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/04-implementation-plan.md" data-file-copy="実装計画と進め方をまとめたファイルです。"><span class="tree-icon">◇</span>04-implementation-plan.md</button>
                 <button class="tree-item file-item" type="button" data-file-name="public_html" data-file-copy="公開サイトと管理画面のPHPファイルが入ります。"><span class="tree-icon">▾</span>public_html</button>
-                <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/index.php" data-file-copy="公開サイトのトップページです。"><span class="tree-icon">◇</span>index.php</button>
+                <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/index.php" data-file-copy="公開サイトのトップページです。" data-file-view="browser" data-preview-url="https://prohit-okinawa.com/"><span class="tree-icon">◇</span>index.php</button>
                 <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/admin.php" data-file-copy="サイト運用の管理画面です。"><span class="tree-icon">◇</span>admin.php</button>
                 <button class="tree-item file-item" type="button" data-file-name="storage/content" data-file-copy="公開サイトで使うコンテンツデータです。"><span class="tree-icon">▾</span>storage/content</button>
                 <button class="tree-item file-item file-item--nested" type="button" data-file-name="storage/content/company.json" data-file-copy="会社情報のデータです。"><span class="tree-icon">◇</span>company.json</button>
@@ -185,11 +178,6 @@
         </nav>
 
         <section class="workbench-pane workbench-main is-mobile-current" data-pane="main">
-            <div class="viewer-tabs">
-                <button class="viewer-tab is-current" type="button" data-viewer-tab="document">表示</button>
-                <button class="viewer-tab" type="button" data-viewer-tab="file">ファイル</button>
-                <button class="viewer-tab" type="button" data-viewer-tab="browser">ブラウザ</button>
-            </div>
             <div class="viewer-panel is-current" data-viewer-panel="document">
             <article class="workbench-document is-current" data-document-panel="project">
                 <div class="document-kicker">Project Overview</div>
@@ -231,8 +219,6 @@
                 <article class="workbench-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title>ファイルを選択</h1><p class="document-summary" data-file-content>左のFILESからファイルを開くと、ここに内容を表示します。</p></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
-                <div class="browser-toolbar"><input type="url" data-browser-url placeholder="https://example.com"><button type="button" data-browser-open>開く</button></div>
-                <div class="browser-empty" data-browser-empty>確認したいURLを入力すると、このペイン内でサイトを表示します。<br>※ サイト側のセキュリティ設定により表示できない場合があります。</div>
                 <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" hidden></iframe>
             </div>
         </section>
@@ -247,8 +233,8 @@
                 </div>
                 <section class="ai-card usage-card" data-usage-card hidden>
                     <h3>この会話の利用状況</h3>
-                    <div class="usage-grid"><div><span>推定利用料</span><strong data-chat-cost>${{ number_format($aiChatEstimatedCostMicrousd / 1_000_000, 4) }}</strong></div><div><span>利用トークン</span><strong data-chat-tokens>{{ number_format($aiChatMessages->sum(fn ($message) => ($message->input_tokens ?? 0) + ($message->output_tokens ?? 0))) }}</strong></div></div>
-                    <p class="meta" style="margin-top:8px">COMPANY OS内の記録による推定値です。OpenAIの正式残高とは異なります。</p>
+                    <div class="usage-grid"><div><span>利用トークン</span><strong data-chat-tokens>{{ number_format($aiChatMessages->sum(fn ($message) => ($message->input_tokens ?? 0) + ($message->output_tokens ?? 0))) }} tokens</strong></div></div>
+                    <p class="meta" style="margin-top:8px">COMPANY OS内のこの会話で使用したトークン数です。</p>
                 </section>
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
@@ -307,6 +293,9 @@
 (() => {
     const workbench = document.querySelector('[data-workbench]');
     if (!workbench) return;
+    const showViewer = name => {
+        workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
+    };
     const openDocument = key => {
         const panel = workbench.querySelector(`[data-document-panel="${CSS.escape(key)}"]`);
         if (!panel) return;
@@ -318,6 +307,7 @@
         workbench.querySelector('[data-ai-context]').textContent = contextLabel;
         workbench.querySelector('[data-chat-context-key]').value = key;
         workbench.querySelector('[data-chat-context-label]').value = contextLabel;
+        showViewer('document');
         workbench.querySelector('[data-pane="main"]').scrollTop = 0;
         if (matchMedia('(max-width:1250px)').matches) showMobilePane('main');
     };
@@ -330,18 +320,20 @@
         if (documentButton) openDocument(documentButton.dataset.document);
         const paneButton = event.target.closest('[data-mobile-pane]');
         if (paneButton) showMobilePane(paneButton.dataset.mobilePane);
-        const viewerButton = event.target.closest('[data-viewer-tab]');
-        if (viewerButton) {
-            const name = viewerButton.dataset.viewerTab;
-            workbench.querySelectorAll('[data-viewer-tab]').forEach(button => button.classList.toggle('is-current', button.dataset.viewerTab === name));
-            workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
-        }
         const fileButton = event.target.closest('[data-file-name]');
         if (fileButton) {
             workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
             workbench.querySelector('[data-file-title]').textContent = fileButton.dataset.fileName;
             workbench.querySelector('[data-file-content]').textContent = fileButton.dataset.fileCopy;
-            workbench.querySelector('[data-viewer-tab="file"]').click();
+            const opensInBrowser = fileButton.dataset.fileView === 'browser' || /(^|\/)index\.html?$/i.test(fileButton.dataset.fileName);
+            if (opensInBrowser) {
+                const frame = workbench.querySelector('[data-browser-frame]');
+                frame.src = fileButton.dataset.previewUrl;
+                frame.hidden = false;
+                showViewer('browser');
+            } else {
+                showViewer('file');
+            }
             const contextLabel = `${@json($project->name)} / File / ${fileButton.dataset.fileName}`;
             workbench.querySelector('[data-ai-context]').textContent = contextLabel;
             workbench.querySelector('[data-chat-context-key]').value = `file:${fileButton.dataset.fileName}`;
@@ -351,15 +343,6 @@
         if (event.target.closest('[data-usage-toggle]')) {
             const card = workbench.querySelector('[data-usage-card]');
             card.hidden = !card.hidden;
-        }
-        if (event.target.closest('[data-browser-open]')) {
-            const input = workbench.querySelector('[data-browser-url]');
-            const frame = workbench.querySelector('[data-browser-frame]');
-            if (input.reportValidity() && input.value) {
-                frame.src = input.value;
-                frame.hidden = false;
-                workbench.querySelector('[data-browser-empty]').hidden = true;
-            }
         }
         if (event.target.closest('[data-copy-request]')) {
             const text = document.getElementById('workspace-ai-copy')?.value || '';
@@ -413,12 +396,8 @@
             pending.remove();
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
             appendMessage('assistant', message.content, 'ただ今');
-            const currentCost = Number(workbench.dataset.chatCost || @json($aiChatEstimatedCostMicrousd / 1_000_000));
-            const nextCost = currentCost + Number(message.estimated_cost_usd || 0);
-            workbench.dataset.chatCost = nextCost;
-            workbench.querySelector('[data-chat-cost]').textContent = `$${nextCost.toFixed(4)}`;
-            const currentTokens = Number((workbench.querySelector('[data-chat-tokens]').textContent || '0').replaceAll(',', ''));
-            workbench.querySelector('[data-chat-tokens]').textContent = (currentTokens + tokens).toLocaleString();
+            const currentTokens = Number((workbench.querySelector('[data-chat-tokens]').textContent || '0').replace(/[^0-9]/g, ''));
+            workbench.querySelector('[data-chat-tokens]').textContent = `${(currentTokens + tokens).toLocaleString()} tokens`;
         } catch (error) {
             pending.remove();
             chatError.textContent = error.message;

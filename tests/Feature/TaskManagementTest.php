@@ -331,6 +331,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('FILES')
             ->assertSee('prohit-okinawa')
             ->assertSee('ブラウザ')
+            ->assertSee('data-file-view="browser"', false)
+            ->assertDontSee('data-viewer-tab', false)
             ->assertSee('AI PARTNER')
             ->assertSee('現行表示へ戻る')
             ->assertSee($project->name)
