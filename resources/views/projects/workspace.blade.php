@@ -12,16 +12,21 @@
     .workbench-bar__identity strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .workbench-mode { display:inline-flex; align-items:center; gap:7px; color:#46606d; font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
     .workbench-mode::before { content:""; width:7px; height:7px; border-radius:50%; background:#42a69a; box-shadow:0 0 0 4px #dff3ef; }
-    .workbench-grid { min-height:0; display:grid; grid-template-columns:minmax(250px,300px) minmax(440px,1fr) minmax(320px,360px); }
+    .workbench-grid { --explorer-width:300px; --ai-width:360px; position:relative; min-height:0; display:grid; grid-template-columns:var(--explorer-width) minmax(360px,1fr) var(--ai-width); }
     .workbench-pane { min-width:0; min-height:0; overflow:auto; }
     .workbench-explorer { border-right:1px solid var(--wb-line); background:#f7f9fa; overflow:hidden; }
     .workbench-tree, .workbench-files { display:none; height:100%; overflow:auto; }
     .workbench-tree.is-current, .workbench-files.is-current { display:block; }
     .explorer-tabs { display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--wb-line); background:#f4f7f8; }
-    .explorer-tab { padding:12px 10px; border:0; border-radius:0; color:#647680; background:transparent; font-size:12px; }
+    .explorer-tab { padding:14px 10px; border:0; border-radius:0; color:#526771; background:transparent; font-size:14px; font-weight:800; }
     .explorer-tab.is-current { color:#173f4a; background:#fff; box-shadow:inset 0 -2px #4f8994; }
     .workbench-main { background:#fff; }
     .workbench-ai { border-left:1px solid var(--wb-line); background:#fafcfc; }
+    .pane-resizer { position:absolute; z-index:8; top:0; bottom:0; width:9px; padding:0; border:0; border-radius:0; background:transparent; cursor:col-resize; transform:translateX(-50%); touch-action:none; }
+    .pane-resizer::after { content:""; position:absolute; top:0; bottom:0; left:4px; width:1px; background:transparent; }
+    .pane-resizer:hover::after, .pane-resizer.is-dragging::after { width:3px; background:#71a6af; }
+    .pane-resizer--explorer { left:var(--explorer-width); }
+    .pane-resizer--ai { left:calc(100% - var(--ai-width)); }
     .pane-head { position:sticky; top:0; z-index:2; padding:13px 15px; border-bottom:1px solid var(--wb-line); background:rgba(250,252,252,.96); backdrop-filter:blur(8px); }
     .pane-head strong { display:block; font-size:13px; }
     .pane-head span { color:var(--muted); font-size:11px; }
@@ -75,6 +80,10 @@
     .document-row { display:block; padding:13px 15px; border:1px solid var(--wb-line); border-radius:8px; color:inherit; background:#fff; }
     .document-row:hover { border-color:#8fb3b8; }
     .document-row strong { display:block; margin-bottom:4px; }
+    .inline-editor { margin-top:20px; padding:18px; border:1px solid #cbd8dd; border-radius:9px; background:#f8fafb; }
+    .inline-editor[hidden] { display:none; }
+    .inline-editor__grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .inline-editor__status { min-height:20px; margin-top:8px; color:#39705c; font-size:12px; }
     .ai-body { display:grid; gap:14px; padding:14px; }
     .ai-context { padding:12px; border:1px solid #c9ddda; border-radius:8px; background:#edf7f5; }
     .ai-context strong { display:block; margin-bottom:4px; font-size:12px; }
@@ -116,6 +125,7 @@
         .mobile-pane-switch button { flex:1; padding:8px; border:1px solid var(--wb-line); color:#425863; background:#fff; font-size:12px; }
         .mobile-pane-switch button.is-current { color:#fff; border-color:var(--accent-dark); background:var(--accent-dark); }
         .workbench-grid { display:block; }
+        .pane-resizer { display:none; }
         .workbench-pane { display:none; height:100%; border:0; }
         .workbench-pane.is-mobile-current { display:block; }
     }
@@ -153,7 +163,6 @@
                 <button class="explorer-tab" type="button" data-explorer-tab="files">FILES</button>
             </div>
             <nav class="workbench-tree is-current" data-explorer-panel="work" aria-label="プロジェクト構造">
-                <div class="pane-head"><strong>WORK</strong><span>ロードマップからタスクまでたどる</span></div>
                 <div class="tree-body">
                     <div class="tree-group"><button class="tree-item is-current" type="button" data-document="project"><span class="tree-icon">▣</span>{{ $project->name }}</button></div>
                     <div class="tree-group">
@@ -180,7 +189,6 @@
             </nav>
 
             <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
-                <div class="pane-head"><strong>FILES</strong><span>フォルダを開いて成果物を確認する</span></div>
                 <div class="file-repository">▣ prohit-okinawa<span>読み取り専用プレビュー</span></div>
                 <div class="tree-body">
                     <button class="tree-item file-item" type="button" data-file-toggle="docs" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>docs</button>
@@ -199,6 +207,8 @@
                 <p class="file-note">現在は画面構成を確かめるプレビューです。次の段階でGitHubの実際のファイル一覧に切り替えます。</p>
             </nav>
         </aside>
+
+        <button class="pane-resizer pane-resizer--explorer" type="button" data-pane-resizer="explorer" aria-label="WORKとFILESの幅を変更"></button>
 
         <section class="workbench-pane workbench-main is-mobile-current" data-pane="main">
             <div class="viewer-panel is-current" data-viewer-panel="document">
@@ -240,7 +250,26 @@
                     <div class="document-kicker">Task</div><h1 class="document-title">{{ $task->title }}</h1>
                     <p class="document-summary">{{ $task->description ?: 'タスクの詳細はまだ登録されていません。' }}</p>
                     <div class="document-meta"><span class="badge">{{ $taskStatuses[$task->status] ?? $task->status }}</span><span class="badge">{{ $task->assignee?->name ?? '担当未設定' }}</span>@if($task->due_date)<span class="badge">期限 {{ $task->due_date->format('Y/m/d') }}</span>@endif</div>
-                    <div class="actions" style="margin-top:20px"><a class="button secondary" href="{{ route('projects.tasks.show', [$project,$task]) }}">詳細・編集を開く</a></div>
+                    @can('update', $task)
+                        <div class="actions" style="margin-top:20px"><button class="secondary" type="button" data-inline-editor-toggle="task-{{ $task->id }}">ここで編集する</button></div>
+                        <form class="inline-editor stack" data-inline-editor="task-{{ $task->id }}" data-workspace-task-form hidden method="POST" action="{{ route('projects.tasks.update', [$project,$task]) }}">
+                            @csrf @method('PUT')
+                            <input type="hidden" name="improvement_id" value="{{ $task->improvement_id }}">
+                            <input type="hidden" name="planned_start_date" value="{{ $task->planned_start_date?->format('Y-m-d') }}">
+                            <input type="hidden" name="due_date" value="{{ $task->due_date?->format('Y-m-d') }}">
+                            <input type="hidden" name="planned_start_day" value="{{ $task->planned_start_day }}">
+                            <input type="hidden" name="due_day" value="{{ $task->due_day }}">
+                            <div class="field"><label for="workspace_task_title_{{ $task->id }}">Task名</label><input id="workspace_task_title_{{ $task->id }}" name="title" value="{{ $task->title }}" required></div>
+                            <div class="field"><label for="workspace_task_description_{{ $task->id }}">説明</label><textarea id="workspace_task_description_{{ $task->id }}" name="description" rows="4">{{ $task->description }}</textarea></div>
+                            <div class="inline-editor__grid">
+                                <div class="field"><label for="workspace_task_status_{{ $task->id }}">進行状況</label><select id="workspace_task_status_{{ $task->id }}" name="status">@foreach($taskStatuses as $value=>$label)<option value="{{ $value }}" @selected($task->status===$value)>{{ $label }}</option>@endforeach</select></div>
+                                <div class="field"><label for="workspace_task_priority_{{ $task->id }}">優先度</label><select id="workspace_task_priority_{{ $task->id }}" name="priority">@foreach($taskPriorities as $value=>$label)<option value="{{ $value }}" @selected($task->priority===$value)>{{ $label }}</option>@endforeach</select></div>
+                                <div class="field"><label for="workspace_task_assignee_{{ $task->id }}">担当者</label><select id="workspace_task_assignee_{{ $task->id }}" name="assigned_to"><option value="">未設定</option>@foreach($assignableUsers as $user)<option value="{{ $user->id }}" @selected($task->assigned_to===$user->id)>{{ $user->name }}</option>@endforeach</select></div>
+                            </div>
+                            <div class="actions"><button type="submit">保存する</button><button class="secondary" type="button" data-inline-editor-close="task-{{ $task->id }}">閉じる</button></div>
+                            <div class="inline-editor__status" data-inline-editor-status aria-live="polite"></div>
+                        </form>
+                    @endcan
                 </article>
             @endforeach
             @if($canViewInternalNotes)<article class="workbench-document" data-document-panel="knowledge"><div class="document-kicker">Company Knowledge</div><h1 class="document-title">社内メモ・資料</h1><p class="document-summary">AIと共有するプロジェクト固有の背景や資料です。</p><div class="document-list">@forelse($internalNotes as $note)<div class="document-row"><strong>{{ $note->user?->name ?? 'メンバー' }}のメモ</strong><p>{{ $note->body ?: '添付資料・参照情報' }}</p><span class="meta">{{ $note->created_at->format('Y/m/d H:i') }} / 添付 {{ $note->attachments->count() }}件</span></div>@empty<p>社内メモはまだありません。</p>@endforelse</div></article>@endif
@@ -254,8 +283,10 @@
             </div>
         </section>
 
+        <button class="pane-resizer pane-resizer--ai" type="button" data-pane-resizer="ai" aria-label="AIパートナーの幅を変更"></button>
+
         <aside class="workbench-pane workbench-ai" data-pane="ai" aria-label="AIパートナー">
-            <div class="pane-head"><strong>AI PARTNER</strong><span>開いている仕事について相談する</span></div>
+            <div class="pane-head"><strong>AI パートナー</strong></div>
             <div class="ai-body">
                 <div class="ai-context"><strong>参照中のコンテキスト</strong><p data-ai-context>{{ $project->name }} / Project Overview</p></div>
                 <div class="ai-chat-summary">
@@ -324,6 +355,46 @@
 (() => {
     const workbench = document.querySelector('[data-workbench]');
     if (!workbench) return;
+    const workbenchGrid = workbench.querySelector('.workbench-grid');
+    const paneWidthKey = `rise-gate-os-pane-widths-${@json($project->public_id)}`;
+    try {
+        const savedWidths = JSON.parse(localStorage.getItem(paneWidthKey) || '{}');
+        if (savedWidths.explorer) workbenchGrid.style.setProperty('--explorer-width', `${savedWidths.explorer}px`);
+        if (savedWidths.ai) workbenchGrid.style.setProperty('--ai-width', `${savedWidths.ai}px`);
+    } catch (error) {}
+    workbench.querySelectorAll('[data-pane-resizer]').forEach(handle => {
+        handle.addEventListener('pointerdown', event => {
+            if (matchMedia('(max-width:900px)').matches) return;
+            event.preventDefault();
+            handle.classList.add('is-dragging');
+            handle.setPointerCapture(event.pointerId);
+            const move = moveEvent => {
+                const bounds = workbenchGrid.getBoundingClientRect();
+                const styles = getComputedStyle(workbenchGrid);
+                const explorerNow = parseFloat(styles.getPropertyValue('--explorer-width')) || 300;
+                const aiNow = parseFloat(styles.getPropertyValue('--ai-width')) || 360;
+                if (handle.dataset.paneResizer === 'explorer') {
+                    const width = Math.max(220, Math.min(480, moveEvent.clientX - bounds.left, bounds.width - aiNow - 360));
+                    workbenchGrid.style.setProperty('--explorer-width', `${width}px`);
+                } else {
+                    const width = Math.max(300, Math.min(520, bounds.right - moveEvent.clientX, bounds.width - explorerNow - 360));
+                    workbenchGrid.style.setProperty('--ai-width', `${width}px`);
+                }
+            };
+            const finish = () => {
+                handle.classList.remove('is-dragging');
+                handle.removeEventListener('pointermove', move);
+                handle.removeEventListener('pointerup', finish);
+                const styles = getComputedStyle(workbenchGrid);
+                localStorage.setItem(paneWidthKey, JSON.stringify({
+                    explorer: Math.round(parseFloat(styles.getPropertyValue('--explorer-width'))),
+                    ai: Math.round(parseFloat(styles.getPropertyValue('--ai-width'))),
+                }));
+            };
+            handle.addEventListener('pointermove', move);
+            handle.addEventListener('pointerup', finish);
+        });
+    });
     const showViewer = name => {
         workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
     };
@@ -375,6 +446,10 @@
                 fileToggle.setAttribute('aria-expanded', String(open));
             }
         }
+        const editorToggle = event.target.closest('[data-inline-editor-toggle]');
+        if (editorToggle) workbench.querySelector(`[data-inline-editor="${CSS.escape(editorToggle.dataset.inlineEditorToggle)}"]`).hidden = false;
+        const editorClose = event.target.closest('[data-inline-editor-close]');
+        if (editorClose) workbench.querySelector(`[data-inline-editor="${CSS.escape(editorClose.dataset.inlineEditorClose)}"]`).hidden = true;
         const fileButton = event.target.closest('[data-file-name]');
         if (fileButton) {
             workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
@@ -403,6 +478,31 @@
             const text = document.getElementById('workspace-ai-copy')?.value || '';
             navigator.clipboard.writeText(text).then(() => workbench.querySelector('[data-copy-result]').textContent = 'コピーしました');
         }
+    });
+
+    workbench.querySelectorAll('[data-workspace-task-form]').forEach(form => {
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            const submit = form.querySelector('button[type="submit"]');
+            const status = form.querySelector('[data-inline-editor-status]');
+            submit.disabled = true;
+            status.textContent = '保存中…';
+            try {
+                const response = await fetch(form.action, {method:'POST', headers:{'Accept':'application/json'}, body:new FormData(form)});
+                if (!response.ok) {
+                    const body = await response.json();
+                    throw new Error(Object.values(body.errors || {}).flat()[0] || body.message || '保存できませんでした。');
+                }
+                const panel = form.closest('[data-document-panel]');
+                panel.querySelector('.document-title').textContent = form.elements.title.value;
+                panel.querySelector('.document-summary').textContent = form.elements.description.value || 'タスクの詳細はまだ登録されていません。';
+                status.textContent = '保存しました。';
+            } catch (error) {
+                status.textContent = error.message;
+            } finally {
+                submit.disabled = false;
+            }
+        });
     });
 
     const chatForm = workbench.querySelector('[data-chat-form]');
