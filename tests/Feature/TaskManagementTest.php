@@ -340,7 +340,10 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-pane="tree"', false)
             ->assertSee('data-pane="files"', false)
             ->assertSee('data-pane="main"', false)
-            ->assertSee('data-pane="ai"', false);
+            ->assertSee('data-pane="ai"', false)
+            ->assertSee('tree-item--roadmap', false)
+            ->assertSee('tree-item--improvement', false)
+            ->assertSee('tree-item--task', false);
     }
 
     public function test_time_view_only_marks_started_overdue_tasks_as_delayed(): void

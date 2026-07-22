@@ -31,6 +31,15 @@
     .tree-item--grandchild { padding-left:45px; color:#5d6b73; font-size:12px; font-weight:500; }
     .tree-icon { flex:0 0 16px; color:#78909b; text-align:center; }
     .tree-count { margin-left:auto; color:#82939c; font-size:10px; }
+    .tree-item--roadmap { border-left:3px solid #9bbbd3; color:#35586f; background:#eef5fa; }
+    .tree-item--roadmap .tree-icon { color:#6f9dbd; }
+    .tree-item--roadmap:hover, .tree-item--roadmap.is-current { color:#294e67; background:#e2eff8; }
+    .tree-item--improvement { border-left:3px solid #9fc8b1; color:#3f6551; background:#eff8f3; }
+    .tree-item--improvement .tree-icon { color:#72a88a; }
+    .tree-item--improvement:hover, .tree-item--improvement.is-current { color:#315b45; background:#e2f2e9; }
+    .tree-item--task { border-left:3px solid #d7aaa8; color:#77504e; background:#fbf1f1; }
+    .tree-item--task .tree-icon { color:#b87f7c; }
+    .tree-item--task:hover, .tree-item--task.is-current { color:#68413f; background:#f6e4e3; }
     .file-repository { padding:11px 12px; border-bottom:1px solid var(--wb-line); color:#40545e; background:#fff; font-size:12px; font-weight:800; }
     .file-repository span { display:block; margin-top:2px; color:#7b8b93; font-size:10px; font-weight:500; }
     .file-item { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; }
@@ -140,18 +149,18 @@
                 <div class="tree-group">
                     <div class="tree-group__label">Plan</div>
                     @forelse($roadmaps as $roadmap)
-                        <button class="tree-item tree-item--child" type="button" data-document="roadmap-{{ $roadmap->id }}"><span class="tree-icon">◇</span>{{ $roadmap->title }}<span class="tree-count">{{ $roadmap->improvements->count() }}</span></button>
+                        <button class="tree-item tree-item--child tree-item--roadmap" type="button" data-document="roadmap-{{ $roadmap->id }}"><span class="tree-icon">◇</span>{{ $roadmap->title }}<span class="tree-count">{{ $roadmap->improvements->count() }}</span></button>
                         @foreach($roadmap->improvements as $improvement)
-                            <button class="tree-item tree-item--grandchild" type="button" data-document="improvement-{{ $improvement->id }}"><span class="tree-icon">○</span>{{ $improvement->title }}</button>
+                            <button class="tree-item tree-item--grandchild tree-item--improvement" type="button" data-document="improvement-{{ $improvement->id }}"><span class="tree-icon">○</span>{{ $improvement->title }}</button>
                         @endforeach
                     @empty
-                        <button class="tree-item tree-item--child" type="button" data-document="roadmaps"><span class="tree-icon">◇</span>ロードマップ<span class="tree-count">0</span></button>
+                        <button class="tree-item tree-item--child tree-item--roadmap" type="button" data-document="roadmaps"><span class="tree-icon">◇</span>ロードマップ<span class="tree-count">0</span></button>
                     @endforelse
                 </div>
                 <div class="tree-group">
                     <div class="tree-group__label">Work</div>
-                    <button class="tree-item" type="button" data-document="improvements"><span class="tree-icon">△</span>すべての改善<span class="tree-count">{{ $allImprovements->count() }}</span></button>
-                    <button class="tree-item" type="button" data-document="tasks"><span class="tree-icon">✓</span>すべてのタスク<span class="tree-count">{{ $allTasks->count() }}</span></button>
+                    <button class="tree-item tree-item--improvement" type="button" data-document="improvements"><span class="tree-icon">△</span>すべての取組み<span class="tree-count">{{ $allImprovements->count() }}</span></button>
+                    <button class="tree-item tree-item--task" type="button" data-document="tasks"><span class="tree-icon">✓</span>すべてのタスク<span class="tree-count">{{ $allTasks->count() }}</span></button>
                     @if($canViewInternalNotes)<button class="tree-item" type="button" data-document="knowledge"><span class="tree-icon">▤</span>社内メモ・資料<span class="tree-count">{{ $internalNotes->count() }}</span></button>@endif
                 </div>
                 <div class="tree-group">
