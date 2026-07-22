@@ -352,6 +352,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-reorder-type="improvement"', false)
             ->assertSee('data-reorder-type="task"', false)
             ->assertSee('ここへ移動')
+            ->assertSee('スケジュールの時間軸も変更しました')
             ->assertSee(route('projects.workspace.order', $project), false)
             ->assertSee('data-inline-editor="improvement-edit-'.$task->improvement_id.'"', false)
             ->assertSee('data-inline-editor="roadmap-edit-'.$roadmap->id.'"', false)
@@ -365,7 +366,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('tree-item--task', false);
     }
 
-    public function test_workspace_reorders_tasks_within_the_same_improvement_without_changing_schedule(): void
+    public function test_workspace_reorders_tasks_and_updates_the_schedule_within_its_parent(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $first = $this->createTask($project, $owner);
@@ -391,12 +392,15 @@ class TaskManagementTest extends TestCase
                 'parent_id' => $first->improvement_id,
                 'ids' => [$second->id, $first->id],
             ])
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('schedule_updated', true);
 
         $this->assertSame(2, $first->fresh()->sort_order);
         $this->assertSame(1, $second->fresh()->sort_order);
-        $this->assertSame(3, $first->fresh()->planned_start_day);
-        $this->assertSame(8, $second->fresh()->due_day);
+        $this->assertSame(6, $first->fresh()->planned_start_day);
+        $this->assertSame(8, $first->fresh()->due_day);
+        $this->assertSame(3, $second->fresh()->planned_start_day);
+        $this->assertSame(5, $second->fresh()->due_day);
     }
 
     public function test_time_view_only_marks_started_overdue_tasks_as_delayed(): void

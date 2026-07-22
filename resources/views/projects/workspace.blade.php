@@ -71,6 +71,8 @@
     .tree-item.is-drop-before::after { top:1px; transform:translateY(-100%); }
     .tree-item.is-drop-after::before { bottom:-2px; }
     .tree-item.is-drop-after::after { bottom:1px; transform:translateY(100%); }
+    .schedule-toast { position:fixed; z-index:50; top:82px; left:50%; padding:10px 16px; border:1px solid #a9d5cd; border-radius:999px; color:#174e48; background:#e6f5f1; box-shadow:0 8px 24px rgba(23,63,74,.16); font-size:12px; font-weight:800; transform:translateX(-50%); }
+    .schedule-toast[hidden] { display:none; }
     .file-repository { padding:11px 12px; border-bottom:1px solid var(--wb-line); color:#40545e; background:#fff; font-size:12px; font-weight:800; }
     .file-repository span { display:block; margin-top:2px; color:#7b8b93; font-size:10px; font-weight:500; }
     .file-item { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; }
@@ -157,6 +159,7 @@
 </style>
 
 <section class="company-workbench" data-workbench data-order-url="{{ route('projects.workspace.order', $project) }}">
+    <div class="schedule-toast" data-schedule-toast hidden>スケジュールの時間軸も変更しました</div>
     <header class="workbench-bar">
         <div class="workbench-bar__identity">
             <span class="workbench-mode">3ペイン表示</span>
@@ -642,7 +645,14 @@
                 headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
                 body:JSON.stringify({type, parent_id:parent === 'project' ? null : Number(parent), ids}),
             });
-            if (!response.ok) throw new Error((await response.json()).message || '表示順を保存できませんでした。');
+            const body = await response.json();
+            if (!response.ok) throw new Error(Object.values(body.errors || {}).flat()[0] || body.message || '表示順を保存できませんでした。');
+            if (body.schedule_updated) {
+                const toast = workbench.querySelector('[data-schedule-toast]');
+                toast.hidden = false;
+                clearTimeout(toast.hideTimer);
+                toast.hideTimer = setTimeout(() => { toast.hidden = true; }, 2000);
+            }
         } catch (error) {
             alert(error.message);
             window.location.reload();
