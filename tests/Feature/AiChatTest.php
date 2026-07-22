@@ -91,7 +91,7 @@ class AiChatTest extends TestCase
         $this->assertDatabaseCount('ai_chat_messages', 0);
     }
 
-    public function test_four_pane_workspace_shows_chat_history_and_tokens_on_demand(): void
+    public function test_three_pane_workspace_shows_chat_history_and_tokens_on_demand(): void
     {
         [$user, $workspace, $project] = $this->projectUser();
         WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);

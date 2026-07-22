@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => $project->name.' | 4ペイン表示'])
+@extends('layouts.app', ['title' => $project->name.' | 3ペイン表示'])
 
 @section('content')
 @php
@@ -12,10 +12,14 @@
     .workbench-bar__identity strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .workbench-mode { display:inline-flex; align-items:center; gap:7px; color:#46606d; font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
     .workbench-mode::before { content:""; width:7px; height:7px; border-radius:50%; background:#42a69a; box-shadow:0 0 0 4px #dff3ef; }
-    .workbench-grid { min-height:0; display:grid; grid-template-columns:minmax(190px,230px) minmax(190px,230px) minmax(420px,1fr) minmax(320px,360px); }
+    .workbench-grid { min-height:0; display:grid; grid-template-columns:minmax(250px,300px) minmax(440px,1fr) minmax(320px,360px); }
     .workbench-pane { min-width:0; min-height:0; overflow:auto; }
-    .workbench-tree { border-right:1px solid var(--wb-line); background:#f7f9fa; }
-    .workbench-files { border-right:1px solid var(--wb-line); background:#fbfcfd; }
+    .workbench-explorer { border-right:1px solid var(--wb-line); background:#f7f9fa; overflow:hidden; }
+    .workbench-tree, .workbench-files { display:none; height:100%; overflow:auto; }
+    .workbench-tree.is-current, .workbench-files.is-current { display:block; }
+    .explorer-tabs { display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--wb-line); background:#f4f7f8; }
+    .explorer-tab { padding:12px 10px; border:0; border-radius:0; color:#647680; background:transparent; font-size:12px; }
+    .explorer-tab.is-current { color:#173f4a; background:#fff; box-shadow:inset 0 -2px #4f8994; }
     .workbench-main { background:#fff; }
     .workbench-ai { border-left:1px solid var(--wb-line); background:#fafcfc; }
     .pane-head { position:sticky; top:0; z-index:2; padding:13px 15px; border-bottom:1px solid var(--wb-line); background:rgba(250,252,252,.96); backdrop-filter:blur(8px); }
@@ -28,18 +32,22 @@
     .tree-item:hover { background:#e9eff2; }
     .tree-item.is-current { color:#0f4c5c; background:#dcebed; }
     .tree-item--child { padding-left:27px; font-size:12px; font-weight:500; }
-    .tree-item--grandchild { padding-left:45px; color:#5d6b73; font-size:12px; font-weight:500; }
+    .tree-item--grandchild { padding-left:31px; color:#5d6b73; font-size:12px; font-weight:500; }
+    .tree-item--task-child { padding-left:49px; font-size:11px; font-weight:500; }
+    .tree-branch[hidden] { display:none; }
+    .tree-expander { transition:transform .16s ease; }
+    [aria-expanded="true"] > .tree-expander { transform:rotate(90deg); }
     .tree-icon { flex:0 0 16px; color:#78909b; text-align:center; }
     .tree-count { margin-left:auto; color:#82939c; font-size:10px; }
-    .tree-item--roadmap { border-left:3px solid #9bbbd3; color:#35586f; background:#eef5fa; }
-    .tree-item--roadmap .tree-icon { color:#6f9dbd; }
-    .tree-item--roadmap:hover, .tree-item--roadmap.is-current { color:#294e67; background:#e2eff8; }
-    .tree-item--improvement { border-left:3px solid #9fc8b1; color:#3f6551; background:#eff8f3; }
-    .tree-item--improvement .tree-icon { color:#72a88a; }
-    .tree-item--improvement:hover, .tree-item--improvement.is-current { color:#315b45; background:#e2f2e9; }
-    .tree-item--task { border-left:3px solid #d7aaa8; color:#77504e; background:#fbf1f1; }
-    .tree-item--task .tree-icon { color:#b87f7c; }
-    .tree-item--task:hover, .tree-item--task.is-current { color:#68413f; background:#f6e4e3; }
+    .tree-item--roadmap { border-left:3px solid #75a7ca; color:#294f68; background:#dfedf7; }
+    .tree-item--roadmap .tree-icon { color:#4f8bb5; }
+    .tree-item--roadmap:hover, .tree-item--roadmap.is-current { color:#1f465f; background:#cfe3f2; }
+    .tree-item--improvement { border-left:3px solid #79b493; color:#315d45; background:#e0f1e7; }
+    .tree-item--improvement .tree-icon { color:#559b73; }
+    .tree-item--improvement:hover, .tree-item--improvement.is-current { color:#28533b; background:#cfe9da; }
+    .tree-item--task { border-left:3px solid #cb8d89; color:#704340; background:#f5e3e2; }
+    .tree-item--task .tree-icon { color:#aa6662; }
+    .tree-item--task:hover, .tree-item--task.is-current { color:#613733; background:#efd2d0; }
     .file-repository { padding:11px 12px; border-bottom:1px solid var(--wb-line); color:#40545e; background:#fff; font-size:12px; font-weight:800; }
     .file-repository span { display:block; margin-top:2px; color:#7b8b93; font-size:10px; font-weight:500; }
     .file-item { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; }
@@ -102,7 +110,7 @@
     .ai-chat-form__actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .ai-chat-form__actions button { padding:9px 13px; }
     .mobile-pane-switch { display:none; }
-    @media (max-width:1250px) {
+    @media (max-width:900px) {
         .company-workbench { min-height:720px; height:calc(100vh - 69px); grid-template-rows:auto auto minmax(0,1fr); }
         .mobile-pane-switch { display:flex; gap:6px; padding:8px; border-bottom:1px solid var(--wb-line); background:#f8fafb; }
         .mobile-pane-switch button { flex:1; padding:8px; border:1px solid var(--wb-line); color:#425863; background:#fff; font-size:12px; }
@@ -123,7 +131,7 @@
 <section class="company-workbench" data-workbench>
     <header class="workbench-bar">
         <div class="workbench-bar__identity">
-            <span class="workbench-mode">4ペイン表示</span>
+            <span class="workbench-mode">3ペイン表示</span>
             <strong>{{ $project->name }}</strong>
         </div>
         <div class="actions">
@@ -133,58 +141,64 @@
     </header>
 
     <div class="mobile-pane-switch" aria-label="表示するペイン">
-        <button type="button" data-mobile-pane="tree">仕事</button>
-        <button type="button" data-mobile-pane="files">ファイル</button>
+        <button type="button" data-mobile-pane="explorer">WORK / FILES</button>
         <button type="button" class="is-current" data-mobile-pane="main">表示</button>
         <button type="button" data-mobile-pane="ai">AI</button>
     </div>
 
     <div class="workbench-grid">
-        <nav class="workbench-pane workbench-tree" data-pane="tree" aria-label="プロジェクト構造">
-            <div class="pane-head"><strong>WORK</strong><span>仕事の流れをたどる</span></div>
-            <div class="tree-body">
-                <div class="tree-group">
-                    <button class="tree-item is-current" type="button" data-document="project"><span class="tree-icon">▣</span>{{ $project->name }}</button>
-                </div>
-                <div class="tree-group">
-                    <div class="tree-group__label">Plan</div>
-                    @forelse($roadmaps as $roadmap)
-                        <button class="tree-item tree-item--child tree-item--roadmap" type="button" data-document="roadmap-{{ $roadmap->id }}"><span class="tree-icon">◇</span>{{ $roadmap->title }}<span class="tree-count">{{ $roadmap->improvements->count() }}</span></button>
-                        @foreach($roadmap->improvements as $improvement)
-                            <button class="tree-item tree-item--grandchild tree-item--improvement" type="button" data-document="improvement-{{ $improvement->id }}"><span class="tree-icon">○</span>{{ $improvement->title }}</button>
-                        @endforeach
-                    @empty
-                        <button class="tree-item tree-item--child tree-item--roadmap" type="button" data-document="roadmaps"><span class="tree-icon">◇</span>ロードマップ<span class="tree-count">0</span></button>
-                    @endforelse
-                </div>
-                <div class="tree-group">
-                    <div class="tree-group__label">Work</div>
-                    <button class="tree-item tree-item--improvement" type="button" data-document="improvements"><span class="tree-icon">△</span>すべての取組み<span class="tree-count">{{ $allImprovements->count() }}</span></button>
-                    <button class="tree-item tree-item--task" type="button" data-document="tasks"><span class="tree-icon">✓</span>すべてのタスク<span class="tree-count">{{ $allTasks->count() }}</span></button>
-                    @if($canViewInternalNotes)<button class="tree-item" type="button" data-document="knowledge"><span class="tree-icon">▤</span>社内メモ・資料<span class="tree-count">{{ $internalNotes->count() }}</span></button>@endif
-                </div>
-                <div class="tree-group">
-                    <div class="tree-group__label">AI</div>
-                    <button class="tree-item" type="button" data-document="ai-proposals"><span class="tree-icon">✦</span>AI提案<span class="tree-count">{{ $pendingAiProposalCount }}</span></button>
-                </div>
+        <aside class="workbench-pane workbench-explorer" data-pane="explorer" aria-label="WORKとFILES">
+            <div class="explorer-tabs">
+                <button class="explorer-tab is-current" type="button" data-explorer-tab="work">WORK</button>
+                <button class="explorer-tab" type="button" data-explorer-tab="files">FILES</button>
             </div>
-        </nav>
+            <nav class="workbench-tree is-current" data-explorer-panel="work" aria-label="プロジェクト構造">
+                <div class="pane-head"><strong>WORK</strong><span>ロードマップからタスクまでたどる</span></div>
+                <div class="tree-body">
+                    <div class="tree-group"><button class="tree-item is-current" type="button" data-document="project"><span class="tree-icon">▣</span>{{ $project->name }}</button></div>
+                    <div class="tree-group">
+                        <div class="tree-group__label">Roadmaps</div>
+                        @forelse($roadmaps as $roadmap)
+                            <button class="tree-item tree-item--roadmap" type="button" data-document="roadmap-{{ $roadmap->id }}" data-tree-toggle="roadmap-{{ $roadmap->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $roadmap->title }}<span class="tree-count">{{ $roadmap->improvements->count() }}</span></button>
+                            <div class="tree-branch" data-tree-branch="roadmap-{{ $roadmap->id }}" hidden>
+                                @foreach($roadmap->improvements as $improvement)
+                                    <button class="tree-item tree-item--grandchild tree-item--improvement" type="button" data-document="improvement-{{ $improvement->id }}" data-tree-toggle="improvement-{{ $improvement->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $improvement->title }}<span class="tree-count">{{ $improvement->tasks->count() }}</span></button>
+                                    <div class="tree-branch" data-tree-branch="improvement-{{ $improvement->id }}" hidden>
+                                        @foreach($improvement->tasks as $task)
+                                            <button class="tree-item tree-item--task-child tree-item--task" type="button" data-document="task-{{ $task->id }}"><span class="tree-icon">✓</span>{{ $task->title }}</button>
+                                        @endforeach
+                                    </div>
+                                @endforeach
+                            </div>
+                        @empty
+                            <button class="tree-item tree-item--roadmap" type="button" data-document="roadmaps"><span class="tree-icon">◇</span>ロードマップ<span class="tree-count">0</span></button>
+                        @endforelse
+                    </div>
+                    @if($canViewInternalNotes)<div class="tree-group"><button class="tree-item" type="button" data-document="knowledge"><span class="tree-icon">▤</span>社内メモ・資料<span class="tree-count">{{ $internalNotes->count() }}</span></button></div>@endif
+                    <div class="tree-group"><button class="tree-item" type="button" data-document="ai-proposals"><span class="tree-icon">✦</span>AI提案<span class="tree-count">{{ $pendingAiProposalCount }}</span></button></div>
+                </div>
+            </nav>
 
-        <nav class="workbench-pane workbench-files" data-pane="files" aria-label="ファイル構成">
-            <div class="pane-head"><strong>FILES</strong><span>成果物とソースを開く</span></div>
-            <div class="file-repository">▣ prohit-okinawa<span>読み取り専用プレビュー</span></div>
-            <div class="tree-body">
-                <button class="tree-item file-item" type="button" data-file-name="docs/README.md" data-file-copy="プロジェクト概要と運用手順をまとめたドキュメントです。"><span class="tree-icon">▾</span>docs</button>
-                <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/01-requirements.md" data-file-copy="Webサイトの要件定義です。"><span class="tree-icon">◇</span>01-requirements.md</button>
-                <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/04-implementation-plan.md" data-file-copy="実装計画と進め方をまとめたファイルです。"><span class="tree-icon">◇</span>04-implementation-plan.md</button>
-                <button class="tree-item file-item" type="button" data-file-name="public_html" data-file-copy="公開サイトと管理画面のPHPファイルが入ります。"><span class="tree-icon">▾</span>public_html</button>
-                <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/index.php" data-file-copy="公開サイトのトップページです。" data-file-view="browser" data-preview-url="https://prohit-okinawa.com/"><span class="tree-icon">◇</span>index.php</button>
-                <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/admin.php" data-file-copy="サイト運用の管理画面です。"><span class="tree-icon">◇</span>admin.php</button>
-                <button class="tree-item file-item" type="button" data-file-name="storage/content" data-file-copy="公開サイトで使うコンテンツデータです。"><span class="tree-icon">▾</span>storage/content</button>
-                <button class="tree-item file-item file-item--nested" type="button" data-file-name="storage/content/company.json" data-file-copy="会社情報のデータです。"><span class="tree-icon">◇</span>company.json</button>
-            </div>
-            <p class="file-note">現在は画面構成を確かめるプレビューです。次の段階でGitHubと接続し、実際のファイル一覧に切り替えます。</p>
-        </nav>
+            <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
+                <div class="pane-head"><strong>FILES</strong><span>フォルダを開いて成果物を確認する</span></div>
+                <div class="file-repository">▣ prohit-okinawa<span>読み取り専用プレビュー</span></div>
+                <div class="tree-body">
+                    <button class="tree-item file-item" type="button" data-file-toggle="docs" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>docs</button>
+                    <div class="tree-branch" data-file-branch="docs" hidden>
+                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/01-requirements.md" data-file-copy="Webサイトの要件定義です。"><span class="tree-icon">◇</span>01-requirements.md</button>
+                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/04-implementation-plan.md" data-file-copy="実装計画と進め方をまとめたファイルです。"><span class="tree-icon">◇</span>04-implementation-plan.md</button>
+                    </div>
+                    <button class="tree-item file-item" type="button" data-file-toggle="public_html" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>public_html</button>
+                    <div class="tree-branch" data-file-branch="public_html" hidden>
+                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/index.php" data-file-copy="公開サイトのトップページです。" data-file-view="browser" data-preview-url="https://prohit-okinawa.com/"><span class="tree-icon">◇</span>index.php</button>
+                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/admin.php" data-file-copy="サイト運用の管理画面です。"><span class="tree-icon">◇</span>admin.php</button>
+                    </div>
+                    <button class="tree-item file-item" type="button" data-file-toggle="storage" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>storage/content</button>
+                    <div class="tree-branch" data-file-branch="storage" hidden><button class="tree-item file-item file-item--nested" type="button" data-file-name="storage/content/company.json" data-file-copy="会社情報のデータです。"><span class="tree-icon">◇</span>company.json</button></div>
+                </div>
+                <p class="file-note">現在は画面構成を確かめるプレビューです。次の段階でGitHubの実際のファイル一覧に切り替えます。</p>
+            </nav>
+        </aside>
 
         <section class="workbench-pane workbench-main is-mobile-current" data-pane="main">
             <div class="viewer-panel is-current" data-viewer-panel="document">
@@ -213,14 +227,22 @@
                     <article class="workbench-document" data-document-panel="improvement-{{ $improvement->id }}">
                         <div class="document-kicker">Improvement</div><h1 class="document-title">{{ $improvement->title }}</h1><p class="document-summary">{{ $improvement->desired_state ?: $improvement->description ?: '改善内容はまだ整理されていません。' }}</p>
                         <div class="document-meta"><span class="badge">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}</span><span class="badge">{{ $improvementVisibilities[$improvement->visibility] ?? $improvement->visibility }}</span></div>
-                        <div class="document-list">@forelse($improvement->tasks as $task)<a class="document-row" href="{{ route('projects.tasks.show', [$project,$task]) }}"><strong>{{ $task->title }}</strong><span class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / {{ $task->assignee?->name ?? '担当未設定' }}</span></a>@empty<p>タスクはまだありません。</p>@endforelse</div>
+                        <div class="document-list">@forelse($improvement->tasks as $task)<button class="tree-item document-row" type="button" data-document="task-{{ $task->id }}"><strong>{{ $task->title }}</strong><span class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / {{ $task->assignee?->name ?? '担当未設定' }}</span></button>@empty<p>タスクはまだありません。</p>@endforelse</div>
                         <div class="actions" style="margin-top:20px"><a class="button secondary" href="{{ route('projects.improvements.show', [$project,$improvement]) }}">詳細を見る</a>@if($canCreateTask)<a class="button" href="{{ route('projects.tasks.create', ['project'=>$project,'improvement'=>$improvement->id]) }}">タスクを追加</a>@endif</div>
                     </article>
                 @endforeach
             @endforeach
 
             <article class="workbench-document" data-document-panel="improvements"><div class="document-kicker">All Improvements</div><h1 class="document-title">すべての改善</h1><div class="document-list">@forelse($allImprovements as $improvement)<button class="tree-item document-row" type="button" data-document="improvement-{{ $improvement->id }}"><strong>{{ $improvement->title }}</strong><span class="meta">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}</span></button>@empty<p>改善はまだありません。</p>@endforelse</div></article>
-            <article class="workbench-document" data-document-panel="tasks"><div class="document-kicker">All Tasks</div><h1 class="document-title">すべてのタスク</h1><div class="document-list">@forelse($allTasks as $task)<a class="document-row" href="{{ route('projects.tasks.show', [$project,$task]) }}"><strong>{{ $task->title }}</strong><span class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / {{ $task->assignee?->name ?? '担当未設定' }}</span></a>@empty<p>タスクはまだありません。</p>@endforelse</div></article>
+            <article class="workbench-document" data-document-panel="tasks"><div class="document-kicker">All Tasks</div><h1 class="document-title">すべてのタスク</h1><div class="document-list">@forelse($allTasks as $task)<button class="tree-item document-row" type="button" data-document="task-{{ $task->id }}"><strong>{{ $task->title }}</strong><span class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / {{ $task->assignee?->name ?? '担当未設定' }}</span></button>@empty<p>タスクはまだありません。</p>@endforelse</div></article>
+            @foreach($allTasks as $task)
+                <article class="workbench-document" data-document-panel="task-{{ $task->id }}">
+                    <div class="document-kicker">Task</div><h1 class="document-title">{{ $task->title }}</h1>
+                    <p class="document-summary">{{ $task->description ?: 'タスクの詳細はまだ登録されていません。' }}</p>
+                    <div class="document-meta"><span class="badge">{{ $taskStatuses[$task->status] ?? $task->status }}</span><span class="badge">{{ $task->assignee?->name ?? '担当未設定' }}</span>@if($task->due_date)<span class="badge">期限 {{ $task->due_date->format('Y/m/d') }}</span>@endif</div>
+                    <div class="actions" style="margin-top:20px"><a class="button secondary" href="{{ route('projects.tasks.show', [$project,$task]) }}">詳細・編集を開く</a></div>
+                </article>
+            @endforeach
             @if($canViewInternalNotes)<article class="workbench-document" data-document-panel="knowledge"><div class="document-kicker">Company Knowledge</div><h1 class="document-title">社内メモ・資料</h1><p class="document-summary">AIと共有するプロジェクト固有の背景や資料です。</p><div class="document-list">@forelse($internalNotes as $note)<div class="document-row"><strong>{{ $note->user?->name ?? 'メンバー' }}のメモ</strong><p>{{ $note->body ?: '添付資料・参照情報' }}</p><span class="meta">{{ $note->created_at->format('Y/m/d H:i') }} / 添付 {{ $note->attachments->count() }}件</span></div>@empty<p>社内メモはまだありません。</p>@endforelse</div></article>@endif
             <article class="workbench-document" data-document-panel="ai-proposals"><div class="document-kicker">AI Proposals</div><h1 class="document-title">AI提案</h1><p class="document-summary">AIが作成した変更案は、人が確認・承認するまでプロジェクトへ反映されません。</p><div class="document-list">@forelse($pendingAiProposals as $proposal)<a class="document-row" href="{{ route('projects.ai-proposals.show', [$project,$proposal]) }}"><strong>{{ $proposal->title }}</strong><span class="meta">承認待ち / {{ $proposal->created_at->format('Y/m/d H:i') }}</span></a>@empty<p>承認待ちのAI提案はありません。</p>@endforelse</div></article>
             </div>
@@ -318,7 +340,7 @@
         workbench.querySelector('[data-chat-context-label]').value = contextLabel;
         showViewer('document');
         workbench.querySelector('[data-pane="main"]').scrollTop = 0;
-        if (matchMedia('(max-width:1250px)').matches) showMobilePane('main');
+        if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
     };
     const showMobilePane = name => {
         workbench.querySelectorAll('[data-pane]').forEach(pane => pane.classList.toggle('is-mobile-current', pane.dataset.pane === name));
@@ -329,6 +351,30 @@
         if (documentButton) openDocument(documentButton.dataset.document);
         const paneButton = event.target.closest('[data-mobile-pane]');
         if (paneButton) showMobilePane(paneButton.dataset.mobilePane);
+        const explorerTab = event.target.closest('[data-explorer-tab]');
+        if (explorerTab) {
+            const name = explorerTab.dataset.explorerTab;
+            workbench.querySelectorAll('[data-explorer-tab]').forEach(button => button.classList.toggle('is-current', button.dataset.explorerTab === name));
+            workbench.querySelectorAll('[data-explorer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.explorerPanel === name));
+        }
+        const treeToggle = event.target.closest('[data-tree-toggle]');
+        if (treeToggle) {
+            const branch = workbench.querySelector(`[data-tree-branch="${CSS.escape(treeToggle.dataset.treeToggle)}"]`);
+            if (branch) {
+                const open = branch.hidden;
+                branch.hidden = !open;
+                treeToggle.setAttribute('aria-expanded', String(open));
+            }
+        }
+        const fileToggle = event.target.closest('[data-file-toggle]');
+        if (fileToggle) {
+            const branch = workbench.querySelector(`[data-file-branch="${CSS.escape(fileToggle.dataset.fileToggle)}"]`);
+            if (branch) {
+                const open = branch.hidden;
+                branch.hidden = !open;
+                fileToggle.setAttribute('aria-expanded', String(open));
+            }
+        }
         const fileButton = event.target.closest('[data-file-name]');
         if (fileButton) {
             workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
@@ -347,7 +393,7 @@
             workbench.querySelector('[data-ai-context]').textContent = contextLabel;
             workbench.querySelector('[data-chat-context-key]').value = `file:${fileButton.dataset.fileName}`;
             workbench.querySelector('[data-chat-context-label]').value = contextLabel;
-            if (matchMedia('(max-width:1250px)').matches) showMobilePane('main');
+            if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
         }
         if (event.target.closest('[data-usage-toggle]')) {
             const card = workbench.querySelector('[data-usage-card]');

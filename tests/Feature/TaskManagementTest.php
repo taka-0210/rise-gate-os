@@ -303,24 +303,20 @@ class TaskManagementTest extends TestCase
             ->assertSee('メンバー・詳細管理');
     }
 
-    public function test_project_has_an_optional_four_pane_workspace(): void
+    public function test_project_has_an_optional_three_pane_workspace(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
-        $roadmap = Roadmap::create([
-            'organization_id' => $project->organization_id,
-            'workspace_id' => $workspace->id,
-            'project_id' => $project->id,
-            'title' => '商品化ロードマップ',
-            'status' => Roadmap::STATUS_ACTIVE,
-            'sort_order' => 1,
-            'created_by' => $owner->id,
-        ]);
+        $task = $this->createTask($project, $owner);
+        $task->update(['title' => '中央に表示するタスク']);
+        $task->improvement->update(['title' => '商品化の取組み']);
+        $roadmap = $task->improvement->roadmap;
+        $roadmap->update(['title' => '商品化ロードマップ']);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.show', $project))
             ->assertOk()
-            ->assertSee('4ペイン表示')
+            ->assertSee('3ペイン表示')
             ->assertSee(route('projects.workspace', $project), false);
 
         $this->actingAs($owner)
@@ -337,8 +333,15 @@ class TaskManagementTest extends TestCase
             ->assertSee('現行表示へ戻る')
             ->assertSee($project->name)
             ->assertSee($roadmap->title)
-            ->assertSee('data-pane="tree"', false)
-            ->assertSee('data-pane="files"', false)
+            ->assertSee($task->improvement->title)
+            ->assertSee($task->title)
+            ->assertSee('data-pane="explorer"', false)
+            ->assertSee('data-explorer-tab="work"', false)
+            ->assertSee('data-explorer-tab="files"', false)
+            ->assertSee('data-tree-toggle="roadmap-', false)
+            ->assertSee('data-tree-toggle="improvement-', false)
+            ->assertSee('data-document="task-'.$task->id.'"', false)
+            ->assertSee('data-document-panel="task-'.$task->id.'"', false)
             ->assertSee('data-pane="main"', false)
             ->assertSee('data-pane="ai"', false)
             ->assertSee('tree-item--roadmap', false)
