@@ -91,7 +91,7 @@ class AiChatTest extends TestCase
         $this->assertDatabaseCount('ai_chat_messages', 0);
     }
 
-    public function test_three_pane_workspace_shows_chat_history_and_cost(): void
+    public function test_four_pane_workspace_shows_chat_history_and_cost_on_demand(): void
     {
         [$user, $workspace, $project] = $this->projectUser();
         WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
@@ -116,7 +116,10 @@ class AiChatTest extends TestCase
             ->assertSee('読み取り専用AI：接続可能')
             ->assertSee('保存済みの会話です。')
             ->assertSee('data-chat-form', false)
-            ->assertSee('推定累計 $0.0006');
+            ->assertSee('利用料をチェックする')
+            ->assertSee('推定利用料')
+            ->assertSee('$0.0006')
+            ->assertDontSee('120 tokens');
     }
 
     private function projectUser(): array

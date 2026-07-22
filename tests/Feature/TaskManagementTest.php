@@ -303,7 +303,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('メンバー・詳細管理');
     }
 
-    public function test_project_has_an_optional_three_pane_workspace(): void
+    public function test_project_has_an_optional_four_pane_workspace(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $roadmap = Roadmap::create([
@@ -320,19 +320,23 @@ class TaskManagementTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.show', $project))
             ->assertOk()
-            ->assertSee('3ペイン表示')
+            ->assertSee('4ペイン表示')
             ->assertSee(route('projects.workspace', $project), false);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.workspace', $project))
             ->assertOk()
-            ->assertSee('PROJECT TREE')
+            ->assertSee('WORK')
+            ->assertSee('FILES')
+            ->assertSee('prohit-okinawa')
+            ->assertSee('ブラウザ')
             ->assertSee('AI PARTNER')
             ->assertSee('現行表示へ戻る')
             ->assertSee($project->name)
             ->assertSee($roadmap->title)
             ->assertSee('data-pane="tree"', false)
+            ->assertSee('data-pane="files"', false)
             ->assertSee('data-pane="main"', false)
             ->assertSee('data-pane="ai"', false);
     }
