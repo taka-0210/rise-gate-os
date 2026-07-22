@@ -164,7 +164,6 @@
             </div>
             <nav class="workbench-tree is-current" data-explorer-panel="work" aria-label="プロジェクト構造">
                 <div class="tree-body">
-                    <div class="tree-group"><button class="tree-item is-current" type="button" data-document="project"><span class="tree-icon">▣</span>{{ $project->name }}</button></div>
                     <div class="tree-group">
                         <div class="tree-group__label">Roadmaps</div>
                         @forelse($roadmaps as $roadmap)
@@ -231,14 +230,43 @@
                     <div class="document-kicker">Roadmap</div><h1 class="document-title">{{ $roadmap->title }}</h1><p class="document-summary">{{ $roadmap->purpose ?: 'このロードマップの目的はまだ登録されていません。' }}</p>
                     <div class="document-meta"><span class="badge">{{ $roadmapStatuses[$roadmap->status] ?? $roadmap->status }}</span><span class="badge">改善 {{ $roadmap->improvements->count() }}件</span></div>
                     <div class="document-list">@foreach($roadmap->improvements as $improvement)<button class="tree-item document-row" type="button" data-document="improvement-{{ $improvement->id }}"><strong>{{ $improvement->title }}</strong><span class="meta">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }} / タスク {{ $improvement->tasks->count() }}件</span></button>@endforeach</div>
-                    @if($canCreateImprovement)<div class="actions" style="margin-top:20px"><a class="button" href="{{ route('projects.improvements.create', ['project'=>$project,'roadmap'=>$roadmap->id]) }}">改善を追加</a></div>@endif
+                    @if($canCreateImprovement)
+                        <div class="actions" style="margin-top:20px"><button type="button" data-inline-editor-toggle="roadmap-create-{{ $roadmap->id }}">取組みを追加</button></div>
+                        <form class="inline-editor stack" data-inline-editor="roadmap-create-{{ $roadmap->id }}" data-workspace-form data-reload-after-save hidden method="POST" action="{{ route('projects.improvements.store', $project) }}">
+                            @csrf
+                            <input type="hidden" name="roadmap_id" value="{{ $roadmap->id }}"><input type="hidden" name="visibility" value="{{ \App\Models\Improvement::VISIBILITY_INTERNAL }}">
+                            <div class="field"><label for="workspace_improvement_new_title_{{ $roadmap->id }}">取組み名</label><input id="workspace_improvement_new_title_{{ $roadmap->id }}" name="title" required></div>
+                            <div class="field"><label for="workspace_improvement_new_current_{{ $roadmap->id }}">現在地</label><textarea id="workspace_improvement_new_current_{{ $roadmap->id }}" name="current_state" rows="3"></textarea></div>
+                            <div class="field"><label for="workspace_improvement_new_desired_{{ $roadmap->id }}">目指す状態</label><textarea id="workspace_improvement_new_desired_{{ $roadmap->id }}" name="desired_state" rows="3"></textarea></div>
+                            <div class="actions"><button type="submit">追加する</button><button class="secondary" type="button" data-inline-editor-close="roadmap-create-{{ $roadmap->id }}">閉じる</button></div><div class="inline-editor__status" data-inline-editor-status></div>
+                        </form>
+                    @endif
                 </article>
                 @foreach($roadmap->improvements as $improvement)
                     <article class="workbench-document" data-document-panel="improvement-{{ $improvement->id }}">
                         <div class="document-kicker">Improvement</div><h1 class="document-title">{{ $improvement->title }}</h1><p class="document-summary">{{ $improvement->desired_state ?: $improvement->description ?: '改善内容はまだ整理されていません。' }}</p>
                         <div class="document-meta"><span class="badge">{{ $improvementStatuses[$improvement->status] ?? $improvement->status }}</span><span class="badge">{{ $improvementVisibilities[$improvement->visibility] ?? $improvement->visibility }}</span></div>
                         <div class="document-list">@forelse($improvement->tasks as $task)<button class="tree-item document-row" type="button" data-document="task-{{ $task->id }}"><strong>{{ $task->title }}</strong><span class="meta">{{ $taskStatuses[$task->status] ?? $task->status }} / {{ $task->assignee?->name ?? '担当未設定' }}</span></button>@empty<p>タスクはまだありません。</p>@endforelse</div>
-                        <div class="actions" style="margin-top:20px"><a class="button secondary" href="{{ route('projects.improvements.show', [$project,$improvement]) }}">詳細を見る</a>@if($canCreateTask)<a class="button" href="{{ route('projects.tasks.create', ['project'=>$project,'improvement'=>$improvement->id]) }}">タスクを追加</a>@endif</div>
+                        <div class="actions" style="margin-top:20px">@can('update',$improvement)<button class="secondary" type="button" data-inline-editor-toggle="improvement-edit-{{ $improvement->id }}">ここで編集</button>@endcan @if($canCreateTask)<button type="button" data-inline-editor-toggle="task-create-{{ $improvement->id }}">タスクを追加</button>@endif</div>
+                        @can('update',$improvement)
+                            <form class="inline-editor stack" data-inline-editor="improvement-edit-{{ $improvement->id }}" data-workspace-form data-update-panel hidden method="POST" action="{{ route('projects.improvements.update', [$project,$improvement]) }}">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="roadmap_id" value="{{ $improvement->roadmap_id }}"><input type="hidden" name="visibility" value="{{ $improvement->visibility }}"><input type="hidden" name="assigned_to" value="{{ $improvement->assigned_to }}"><input type="hidden" name="implemented_by" value="{{ $improvement->implemented_by }}"><input type="hidden" name="planned_effort_days" value="{{ $improvement->planned_effort_days }}"><input type="hidden" name="planned_start_date" value="{{ $improvement->planned_start_date?->format('Y-m-d') }}"><input type="hidden" name="target_date" value="{{ $improvement->target_date?->format('Y-m-d') }}"><input type="hidden" name="planned_start_day" value="{{ $improvement->planned_start_day }}"><input type="hidden" name="target_day" value="{{ $improvement->target_day }}"><input type="hidden" name="completed_at" value="{{ $improvement->completed_at?->format('Y-m-d') }}"><input type="hidden" name="implemented_at" value="{{ $improvement->implemented_at?->format('Y-m-d') }}">
+                                <textarea name="problem" hidden>{{ $improvement->problem }}</textarea><textarea name="hypothesis" hidden>{{ $improvement->hypothesis }}</textarea><textarea name="action" hidden>{{ $improvement->action }}</textarea><textarea name="result" hidden>{{ $improvement->result }}</textarea><textarea name="impact" hidden>{{ $improvement->impact }}</textarea><textarea name="next_action" hidden>{{ $improvement->next_action }}</textarea>
+                                <div class="field"><label for="workspace_improvement_title_{{ $improvement->id }}">取組み名</label><input id="workspace_improvement_title_{{ $improvement->id }}" name="title" value="{{ $improvement->title }}" required></div>
+                                <div class="field"><label for="workspace_improvement_current_{{ $improvement->id }}">現在地</label><textarea id="workspace_improvement_current_{{ $improvement->id }}" name="current_state" rows="3">{{ $improvement->current_state }}</textarea></div>
+                                <div class="field"><label for="workspace_improvement_desired_{{ $improvement->id }}">目指す状態</label><textarea id="workspace_improvement_desired_{{ $improvement->id }}" name="desired_state" rows="3">{{ $improvement->desired_state }}</textarea></div>
+                                <div class="actions"><button type="submit">保存する</button><button class="secondary" type="button" data-inline-editor-close="improvement-edit-{{ $improvement->id }}">閉じる</button></div><div class="inline-editor__status" data-inline-editor-status></div>
+                            </form>
+                        @endcan
+                        @if($canCreateTask)
+                            <form class="inline-editor stack" data-inline-editor="task-create-{{ $improvement->id }}" data-workspace-form data-reload-after-save hidden method="POST" action="{{ route('projects.tasks.store', $project) }}">
+                                @csrf <input type="hidden" name="improvement_id" value="{{ $improvement->id }}"><input type="hidden" name="status" value="{{ \App\Models\Task::STATUS_TODO }}"><input type="hidden" name="priority" value="{{ \App\Models\Task::PRIORITY_NORMAL }}">
+                                <div class="field"><label for="workspace_task_new_title_{{ $improvement->id }}">Task名</label><input id="workspace_task_new_title_{{ $improvement->id }}" name="title" required></div>
+                                <div class="field"><label for="workspace_task_new_description_{{ $improvement->id }}">説明</label><textarea id="workspace_task_new_description_{{ $improvement->id }}" name="description" rows="4"></textarea></div>
+                                <div class="actions"><button type="submit">追加する</button><button class="secondary" type="button" data-inline-editor-close="task-create-{{ $improvement->id }}">閉じる</button></div><div class="inline-editor__status" data-inline-editor-status></div>
+                            </form>
+                        @endif
                     </article>
                 @endforeach
             @endforeach
@@ -252,7 +280,7 @@
                     <div class="document-meta"><span class="badge">{{ $taskStatuses[$task->status] ?? $task->status }}</span><span class="badge">{{ $task->assignee?->name ?? '担当未設定' }}</span>@if($task->due_date)<span class="badge">期限 {{ $task->due_date->format('Y/m/d') }}</span>@endif</div>
                     @can('update', $task)
                         <div class="actions" style="margin-top:20px"><button class="secondary" type="button" data-inline-editor-toggle="task-{{ $task->id }}">ここで編集する</button></div>
-                        <form class="inline-editor stack" data-inline-editor="task-{{ $task->id }}" data-workspace-task-form hidden method="POST" action="{{ route('projects.tasks.update', [$project,$task]) }}">
+                        <form class="inline-editor stack" data-inline-editor="task-{{ $task->id }}" data-workspace-form data-update-panel hidden method="POST" action="{{ route('projects.tasks.update', [$project,$task]) }}">
                             @csrf @method('PUT')
                             <input type="hidden" name="improvement_id" value="{{ $task->improvement_id }}">
                             <input type="hidden" name="planned_start_date" value="{{ $task->planned_start_date?->format('Y-m-d') }}">
@@ -480,7 +508,7 @@
         }
     });
 
-    workbench.querySelectorAll('[data-workspace-task-form]').forEach(form => {
+    workbench.querySelectorAll('[data-workspace-form]').forEach(form => {
         form.addEventListener('submit', async event => {
             event.preventDefault();
             const submit = form.querySelector('button[type="submit"]');
@@ -493,9 +521,15 @@
                     const body = await response.json();
                     throw new Error(Object.values(body.errors || {}).flat()[0] || body.message || '保存できませんでした。');
                 }
+                if (form.hasAttribute('data-reload-after-save')) {
+                    status.textContent = '保存しました。表示を更新します…';
+                    window.location.reload();
+                    return;
+                }
                 const panel = form.closest('[data-document-panel]');
                 panel.querySelector('.document-title').textContent = form.elements.title.value;
-                panel.querySelector('.document-summary').textContent = form.elements.description.value || 'タスクの詳細はまだ登録されていません。';
+                const summary = form.elements.description?.value || form.elements.desired_state?.value || form.elements.current_state?.value || '';
+                panel.querySelector('.document-summary').textContent = summary || '詳細はまだ登録されていません。';
                 status.textContent = '保存しました。';
             } catch (error) {
                 status.textContent = error.message;
