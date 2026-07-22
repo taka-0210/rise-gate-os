@@ -85,6 +85,7 @@ Design documents are managed separately from implementation code.
 - `docs/database.md`: ER and table design
 - `docs/roadmap.md`: Phase plan
 - `docs/operation.md`: Operation rules for Project and Improvement
+- `docs/development-standard.md`: RISE GATE全案件の開発・Git・手動デプロイ標準
 - `docs/changelog.md`: Design decisions and changes
 
 ## Local Development

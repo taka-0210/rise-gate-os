@@ -125,4 +125,5 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 - `database.md`: ER図・テーブル設計・データ方針
 - `roadmap.md`: Phase管理と実装順序
 - `operation.md`: Project / Improvement の運用ルール
+- `development-standard.md`: 全案件共通の開発・Git・手動デプロイ標準
 - `changelog.md`: 設計変更履歴と意思決定
