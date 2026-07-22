@@ -303,6 +303,40 @@ class TaskManagementTest extends TestCase
             ->assertSee('メンバー・詳細管理');
     }
 
+    public function test_project_has_an_optional_three_pane_workspace(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $roadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '商品化ロードマップ',
+            'status' => Roadmap::STATUS_ACTIVE,
+            'sort_order' => 1,
+            'created_by' => $owner->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertSee('3ペイン表示')
+            ->assertSee(route('projects.workspace', $project), false);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.workspace', $project))
+            ->assertOk()
+            ->assertSee('PROJECT TREE')
+            ->assertSee('AI PARTNER')
+            ->assertSee('現行表示へ戻る')
+            ->assertSee($project->name)
+            ->assertSee($roadmap->title)
+            ->assertSee('data-pane="tree"', false)
+            ->assertSee('data-pane="main"', false)
+            ->assertSee('data-pane="ai"', false);
+    }
+
     public function test_time_view_only_marks_started_overdue_tasks_as_delayed(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

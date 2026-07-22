@@ -408,6 +408,11 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function workspace(Request $request, Project $project): View
+    {
+        return view('projects.workspace', $this->show($request, $project)->getData());
+    }
+
     public function legacy(Request $request, Project $project): View
     {
         return view('projects.show', $this->show($request, $project)->getData());
