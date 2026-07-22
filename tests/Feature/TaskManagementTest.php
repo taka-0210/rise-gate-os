@@ -351,6 +351,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-reorder-type="roadmap"', false)
             ->assertSee('data-reorder-type="improvement"', false)
             ->assertSee('data-reorder-type="task"', false)
+            ->assertSee('ここへ移動')
             ->assertSee(route('projects.workspace.order', $project), false)
             ->assertSee('data-inline-editor="improvement-edit-'.$task->improvement_id.'"', false)
             ->assertSee('data-inline-editor="roadmap-edit-'.$roadmap->id.'"', false)

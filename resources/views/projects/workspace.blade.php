@@ -43,7 +43,7 @@
     .tree-body { padding:10px 8px 24px; }
     .tree-group { margin:5px 0 10px; }
     .tree-group__label { padding:7px 10px; color:#74838c; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
-    .tree-item { width:100%; display:flex; align-items:center; gap:8px; min-height:34px; padding:7px 10px; border:0; border-radius:6px; color:#31434d; background:transparent; text-align:left; font-size:13px; font-weight:600; cursor:pointer; }
+    .tree-item { position:relative; width:100%; display:flex; align-items:center; gap:8px; min-height:34px; padding:7px 10px; border:0; border-radius:6px; color:#31434d; background:transparent; text-align:left; font-size:13px; font-weight:600; cursor:pointer; }
     .tree-item:hover { background:#e9eff2; }
     .tree-item.is-current { color:#0f4c5c; background:#dcebed; }
     .tree-item--child { padding-left:27px; font-size:12px; font-weight:500; }
@@ -65,7 +65,12 @@
     .tree-item--task:hover, .tree-item--task.is-current { color:#613733; background:#efd2d0; }
     .tree-item[draggable="true"] { cursor:grab; }
     .tree-item.is-dragging { opacity:.45; }
-    .tree-item.is-drop-target { outline:2px solid #69a0aa; outline-offset:-2px; }
+    .tree-item.is-drop-before::before, .tree-item.is-drop-after::before { content:""; position:absolute; z-index:4; right:5px; left:5px; height:3px; border-radius:999px; background:#328392; box-shadow:0 0 0 2px #e5f3f5; pointer-events:none; }
+    .tree-item.is-drop-before::after, .tree-item.is-drop-after::after { content:"ここへ移動"; position:absolute; z-index:5; right:7px; padding:2px 7px; border-radius:999px; color:#fff; background:#256c78; box-shadow:0 1px 4px rgba(23,63,74,.2); font-size:9px; font-weight:800; line-height:1.5; pointer-events:none; }
+    .tree-item.is-drop-before::before { top:-2px; }
+    .tree-item.is-drop-before::after { top:1px; transform:translateY(-100%); }
+    .tree-item.is-drop-after::before { bottom:-2px; }
+    .tree-item.is-drop-after::after { bottom:1px; transform:translateY(100%); }
     .file-repository { padding:11px 12px; border-bottom:1px solid var(--wb-line); color:#40545e; background:#fff; font-size:12px; font-weight:800; }
     .file-repository span { display:block; margin-top:2px; color:#7b8b93; font-size:10px; font-weight:500; }
     .file-item { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; }
@@ -590,6 +595,12 @@
     });
 
     let draggedTreeItem = null;
+    const clearDropIndicators = () => {
+        workbench.querySelectorAll('.is-drop-before, .is-drop-after').forEach(item => {
+            item.classList.remove('is-drop-before', 'is-drop-after');
+            delete item.dataset.dropPosition;
+        });
+    };
     workbench.addEventListener('dragstart', event => {
         const item = event.target.closest('[data-reorder-type]');
         if (!item) return;
@@ -599,21 +610,29 @@
     });
     workbench.addEventListener('dragover', event => {
         const target = event.target.closest('[data-reorder-type]');
+        clearDropIndicators();
         if (!draggedTreeItem || !target || target === draggedTreeItem) return;
         if (target.dataset.reorderType !== draggedTreeItem.dataset.reorderType || target.dataset.reorderParent !== draggedTreeItem.dataset.reorderParent) return;
         event.preventDefault();
-        target.classList.add('is-drop-target');
+        const position = event.clientY < target.getBoundingClientRect().top + (target.offsetHeight / 2) ? 'before' : 'after';
+        target.dataset.dropPosition = position;
+        target.classList.add(`is-drop-${position}`);
     });
-    workbench.addEventListener('dragleave', event => event.target.closest('[data-reorder-type]')?.classList.remove('is-drop-target'));
     workbench.addEventListener('drop', async event => {
         const target = event.target.closest('[data-reorder-type]');
-        workbench.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
+        const position = target?.dataset.dropPosition;
+        clearDropIndicators();
         if (!draggedTreeItem || !target || target === draggedTreeItem) return;
         if (target.dataset.reorderType !== draggedTreeItem.dataset.reorderType || target.dataset.reorderParent !== draggedTreeItem.dataset.reorderParent) return;
         event.preventDefault();
-        const branch = draggedTreeItem.nextElementSibling?.classList.contains('tree-branch') ? draggedTreeItem.nextElementSibling : null;
-        target.before(draggedTreeItem);
-        if (branch) draggedTreeItem.after(branch);
+        const sourceBranch = draggedTreeItem.nextElementSibling?.classList.contains('tree-branch') ? draggedTreeItem.nextElementSibling : null;
+        const targetBranch = target.nextElementSibling?.classList.contains('tree-branch') ? target.nextElementSibling : null;
+        if (position === 'after') {
+            (targetBranch || target).after(draggedTreeItem);
+        } else {
+            target.before(draggedTreeItem);
+        }
+        if (sourceBranch) draggedTreeItem.after(sourceBranch);
         const type = draggedTreeItem.dataset.reorderType;
         const parent = draggedTreeItem.dataset.reorderParent;
         const ids = [...workbench.querySelectorAll(`[data-reorder-type="${type}"][data-reorder-parent="${CSS.escape(parent)}"]`)].map(item => Number(item.dataset.reorderId));
@@ -631,7 +650,7 @@
     });
     workbench.addEventListener('dragend', () => {
         draggedTreeItem?.classList.remove('is-dragging');
-        workbench.querySelectorAll('.is-drop-target').forEach(item => item.classList.remove('is-drop-target'));
+        clearDropIndicators();
         draggedTreeItem = null;
     });
 
