@@ -370,7 +370,8 @@ class TaskManagementTest extends TestCase
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $first = $this->createTask($project, $owner);
-        $first->update(['sort_order' => 1, 'planned_start_day' => 3, 'due_day' => 5]);
+        $first->improvement->update(['planned_start_day' => 3, 'target_day' => 8]);
+        $first->update(['sort_order' => 1, 'planned_start_day' => 3, 'due_day' => 6]);
         $second = Task::create([
             'organization_id' => $project->organization_id,
             'workspace_id' => $workspace->id,
@@ -381,7 +382,7 @@ class TaskManagementTest extends TestCase
             'priority' => Task::PRIORITY_NORMAL,
             'created_by' => $owner->id,
             'sort_order' => 2,
-            'planned_start_day' => 6,
+            'planned_start_day' => 4,
             'due_day' => 8,
         ]);
 
@@ -397,10 +398,10 @@ class TaskManagementTest extends TestCase
 
         $this->assertSame(2, $first->fresh()->sort_order);
         $this->assertSame(1, $second->fresh()->sort_order);
-        $this->assertSame(6, $first->fresh()->planned_start_day);
-        $this->assertSame(8, $first->fresh()->due_day);
+        $this->assertSame(4, $first->fresh()->planned_start_day);
+        $this->assertSame(7, $first->fresh()->due_day);
         $this->assertSame(3, $second->fresh()->planned_start_day);
-        $this->assertSame(5, $second->fresh()->due_day);
+        $this->assertSame(7, $second->fresh()->due_day);
     }
 
     public function test_time_view_only_marks_started_overdue_tasks_as_delayed(): void

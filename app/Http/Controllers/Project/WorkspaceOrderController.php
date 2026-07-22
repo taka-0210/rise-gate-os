@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class WorkspaceOrderController extends Controller
 {
@@ -71,23 +70,25 @@ class WorkspaceOrderController extends Controller
     {
         if ($models->isEmpty() || $models->contains(fn ($model) => ! $model->planned_start_day || ! $this->endDay($model, $type))) return [];
 
-        [$parentStart, $parentEnd] = match ($type) {
-            'roadmap' => [1, $project->duration_days],
-            'improvement' => [Roadmap::find($parentId)?->planned_start_day, Roadmap::find($parentId)?->target_day],
-            'task' => [Improvement::find($parentId)?->planned_start_day, Improvement::find($parentId)?->target_day],
+        $parent = match ($type) {
+            'improvement' => Roadmap::find($parentId),
+            'task' => Improvement::find($parentId),
+            default => null,
         };
+        [$parentStart, $parentEnd] = $type === 'roadmap'
+            ? [1, $project->duration_days]
+            : [$parent?->planned_start_day, $parent?->target_day];
         $parentStart = (int) ($parentStart ?: $models->min('planned_start_day'));
         $parentEnd = (int) ($parentEnd ?: $models->max(fn ($model) => $this->endDay($model, $type)));
-        $cursor = max($parentStart, (int) $models->min('planned_start_day'));
+        $availableStarts = $models->pluck('planned_start_day')->sort()->values();
         $schedule = [];
-        foreach ($ids as $id) {
+        foreach ($ids as $index => $id) {
             $model = $models->firstWhere('id', $id);
             $duration = $this->endDay($model, $type) - $model->planned_start_day + 1;
-            $schedule[$id] = [$cursor, $cursor + $duration - 1];
-            $cursor += $duration;
-        }
-        if ($cursor - 1 > $parentEnd) {
-            throw ValidationException::withMessages(['schedule' => '並び替え後の日程が親要素の期間を超えます。先に期間を調整してください。']);
+            $latestStart = $parentEnd - $duration + 1;
+            if ($latestStart < $parentStart) return [];
+            $start = min(max((int) $availableStarts[$index], $parentStart), $latestStart);
+            $schedule[$id] = [$start, $start + $duration - 1];
         }
         return $schedule;
     }
