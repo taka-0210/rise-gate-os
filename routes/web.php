@@ -101,6 +101,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::get('/projects/{project}/workspace', [ProjectController::class, 'workspace'])->name('projects.workspace');
         Route::patch('/projects/{project}/workspace/order', [WorkspaceOrderController::class, 'update'])->name('projects.workspace.order');
+        Route::patch('/projects/{project}/workspace/preference', [WorkspaceOrderController::class, 'preference'])->name('projects.workspace.preference');
         Route::post('/projects/{project}/ai-chat/messages', [AiChatController::class, 'store'])->middleware('throttle:20,1')->name('projects.ai-chat.messages.store');
         Route::get('/projects/{project}/client-plan', [ProjectController::class, 'clientPlan'])->name('projects.client-plan');
         Route::get('/projects/{project}/business-media/{type}', [WorkspaceBusinessProfileController::class, 'projectMedia'])->name('projects.business-media');

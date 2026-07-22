@@ -41,6 +41,10 @@
     .pane-head strong { display:block; font-size:13px; }
     .pane-head span { color:var(--muted); font-size:11px; }
     .tree-body { padding:10px 8px 24px; }
+    .reorder-preference { display:grid; gap:5px; padding:10px 10px 8px; border-bottom:1px solid var(--wb-line); background:#fff; }
+    .reorder-preference label { color:#63747d; font-size:10px; font-weight:800; }
+    .reorder-preference select { width:100%; padding:7px 9px; border:1px solid #cbd6db; border-radius:6px; color:#29434e; background:#f8fafb; font-size:11px; }
+    .reorder-preference small { min-height:15px; color:#4c8078; font-size:9px; }
     .tree-group { margin:5px 0 10px; }
     .tree-group__label { padding:7px 10px; color:#74838c; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
     .tree-item { position:relative; width:100%; display:flex; align-items:center; gap:8px; min-height:34px; padding:7px 10px; border:0; border-radius:6px; color:#31434d; background:transparent; text-align:left; font-size:13px; font-weight:600; cursor:pointer; }
@@ -158,7 +162,7 @@
     }
 </style>
 
-<section class="company-workbench" data-workbench data-order-url="{{ route('projects.workspace.order', $project) }}">
+<section class="company-workbench" data-workbench data-order-url="{{ route('projects.workspace.order', $project) }}" data-preference-url="{{ route('projects.workspace.preference', $project) }}">
     <div class="schedule-toast" data-schedule-toast hidden>スケジュールの時間軸も変更しました</div>
     <header class="workbench-bar">
         <div class="workbench-bar__identity">
@@ -184,6 +188,16 @@
                 <button class="explorer-tab" type="button" data-explorer-tab="files">FILES</button>
             </div>
             <nav class="workbench-tree is-current" data-explorer-panel="work" aria-label="プロジェクト構造">
+                @if($canEditProject)
+                    <div class="reorder-preference">
+                        <label for="workspace-reorder-mode">ドラッグ時の時間軸</label>
+                        <select id="workspace-reorder-mode" data-reorder-mode>
+                            <option value="schedule" @selected($project->workspace_reorder_mode !== 'order_only')>順番と時間軸を変更</option>
+                            <option value="order_only" @selected($project->workspace_reorder_mode === 'order_only')>順番だけ変更</option>
+                        </select>
+                        <small data-reorder-mode-status></small>
+                    </div>
+                @endif
                 <div class="tree-body">
                     <div class="tree-group">
                         <div class="tree-group__label">Roadmaps</div>
@@ -598,6 +612,23 @@
     });
 
     let draggedTreeItem = null;
+    workbench.querySelector('[data-reorder-mode]')?.addEventListener('change', async event => {
+        const status = workbench.querySelector('[data-reorder-mode-status]');
+        status.textContent = '保存中…';
+        try {
+            const response = await fetch(workbench.dataset.preferenceUrl, {
+                method:'PATCH',
+                headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
+                body:JSON.stringify({workspace_reorder_mode:event.target.value}),
+            });
+            if (!response.ok) throw new Error('設定を保存できませんでした。');
+            status.textContent = 'このProjectに保存しました';
+            setTimeout(() => { status.textContent = ''; }, 2000);
+        } catch (error) {
+            status.textContent = error.message;
+        }
+    });
+
     const clearDropIndicators = () => {
         workbench.querySelectorAll('.is-drop-before, .is-drop-after').forEach(item => {
             item.classList.remove('is-drop-before', 'is-drop-after');

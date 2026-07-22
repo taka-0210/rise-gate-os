@@ -43,6 +43,7 @@ class Project extends Model
         'start_date',
         'due_date',
         'duration_days',
+        'workspace_reorder_mode',
         'published_at',
         'completed_at',
     ];

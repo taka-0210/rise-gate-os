@@ -15,6 +15,17 @@ use Illuminate\Validation\Rule;
 
 class WorkspaceOrderController extends Controller
 {
+    public function preference(Request $request, Project $project): JsonResponse
+    {
+        Gate::authorize('update', $project);
+        $data = $request->validate([
+            'workspace_reorder_mode' => ['required', Rule::in(['schedule', 'order_only'])],
+        ]);
+        $project->update($data);
+
+        return response()->json(['message' => '並び替え方法を保存しました。']);
+    }
+
     public function update(Request $request, Project $project): JsonResponse
     {
         Gate::authorize('view', $project);
@@ -46,7 +57,9 @@ class WorkspaceOrderController extends Controller
         };
 
         $scheduleUpdated = DB::transaction(function () use ($models, $data, $field, $project): bool {
-            $schedule = $this->buildSchedule($project, $data['type'], $models, $data['ids'], $data['parent_id']);
+            $schedule = $project->workspace_reorder_mode === 'order_only'
+                ? []
+                : $this->buildSchedule($project, $data['type'], $models, $data['ids'], $data['parent_id']);
             $scheduleUpdated = false;
             foreach ($data['ids'] as $index => $id) {
                 $model = $models->firstWhere('id', $id);
