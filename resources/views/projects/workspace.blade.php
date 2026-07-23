@@ -169,7 +169,11 @@
     .ai-message--user { justify-self:end; }
     .ai-message--assistant { justify-self:start; }
     .ai-message__bubble { padding:10px 12px; border-radius:11px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.65; }
-    .ai-message__image { display:block; width:auto; max-width:100%; max-height:220px; margin-bottom:7px; border-radius:7px; object-fit:contain; }
+    .ai-message__image { display:block; width:auto; max-width:100%; max-height:220px; margin-bottom:7px; border-radius:7px; object-fit:contain; cursor:zoom-in; }
+    .chat-image-modal { width:min(92vw,1200px); max-width:none; padding:42px 18px 18px; border:0; border-radius:10px; background:#111820; box-shadow:0 24px 70px rgba(0,0,0,.45); }
+    .chat-image-modal::backdrop { background:rgba(8,18,23,.78); }
+    .chat-image-modal img { display:block; width:auto; max-width:100%; max-height:82vh; margin:auto; object-fit:contain; }
+    .chat-image-modal__close { position:absolute; top:9px; right:10px; width:28px; height:28px; padding:0; border:1px solid #687781; border-radius:50%; color:#fff; background:#26343d; font-size:18px; line-height:26px; }
     .file-change-proposal { min-width:0; margin-top:7px; padding:9px; border:1px solid #9fc7bd; border-radius:8px; color:#294b45; background:#f1faf7; font-size:11px; }
     .file-change-proposal summary { cursor:pointer; font-weight:800; }
     .file-change-proposal pre { max-width:100%; max-height:260px; overflow-y:auto; overflow-x:hidden; padding:9px; border-radius:6px; color:#e6edf3; background:#0d1117; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
@@ -442,7 +446,7 @@
                                 </details>
                             @endif
                             <div class="ai-message__meta">
-                                {{ $chatMessage->created_at->format('m/d H:i') }}
+                                {{ $chatMessage->created_at->timezone(config('app.display_timezone'))->format('m/d H:i') }}
                             </div>
                         </article>
                     @empty
@@ -494,6 +498,10 @@
         </aside>
     </div>
 </section>
+<dialog class="chat-image-modal" data-chat-image-modal aria-label="添付画像の拡大表示">
+    <button class="chat-image-modal__close" type="button" data-chat-image-modal-close aria-label="閉じる">×</button>
+    <img src="" alt="添付画像の拡大表示" data-chat-image-modal-image>
+</dialog>
 
 <script>
 (() => {
@@ -1025,6 +1033,18 @@
     const chatForm = workbench.querySelector('[data-chat-form]');
     const chatMessages = workbench.querySelector('[data-chat-messages]');
     const chatError = workbench.querySelector('[data-chat-error]');
+    const chatImageModal = document.querySelector('[data-chat-image-modal]');
+    const closeChatImageModal = () => chatImageModal?.close();
+    chatMessages?.addEventListener('click', event => {
+        const image = event.target.closest('.ai-message__image');
+        if (!image || !chatImageModal) return;
+        chatImageModal.querySelector('[data-chat-image-modal-image]').src = image.src;
+        chatImageModal.showModal();
+    });
+    chatImageModal?.querySelector('[data-chat-image-modal-close]')?.addEventListener('click', closeChatImageModal);
+    chatImageModal?.addEventListener('click', event => {
+        if (event.target === chatImageModal) closeChatImageModal();
+    });
     const appendFileChange = (article, proposal) => {
         if (!proposal) return;
         const details = document.createElement('details');
