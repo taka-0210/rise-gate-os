@@ -341,6 +341,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('📁')
             ->assertSee('code-viewer', false)
             ->assertSee('code-line', false)
+            ->assertSee('data-pdf-frame', false)
+            ->assertSee('PDFビューワー')
             ->assertDontSee('data-viewer-tab', false)
             ->assertSee('AI パートナー')
             ->assertDontSee('開いている仕事について相談する')
