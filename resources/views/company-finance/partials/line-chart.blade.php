@@ -43,9 +43,22 @@
             @php($points = collect($item['values'])->map(fn ($value, $index) => $x($index).','.$y((float) $value))->join(' '))
             <polyline points="{{ $points }}" fill="none" stroke="{{ $item['color'] }}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             @foreach ($item['values'] as $index => $value)
-                <circle cx="{{ $x($index) }}" cy="{{ $y((float) $value) }}" r="3.5" fill="{{ $item['color'] }}">
+                <circle class="finance-chart__point" cx="{{ $x($index) }}" cy="{{ $y((float) $value) }}" r="3.5" fill="{{ $item['color'] }}">
                     <title>{{ $periods[$index]->period_number }}期 {{ $item['label'] }}：{{ $unit === '%' ? number_format($value, 2).'%' : number_format($value).'円' }}</title>
                 </circle>
+                <circle
+                    class="finance-chart__hit"
+                    cx="{{ $x($index) }}"
+                    cy="{{ $y((float) $value) }}"
+                    r="12"
+                    fill="transparent"
+                    tabindex="0"
+                    data-period="{{ $periods[$index]->period_number }}期"
+                    data-label="{{ $item['label'] }}"
+                    data-value="{{ $unit === '%' ? number_format($value, 2).'%' : number_format($value).'円' }}"
+                    data-color="{{ $item['color'] }}"
+                    aria-label="{{ $periods[$index]->period_number }}期 {{ $item['label'] }} {{ $unit === '%' ? number_format($value, 2).'%' : number_format($value).'円' }}"
+                />
             @endforeach
         @endforeach
         @foreach ($periods as $index => $period)
@@ -54,4 +67,31 @@
             @endif
         @endforeach
     </svg>
+    <div class="finance-chart__tooltip" role="status" aria-live="polite"></div>
 </div>
+
+@once
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.finance-chart').forEach((chart) => {
+        const tooltip = chart.querySelector('.finance-chart__tooltip');
+        const show = (point) => {
+            const chartRect = chart.getBoundingClientRect();
+            const pointRect = point.getBoundingClientRect();
+            tooltip.innerHTML = `<strong>${point.dataset.period}</strong><span>${point.dataset.label}</span><b>${point.dataset.value}</b>`;
+            tooltip.style.setProperty('--point-color', point.dataset.color);
+            tooltip.style.left = `${pointRect.left - chartRect.left + pointRect.width / 2}px`;
+            tooltip.style.top = `${pointRect.top - chartRect.top}px`;
+            tooltip.classList.add('is-visible');
+        };
+        const hide = () => tooltip.classList.remove('is-visible');
+        chart.querySelectorAll('.finance-chart__hit').forEach((point) => {
+            point.addEventListener('mouseenter', () => show(point));
+            point.addEventListener('mouseleave', hide);
+            point.addEventListener('focus', () => show(point));
+            point.addEventListener('blur', hide);
+        });
+    });
+});
+</script>
+@endonce

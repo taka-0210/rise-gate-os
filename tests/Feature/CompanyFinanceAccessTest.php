@@ -44,7 +44,11 @@ class CompanyFinanceAccessTest extends TestCase
             ->assertSee('123,456,789')
             ->assertSee('11月決算')
             ->assertSee('売上・粗利益・販管費')
-            ->assertSee('利益率の推移');
+            ->assertSee('利益率の推移')
+            ->assertSee('← 経営数値へ戻る')
+            ->assertSee('data-period="21期"', false)
+            ->assertSee('finance-chart__tooltip', false)
+            ->assertSee('class="positive"', false);
 
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-members.index'))
