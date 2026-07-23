@@ -99,6 +99,19 @@ class AiChatTest extends TestCase
         [$user, $workspace, $project] = $this->projectUser();
         WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
         config(['services.openai.api_key' => 'test-key', 'services.openai.chat_model' => 'gpt-5.6-terra']);
+        $thread = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'user_id' => $user->id,
+        ]);
+        foreach (range(1, 21) as $index) {
+            $thread->messages()->create([
+                'role' => $index % 2 ? 'user' : 'assistant',
+                'content' => "過去の会話{$index}",
+                'created_at' => now()->subMinutes(30 - $index),
+                'updated_at' => now()->subMinutes(30 - $index),
+            ]);
+        }
         Http::fake(['api.openai.com/v1/responses' => Http::response([
             'id' => 'resp_image',
             'model' => 'gpt-5.6-terra',
@@ -114,17 +127,46 @@ class AiChatTest extends TestCase
             ], ['Accept' => 'application/json']);
 
         $response->assertOk()->assertJsonPath('message.content', '画像を確認しました。');
-        $message = $project->aiChatThreads()->firstOrFail()->messages()->where('role', 'user')->firstOrFail();
+        $message = $thread->messages()->reorder()->latest()->where('role', 'user')->firstOrFail();
         Storage::disk('local')->assertExists($message->image_path);
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.ai-chat.messages.image', [$project, $message]))
             ->assertOk()
             ->assertHeader('content-type', 'image/png');
-        Http::assertSent(fn (Request $request): bool => str_contains(
-            data_get($request->data(), 'input.0.content.1.image_url', ''),
-            'data:image/png;base64,'
-        ));
+        Http::assertSent(function (Request $request): bool {
+            $payload = json_encode($request['input'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return str_contains($payload, 'data:image/png;base64,')
+                && str_contains($payload, 'この画面を見て');
+        });
+    }
+
+    public function test_workspace_loads_the_latest_fifty_chat_messages_in_chronological_order(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $thread = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'user_id' => $user->id,
+        ]);
+        foreach (range(1, 55) as $index) {
+            $thread->messages()->create([
+                'role' => 'user',
+                'content' => "会話番号{$index}",
+                'created_at' => now()->addSeconds($index),
+                'updated_at' => now()->addSeconds($index),
+            ]);
+        }
+
+        $response = $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.workspace', $project));
+
+        $response->assertOk()
+            ->assertDontSee('会話番号1</div>', false)
+            ->assertSeeInOrder(['会話番号6', '会話番号55']);
     }
 
     public function test_three_pane_workspace_shows_chat_history_and_tokens_on_demand(): void

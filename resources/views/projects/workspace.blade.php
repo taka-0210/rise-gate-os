@@ -1001,7 +1001,7 @@
             image.alt = '添付画像';
             bubble.append(image);
         }
-        bubble.textContent = content;
+        bubble.append(document.createTextNode(content));
         const metadata = document.createElement('div');
         metadata.className = 'ai-message__meta';
         metadata.textContent = meta;

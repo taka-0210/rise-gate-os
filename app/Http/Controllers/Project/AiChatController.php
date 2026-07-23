@@ -63,7 +63,7 @@ class AiChatController extends Controller
         $startedAt = microtime(true);
         try {
             $result = $chat->respond(
-                $thread->messages()->latest()->limit(20)->get()->reverse()->values(),
+                $thread->messages()->reorder()->latest('id')->limit(20)->get()->reverse()->values(),
                 $this->projectContext($request, $project, $validated['context_label'] ?? null),
                 $request->user()->id,
             );

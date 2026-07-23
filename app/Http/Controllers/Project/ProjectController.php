@@ -421,15 +421,15 @@ class ProjectController extends Controller
         $thread = AiChatThread::query()
             ->where('project_id', $project->id)
             ->where('user_id', $request->user()->id)
-            ->with(['messages' => fn ($query) => $query->latest()->limit(50)])
             ->first();
+        $chatMessages = $thread?->messages()->reorder()->latest('id')->limit(50)->get()->reverse()->values() ?? collect();
 
         return view('projects.workspace', [
             ...$data,
-            'aiChatMessages' => $thread?->messages->sortBy('created_at')->values() ?? collect(),
+            'aiChatMessages' => $chatMessages,
             'aiChatEnabled' => (bool) $project->owningWorkspace?->aiSetting?->enabled,
             'aiChatConfigured' => (string) config('services.openai.api_key') !== '',
-            'aiChatEstimatedCostMicrousd' => $thread?->messages->sum('estimated_cost_microusd') ?? 0,
+            'aiChatEstimatedCostMicrousd' => $chatMessages->sum('estimated_cost_microusd'),
             'localConnection' => $project->localConnections()->where('user_id', $request->user()->id)->first(),
         ]);
     }
