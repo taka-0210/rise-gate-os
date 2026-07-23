@@ -199,6 +199,9 @@
     .diff-line--removed { color:#ffd0d0; background:#3e1b1e; }
     .diff-line--context { color:#c4ced3; }
     .diff-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .workbench-notice { position:fixed; z-index:1000; top:82px; left:50%; width:min(90vw,560px); padding:12px 16px; border:1px solid #9fc8bd; border-radius:8px; color:#174f40; background:#effaf6; box-shadow:0 10px 30px rgba(23,54,64,.18); font-size:12px; font-weight:700; transform:translateX(-50%); }
+    .workbench-notice[hidden] { display:none; }
+    .workbench-notice.is-error { border-color:#dfaaa2; color:#843c32; background:#fff5f3; }
     .ai-message--user .ai-message__bubble { color:#fff; background:#155566; border-bottom-right-radius:3px; }
     .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
     .ai-message__meta { color:#7d8c94; font-size:9px; }
@@ -471,6 +474,7 @@
                                     <summary>{{ $chatMessage->file_change_status === 'applied' ? '反映済み' : ($chatMessage->file_change_status === 'rejected' ? '破棄済み' : '変更提案') }}</summary>
                                     <strong>{{ $chatMessage->file_change_path }}</strong>
                                     <textarea hidden data-file-change-content>{{ $chatMessage->file_change_content }}</textarea>
+                                    <span class="file-change-status" data-file-change-status></span>
                                     @if($chatMessage->file_change_status === 'pending')
                                         <div class="file-change-actions" data-file-change-actions>
                                             <button class="file-change-apply" type="button" data-file-change-diff>差分を確認</button>
@@ -480,7 +484,6 @@
                                         </div>
                                     @endif
                                     <details class="file-change-source"><summary>変更後のファイル全文を表示</summary><pre>{{ $chatMessage->file_change_content }}</pre></details>
-                                    <span class="file-change-status" data-file-change-status></span>
                                 </details>
                             @endif
                             <div class="ai-message__meta">
@@ -536,6 +539,7 @@
         </aside>
     </div>
 </section>
+<div class="workbench-notice" data-workbench-notice role="status" aria-live="assertive" hidden></div>
 <dialog class="chat-image-modal" data-chat-image-modal aria-label="添付画像の拡大表示">
     <button class="chat-image-modal__close" type="button" data-chat-image-modal-close aria-label="閉じる">×</button>
     <img src="" alt="添付画像の拡大表示" data-chat-image-modal-image>
@@ -545,6 +549,15 @@
 (() => {
     const workbench = document.querySelector('[data-workbench]');
     if (!workbench) return;
+    const workbenchNotice = document.querySelector('[data-workbench-notice]');
+    let workbenchNoticeTimer = null;
+    const showWorkbenchNotice = (message, type = 'info', duration = 0) => {
+        clearTimeout(workbenchNoticeTimer);
+        workbenchNotice.textContent = message;
+        workbenchNotice.classList.toggle('is-error', type === 'error');
+        workbenchNotice.hidden = false;
+        if (duration > 0) workbenchNoticeTimer = setTimeout(() => { workbenchNotice.hidden = true; }, duration);
+    };
     const workbenchGrid = workbench.querySelector('.workbench-grid');
     const localTree = workbench.querySelector('[data-local-file-tree]');
     const localStatus = workbench.querySelector('[data-local-file-status]');
@@ -1101,6 +1114,10 @@
         source.dataset.fileChangeContent = '';
         source.value = proposal.content;
         details.append(summary, path, source);
+        const status = document.createElement('span');
+        status.className = 'file-change-status';
+        status.dataset.fileChangeStatus = '';
+        details.append(status);
         if (proposal.status === 'pending') {
             const actions = document.createElement('div');
             actions.className = 'file-change-actions';
@@ -1138,10 +1155,6 @@
         preview.textContent = proposal.content;
         full.append(fullSummary, preview);
         details.append(full);
-        const status = document.createElement('span');
-        status.className = 'file-change-status';
-        status.dataset.fileChangeStatus = '';
-        details.append(status);
         article.append(details);
     };
     const scrollChatTo = (article, align = 'end') => requestAnimationFrame(() => {
@@ -1317,28 +1330,38 @@
     const applyFileChange = async (proposal, apply) => {
         const path = apply.dataset.filePath;
         const status = proposal.querySelector('[data-file-change-status]');
+        const originalLabel = apply.textContent;
         if (/(^|\/)\.env($|[./])|^(vendor|storage|\.git)(\/|$)/i.test(path)) {
             status.textContent = 'このファイルは保護対象のため変更できません。';
+            showWorkbenchNotice(status.textContent, 'error');
             return;
         }
         apply.disabled = true;
         status.textContent = '書き込み許可を確認しています…';
+        showWorkbenchNotice(`${path}：書き込み許可を確認しています…`);
         try {
             const permission = await requestLocalWritePermission();
             if (permission !== 'granted') throw new Error('ローカルファイルへの書き込み許可が必要です。');
             if (!confirm(`「${path}」へ、この変更案を反映しますか？`)) {
                 status.textContent = '';
                 apply.disabled = false;
+                workbenchNotice.hidden = true;
                 return;
             }
-            status.textContent = '現在のファイルを確認しています…';
+            apply.textContent = '反映中…';
+            status.textContent = '反映中：現在のファイルを確認しています…';
+            showWorkbenchNotice(`${path}：変更前ファイルを確認しています…`);
             const handle = await resolveLocalFileHandle(path);
             const current = await (await handle.getFile()).text();
             if (await hashText(current) !== apply.dataset.originalHash) {
                 throw new Error('提案後にファイルが変更されています。最新内容でAIへ再度依頼してください。');
             }
+            status.textContent = '反映中：バックアップを作成しています…';
+            showWorkbenchNotice(`${path}：変更前ファイルをバックアップしています…`);
             await saveLocalBackup(path, current);
             const proposed = proposalContent(proposal);
+            status.textContent = '反映中：ローカルファイルを書き換えています…';
+            showWorkbenchNotice(`${path}：ローカルファイルへ反映しています…`);
             const writable = await handle.createWritable();
             await writable.write(proposed);
             await writable.close();
@@ -1357,6 +1380,7 @@
             proposal.querySelector('summary').textContent = '反映済み';
             proposal.querySelector('[data-file-change-actions]')?.remove();
             status.textContent = `✓ ${path} を更新しました。変更前の内容はこのブラウザにバックアップ済みです。`;
+            showWorkbenchNotice(status.textContent, 'info', 5000);
             if (activeDiffProposal === proposal) {
                 workbench.querySelector('[data-diff-actions]').hidden = true;
                 workbench.querySelector('[data-diff-status]').textContent = '反映済み・変更前ファイルはバックアップ済み';
@@ -1364,6 +1388,8 @@
         } catch (error) {
             status.textContent = error.message;
             apply.disabled = false;
+            apply.textContent = originalLabel;
+            showWorkbenchNotice(error.message, 'error');
         }
     };
     const reviseFileChange = async proposal => {
