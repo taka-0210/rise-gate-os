@@ -19,21 +19,30 @@ class EnsureCurrentWorkspace
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        $currentCompany = $request->attributes->get('currentCompany');
         $workspaceId = $request->session()->get('current_workspace_id');
 
         if (! $user) {
             return redirect()->route('login');
         }
 
-        if (! $workspaceId || ! $user->canAccessWorkspace((int) $workspaceId)) {
+        $selectedWorkspaceIsValid = $workspaceId
+            && $user->canAccessWorkspace((int) $workspaceId)
+            && Workspace::query()
+                ->whereKey($workspaceId)
+                ->where('organization_id', $currentCompany->id)
+                ->exists();
+
+        if (! $selectedWorkspaceIsValid) {
             $workspace = $user->workspaces()
                 ->where('workspaces.status', Workspace::STATUS_ACTIVE)
+                ->where('workspaces.organization_id', $currentCompany->id)
                 ->orderBy('workspaces.name')
                 ->first();
 
             if (! $workspace) {
                 $request->session()->forget('current_workspace_id');
-                return redirect()->route('workspaces.index');
+                return redirect()->route('company.home');
             }
 
             $workspaceId = $workspace->id;
@@ -42,6 +51,7 @@ class EnsureCurrentWorkspace
 
         $currentWorkspace = Workspace::query()
             ->with('organization')
+            ->where('organization_id', $currentCompany->id)
             ->findOrFail($workspaceId);
 
         $membership = $user->workspaces()

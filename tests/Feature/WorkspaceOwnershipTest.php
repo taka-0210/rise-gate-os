@@ -15,17 +15,19 @@ class WorkspaceOwnershipTest extends TestCase
     public function test_first_owned_workspace_is_included_and_active(): void
     {
         $user = User::factory()->create();
+        $organization = Organization::create(['name' => 'My Business', 'slug' => 'my-business']);
+        $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
 
         $response = $this->actingAs($user)
-            ->withSession(['access_mode' => 'workspace'])
+            ->withSession(['access_mode' => 'workspace', 'current_company_id' => $organization->id])
             ->post(route('workspaces.store'), [
-                'organization_name' => 'My Business',
                 'workspace_name' => 'My Business WS',
+                'type' => Workspace::TYPE_SHARED,
                 'purpose' => '本業',
             ]);
 
         $workspace = Workspace::where('name', 'My Business WS')->firstOrFail();
-        $response->assertRedirect(route('dashboard'))->assertSessionHas('current_workspace_id', $workspace->id);
+        $response->assertRedirect(route('company.home'))->assertSessionHas('current_workspace_id', $workspace->id);
         $this->assertSame($user->id, $workspace->owner_user_id);
         $this->assertSame(Workspace::BILLING_INCLUDED, $workspace->billing_type);
         $this->assertSame(Workspace::STATUS_ACTIVE, $workspace->status);
@@ -35,13 +37,13 @@ class WorkspaceOwnershipTest extends TestCase
     public function test_second_owned_workspace_is_additional_and_pending(): void
     {
         $user = User::factory()->create();
-        $this->ownedWorkspace($user, 'First Workspace');
+        $firstWorkspace = $this->ownedWorkspace($user, 'First Workspace');
 
         $this->actingAs($user)
-            ->withSession(['access_mode' => 'workspace'])
+            ->withSession(['access_mode' => 'workspace', 'current_company_id' => $firstWorkspace->organization_id])
             ->post(route('workspaces.store'), [
-                'organization_name' => 'Second Business',
                 'workspace_name' => 'Second Workspace',
+                'type' => Workspace::TYPE_SHARED,
             ])
             ->assertRedirect(route('workspaces.index'))
             ->assertSessionHas('status');
@@ -61,15 +63,16 @@ class WorkspaceOwnershipTest extends TestCase
         $invitedWorkspace->users()->attach($user->id, ['role' => 'member', 'joined_at' => now()]);
 
         $this->actingAs($user)
-            ->withSession(['access_mode' => 'workspace'])
+            ->withSession(['access_mode' => 'workspace', 'current_company_id' => $invitedWorkspace->organization_id])
             ->post(route('workspaces.store'), [
-                'organization_name' => 'My First Business',
                 'workspace_name' => 'My First Workspace',
+                'type' => Workspace::TYPE_PERSONAL,
             ]);
 
         $workspace = Workspace::where('name', 'My First Workspace')->firstOrFail();
         $this->assertSame(Workspace::BILLING_INCLUDED, $workspace->billing_type);
         $this->assertSame(Workspace::STATUS_ACTIVE, $workspace->status);
+        $this->assertSame(Workspace::TYPE_PERSONAL, $workspace->type);
     }
 
     public function test_pending_workspace_cannot_be_selected_until_system_admin_approves_it(): void

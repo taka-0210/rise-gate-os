@@ -23,7 +23,7 @@ class WorkspaceFoundationTest extends TestCase
             'password_confirmation' => 'password-test',
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $response->assertRedirect(route('company.home'));
 
         $user = User::where('email', 'takami@example.com')->firstOrFail();
         $organization = Organization::where('name', 'Rise Gate')->firstOrFail();
@@ -43,6 +43,7 @@ class WorkspaceFoundationTest extends TestCase
             'role' => 'owner',
         ]);
         $response->assertSessionHas('current_workspace_id', $workspace->id);
+        $response->assertSessionHas('current_company_id', $organization->id);
     }
 
     public function test_self_registration_is_closed_after_the_first_user(): void

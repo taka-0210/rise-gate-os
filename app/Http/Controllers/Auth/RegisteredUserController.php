@@ -72,10 +72,11 @@ class RegisteredUserController extends Controller
         });
 
         Auth::login($user);
+        $request->session()->put('current_company_id', $workspace->organization_id);
         $request->session()->put('current_workspace_id', $workspace->id);
         $request->session()->put('access_mode', 'workspace');
 
-        return redirect()->route('dashboard');
+        return redirect()->route('company.home');
     }
 
     private function uniqueOrganizationSlug(string $name): string

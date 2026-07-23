@@ -4,7 +4,7 @@
     <section class="stack">
         <div>
             <h1>Workspaceを選択</h1>
-            <p>所有しているWorkspaceと、招待されて所属しているWorkspaceを切り替えます。</p>
+            <p>{{ $currentCompany->name }}で参加している共有・個人Workspaceを切り替えます。</p>
         </div>
         <div class="actions"><a class="button" href="{{ route('workspaces.create') }}">新しいWorkspaceを作成</a></div>
 
@@ -26,6 +26,7 @@
                                 @endif
                             </h2>
                             <div class="meta">{{ $workspace->organization->name }} / {{ $workspace->pivot->role }}</div>
+                            <div class="meta">{{ $workspace->type === 'personal' ? '個人Workspace' : '共有Workspace' }}</div>
                         </div>
                         <div class="actions">
                             @if ($workspace->owner_user_id === auth()->id())

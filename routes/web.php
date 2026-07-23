@@ -7,6 +7,8 @@ use App\Http\Controllers\Client\ClientController;
 use App\Http\Controllers\Client\ClientCompanyAccountController;
 use App\Http\Controllers\CompanyFinanceController;
 use App\Http\Controllers\CompanyMemberAccessController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CompanyHomeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EstimateController;
@@ -54,13 +56,22 @@ Route::post('/estimate-review/{token}/respond', [\App\Http\Controllers\PublicEst
 Route::middleware(['auth', 'active-user'])->group(function (): void {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
-    Route::get('/workspaces', [WorkspaceController::class, 'index'])->middleware('workspace-mode')->name('workspaces.index');
-    Route::get('/workspaces/create', [WorkspaceController::class, 'create'])->middleware('workspace-mode')->name('workspaces.create');
-    Route::post('/workspaces', [WorkspaceController::class, 'store'])->middleware('workspace-mode')->name('workspaces.store');
-    Route::post('/workspaces/{workspace}/switch', [WorkspaceController::class, 'switch'])->middleware('workspace-mode')->name('workspaces.switch');
-    Route::post('/workspaces/{workspace}/projects', [WorkspaceController::class, 'projects'])->middleware('workspace-mode')->name('workspaces.projects');
-    Route::get('/workspaces/{workspace}/edit', [WorkspaceController::class, 'edit'])->middleware('workspace-mode')->name('workspaces.edit');
-    Route::put('/workspaces/{workspace}', [WorkspaceController::class, 'update'])->middleware('workspace-mode')->name('workspaces.update');
+    Route::get('/companies', [CompanyController::class, 'index'])->middleware('workspace-mode')->name('companies.index');
+    Route::post('/companies/{organization}/switch', [CompanyController::class, 'switch'])->middleware('workspace-mode')->name('companies.switch');
+
+    Route::middleware(['workspace-mode', 'company'])->group(function (): void {
+        Route::get('/company', CompanyHomeController::class)->name('company.home');
+        Route::get('/company/finance', [CompanyFinanceController::class, 'index'])->name('company-finance.index');
+        Route::get('/company/members', [CompanyMemberAccessController::class, 'index'])->name('company-members.index');
+        Route::put('/company/members/{user}', [CompanyMemberAccessController::class, 'update'])->name('company-members.update');
+        Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
+        Route::get('/workspaces/create', [WorkspaceController::class, 'create'])->name('workspaces.create');
+        Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
+        Route::post('/workspaces/{workspace}/switch', [WorkspaceController::class, 'switch'])->name('workspaces.switch');
+        Route::post('/workspaces/{workspace}/projects', [WorkspaceController::class, 'projects'])->name('workspaces.projects');
+        Route::get('/workspaces/{workspace}/edit', [WorkspaceController::class, 'edit'])->name('workspaces.edit');
+        Route::put('/workspaces/{workspace}', [WorkspaceController::class, 'update'])->name('workspaces.update');
+    });
 
     Route::middleware('system-admin')->prefix('system-admin')->name('system-admin.')->group(function (): void {
         Route::post('/exit', [SystemAdminSessionController::class, 'exit'])->name('exit');
@@ -77,11 +88,8 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::put('/workspaces/{workspace}/status', [SystemAdminWorkspaceController::class, 'updateStatus'])->name('workspaces.status.update');
     });
 
-    Route::middleware(['workspace-mode', 'workspace'])->group(function (): void {
+    Route::middleware(['workspace-mode', 'company', 'workspace'])->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
-        Route::get('/company/finance', [CompanyFinanceController::class, 'index'])->name('company-finance.index');
-        Route::get('/company/members', [CompanyMemberAccessController::class, 'index'])->name('company-members.index');
-        Route::put('/company/members/{user}', [CompanyMemberAccessController::class, 'update'])->name('company-members.update');
         Route::view('/development-guide', 'guides.development')->name('development-guide');
         Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
         Route::get('/estimates', [EstimateController::class, 'index'])->name('estimates.index');

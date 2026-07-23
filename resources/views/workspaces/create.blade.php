@@ -2,10 +2,10 @@
 
 @section('content')
     <section class="stack">
-        <div><a href="{{ route('workspaces.index') }}">← Workspace一覧</a></div>
+        <div><a href="{{ route('company.home') }}">← {{ $currentCompany->name }}</a></div>
         <div>
             <h1>新しいWorkspace</h1>
-            <p>別会社・別ブランド・新規事業など、独立して育てたい仕事の場所を作成します。</p>
+            <p>{{ $currentCompany->name }}の中に、共有または個人用の仕事場を作成します。</p>
         </div>
         <div class="panel stack">
             <div class="card">
@@ -15,14 +15,18 @@
             <form class="stack" method="POST" action="{{ route('workspaces.store') }}">
                 @csrf
                 <div class="field">
-                    <label for="organization_name">Organization名</label>
-                    <input id="organization_name" name="organization_name" value="{{ old('organization_name') }}" required>
-                    @error('organization_name') <div class="error">{{ $message }}</div> @enderror
-                </div>
-                <div class="field">
                     <label for="workspace_name">Workspace名</label>
                     <input id="workspace_name" name="workspace_name" value="{{ old('workspace_name') }}" required>
                     @error('workspace_name') <div class="error">{{ $message }}</div> @enderror
+                </div>
+                <div class="field">
+                    <label for="type">Workspaceの種類</label>
+                    <select id="type" name="type" required>
+                        <option value="shared" @selected(old('type', 'shared') === 'shared')>共有Workspace</option>
+                        <option value="personal" @selected(old('type') === 'personal')>個人Workspace</option>
+                    </select>
+                    <p class="meta">個人Workspaceも会社の資産です。原則として本人だけが利用し、会社Ownerが管理できます。</p>
+                    @error('type') <div class="error">{{ $message }}</div> @enderror
                 </div>
                 <div class="field">
                     <label for="purpose">利用目的</label>

@@ -14,7 +14,7 @@ class CompanyMemberAccessController extends Controller
 {
     public function index(Request $request, CompanyAccess $access): View
     {
-        $organization = $request->attributes->get('currentWorkspace')->organization;
+        $organization = $request->attributes->get('currentCompany');
         abort_unless($access->canManageMembers($request->user(), $organization), 403);
 
         $memberships = OrganizationUser::query()
@@ -31,7 +31,7 @@ class CompanyMemberAccessController extends Controller
         User $user,
         CompanyAccess $access,
     ): RedirectResponse {
-        $organization = $request->attributes->get('currentWorkspace')->organization;
+        $organization = $request->attributes->get('currentCompany');
         abort_unless($access->canManageMembers($request->user(), $organization), 403);
 
         $membership = OrganizationUser::query()

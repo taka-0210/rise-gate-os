@@ -184,18 +184,25 @@ class TaskManagementTest extends TestCase
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $viewer = User::factory()->create();
+        $workspace->organization->users()->attach($viewer->id, ['role' => 'member', 'joined_at' => now()]);
         $workspace->users()->attach($viewer->id, ['role' => 'member', 'joined_at' => now()]);
         $this->addMember($project, $viewer, $workspace, ProjectMember::ROLE_VIEWER, ProjectMember::PERMISSION_VIEW);
         $task = $this->createTask($project, $owner);
 
         $this->actingAs($viewer)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession([
+                'current_company_id' => $workspace->organization_id,
+                'current_workspace_id' => $workspace->id,
+            ])
             ->get(route('projects.tasks.show', [$project, $task]))
             ->assertOk()
             ->assertDontSee('編集する');
 
         $this->actingAs($viewer)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession([
+                'current_company_id' => $workspace->organization_id,
+                'current_workspace_id' => $workspace->id,
+            ])
             ->get(route('projects.tasks.edit', [$project, $task]))
             ->assertForbidden();
     }

@@ -33,6 +33,7 @@ class ClientCompanyAccountController extends Controller
         }
 
         if ($workspace->status === Workspace::STATUS_ACTIVE) {
+            $request->session()->put('current_company_id', $workspace->organization_id);
             $request->session()->put('current_workspace_id', $workspace->id);
 
             return redirect()

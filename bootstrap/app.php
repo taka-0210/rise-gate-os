@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureCurrentWorkspace;
+use App\Http\Middleware\EnsureCurrentCompany;
 use App\Http\Middleware\EnsureSystemAdmin;
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureWorkspaceMode;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trimStrings(except: ['file_content']);
         $middleware->alias([
             'workspace' => EnsureCurrentWorkspace::class,
+            'company' => EnsureCurrentCompany::class,
             'system-admin' => EnsureSystemAdmin::class,
             'active-user' => EnsureActiveUser::class,
             'workspace-mode' => EnsureWorkspaceMode::class,

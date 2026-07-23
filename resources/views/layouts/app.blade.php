@@ -291,23 +291,33 @@
                         <button class="secondary" type="submit">Workspace画面へ</button>
                     </form>
                 @else
-                    @isset($currentWorkspace)
-                        <span class="workspace-pill">{{ $currentWorkspace->name }} / {{ $currentWorkspaceRole }}</span>
+                    @isset($currentCompany)
+                        <a class="workspace-pill" href="{{ route('company.home') }}">{{ $currentCompany->name }}</a>
+                        @if (($availableCompanyCount ?? 0) > 1)
+                            <a href="{{ route('companies.index') }}">会社切替</a>
+                        @endif
                     @endisset
-                    @if ($canViewCompanyFinance ?? false)
-                        <a href="{{ route('company-finance.index') }}">経営数値</a>
-                    @endif
-                    @if ($canManageCompanyMembers ?? false)
-                        <a href="{{ route('company-members.index') }}">会社設定</a>
-                    @endif
-                    <a href="{{ route('clients.index') }}">Clients</a>
-                    <a href="{{ route('projects.index') }}">Projects</a>
-                    <a href="{{ route('development-guide') }}">開発の進め方</a>
-                    <a href="{{ route('documents.index') }}">帳票管理</a>
-                    <a href="{{ route('ai-connections.index') }}">AI接続</a>
-                    <a href="{{ route('ai-settings.edit') }}">AI設定</a>
-                    <a href="{{ route('workspace-business-profile.edit') }}">事業者情報</a>
-                    <a href="{{ route('workspaces.index') }}">Workspaces</a>
+                    @isset($currentWorkspace)
+                        <span class="workspace-pill">› {{ $currentWorkspace->name }} / {{ $currentWorkspaceRole }}</span>
+                    @endisset
+                    @isset($currentCompany)
+                        @if ($canViewCompanyFinance ?? false)
+                            <a href="{{ route('company-finance.index') }}">経営数値</a>
+                        @endif
+                        @if ($canManageCompanyMembers ?? false)
+                            <a href="{{ route('company-members.index') }}">会社設定</a>
+                        @endif
+                        <a href="{{ route('workspaces.index') }}">Workspaces</a>
+                    @endisset
+                    @isset($currentWorkspace)
+                        <a href="{{ route('clients.index') }}">Clients</a>
+                        <a href="{{ route('projects.index') }}">Projects</a>
+                        <a href="{{ route('development-guide') }}">開発の進め方</a>
+                        <a href="{{ route('documents.index') }}">帳票管理</a>
+                        <a href="{{ route('ai-connections.index') }}">AI接続</a>
+                        <a href="{{ route('ai-settings.edit') }}">AI設定</a>
+                        <a href="{{ route('workspace-business-profile.edit') }}">事業者情報</a>
+                    @endisset
                     @if (auth()->user()->is_system_admin)
                         <a href="{{ route('system-admin.login') }}">System Admin Login</a>
                     @endif

@@ -12,8 +12,7 @@ class CompanyFinanceController extends Controller
 {
     public function index(Request $request, CompanyAccess $access): View
     {
-        $workspace = $request->attributes->get('currentWorkspace');
-        $organization = $workspace->organization;
+        $organization = $request->attributes->get('currentCompany');
         abort_unless(
             $access->allows($request->user(), $organization, OrganizationUser::PERMISSION_FINANCE_VIEW_PL),
             403

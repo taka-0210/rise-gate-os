@@ -69,7 +69,11 @@ class ClientCompanyAccountPromotionTest extends TestCase
             'workspace_id' => $workspace->id,
             'name' => 'Client Company',
         ]);
-        $session = ['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id];
+        $session = [
+            'access_mode' => 'workspace',
+            'current_company_id' => $provider->id,
+            'current_workspace_id' => $workspace->id,
+        ];
 
         $this->actingAs($user)->withSession($session)
             ->post(route('clients.company-account.store', $client), ['workspace_name' => '経営WS'])

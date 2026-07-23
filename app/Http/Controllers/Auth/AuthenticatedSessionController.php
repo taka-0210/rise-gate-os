@@ -34,17 +34,17 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         $request->session()->put('access_mode', 'workspace');
 
-        $workspace = $request->user()->workspaces()
-            ->where('workspaces.status', \App\Models\Workspace::STATUS_ACTIVE)
-            ->orderBy('workspaces.name')
-            ->first();
+        $companies = $request->user()->organizations()->orderBy('organizations.name')->get();
+        if ($companies->count() === 1) {
+            $request->session()->put('current_company_id', $companies->first()->id);
+            $request->session()->forget('current_workspace_id');
 
-        if ($workspace) {
-            $request->session()->put('current_workspace_id', $workspace->id);
-            return redirect()->intended(route('dashboard'));
+            return redirect()->intended(route('company.home'));
         }
 
-        return redirect()->route('workspaces.index');
+        $request->session()->forget(['current_company_id', 'current_workspace_id']);
+
+        return redirect()->route('companies.index');
     }
 
     public function destroy(Request $request): RedirectResponse

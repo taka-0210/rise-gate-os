@@ -260,14 +260,13 @@ class ProjectFoundationTest extends TestCase
     public function test_workspace_owner_can_move_project_and_all_children_to_another_managed_workspace(): void
     {
         [$owner, $sourceWorkspace] = $this->createWorkspaceOwner();
-        $destinationOrganization = Organization::create(['name' => 'Destination Org', 'slug' => 'destination-org']);
+        $destinationOrganization = $sourceWorkspace->organization;
         $destinationWorkspace = Workspace::create([
             'organization_id' => $destinationOrganization->id,
             'owner_user_id' => $owner->id,
             'name' => 'Destination Workspace',
             'slug' => 'destination-workspace',
         ]);
-        $destinationOrganization->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
         $destinationWorkspace->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
         $destinationClient = Client::create([
             'organization_id' => $destinationOrganization->id,
@@ -302,7 +301,11 @@ class ProjectFoundationTest extends TestCase
         ]);
 
         $this->actingAs($owner)
-            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $sourceWorkspace->id])
+            ->withSession([
+                'access_mode' => 'workspace',
+                'current_company_id' => $sourceWorkspace->organization_id,
+                'current_workspace_id' => $sourceWorkspace->id,
+            ])
             ->post(route('projects.move', $project), [
                 'destination_workspace_id' => $destinationWorkspace->id,
                 'destination_client_id' => $destinationClient->id,
@@ -324,8 +327,15 @@ class ProjectFoundationTest extends TestCase
     public function test_project_cannot_be_moved_to_workspace_where_user_is_only_a_member(): void
     {
         [$owner, $sourceWorkspace] = $this->createWorkspaceOwner();
-        [, $destinationWorkspace] = $this->createWorkspaceOwner('Other Org', 'Other Workspace', 'other-owner@example.com');
-        $destinationWorkspace->organization->users()->attach($owner->id, ['role' => 'member', 'joined_at' => now()]);
+        $otherOwner = User::factory()->create(['email' => 'other-owner@example.com']);
+        $destinationWorkspace = Workspace::create([
+            'organization_id' => $sourceWorkspace->organization_id,
+            'owner_user_id' => $otherOwner->id,
+            'name' => 'Other Workspace',
+            'slug' => 'other-workspace',
+        ]);
+        $sourceWorkspace->organization->users()->attach($otherOwner->id, ['role' => 'member', 'joined_at' => now()]);
+        $destinationWorkspace->users()->attach($otherOwner->id, ['role' => 'owner', 'joined_at' => now()]);
         $destinationWorkspace->users()->attach($owner->id, ['role' => 'member', 'joined_at' => now()]);
         $project = Project::create([
             'organization_id' => $sourceWorkspace->organization_id,
@@ -337,7 +347,11 @@ class ProjectFoundationTest extends TestCase
         $this->addProjectMember($project, $owner, $sourceWorkspace, 'owner', 'admin');
 
         $this->actingAs($owner)
-            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $sourceWorkspace->id])
+            ->withSession([
+                'access_mode' => 'workspace',
+                'current_company_id' => $sourceWorkspace->organization_id,
+                'current_workspace_id' => $sourceWorkspace->id,
+            ])
             ->post(route('projects.move', $project), ['destination_workspace_id' => $destinationWorkspace->id, 'destination_client_id' => 999])
             ->assertForbidden();
 

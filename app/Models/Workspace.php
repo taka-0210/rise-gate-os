@@ -20,6 +20,8 @@ class Workspace extends Model
     public const STATUS_PENDING = 'pending';
     public const STATUS_ACTIVE = 'active';
     public const STATUS_SUSPENDED = 'suspended';
+    public const TYPE_SHARED = 'shared';
+    public const TYPE_PERSONAL = 'personal';
 
     protected $fillable = [
         'public_id',
@@ -30,6 +32,8 @@ class Workspace extends Model
         'billing_type',
         'status',
         'purpose',
+        'type',
+        'personal_owner_user_id',
     ];
 
     protected static function booted(): void
@@ -47,6 +51,11 @@ class Workspace extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function personalOwner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'personal_owner_user_id');
     }
 
     public function users(): BelongsToMany

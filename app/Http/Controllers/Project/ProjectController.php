@@ -686,6 +686,7 @@ class ProjectController extends Controller
     {
         return $request->user()->workspaces()
             ->where('workspaces.status', Workspace::STATUS_ACTIVE)
+            ->where('workspaces.organization_id', $project->organization_id)
             ->where('workspaces.id', '!=', $project->owning_workspace_id)
             ->wherePivotIn('role', ['owner', 'admin'])
             ->with(['organization', 'clients' => fn ($query) => $query->orderBy('name')])
