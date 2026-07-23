@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\ProjectLocalConnection;
 use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
@@ -311,6 +312,13 @@ class TaskManagementTest extends TestCase
         $task->improvement->update(['title' => '商品化の取組み']);
         $roadmap = $task->improvement->roadmap;
         $roadmap->update(['title' => '商品化ロードマップ']);
+        ProjectLocalConnection::create([
+            'project_id' => $project->id,
+            'user_id' => $owner->id,
+            'directory_name' => 'prohit-okinawa',
+            'local_path' => 'C:\\xampp\\htdocs\\prohit-okinawa',
+            'status' => 'configured',
+        ]);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])

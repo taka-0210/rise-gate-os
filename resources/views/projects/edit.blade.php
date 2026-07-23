@@ -107,6 +107,39 @@
         </form>
     </section>
 
+    <section class="panel stack" style="margin-top:24px;">
+        <div>
+            <h2>このPCのローカルフォルダ</h2>
+            <p>この設定は、同じProjectを使う他のメンバーとは共有されません。PCごと・利用者ごとに設定します。</p>
+        </div>
+        <form class="stack" method="POST" action="{{ route('projects.local-connection.store', $project) }}">
+            @csrf
+            <div class="grid">
+                <div class="field">
+                    <label for="directory_name">フォルダ名</label>
+                    <input id="directory_name" name="directory_name" value="{{ old('directory_name', $localConnection?->directory_name) }}" placeholder="例：prohit-okinawa" required>
+                    @error('directory_name') <div class="error">{{ $message }}</div> @enderror
+                </div>
+                <div class="field">
+                    <label for="local_path">ローカルパス</label>
+                    <input id="local_path" name="local_path" value="{{ old('local_path', $localConnection?->local_path) }}" placeholder="例：C:\xampp\htdocs\prohit-okinawa" required>
+                    @error('local_path') <div class="error">{{ $message }}</div> @enderror
+                </div>
+            </div>
+            <div class="meta">現在は設定情報の保存まで対応しています。実ファイルとの接続には、次の段階で導入するPC側の接続アプリが必要です。</div>
+            <div class="actions">
+                <button type="submit">ローカルフォルダ設定を保存</button>
+                <span class="meta">状態：{{ $localConnection ? '設定済み（接続アプリ待ち）' : '未設定' }}</span>
+            </div>
+        </form>
+        @if($localConnection)
+            <form method="POST" action="{{ route('projects.local-connection.destroy', $project) }}">
+                @csrf @method('DELETE')
+                <button class="secondary" type="submit">設定を解除</button>
+            </form>
+        @endif
+    </section>
+
     @if ($canMoveProject)
         <section class="panel stack" style="margin-top:24px;">
             <div>

@@ -365,6 +365,41 @@ class ProjectFoundationTest extends TestCase
         $this->assertDatabaseHas('project_members', ['project_id' => $project->id, 'user_id' => $owner->id]);
     }
 
+    public function test_project_editor_can_save_a_private_local_folder_setting(): void
+    {
+        [$owner, $workspace] = $this->createWorkspaceOwner();
+        $project = Project::create([
+            'organization_id' => $workspace->organization_id,
+            'owning_workspace_id' => $workspace->id,
+            'billing_workspace_id' => $workspace->id,
+            'owner_user_id' => $owner->id,
+            'name' => 'Local Files Project',
+        ]);
+        $this->addProjectMember($project, $owner, $workspace, 'owner', 'admin');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.edit', $project))
+            ->assertOk()
+            ->assertSee('このPCのローカルフォルダ')
+            ->assertSee(route('projects.local-connection.store', $project), false);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.local-connection.store', $project), [
+                'directory_name' => 'prohit-okinawa',
+                'local_path' => 'C:\\xampp\\htdocs\\prohit-okinawa',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('project_local_connections', [
+            'project_id' => $project->id,
+            'user_id' => $owner->id,
+            'directory_name' => 'prohit-okinawa',
+            'status' => 'configured',
+        ]);
+    }
+
     public function test_project_is_not_deleted_with_wrong_password(): void
     {
         [$owner, $workspace] = $this->createWorkspaceOwner();

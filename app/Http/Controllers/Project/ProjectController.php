@@ -430,6 +430,7 @@ class ProjectController extends Controller
             'aiChatEnabled' => (bool) $project->owningWorkspace?->aiSetting?->enabled,
             'aiChatConfigured' => (string) config('services.openai.api_key') !== '',
             'aiChatEstimatedCostMicrousd' => $thread?->messages->sum('estimated_cost_microusd') ?? 0,
+            'localConnection' => $project->localConnections()->where('user_id', $request->user()->id)->first(),
         ]);
     }
 
@@ -528,6 +529,7 @@ class ProjectController extends Controller
             'clients' => $this->workspaceClients($project->owning_workspace_id),
             'movableWorkspaces' => $this->movableWorkspaces($request, $project),
             'canMoveProject' => Gate::allows('move', $project),
+            'localConnection' => $project->localConnections()->where('user_id', $request->user()->id)->first(),
         ]);
     }
 

@@ -223,7 +223,7 @@
             </nav>
 
             <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
-                <div class="file-repository">▣ prohit-okinawa<span>読み取り専用プレビュー</span></div>
+                <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? '設定済み・接続アプリ待ち' : 'Project設定から登録してください' }}</span></div>
                 <div class="tree-body">
                     <button class="tree-item file-item" type="button" data-file-toggle="docs" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>docs</button>
                     <div class="tree-branch" data-file-branch="docs" hidden>
