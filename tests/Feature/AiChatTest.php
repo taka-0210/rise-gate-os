@@ -223,6 +223,41 @@ class AiChatTest extends TestCase
         $this->assertDatabaseHas('ai_chat_messages', ['id' => $message->id, 'file_change_status' => 'applied']);
     }
 
+    public function test_owner_can_reject_a_pending_file_change(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        $thread = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'user_id' => $user->id,
+        ]);
+        $message = $thread->messages()->create([
+            'role' => 'assistant',
+            'content' => '変更案です。',
+            'file_change_path' => 'public_html/index.php',
+            'file_change_content' => '<h1>変更後</h1>',
+            'file_change_original_hash' => hash('sha256', '<h1>変更前</h1>'),
+            'file_change_status' => 'pending',
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.workspace', $project))
+            ->assertOk()
+            ->assertSee('data-viewer-panel="diff"', false)
+            ->assertSee('差分を確認')
+            ->assertSee('AIへ修正を依頼')
+            ->assertSee('提案を破棄');
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-chat.messages.file-change.rejected', [$project, $message]), [], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('status', 'rejected');
+
+        $this->assertDatabaseHas('ai_chat_messages', ['id' => $message->id, 'file_change_status' => 'rejected']);
+    }
+
     public function test_three_pane_workspace_shows_chat_history_and_tokens_on_demand(): void
     {
         [$user, $workspace, $project] = $this->projectUser();

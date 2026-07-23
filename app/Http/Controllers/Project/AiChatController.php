@@ -125,6 +125,24 @@ class AiChatController extends Controller
 
     public function markFileChangeApplied(Request $request, Project $project, AiChatMessage $message): JsonResponse
     {
+        $this->authorizeFileChange($request, $project, $message);
+        abort_unless($message->file_change_status === 'pending', 409, 'この変更提案は処理済みです。');
+        $message->update(['file_change_status' => 'applied', 'file_change_applied_at' => now()]);
+
+        return response()->json(['status' => 'applied']);
+    }
+
+    public function markFileChangeRejected(Request $request, Project $project, AiChatMessage $message): JsonResponse
+    {
+        $this->authorizeFileChange($request, $project, $message);
+        abort_unless($message->file_change_status === 'pending', 409, 'この変更提案は処理済みです。');
+        $message->update(['file_change_status' => 'rejected', 'file_change_applied_at' => null]);
+
+        return response()->json(['status' => 'rejected']);
+    }
+
+    private function authorizeFileChange(Request $request, Project $project, AiChatMessage $message): void
+    {
         Gate::authorize('view', $project);
         abort_unless(
             $message->thread?->project_id === $project->id
@@ -133,9 +151,6 @@ class AiChatController extends Controller
             && $message->file_change_path,
             404
         );
-        $message->update(['file_change_status' => 'applied', 'file_change_applied_at' => now()]);
-
-        return response()->json(['status' => 'applied']);
     }
 
     private function projectContext(Request $request, Project $project, array $validated): array
@@ -217,6 +232,7 @@ class AiChatController extends Controller
                 'original_hash' => $message->file_change_original_hash,
                 'status' => $message->file_change_status,
                 'apply_url' => route('projects.ai-chat.messages.file-change.applied', [$message->thread->project_id, $message]),
+                'reject_url' => route('projects.ai-chat.messages.file-change.rejected', [$message->thread->project_id, $message]),
             ] : null,
         ];
     }

@@ -177,9 +177,28 @@
     .file-change-proposal { min-width:0; margin-top:7px; padding:9px; border:1px solid #9fc7bd; border-radius:8px; color:#294b45; background:#f1faf7; font-size:11px; }
     .file-change-proposal summary { cursor:pointer; font-weight:800; }
     .file-change-proposal pre { max-width:100%; max-height:260px; overflow-y:auto; overflow-x:hidden; padding:9px; border-radius:6px; color:#e6edf3; background:#0d1117; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
-    .file-change-proposal button { width:100%; margin-top:7px; padding:8px; }
+    .file-change-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; }
+    .file-change-actions button { width:100%; padding:8px 5px; font-size:10px; }
+    .file-change-actions .file-change-apply { grid-column:1 / -1; }
+    .file-change-source { margin-top:7px; }
+    .file-change-source summary { font-size:10px; font-weight:600; }
     .file-change-proposal.is-applied { border-color:#b8c7cc; color:#687980; background:#f4f6f7; }
+    .file-change-proposal.is-rejected { border-color:#d5dadd; color:#7b858a; background:#f7f8f8; }
     .file-change-status { display:block; margin-top:6px; font-size:10px; }
+    .file-item.is-updated { background:#e9f7f2; box-shadow:inset 3px 0 #3f9b7d; }
+    .file-update-mark { flex:0 0 auto; margin-left:auto; padding:1px 5px; border-radius:999px; color:#1d6b54; background:#ccecdf; font-size:9px; font-weight:800; }
+    .diff-viewer { min-height:100%; padding:22px 28px 40px; background:#fff; }
+    .diff-viewer__head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .diff-viewer__head h1 { margin:3px 0 0; font-size:24px; }
+    .diff-viewer__status { color:#60737c; font-size:11px; }
+    .diff-code { overflow:auto; border:1px solid #26333b; border-radius:8px; color:#dbe5ea; background:#0d1117; font:11px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .diff-line { display:grid; grid-template-columns:44px 22px minmax(0,1fr); min-width:0; padding:0 10px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .diff-line__number { padding-right:8px; color:#6d7d86; text-align:right; user-select:none; }
+    .diff-line__sign { text-align:center; user-select:none; }
+    .diff-line--added { color:#c7f0d8; background:#123622; }
+    .diff-line--removed { color:#ffd0d0; background:#3e1b1e; }
+    .diff-line--context { color:#c4ced3; }
+    .diff-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
     .ai-message--user .ai-message__bubble { color:#fff; background:#155566; border-bottom-right-radius:3px; }
     .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
     .ai-message__meta { color:#7d8c94; font-size:9px; }
@@ -411,6 +430,20 @@
                     <div class="image-stage"><img class="image-preview" data-image-preview alt="" hidden></div>
                 </div>
             </div>
+            <div class="viewer-panel" data-viewer-panel="diff">
+                <article class="diff-viewer">
+                    <div class="diff-viewer__head">
+                        <div><div class="document-kicker">Change Proposal</div><h1 data-diff-title>変更差分</h1></div>
+                        <span class="diff-viewer__status" data-diff-status></span>
+                    </div>
+                    <div class="diff-code" data-diff-content></div>
+                    <div class="diff-actions" data-diff-actions hidden>
+                        <button type="button" data-diff-apply>承認して反映</button>
+                        <button class="secondary" type="button" data-diff-revise>AIへ修正を依頼</button>
+                        <button class="secondary" type="button" data-diff-reject>提案を破棄</button>
+                    </div>
+                </article>
+            </div>
         </section>
 
         <button class="pane-resizer pane-resizer--ai" type="button" data-pane-resizer="ai" aria-label="AIパートナーの幅を変更"></button>
@@ -434,15 +467,19 @@
                         <article class="ai-message ai-message--{{ $chatMessage->role }}">
                             <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@endif{{ $chatMessage->content }}</div>
                             @if($chatMessage->file_change_path)
-                                <details class="file-change-proposal {{ $chatMessage->file_change_status === 'applied' ? 'is-applied' : '' }}" data-file-change>
-                                    <summary>{{ $chatMessage->file_change_status === 'applied' ? '反映済み' : '変更案を確認' }}</summary>
+                                <details class="file-change-proposal {{ $chatMessage->file_change_status === 'applied' ? 'is-applied' : ($chatMessage->file_change_status === 'rejected' ? 'is-rejected' : '') }}" data-file-change data-file-change-id="{{ $chatMessage->id }}">
+                                    <summary>{{ $chatMessage->file_change_status === 'applied' ? '反映済み' : ($chatMessage->file_change_status === 'rejected' ? '破棄済み' : '変更提案') }}</summary>
                                     <strong>{{ $chatMessage->file_change_path }}</strong>
-                                    <p>変更後のファイル全文</p>
-                                    <pre>{{ $chatMessage->file_change_content }}</pre>
                                     <textarea hidden data-file-change-content>{{ $chatMessage->file_change_content }}</textarea>
-                                    @if($chatMessage->file_change_status !== 'applied')
-                                        <button type="button" data-file-change-apply data-file-path="{{ $chatMessage->file_change_path }}" data-original-hash="{{ $chatMessage->file_change_original_hash }}" data-apply-url="{{ route('projects.ai-chat.messages.file-change.applied', [$project, $chatMessage]) }}">承認してローカルへ反映</button>
+                                    @if($chatMessage->file_change_status === 'pending')
+                                        <div class="file-change-actions" data-file-change-actions>
+                                            <button class="file-change-apply" type="button" data-file-change-diff>差分を確認</button>
+                                            <button type="button" data-file-change-revise>AIへ修正を依頼</button>
+                                            <button type="button" data-file-change-reject data-reject-url="{{ route('projects.ai-chat.messages.file-change.rejected', [$project, $chatMessage]) }}">提案を破棄</button>
+                                            <button class="file-change-apply" type="button" data-file-change-apply data-file-path="{{ $chatMessage->file_change_path }}" data-original-hash="{{ $chatMessage->file_change_original_hash }}" data-apply-url="{{ route('projects.ai-chat.messages.file-change.applied', [$project, $chatMessage]) }}">承認してローカルへ反映</button>
+                                        </div>
                                     @endif
+                                    <details class="file-change-source"><summary>変更後のファイル全文を表示</summary><pre>{{ $chatMessage->file_change_content }}</pre></details>
                                     <span class="file-change-status" data-file-change-status></span>
                                 </details>
                             @endif
@@ -780,7 +817,10 @@
             if (kind === 'document') openDocument(workspaceTab.dataset.tabKey);
             else {
                 ensureTab({id:workspaceTab.dataset.workspaceTab, kind, key:workspaceTab.dataset.tabKey, label:workspaceTab.querySelector('.workspace-tab__label').textContent, content:workspaceTab.dataset.tabContent, url:workspaceTab.dataset.tabUrl});
-                if (kind === 'browser') {
+                if (kind === 'diff') {
+                    const state = diffStates.get(workspaceTab.dataset.tabKey);
+                    if (state) renderDiff(state);
+                } else if (kind === 'browser') {
                     setChatFileContext();
                     const frame = workbench.querySelector('[data-browser-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('browser');
                 } else if (kind === 'pdf') {
@@ -1049,31 +1089,55 @@
     const appendFileChange = (article, proposal) => {
         if (!proposal) return;
         const details = document.createElement('details');
-        details.className = `file-change-proposal${proposal.status === 'applied' ? ' is-applied' : ''}`;
+        details.className = `file-change-proposal${proposal.status === 'applied' ? ' is-applied' : proposal.status === 'rejected' ? ' is-rejected' : ''}`;
         details.dataset.fileChange = '';
+        details.dataset.fileChangeId = proposal.message_id;
         const summary = document.createElement('summary');
-        summary.textContent = proposal.status === 'applied' ? '反映済み' : '変更案を確認';
+        summary.textContent = proposal.status === 'applied' ? '反映済み' : proposal.status === 'rejected' ? '破棄済み' : '変更提案';
         const path = document.createElement('strong');
         path.textContent = proposal.path;
-        const description = document.createElement('p');
-        description.textContent = '変更後のファイル全文';
-        const preview = document.createElement('pre');
-        preview.textContent = proposal.content;
         const source = document.createElement('textarea');
         source.hidden = true;
         source.dataset.fileChangeContent = '';
         source.value = proposal.content;
-        details.append(summary, path, description, preview, source);
-        if (proposal.status !== 'applied') {
+        details.append(summary, path, source);
+        if (proposal.status === 'pending') {
+            const actions = document.createElement('div');
+            actions.className = 'file-change-actions';
+            actions.dataset.fileChangeActions = '';
+            const diff = document.createElement('button');
+            diff.type = 'button';
+            diff.className = 'file-change-apply';
+            diff.dataset.fileChangeDiff = '';
+            diff.textContent = '差分を確認';
+            const revise = document.createElement('button');
+            revise.type = 'button';
+            revise.dataset.fileChangeRevise = '';
+            revise.textContent = 'AIへ修正を依頼';
+            const reject = document.createElement('button');
+            reject.type = 'button';
+            reject.dataset.fileChangeReject = '';
+            reject.dataset.rejectUrl = proposal.reject_url;
+            reject.textContent = '提案を破棄';
             const apply = document.createElement('button');
             apply.type = 'button';
+            apply.className = 'file-change-apply';
             apply.dataset.fileChangeApply = '';
             apply.dataset.filePath = proposal.path;
             apply.dataset.originalHash = proposal.original_hash;
             apply.dataset.applyUrl = proposal.apply_url;
             apply.textContent = '承認してローカルへ反映';
-            details.append(apply);
+            actions.append(diff, revise, reject, apply);
+            details.append(actions);
         }
+        const full = document.createElement('details');
+        full.className = 'file-change-source';
+        const fullSummary = document.createElement('summary');
+        fullSummary.textContent = '変更後のファイル全文を表示';
+        const preview = document.createElement('pre');
+        preview.textContent = proposal.content;
+        full.append(fullSummary, preview);
+        details.append(full);
         const status = document.createElement('span');
         status.className = 'file-change-status';
         status.dataset.fileChangeStatus = '';
@@ -1175,11 +1239,84 @@
             transaction.onerror = () => reject(transaction.error);
         };
     });
-    workbench.addEventListener('click', async event => {
-        const apply = event.target.closest('[data-file-change-apply]');
-        if (!apply) return;
+    const diffStates = new Map();
+    let activeDiffProposal = null;
+    const proposalPath = proposal => proposal.querySelector('[data-file-change-apply]')?.dataset.filePath || proposal.querySelector('strong')?.textContent.trim() || '';
+    const proposalContent = proposal => proposal.querySelector('[data-file-change-content]').value;
+    const renderDiffLine = (container, type, number, text) => {
+        const line = document.createElement('div');
+        line.className = `diff-line diff-line--${type}`;
+        const lineNumber = document.createElement('span');
+        lineNumber.className = 'diff-line__number';
+        lineNumber.textContent = number || '';
+        const sign = document.createElement('span');
+        sign.className = 'diff-line__sign';
+        sign.textContent = type === 'added' ? '+' : type === 'removed' ? '−' : ' ';
+        const content = document.createElement('span');
+        content.textContent = text;
+        line.append(lineNumber, sign, content);
+        container.append(line);
+    };
+    const renderDiff = state => {
+        activeDiffProposal = state.proposal;
+        workbench.querySelector('[data-diff-title]').textContent = state.path;
+        const status = workbench.querySelector('[data-diff-status]');
+        status.textContent = state.changedAfterProposal ? '提案後にローカルファイルが変更されています' : '変更前と変更後の差分';
+        const container = workbench.querySelector('[data-diff-content]');
+        container.replaceChildren();
+        const before = state.current.replaceAll('\r\n', '\n').split('\n');
+        const after = state.proposed.replaceAll('\r\n', '\n').split('\n');
+        let prefix = 0;
+        while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix++;
+        let suffix = 0;
+        while (suffix < before.length - prefix && suffix < after.length - prefix && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix++;
+        const contextStart = Math.max(0, prefix - 3);
+        if (contextStart > 0) renderDiffLine(container, 'context', '', `… ${contextStart}行省略 …`);
+        for (let index = contextStart; index < prefix; index++) renderDiffLine(container, 'context', index + 1, before[index]);
+        for (let index = prefix; index < before.length - suffix; index++) renderDiffLine(container, 'removed', index + 1, before[index]);
+        for (let index = prefix; index < after.length - suffix; index++) renderDiffLine(container, 'added', index + 1, after[index]);
+        const suffixStart = before.length - suffix;
+        for (let index = suffixStart; index < Math.min(before.length, suffixStart + 3); index++) renderDiffLine(container, 'context', index + 1, before[index]);
+        if (suffix > 3) renderDiffLine(container, 'context', '', `… ${suffix - 3}行省略 …`);
+        if (prefix === before.length && prefix === after.length) renderDiffLine(container, 'context', '', '変更はありません。');
+        workbench.querySelector('[data-diff-actions]').hidden = !state.proposal.querySelector('[data-file-change-actions]');
+        showViewer('diff');
+    };
+    const openFileChangeDiff = async proposal => {
+        if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
+        const permission = await localDirectoryHandle.requestPermission({mode:'read'});
+        if (permission !== 'granted') throw new Error('差分確認にはローカルフォルダの読み取り許可が必要です。');
+        const path = proposalPath(proposal);
+        const handle = await resolveLocalFileHandle(path);
+        const current = await (await handle.getFile()).text();
+        const proposed = proposalContent(proposal);
+        const originalHash = proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash;
+        const state = {proposal, path, current, proposed, changedAfterProposal:originalHash ? await hashText(current) !== originalHash : false};
+        const id = proposal.dataset.fileChangeId || path;
+        diffStates.set(id, state);
+        ensureTab({id:`diff:${id}`, kind:'diff', key:id, label:`差分: ${path.split('/').pop()}`});
+        renderDiff(state);
+        const contextLabel = `${@json($project->name)} / Change Proposal / ${path}`;
+        workbench.querySelector('[data-ai-context]').textContent = contextLabel;
+        workbench.querySelector('[data-chat-context-key]').value = `file:${path}`;
+        workbench.querySelector('[data-chat-context-label]').value = contextLabel;
+        setChatFileContext(path, current);
+        if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
+    };
+    const markFileUpdated = path => {
+        const fileButton = [...workbench.querySelectorAll('[data-file-name]')].find(item => item.dataset.fileName === path);
+        if (!fileButton) return;
+        fileButton.classList.add('is-updated');
+        if (!fileButton.querySelector('.file-update-mark')) {
+            const mark = document.createElement('span');
+            mark.className = 'file-update-mark';
+            mark.textContent = '更新';
+            fileButton.append(mark);
+        }
+    };
+    const applyFileChange = async (proposal, apply) => {
         const path = apply.dataset.filePath;
-        const status = apply.closest('[data-file-change]').querySelector('[data-file-change-status]');
+        const status = proposal.querySelector('[data-file-change-status]');
         if (/(^|\/)\.env($|[./])|^(vendor|storage|\.git)(\/|$)/i.test(path)) {
             status.textContent = 'このファイルは保護対象のため変更できません。';
             return;
@@ -1201,7 +1338,7 @@
                 throw new Error('提案後にファイルが変更されています。最新内容でAIへ再度依頼してください。');
             }
             await saveLocalBackup(path, current);
-            const proposed = apply.closest('[data-file-change]').querySelector('[data-file-change-content]').value;
+            const proposed = proposalContent(proposal);
             const writable = await handle.createWritable();
             await writable.write(proposed);
             await writable.close();
@@ -1210,18 +1347,80 @@
             const tab = tabs.querySelector(`[data-workspace-tab="${CSS.escape(`file:${path}`)}"]`);
             if (tab) tab.dataset.tabContent = proposed;
             if (workbench.querySelector('[data-file-title]').textContent === path) renderCode(proposed);
-            await fetch(apply.dataset.applyUrl, {
+            markFileUpdated(path);
+            const response = await fetch(apply.dataset.applyUrl, {
                 method:'POST',
                 headers:{'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
             });
-            const proposal = apply.closest('[data-file-change]');
+            if (!response.ok) throw new Error('ファイルは更新されましたが、反映履歴を保存できませんでした。画面を再読み込みせず管理者へ連絡してください。');
             proposal.classList.add('is-applied');
             proposal.querySelector('summary').textContent = '反映済み';
-            apply.remove();
-            status.textContent = 'ローカルファイルへ反映しました。変更前の内容はこのブラウザにバックアップ済みです。';
+            proposal.querySelector('[data-file-change-actions]')?.remove();
+            status.textContent = `✓ ${path} を更新しました。変更前の内容はこのブラウザにバックアップ済みです。`;
+            if (activeDiffProposal === proposal) {
+                workbench.querySelector('[data-diff-actions]').hidden = true;
+                workbench.querySelector('[data-diff-status]').textContent = '反映済み・変更前ファイルはバックアップ済み';
+            }
         } catch (error) {
             status.textContent = error.message;
             apply.disabled = false;
+        }
+    };
+    const reviseFileChange = async proposal => {
+        const path = proposalPath(proposal);
+        let current = [...diffStates.values()].find(state => state.proposal === proposal)?.current;
+        if (current === undefined) {
+            if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
+            const permission = await localDirectoryHandle.requestPermission({mode:'read'});
+            if (permission !== 'granted') throw new Error('修正依頼にはローカルフォルダの読み取り許可が必要です。');
+            const handle = await resolveLocalFileHandle(path);
+            current = await (await handle.getFile()).text();
+        }
+        const contextLabel = `${@json($project->name)} / File / ${path}`;
+        workbench.querySelector('[data-ai-context]').textContent = contextLabel;
+        workbench.querySelector('[data-chat-context-key]').value = `file:${path}`;
+        workbench.querySelector('[data-chat-context-label]').value = contextLabel;
+        setChatFileContext(path, current);
+        const textarea = chatForm.elements.content;
+        textarea.value = `「${path}」の変更提案を修正してください。\n修正内容：`;
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        proposal.querySelector('[data-file-change-status]').textContent = '修正内容を入力して送信してください。';
+        if (matchMedia('(max-width:900px)').matches) showMobilePane('ai');
+    };
+    const rejectFileChange = async proposal => {
+        if (!confirm(`「${proposalPath(proposal)}」の変更提案を破棄しますか？`)) return;
+        const reject = proposal.querySelector('[data-file-change-reject]');
+        const response = await fetch(reject.dataset.rejectUrl, {
+            method:'POST',
+            headers:{'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
+        });
+        if (!response.ok) throw new Error('変更提案を破棄できませんでした。');
+        proposal.classList.add('is-rejected');
+        proposal.querySelector('summary').textContent = '破棄済み';
+        proposal.querySelector('[data-file-change-actions]')?.remove();
+        proposal.querySelector('[data-file-change-status]').textContent = 'この提案は破棄しました。';
+        if (activeDiffProposal === proposal) {
+            workbench.querySelector('[data-diff-actions]').hidden = true;
+            workbench.querySelector('[data-diff-status]').textContent = '破棄済み';
+        }
+    };
+    workbench.addEventListener('click', async event => {
+        const proposal = event.target.closest('[data-file-change]');
+        try {
+            if (event.target.closest('[data-file-change-diff]')) await openFileChangeDiff(proposal);
+            if (event.target.closest('[data-file-change-revise]')) await reviseFileChange(proposal);
+            if (event.target.closest('[data-file-change-reject]')) await rejectFileChange(proposal);
+            const apply = event.target.closest('[data-file-change-apply]');
+            if (apply) await applyFileChange(proposal, apply);
+            if (event.target.closest('[data-diff-apply]') && activeDiffProposal) {
+                await applyFileChange(activeDiffProposal, activeDiffProposal.querySelector('[data-file-change-apply]'));
+            }
+            if (event.target.closest('[data-diff-revise]') && activeDiffProposal) await reviseFileChange(activeDiffProposal);
+            if (event.target.closest('[data-diff-reject]') && activeDiffProposal) await rejectFileChange(activeDiffProposal);
+        } catch (error) {
+            const status = proposal?.querySelector('[data-file-change-status]') || workbench.querySelector('[data-diff-status]');
+            status.textContent = error.message;
         }
     });
     chatForm?.addEventListener('submit', async event => {
