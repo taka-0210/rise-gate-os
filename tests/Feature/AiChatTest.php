@@ -246,6 +246,45 @@ class AiChatTest extends TestCase
         ]);
     }
 
+    public function test_ai_can_find_and_propose_a_change_to_a_file_that_is_not_open(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key', 'services.openai.chat_model' => 'gpt-5.6-terra']);
+        $original = json_encode(['title' => '厨房だけではなく、繁盛店を創る。'], JSON_UNESCAPED_UNICODE);
+        $updated = json_encode(['title' => '厨房だけではなく 繁盛店を創る。'], JSON_UNESCAPED_UNICODE);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'id' => 'resp_project_file',
+            'model' => 'gpt-5.6-terra',
+            'output' => [[
+                'type' => 'message',
+                'content' => [[
+                    'type' => 'output_text',
+                    'text' => json_encode([
+                        'answer' => '参照先のHEROデータに変更案を作成しました。',
+                        'file_change' => ['path' => 'storage/content/hero.json', 'content' => $updated],
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]],
+            ]],
+            'usage' => ['input_tokens' => 120, 'output_tokens' => 30],
+        ])]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), [
+                'content' => '見出しの読点を削除して',
+                'context_key' => 'project',
+                'project_files' => json_encode([
+                    ['path' => 'public_html/index.php', 'content' => "<?php load_content('hero');"],
+                    ['path' => 'storage/content/hero.json', 'content' => $original],
+                ], JSON_UNESCAPED_UNICODE),
+            ])
+            ->assertOk()
+            ->assertJsonPath('message.file_change.path', 'storage/content/hero.json')
+            ->assertJsonPath('message.file_change.content', $updated)
+            ->assertJsonPath('message.file_change.original_hash', hash('sha256', $original));
+    }
+
     public function test_owner_can_reject_a_pending_file_change(): void
     {
         [$user, $workspace, $project] = $this->projectUser();

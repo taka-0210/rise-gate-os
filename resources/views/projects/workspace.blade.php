@@ -510,6 +510,7 @@
                     <input type="hidden" name="context_label" value="{{ $project->name }} / Project Overview" data-chat-context-label>
                     <input type="hidden" name="file_path" value="" data-chat-file-path>
                     <textarea name="file_content" hidden data-chat-file-content></textarea>
+                    <textarea name="project_files" hidden data-chat-project-files></textarea>
                     <div class="ai-chat-form__actions">
                         <button class="chat-attach-button" type="button" data-chat-image-select><span class="chat-attach-button__icon" aria-hidden="true">📎</span>画像を選択</button>
                         <span class="chat-paste-hint">スクショは貼り付けもできます</span>
@@ -1304,6 +1305,31 @@
         await writeHandleText(await backup.getFileHandle('meta.json', {create:true}), `${JSON.stringify(meta, null, 2)}\n`);
         return {directoryName, meta, handle:backup};
     };
+    const collectProjectTextFiles = async () => {
+        if (!localDirectoryHandle || await localDirectoryHandle.queryPermission({mode:'read'}) !== 'granted') return [];
+        const files = [];
+        let totalBytes = 0;
+        const allowed = /\.(?:php|html?|css|js|mjs|cjs|json|md|txt|xml|ya?ml|csv|ini|conf|sql)$/i;
+        const ignoredDirectories = new Set(['.git', '.rise-gate', 'vendor', 'node_modules', 'bootstrap/cache']);
+        const walk = async (directory, prefix = '') => {
+            for await (const [name, handle] of directory.entries()) {
+                if (files.length >= 100 || totalBytes >= 250000) return;
+                const path = prefix ? `${prefix}/${name}` : name;
+                if (handle.kind === 'directory') {
+                    if (!ignoredDirectories.has(name) && !ignoredDirectories.has(path)) await walk(handle, path);
+                    continue;
+                }
+                if (!allowed.test(name)) continue;
+                const file = await handle.getFile();
+                if (file.size > 100000 || totalBytes + file.size > 250000) continue;
+                const content = await file.text();
+                files.push({path, content});
+                totalBytes += file.size;
+            }
+        };
+        await walk(localDirectoryHandle);
+        return files;
+    };
     const saveLocalBackup = (path, content) => new Promise((resolve, reject) => {
         const request = indexedDB.open('rise-gate-file-backups', 1);
         request.onupgradeneeded = () => request.result.createObjectStore('backups', {keyPath:'id'});
@@ -1540,7 +1566,9 @@
         const path = apply.dataset.filePath;
         const status = proposal.querySelector('[data-file-change-status]');
         const originalLabel = apply.textContent;
-        if (/(^|\/)\.env($|[./])|^(vendor|storage|\.git|\.rise-gate)(\/|$)/i.test(path)) {
+        const protectedPath = /(^|\/)\.env($|[./])|^(vendor|\.git|\.rise-gate)(\/|$)/i.test(path)
+            || (/^storage(\/|$)/i.test(path) && !/^storage\/content(\/|$)/i.test(path));
+        if (protectedPath) {
             status.textContent = 'このファイルは保護対象のため変更できません。';
             showWorkbenchNotice(status.textContent, 'error');
             return;
@@ -1672,14 +1700,17 @@
         const content = textarea.value.trim();
         if (!content) return;
         const submit = chatForm.querySelector('button[type="submit"]');
-        const payload = new FormData(chatForm);
         chatError.hidden = true;
         const attachedImageUrl = chatImageObjectUrl;
         const userMessage = appendMessage('user', content, '送信中', false, attachedImageUrl);
-        const pending = appendMessage('assistant', '考えています…', '', true);
+        const pending = appendMessage('assistant', 'プロジェクトを確認しています…', '', true);
         textarea.value = '';
         submit.disabled = true;
         try {
+            const changeRequest = /変更|修正|直し|直して|削除|追加|差し替|書き換|改行|見出し/.test(content);
+            const projectFiles = changeRequest ? await collectProjectTextFiles() : [];
+            chatForm.querySelector('[data-chat-project-files]').value = projectFiles.length ? JSON.stringify(projectFiles) : '';
+            const payload = new FormData(chatForm);
             const response = await fetch(chatForm.dataset.chatUrl, {
                 method: 'POST',
                 headers: {'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},

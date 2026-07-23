@@ -36,6 +36,7 @@ class AiChatController extends Controller
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'file_path' => ['nullable', 'string', 'max:500'],
             'file_content' => ['nullable', 'string', 'max:1000000'],
+            'project_files' => ['nullable', 'json', 'max:1000000'],
         ]);
 
         $thread = AiChatThread::firstOrCreate([
@@ -196,8 +197,25 @@ class AiChatController extends Controller
         }
         $protected = $filePath && (
             preg_match('~(^|/)\.env($|[./])~i', $filePath)
-            || preg_match('~^(vendor|storage|\.git|\.rise-gate)(/|$)~i', $filePath)
+            || preg_match('~^(vendor|\.git|\.rise-gate)(/|$)~i', $filePath)
+            || (preg_match('~^storage(/|$)~i', $filePath) && ! preg_match('~^storage/content(/|$)~i', $filePath))
         );
+        $projectFiles = collect(json_decode($validated['project_files'] ?? '[]', true))
+            ->filter(fn ($file): bool => is_array($file) && is_string($file['path'] ?? null) && is_string($file['content'] ?? null))
+            ->map(function (array $file): array {
+                $path = str_replace('\\', '/', $file['path']);
+                $content = str_replace(["\r\n", "\r"], "\n", $file['content']);
+
+                return ['path' => $path, 'content' => $content, 'sha256' => hash('sha256', $content)];
+            })
+            ->reject(fn (array $file): bool =>
+                preg_match('~(^|/)\.env($|[./])~i', $file['path'])
+                || preg_match('~^(vendor|\.git|\.rise-gate)(/|$)~i', $file['path'])
+                || (preg_match('~^storage(/|$)~i', $file['path']) && ! preg_match('~^storage/content(/|$)~i', $file['path']))
+            )
+            ->take(100)
+            ->values()
+            ->all();
 
         return [
             'currently_open' => $validated['context_label'] ?? null,
@@ -215,6 +233,7 @@ class AiChatController extends Controller
                     'when_no_change' => ['answer' => 'Normal Japanese answer', 'file_change' => null],
                 ],
             ] : null,
+            'project_files' => $projectFiles,
             'project' => [
                 'name' => $project->name,
                 'client' => $project->client?->name,

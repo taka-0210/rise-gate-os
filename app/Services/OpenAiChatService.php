@@ -32,7 +32,7 @@ class OpenAiChatService
                     ])->values()->all(),
                     'reasoning' => ['effort' => 'low'],
                     'text' => $this->textConfiguration($projectContext),
-                    'max_output_tokens' => empty($projectContext['open_file']) ? 1200 : 12000,
+                    'max_output_tokens' => $this->editableFiles($projectContext) === [] ? 1200 : 12000,
                     'store' => false,
                     'safety_identifier' => hash('sha256', 'rise-gate-os-user-'.$userId),
                 ]);
@@ -58,7 +58,7 @@ class OpenAiChatService
             throw new RuntimeException('AIの回答本文を確認できませんでした。');
         }
 
-        $structured = $this->parseFileChange($content, $projectContext['open_file'] ?? null);
+        $structured = $this->parseFileChange($content, $this->editableFiles($projectContext));
         if ($structured) {
             $content = $structured['answer'];
         }
@@ -86,7 +86,7 @@ class OpenAiChatService
 
     private function textConfiguration(array $projectContext): array
     {
-        if (empty($projectContext['open_file'])) {
+        if ($this->editableFiles($projectContext) === []) {
             return ['verbosity' => 'low'];
         }
 
@@ -95,7 +95,7 @@ class OpenAiChatService
             'format' => [
                 'type' => 'json_schema',
                 'name' => 'file_change_proposal',
-                'description' => 'A Japanese answer and an optional complete replacement for the currently open file.',
+                'description' => 'A Japanese answer and an optional complete replacement for one supplied project file.',
                 'strict' => true,
                 'schema' => [
                     'type' => 'object',
@@ -123,9 +123,9 @@ class OpenAiChatService
         ];
     }
 
-    private function parseFileChange(string $content, ?array $openFile): ?array
+    private function parseFileChange(string $content, array $editableFiles): ?array
     {
-        if (! $openFile) {
+        if ($editableFiles === []) {
             return null;
         }
         $json = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($content));
@@ -137,7 +137,11 @@ class OpenAiChatService
         if ($change === null) {
             return ['answer' => $decoded['answer'], 'path' => null];
         }
-        if (! is_array($change) || ($change['path'] ?? null) !== $openFile['path'] || ! is_string($change['content'] ?? null)) {
+        if (! is_array($change) || ! is_string($change['path'] ?? null) || ! is_string($change['content'] ?? null)) {
+            return null;
+        }
+        $target = collect($editableFiles)->firstWhere('path', $change['path']);
+        if (! $target) {
             return null;
         }
         if (strlen($change['content']) > 1_000_000) {
@@ -146,9 +150,9 @@ class OpenAiChatService
 
         return [
             'answer' => is_string($decoded['answer'] ?? null) ? $decoded['answer'] : '変更案を作成しました。内容を確認してください。',
-            'path' => $openFile['path'],
+            'path' => $target['path'],
             'content' => $change['content'],
-            'original_hash' => $openFile['sha256'],
+            'original_hash' => $target['sha256'],
         ];
     }
 
@@ -166,12 +170,12 @@ class OpenAiChatService
 
     private function instructions(array $context): string
     {
-        $fileChangeInstruction = empty($context['open_file']) ? '' : <<<'PROMPT'
+        $fileChangeInstruction = $this->editableFiles($context) === [] ? '' : <<<'PROMPT'
 
-IMPORTANT: When open_file is present, return only valid JSON with no Markdown fence:
-{"answer":"short Japanese explanation","file_change":{"path":"exact open_file.path","content":"complete updated file content"}}
+IMPORTANT: When project_files or open_file is present, inspect the supplied files and return only valid JSON with no Markdown fence:
+{"answer":"short Japanese explanation","file_change":{"path":"exact supplied file path","content":"complete updated file content"}}
 If no file change is needed, return {"answer":"normal Japanese answer","file_change":null}.
-Never target another file.
+Choose exactly one file from the supplied paths. Never invent or target another path.
 PROMPT;
         return <<<'PROMPT'
 あなたはRISE GATE OSの読み取り専用AIパートナーです。
@@ -182,5 +186,15 @@ OSのデータを変更した、保存した、承認したとは決して述べ
 
 現在のプロジェクト情報:
 PROMPT."\n".json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).$fileChangeInstruction;
+    }
+
+    private function editableFiles(array $context): array
+    {
+        $files = $context['project_files'] ?? [];
+        if (! empty($context['open_file']) && ! collect($files)->contains('path', $context['open_file']['path'])) {
+            array_unshift($files, $context['open_file']);
+        }
+
+        return $files;
     }
 }
