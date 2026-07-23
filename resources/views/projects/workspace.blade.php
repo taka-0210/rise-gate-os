@@ -124,7 +124,9 @@
     .workbench-document.is-current { display:block; }
     .file-preview-document { padding-top:16px; }
     .file-preview-document .document-kicker { margin-bottom:5px; }
-    .file-preview-document .document-title { max-width:100%; margin:0; overflow:hidden; color:#314955; font:700 16px/1.45 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; letter-spacing:0; text-overflow:ellipsis; white-space:nowrap; }
+    .file-preview-document .document-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:3px 9px; max-width:100%; margin:0; overflow:visible; color:#314955; font:700 16px/1.45 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; letter-spacing:0; white-space:normal; }
+    .file-preview-title__path { min-width:0; overflow-wrap:anywhere; }
+    .file-preview-title__time { color:#7b8c94; font:500 10px/1.4 system-ui,-apple-system,"Noto Sans JP",sans-serif; white-space:nowrap; }
     .file-preview-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
     .file-preview-actions[hidden] { display:none; }
     .file-preview-actions button, .file-preview-actions a { padding:6px 10px; border:1px solid #bccbd2; border-radius:6px; color:#294752; background:#fff; font-size:11px; font-weight:750; text-decoration:none; cursor:pointer; }
@@ -749,7 +751,16 @@
         const title = workbench.querySelector('[data-file-title]');
         const savedAt = formatFileSavedAt(modifiedAt);
         title.dataset.filePath = path;
-        title.textContent = `${path.split('/').pop()}${savedAt ? `（保存日時： ${savedAt}）` : ''}`;
+        const pathLabel = document.createElement('span');
+        pathLabel.className = 'file-preview-title__path';
+        pathLabel.textContent = path;
+        title.replaceChildren(pathLabel);
+        if (savedAt) {
+            const timestamp = document.createElement('small');
+            timestamp.className = 'file-preview-title__time';
+            timestamp.textContent = `（更新日時： ${savedAt}）`;
+            title.append(timestamp);
+        }
         title.title = path;
     };
     const renderCode = content => {

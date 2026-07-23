@@ -364,7 +364,8 @@ class AiChatTest extends TestCase
             ->assertSee('data-change-history', false)
             ->assertSee('data-add-backup-gitignore', false)
             ->assertSee('date.getFullYear()', false)
-            ->assertSee('保存日時：', false)
+            ->assertSee('更新日時：', false)
+            ->assertSee('file-preview-title__time', false)
             ->assertSee('revealLocalFile', false)
             ->assertDontSee('推定利用料')
             ->assertDontSee('$0.0006');
