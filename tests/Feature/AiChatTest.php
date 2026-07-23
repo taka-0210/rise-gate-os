@@ -313,6 +313,7 @@ class AiChatTest extends TestCase
             ->get(route('projects.workspace', $project))
             ->assertOk()
             ->assertSee('data-viewer-panel="diff"', false)
+            ->assertSee('.diff-actions[hidden]', false)
             ->assertSee('差分を確認')
             ->assertSee('AIへ修正を依頼')
             ->assertSee('提案を破棄');

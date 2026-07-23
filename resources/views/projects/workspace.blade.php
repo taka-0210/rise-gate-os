@@ -201,6 +201,7 @@
     .diff-line--removed { color:#ffd0d0; background:#3e1b1e; }
     .diff-line--context { color:#c4ced3; }
     .diff-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .diff-actions[hidden] { display:none !important; }
     .workbench-notice { position:fixed; z-index:1000; top:82px; left:50%; width:min(90vw,560px); padding:12px 16px; border:1px solid #9fc8bd; border-radius:8px; color:#174f40; background:#effaf6; box-shadow:0 10px 30px rgba(23,54,64,.18); font-size:12px; font-weight:700; transform:translateX(-50%); }
     .workbench-notice[hidden] { display:none; }
     .workbench-notice.is-error { border-color:#dfaaa2; color:#843c32; background:#fff5f3; }
