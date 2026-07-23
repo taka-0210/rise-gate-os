@@ -317,6 +317,7 @@ class TaskManagementTest extends TestCase
             'user_id' => $owner->id,
             'directory_name' => 'prohit-okinawa',
             'local_path' => 'C:\\xampp\\htdocs\\prohit-okinawa',
+            'local_site_url' => 'http://localhost/prohit-okinawa/public_html/',
             'status' => 'configured',
         ]);
 
@@ -346,6 +347,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-image-preview', false)
             ->assertSee('画面に合わせる')
             ->assertSee('data-image-size="original"', false)
+            ->assertSee('data-open-local-browser', false)
+            ->assertSee('http:\/\/localhost\/prohit-okinawa\/public_html\/', false)
             ->assertSee("ensureLocalFolderAccess().catch", false)
             ->assertDontSee('data-viewer-tab', false)
             ->assertSee('AI パートナー')

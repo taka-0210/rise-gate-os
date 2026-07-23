@@ -16,6 +16,7 @@ class ProjectLocalConnectionController extends Controller
         Gate::authorize('update', $project);
         $data = $request->validate([
             'directory_name' => ['required', 'string', 'max:255'],
+            'local_site_url' => ['nullable', 'url:http,https', 'max:2048'],
         ]);
         ProjectLocalConnection::updateOrCreate(
             ['project_id' => $project->id, 'user_id' => $request->user()->id],

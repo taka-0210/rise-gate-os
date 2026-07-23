@@ -128,6 +128,12 @@
                     <div class="meta">自動取得後も自由に変更できます。</div>
                     @error('directory_name') <div class="error">{{ $message }}</div> @enderror
                 </div>
+                <div class="field">
+                    <label for="local_site_url">ローカルサイトURL</label>
+                    <input id="local_site_url" name="local_site_url" type="url" value="{{ old('local_site_url', $localConnection?->local_site_url) }}" placeholder="http://localhost/prohit-okinawa/public_html/">
+                    <div class="meta">XAMPPなどで表示できるURLを入力します。末尾の / は自動で補います。</div>
+                    @error('local_site_url') <div class="error">{{ $message }}</div> @enderror
+                </div>
             </div>
             <div class="meta">フォルダへのアクセス権はこのブラウザ内だけに保存され、サーバーや他の利用者には共有されません。Chrome・Edgeに対応しています。</div>
             <div class="actions">
@@ -146,6 +152,7 @@
         (() => {
             const setting = document.querySelector('[data-local-folder-setting]');
             const name = document.querySelector('[data-directory-name]');
+            const siteUrl = document.querySelector('[name="local_site_url"]');
             const browse = document.querySelector('[data-folder-browse]');
             const status = document.querySelector('[data-folder-browse-status]');
             if (!setting || !name || !browse) return;
@@ -166,6 +173,7 @@
                 if (!folderName) return;
                 name.value = folderName;
                 name.dataset.manuallyEdited = '';
+                if (siteUrl && !siteUrl.value.trim()) siteUrl.value = `http://localhost/${encodeURIComponent(folderName)}/public_html/`;
             };
             name.addEventListener('input', () => { name.dataset.manuallyEdited = 'true'; });
             browse.addEventListener('click', async () => {

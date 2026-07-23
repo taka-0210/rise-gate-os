@@ -118,6 +118,9 @@
     .file-preview-document { padding-top:16px; }
     .file-preview-document .document-kicker { margin-bottom:5px; }
     .file-preview-document .document-title { max-width:100%; margin:0; overflow:hidden; color:#314955; font:700 16px/1.45 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; letter-spacing:0; text-overflow:ellipsis; white-space:nowrap; }
+    .file-preview-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+    .file-preview-actions[hidden] { display:none; }
+    .file-preview-actions button, .file-preview-actions a { padding:6px 10px; border:1px solid #bccbd2; border-radius:6px; color:#294752; background:#fff; font-size:11px; font-weight:750; text-decoration:none; cursor:pointer; }
     .file-preview-document .code-shell { margin-top:10px; }
     .document-kicker { margin-bottom:8px; color:#55828b; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
     .document-title { margin-bottom:8px; font-size:clamp(26px,3vw,42px); letter-spacing:-.03em; }
@@ -363,10 +366,10 @@
             <article class="workbench-document" data-document-panel="ai-proposals"><div class="document-kicker">AI Proposals</div><h1 class="document-title">AI提案</h1><p class="document-summary">AIが作成した変更案は、人が確認・承認するまでプロジェクトへ反映されません。</p><div class="document-list">@forelse($pendingAiProposals as $proposal)<a class="document-row" href="{{ route('projects.ai-proposals.show', [$project,$proposal]) }}"><strong>{{ $proposal->title }}</strong><span class="meta">承認待ち / {{ $proposal->created_at->format('Y/m/d H:i') }}</span></a>@empty<p>承認待ちのAI提案はありません。</p>@endforelse</div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="file">
-                <article class="workbench-document file-preview-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title title="ファイルを選択">ファイルを選択</h1><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
+                <article class="workbench-document file-preview-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title title="ファイルを選択">ファイルを選択</h1><div class="file-preview-actions" data-file-preview-actions hidden><button type="button" data-open-local-browser>ブラウザで表示</button><a data-open-local-external target="_blank" rel="noopener">別タブで開く</a></div><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
-                <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox hidden></iframe>
+                <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" hidden></iframe>
             </div>
             <div class="viewer-panel" data-viewer-panel="pdf">
                 <iframe class="pdf-frame" data-pdf-frame title="PDFビューワー" hidden></iframe>
@@ -454,6 +457,7 @@
     const workbenchGrid = workbench.querySelector('.workbench-grid');
     const localTree = workbench.querySelector('[data-local-file-tree]');
     const localStatus = workbench.querySelector('[data-local-file-status]');
+    const localSiteUrl = @json($localConnection?->local_site_url);
     let localDirectoryHandle = null;
     const loadLocalHandle = () => new Promise((resolve, reject) => {
         const request = indexedDB.open('rise-gate-local-folders', 1);
@@ -550,6 +554,24 @@
     });
     const showViewer = name => {
         workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
+    };
+    const localBrowserUrl = path => {
+        if (!localSiteUrl) return '';
+        let relative = String(path || '').replaceAll('\\', '/').replace(/^\/+/, '');
+        const base = localSiteUrl.endsWith('/') ? localSiteUrl : `${localSiteUrl}/`;
+        try {
+            const basePath = new URL(base).pathname.replace(/\/+$/, '');
+            if (basePath.endsWith('/public_html') && relative.startsWith('public_html/')) relative = relative.slice(12);
+            return new URL(relative, base).href;
+        } catch (error) { return ''; }
+    };
+    const setLocalBrowserActions = path => {
+        const actions = workbench.querySelector('[data-file-preview-actions]');
+        const url = /\.(?:php|html?)$/i.test(path) ? localBrowserUrl(path) : '';
+        actions.hidden = !url;
+        actions.dataset.browserUrl = url;
+        const external = actions.querySelector('[data-open-local-external]');
+        external.href = url || '#';
     };
     const renderCode = content => {
         const viewer = workbench.querySelector('[data-file-content]');
@@ -683,6 +705,7 @@
                     const fileTitle = workbench.querySelector('[data-file-title]');
                     fileTitle.textContent = workspaceTab.dataset.tabKey;
                     fileTitle.title = workspaceTab.dataset.tabKey;
+                    setLocalBrowserActions(workspaceTab.dataset.tabKey);
                     renderCode(workspaceTab.dataset.tabContent);
                     showViewer('file');
                 }
@@ -728,6 +751,7 @@
             const fileTitle = workbench.querySelector('[data-file-title]');
             fileTitle.textContent = fileButton.dataset.fileName;
             fileTitle.title = fileButton.dataset.fileName;
+            setLocalBrowserActions(fileButton.dataset.fileName);
             const opensAsPdf = localFile?.type === 'application/pdf' || /\.pdf$/i.test(fileButton.dataset.fileName);
             const opensAsImage = localFile?.type.startsWith('image/') || /\.(?:jpe?g|png|gif|webp|svg|bmp|ico|avif)$/i.test(fileButton.dataset.fileName);
             if (!opensAsPdf && !opensAsImage) renderCode(fileButton.dataset.fileCopy);
@@ -768,6 +792,18 @@
         }
         const imageSize = event.target.closest('[data-image-size]');
         if (imageSize) workbench.querySelector('[data-image-preview]').classList.toggle('is-original', imageSize.dataset.imageSize === 'original');
+        if (event.target.closest('[data-open-local-browser]')) {
+            const actions = workbench.querySelector('[data-file-preview-actions]');
+            const url = actions.dataset.browserUrl;
+            if (url) {
+                const path = workbench.querySelector('[data-file-title]').textContent;
+                ensureTab({id:`browser:${path}`, kind:'browser', key:path, label:`↗ ${path.split('/').pop()}`, url});
+                const frame = workbench.querySelector('[data-browser-frame]');
+                frame.src = url;
+                frame.hidden = false;
+                showViewer('browser');
+            }
+        }
         if (event.target.closest('[data-usage-toggle]')) {
             const card = workbench.querySelector('[data-usage-card]');
             card.hidden = !card.hidden;

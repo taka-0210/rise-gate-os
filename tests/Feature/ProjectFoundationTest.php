@@ -392,6 +392,7 @@ class ProjectFoundationTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.local-connection.store', $project), [
                 'directory_name' => 'prohit-okinawa',
+                'local_site_url' => 'http://localhost/prohit-okinawa/public_html/',
                 'local_path' => 'C:\\xampp\\htdocs\\prohit-okinawa',
             ])
             ->assertSessionHasNoErrors();
@@ -400,6 +401,7 @@ class ProjectFoundationTest extends TestCase
             'project_id' => $project->id,
             'user_id' => $owner->id,
             'directory_name' => 'prohit-okinawa',
+            'local_site_url' => 'http://localhost/prohit-okinawa/public_html/',
             'status' => 'configured',
         ]);
     }

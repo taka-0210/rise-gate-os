@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProjectLocalConnection extends Model
 {
-    protected $fillable = ['project_id', 'user_id', 'directory_name', 'local_path', 'status', 'last_connected_at'];
+    protected $fillable = ['project_id', 'user_id', 'directory_name', 'local_path', 'local_site_url', 'status', 'last_connected_at'];
 
     protected function casts(): array
     {
