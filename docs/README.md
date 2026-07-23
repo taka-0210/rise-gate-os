@@ -121,6 +121,7 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 ## Documents
 
 - `philosophy.md`: 思想・目的・価値観
+- `product/company-os-value.md`: COMPANY OSの価値、ChatGPTとの違い、現在地と目指す姿
 - `architecture.md`: システム全体構成と責務分離
 - `database.md`: ER図・テーブル設計・データ方針
 - `roadmap.md`: Phase管理と実装順序
