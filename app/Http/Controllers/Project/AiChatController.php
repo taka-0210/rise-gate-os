@@ -62,6 +62,30 @@ class AiChatController extends Controller
             ]);
         }
 
+        if ($this->requestsBackupRestore($validated['content'])) {
+            $assistantMessage = $thread->messages()->create([
+                'role' => AiChatMessage::ROLE_ASSISTANT,
+                'content' => '変更履歴を開きました。戻したい日時の「差分を見る」で内容を確認し、「元に戻す」を押してください。復元する直前の状態も自動でバックアップされます。',
+            ]);
+            $thread->touch();
+
+            AiAuditLog::create([
+                'workspace_id' => $workspace->id,
+                'user_id' => $request->user()->id,
+                'project_id' => $project->id,
+                'event' => 'ai_chat.change_history_opened',
+                'succeeded' => true,
+                'duration_ms' => 0,
+                'request_fingerprint' => hash('sha256', $userMessage->content),
+                'occurred_at' => now(),
+            ]);
+
+            return response()->json([
+                'message' => $this->messageData($assistantMessage),
+                'ui_action' => 'open_change_history',
+            ]);
+        }
+
         $startedAt = microtime(true);
         try {
             $result = $chat->respond(
@@ -153,6 +177,12 @@ class AiChatController extends Controller
         );
     }
 
+    private function requestsBackupRestore(string $content): bool
+    {
+        return str_contains($content, 'バックアップ')
+            && preg_match('/(?:元に戻|戻そ|戻して|復元|もど)/u', $content) === 1;
+    }
+
     private function projectContext(Request $request, Project $project, array $validated): array
     {
         $memberRole = $project->members()->where('user_id', $request->user()->id)
@@ -166,7 +196,7 @@ class AiChatController extends Controller
         }
         $protected = $filePath && (
             preg_match('~(^|/)\.env($|[./])~i', $filePath)
-            || preg_match('~^(vendor|storage|\.git)(/|$)~i', $filePath)
+            || preg_match('~^(vendor|storage|\.git|\.rise-gate)(/|$)~i', $filePath)
         );
 
         return [

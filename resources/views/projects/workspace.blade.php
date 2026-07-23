@@ -88,7 +88,7 @@
     .schedule-toast[hidden] { display:none; }
     .file-repository { padding:11px 12px; border-bottom:1px solid var(--wb-line); color:#40545e; background:#fff; font-size:12px; font-weight:800; }
     .file-repository span { display:block; margin-top:2px; color:#7b8b93; font-size:10px; font-weight:500; }
-    .file-item { justify-content:flex-start; width:100%; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; text-align:left; }
+    .file-item { justify-content:flex-start; width:100%; min-height:28px; padding:4px 8px; gap:5px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; text-align:left; }
     .file-item--directory { color:#294d5a; font-weight:750; }
     .file-item__expander { flex:0 0 12px; color:#71848d; text-align:center; }
     .file-item__kind { flex:0 0 18px; font-family:"Segoe UI Emoji","Noto Color Emoji",sans-serif; font-size:14px; line-height:1; text-align:left; }
@@ -1692,6 +1692,12 @@
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
             appendMessage('assistant', message.content, 'ただ今', false, '', message.file_change, false);
+            if (body.ui_action === 'open_change_history') {
+                const history = workbench.querySelector('[data-change-history-card]');
+                history.open = true;
+                history.scrollIntoView({behavior:'smooth', block:'nearest'});
+                refreshLocalChangeHistory().catch(() => {});
+            }
             scrollChatTo(userMessage, 'start');
             chatImageInput.value = '';
             chatImagePreview.hidden = true;

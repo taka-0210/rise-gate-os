@@ -223,6 +223,29 @@ class AiChatTest extends TestCase
         $this->assertDatabaseHas('ai_chat_messages', ['id' => $message->id, 'file_change_status' => 'applied']);
     }
 
+    public function test_backup_restore_request_opens_local_change_history_without_calling_openai(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        Http::fake();
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), [
+                'content' => 'バックアップファイルから元に戻そう。',
+                'context_key' => 'project',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ui_action', 'open_change_history')
+            ->assertJsonPath('message.content', '変更履歴を開きました。戻したい日時の「差分を見る」で内容を確認し、「元に戻す」を押してください。復元する直前の状態も自動でバックアップされます。');
+
+        Http::assertNothingSent();
+        $this->assertDatabaseHas('ai_chat_messages', [
+            'role' => 'user',
+            'content' => 'バックアップファイルから元に戻そう。',
+        ]);
+    }
+
     public function test_owner_can_reject_a_pending_file_change(): void
     {
         [$user, $workspace, $project] = $this->projectUser();
