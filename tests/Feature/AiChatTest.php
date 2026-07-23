@@ -345,6 +345,7 @@ class AiChatTest extends TestCase
             ->assertSee('読み取り専用AI：接続可能')
             ->assertSee('保存済みの会話です。')
             ->assertSee('data-chat-form', false)
+            ->assertSee("payload.set('content', content)", false)
             ->assertSee('data-chat-image-input', false)
             ->assertSee('貼り付けもできます')
             ->assertSee('data-chat-file-content', false)

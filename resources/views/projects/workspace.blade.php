@@ -1711,6 +1711,7 @@
             const projectFiles = changeRequest ? await collectProjectTextFiles() : [];
             chatForm.querySelector('[data-chat-project-files]').value = projectFiles.length ? JSON.stringify(projectFiles) : '';
             const payload = new FormData(chatForm);
+            payload.set('content', content);
             const response = await fetch(chatForm.dataset.chatUrl, {
                 method: 'POST',
                 headers: {'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
