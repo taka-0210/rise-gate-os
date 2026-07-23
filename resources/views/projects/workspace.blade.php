@@ -79,7 +79,11 @@
     .schedule-toast[hidden] { display:none; }
     .file-repository { padding:11px 12px; border-bottom:1px solid var(--wb-line); color:#40545e; background:#fff; font-size:12px; font-weight:800; }
     .file-repository span { display:block; margin-top:2px; color:#7b8b93; font-size:10px; font-weight:500; }
-    .file-item { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; }
+    .file-item { justify-content:flex-start; width:100%; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:500; text-align:left; }
+    .file-item--directory { color:#294d5a; font-weight:750; }
+    .file-item__expander { flex:0 0 12px; color:#71848d; text-align:center; }
+    .file-item__kind { flex:0 0 18px; font-family:"Segoe UI Emoji","Noto Color Emoji",sans-serif; font-size:14px; line-height:1; text-align:left; }
+    .file-item__label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
     .file-item--nested { padding-left:27px; }
     .file-note { margin:12px 10px; padding:10px; border:1px dashed #c7d3d9; border-radius:7px; color:#6a7b84; background:#fff; font-size:10px; line-height:1.55; }
     .viewer-panel { display:none; min-height:100%; }
@@ -439,9 +443,9 @@
             const path = prefix ? `${prefix}/${entry.name}` : entry.name;
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'tree-item file-item';
+            button.className = `tree-item file-item${entry.kind === 'directory' ? ' file-item--directory' : ' file-item--file'}`;
             button.style.paddingLeft = `${10 + depth * 17}px`;
-            button.innerHTML = `<span class="tree-icon">${entry.kind === 'directory' ? '▸' : '◇'}</span><span></span>`;
+            button.innerHTML = `<span class="file-item__expander">${entry.kind === 'directory' ? '▸' : ''}</span><span class="file-item__kind" aria-hidden="true">${entry.kind === 'directory' ? '📁' : '📄'}</span><span class="file-item__label"></span>`;
             button.lastElementChild.textContent = entry.name;
             if (entry.kind === 'directory') {
                 button.dataset.localDirectory = path;
@@ -611,7 +615,7 @@
             const open = localDirectory.localBranch.hidden;
             localDirectory.localBranch.hidden = !open;
             localDirectory.setAttribute('aria-expanded', String(open));
-            localDirectory.querySelector('.tree-icon').textContent = open ? '▾' : '▸';
+            localDirectory.querySelector('.file-item__expander').textContent = open ? '▾' : '▸';
             if (open && !localDirectory.localBranch.hasChildNodes()) await renderLocalDirectory(localDirectory.localHandle, localDirectory.localBranch, localDirectory.dataset.localDirectory, localDirectory.dataset.localDirectory.split('/').length);
         }
         const treeToggle = event.target.closest('[data-tree-toggle]');
