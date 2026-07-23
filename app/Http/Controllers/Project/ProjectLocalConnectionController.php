@@ -16,11 +16,10 @@ class ProjectLocalConnectionController extends Controller
         Gate::authorize('update', $project);
         $data = $request->validate([
             'directory_name' => ['required', 'string', 'max:255'],
-            'local_path' => ['required', 'string', 'max:2048'],
         ]);
         ProjectLocalConnection::updateOrCreate(
             ['project_id' => $project->id, 'user_id' => $request->user()->id],
-            $data + ['status' => 'configured', 'last_connected_at' => null],
+            $data + ['local_path' => 'browser-directory-handle', 'status' => 'configured', 'last_connected_at' => null],
         );
 
         return back()->with('status', 'このPCのローカルフォルダ設定を保存しました。');

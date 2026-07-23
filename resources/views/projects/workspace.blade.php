@@ -162,7 +162,7 @@
     }
 </style>
 
-<section class="company-workbench" data-workbench data-order-url="{{ route('projects.workspace.order', $project) }}" data-preference-url="{{ route('projects.workspace.preference', $project) }}">
+<section class="company-workbench" data-workbench data-order-url="{{ route('projects.workspace.order', $project) }}" data-preference-url="{{ route('projects.workspace.preference', $project) }}" data-local-handle-key="project-{{ $project->id }}-user-{{ auth()->id() }}">
     <div class="schedule-toast" data-schedule-toast hidden>スケジュールの時間軸も変更しました</div>
     <header class="workbench-bar">
         <div class="workbench-bar__identity">
@@ -223,22 +223,9 @@
             </nav>
 
             <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
-                <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? '設定済み・接続アプリ待ち' : 'Project設定から登録してください' }}</span></div>
-                <div class="tree-body">
-                    <button class="tree-item file-item" type="button" data-file-toggle="docs" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>docs</button>
-                    <div class="tree-branch" data-file-branch="docs" hidden>
-                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/01-requirements.md" data-file-copy="Webサイトの要件定義です。"><span class="tree-icon">◇</span>01-requirements.md</button>
-                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="docs/04-implementation-plan.md" data-file-copy="実装計画と進め方をまとめたファイルです。"><span class="tree-icon">◇</span>04-implementation-plan.md</button>
-                    </div>
-                    <button class="tree-item file-item" type="button" data-file-toggle="public_html" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>public_html</button>
-                    <div class="tree-branch" data-file-branch="public_html" hidden>
-                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/index.php" data-file-copy="公開サイトのトップページです。" data-file-view="browser" data-preview-url="https://prohit-okinawa.com/"><span class="tree-icon">◇</span>index.php</button>
-                        <button class="tree-item file-item file-item--nested" type="button" data-file-name="public_html/admin.php" data-file-copy="サイト運用の管理画面です。"><span class="tree-icon">◇</span>admin.php</button>
-                    </div>
-                    <button class="tree-item file-item" type="button" data-file-toggle="storage" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>storage/content</button>
-                    <div class="tree-branch" data-file-branch="storage" hidden><button class="tree-item file-item file-item--nested" type="button" data-file-name="storage/content/company.json" data-file-copy="会社情報のデータです。"><span class="tree-icon">◇</span>company.json</button></div>
-                </div>
-                <p class="file-note">現在は画面構成を確かめるプレビューです。次の段階でGitHubの実際のファイル一覧に切り替えます。</p>
+                <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? 'ブラウザ接続・読み取り専用' : 'Project設定から登録してください' }}</span></div>
+                <div class="tree-body" data-local-file-tree><p class="file-note">フォルダへのアクセスを確認しています…</p></div>
+                <p class="file-note" data-local-file-status>Chrome・EdgeでProject設定からフォルダを選択してください。</p>
             </nav>
         </aside>
 
@@ -352,7 +339,7 @@
                 <article class="workbench-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title>ファイルを選択</h1><p class="document-summary" data-file-content>左のFILESからファイルを開くと、ここに内容を表示します。</p></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
-                <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" hidden></iframe>
+                <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox hidden></iframe>
             </div>
         </section>
 
@@ -429,6 +416,63 @@
     const workbench = document.querySelector('[data-workbench]');
     if (!workbench) return;
     const workbenchGrid = workbench.querySelector('.workbench-grid');
+    const localTree = workbench.querySelector('[data-local-file-tree]');
+    const localStatus = workbench.querySelector('[data-local-file-status]');
+    let localDirectoryHandle = null;
+    const loadLocalHandle = () => new Promise((resolve, reject) => {
+        const request = indexedDB.open('rise-gate-local-folders', 1);
+        request.onupgradeneeded = () => request.result.createObjectStore('handles');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const transaction = request.result.transaction('handles', 'readonly');
+            const get = transaction.objectStore('handles').get(workbench.dataset.localHandleKey);
+            get.onsuccess = () => resolve(get.result || null);
+            get.onerror = () => reject(get.error);
+        };
+    });
+    const renderLocalDirectory = async (handle, container, prefix = '', depth = 0) => {
+        container.replaceChildren();
+        const entries = [];
+        for await (const entry of handle.values()) entries.push(entry);
+        entries.sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name, 'ja') : a.kind === 'directory' ? -1 : 1);
+        entries.forEach(entry => {
+            const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'tree-item file-item';
+            button.style.paddingLeft = `${10 + depth * 17}px`;
+            button.innerHTML = `<span class="tree-icon">${entry.kind === 'directory' ? '▸' : '◇'}</span><span></span>`;
+            button.lastElementChild.textContent = entry.name;
+            if (entry.kind === 'directory') {
+                button.dataset.localDirectory = path;
+                button.localHandle = entry;
+                const branch = document.createElement('div');
+                branch.className = 'tree-branch';
+                branch.hidden = true;
+                button.localBranch = branch;
+                container.append(button, branch);
+            } else {
+                button.dataset.fileName = path;
+                button.localFileHandle = entry;
+                container.append(button);
+            }
+        });
+        localStatus.textContent = `${entries.length}項目を表示中（読み取り専用）`;
+    };
+    const ensureLocalFolderAccess = async () => {
+        localDirectoryHandle ||= await loadLocalHandle();
+        if (!localDirectoryHandle) { localTree.innerHTML = '<p class="file-note">Project設定からBROWSEでフォルダを選択してください。</p>'; return; }
+        let permission = await localDirectoryHandle.queryPermission({mode:'read'});
+        if (permission !== 'granted') permission = await localDirectoryHandle.requestPermission({mode:'read'});
+        if (permission !== 'granted') { localStatus.textContent = 'フォルダへのアクセス許可が必要です。'; return; }
+        await renderLocalDirectory(localDirectoryHandle, localTree);
+    };
+    loadLocalHandle().then(async handle => {
+        localDirectoryHandle = handle;
+        if (!handle) { localTree.innerHTML = '<p class="file-note">Project設定からBROWSEでフォルダを選択してください。</p>'; return; }
+        if (await handle.queryPermission({mode:'read'}) === 'granted') await renderLocalDirectory(handle, localTree);
+        else localTree.innerHTML = '<p class="file-note">FILESをクリックしてフォルダへのアクセスを再開してください。</p>';
+    }).catch(() => { localStatus.textContent = 'ローカルフォルダ設定を読み込めませんでした。'; });
     const paneWidthKey = `rise-gate-os-pane-widths-${@json($project->public_id)}`;
     try {
         const savedWidths = JSON.parse(localStorage.getItem(paneWidthKey) || '{}');
@@ -518,7 +562,7 @@
         workbench.querySelectorAll('[data-pane]').forEach(pane => pane.classList.toggle('is-mobile-current', pane.dataset.pane === name));
         workbench.querySelectorAll('[data-mobile-pane]').forEach(button => button.classList.toggle('is-current', button.dataset.mobilePane === name));
     };
-    workbench.addEventListener('click', event => {
+    workbench.addEventListener('click', async event => {
         const documentButton = event.target.closest('[data-document]');
         if (documentButton) openDocument(documentButton.dataset.document);
         const closeTab = event.target.closest('[data-close-workspace-tab]');
@@ -557,6 +601,18 @@
             const name = explorerTab.dataset.explorerTab;
             workbench.querySelectorAll('[data-explorer-tab]').forEach(button => button.classList.toggle('is-current', button.dataset.explorerTab === name));
             workbench.querySelectorAll('[data-explorer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.explorerPanel === name));
+            if (name === 'files') {
+                try { await ensureLocalFolderAccess(); }
+                catch (error) { localStatus.textContent = error.name === 'SecurityError' ? 'BROWSEからフォルダを再選択してください。' : 'フォルダを開けませんでした。'; }
+            }
+        }
+        const localDirectory = event.target.closest('[data-local-directory]');
+        if (localDirectory) {
+            const open = localDirectory.localBranch.hidden;
+            localDirectory.localBranch.hidden = !open;
+            localDirectory.setAttribute('aria-expanded', String(open));
+            localDirectory.querySelector('.tree-icon').textContent = open ? '▾' : '▸';
+            if (open && !localDirectory.localBranch.hasChildNodes()) await renderLocalDirectory(localDirectory.localHandle, localDirectory.localBranch, localDirectory.dataset.localDirectory, localDirectory.dataset.localDirectory.split('/').length);
         }
         const treeToggle = event.target.closest('[data-tree-toggle]');
         if (treeToggle) {
@@ -582,14 +638,19 @@
         if (editorClose) workbench.querySelector(`[data-inline-editor="${CSS.escape(editorClose.dataset.inlineEditorClose)}"]`).hidden = true;
         const fileButton = event.target.closest('[data-file-name]');
         if (fileButton) {
+            if (fileButton.localFileHandle) {
+                const file = await fileButton.localFileHandle.getFile();
+                fileButton.dataset.fileCopy = file.size > 1024 * 1024 ? '1MBを超えるためプレビューできません。' : await file.text();
+            }
             workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
             workbench.querySelector('[data-file-title]').textContent = fileButton.dataset.fileName;
             workbench.querySelector('[data-file-content]').textContent = fileButton.dataset.fileCopy;
             const opensInBrowser = fileButton.dataset.fileView === 'browser' || /(^|\/)index\.html?$/i.test(fileButton.dataset.fileName);
-            ensureTab({id:`file:${fileButton.dataset.fileName}`, kind:opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:fileButton.dataset.previewUrl || ''});
+            const previewUrl = opensInBrowser && fileButton.localFileHandle ? URL.createObjectURL(new Blob([fileButton.dataset.fileCopy], {type:'text/html'})) : (fileButton.dataset.previewUrl || '');
+            ensureTab({id:`file:${fileButton.dataset.fileName}`, kind:opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl});
             if (opensInBrowser) {
                 const frame = workbench.querySelector('[data-browser-frame]');
-                frame.src = fileButton.dataset.previewUrl;
+                frame.src = previewUrl;
                 frame.hidden = false;
                 showViewer('browser');
             } else {

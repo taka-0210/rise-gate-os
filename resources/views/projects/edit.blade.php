@@ -117,28 +117,22 @@
         </div>
         <form class="stack" method="POST" action="{{ route('projects.local-connection.store', $project) }}">
             @csrf
-            <div class="stack">
+            <div class="stack" data-local-folder-setting data-handle-key="project-{{ $project->id }}-user-{{ auth()->id() }}">
                 <div class="field">
-                    <label for="local_path">ローカルパス</label>
-                    <div class="local-path-control">
-                        <input id="local_path" name="local_path" value="{{ old('local_path', $localConnection?->local_path) }}" placeholder="例：C:\xampp\htdocs\prohit-okinawa" required data-local-path>
-                        <button class="secondary" type="button" data-folder-browse>BROWSE</button>
-                    </div>
-                    <input type="file" webkitdirectory directory multiple hidden data-folder-picker>
-                    <div class="meta" data-folder-browse-status>ブラウザで選択した場合、フォルダ名は自動取得されます。絶対パスは安全上ブラウザから取得できないため入力してください。</div>
-                    @error('local_path') <div class="error">{{ $message }}</div> @enderror
+                    <label>ローカルフォルダ</label>
+                    <div class="local-path-control"><button class="secondary" type="button" data-folder-browse>BROWSE</button><span class="meta" data-folder-browse-status>{{ $localConnection ? '登録済みのフォルダを再選択できます。' : 'フォルダを選択してください。' }}</span></div>
                 </div>
                 <div class="field">
-                    <label for="directory_name">フォルダ名</label>
+                    <label for="directory_name">表示名</label>
                     <input id="directory_name" name="directory_name" value="{{ old('directory_name', $localConnection?->directory_name) }}" placeholder="ローカルパスから自動取得" required data-directory-name>
                     <div class="meta">自動取得後も自由に変更できます。</div>
                     @error('directory_name') <div class="error">{{ $message }}</div> @enderror
                 </div>
             </div>
-            <div class="meta">現在は設定情報の保存まで対応しています。実ファイルとの接続には、次の段階で導入するPC側の接続アプリが必要です。</div>
+            <div class="meta">フォルダへのアクセス権はこのブラウザ内だけに保存され、サーバーや他の利用者には共有されません。Chrome・Edgeに対応しています。</div>
             <div class="actions">
                 <button type="submit">ローカルフォルダ設定を保存</button>
-                <span class="meta">状態：{{ $localConnection ? '設定済み（接続アプリ待ち）' : '未設定' }}</span>
+                <span class="meta">状態：{{ $localConnection ? 'フォルダ登録済み' : '未設定' }}</span>
             </div>
         </form>
         @if($localConnection)
@@ -150,42 +144,40 @@
     </section>
     <script>
         (() => {
-            const path = document.querySelector('[data-local-path]');
+            const setting = document.querySelector('[data-local-folder-setting]');
             const name = document.querySelector('[data-directory-name]');
             const browse = document.querySelector('[data-folder-browse]');
-            const picker = document.querySelector('[data-folder-picker]');
             const status = document.querySelector('[data-folder-browse-status]');
-            if (!path || !name || !browse || !picker) return;
+            if (!setting || !name || !browse) return;
+
+            const saveHandle = handle => new Promise((resolve, reject) => {
+                const request = indexedDB.open('rise-gate-local-folders', 1);
+                request.onupgradeneeded = () => request.result.createObjectStore('handles');
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    const transaction = request.result.transaction('handles', 'readwrite');
+                    transaction.objectStore('handles').put(handle, setting.dataset.handleKey);
+                    transaction.oncomplete = resolve;
+                    transaction.onerror = () => reject(transaction.error);
+                };
+            });
 
             const applyFolderName = folderName => {
                 if (!folderName) return;
                 name.value = folderName;
                 name.dataset.manuallyEdited = '';
             };
-            path.addEventListener('input', () => {
-                if (name.dataset.manuallyEdited === 'true') return;
-                const normalized = path.value.trim().replace(/[\\/]+$/, '');
-                applyFolderName(normalized.split(/[\\/]/).pop());
-            });
             name.addEventListener('input', () => { name.dataset.manuallyEdited = 'true'; });
             browse.addEventListener('click', async () => {
-                if ('showDirectoryPicker' in window) {
-                    try {
-                        const handle = await window.showDirectoryPicker({mode:'read'});
-                        applyFolderName(handle.name);
-                        status.textContent = `「${handle.name}」を選択しました。絶対パスを確認して入力してください。`;
-                    } catch (error) {
-                        if (error.name !== 'AbortError') status.textContent = 'フォルダを選択できませんでした。';
-                    }
-                    return;
+                if (!('showDirectoryPicker' in window)) { status.textContent = 'このブラウザは未対応です。ChromeまたはEdgeをご利用ください。'; return; }
+                try {
+                    const handle = await window.showDirectoryPicker({mode:'read', id:setting.dataset.handleKey});
+                    await saveHandle(handle);
+                    applyFolderName(handle.name);
+                    status.textContent = `「${handle.name}」へのアクセス権を保存しました。`;
+                } catch (error) {
+                    if (error.name !== 'AbortError') status.textContent = 'フォルダを選択できませんでした。';
                 }
-                picker.click();
-            });
-            picker.addEventListener('change', () => {
-                const relativePath = picker.files[0]?.webkitRelativePath || '';
-                const folderName = relativePath.split('/')[0];
-                applyFolderName(folderName);
-                if (folderName) status.textContent = `「${folderName}」を選択しました。絶対パスを確認して入力してください。`;
             });
         })();
     </script>

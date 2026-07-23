@@ -382,9 +382,10 @@ class ProjectFoundationTest extends TestCase
             ->get(route('projects.edit', $project))
             ->assertOk()
             ->assertSee('このPCのローカルフォルダ')
-            ->assertSeeInOrder(['ローカルパス', 'フォルダ名'])
+            ->assertSeeInOrder(['ローカルフォルダ', '表示名'])
             ->assertSee('BROWSE')
             ->assertSee('data-folder-browse', false)
+            ->assertDontSee('name="local_path"', false)
             ->assertSee(route('projects.local-connection.store', $project), false);
 
         $this->actingAs($owner)
