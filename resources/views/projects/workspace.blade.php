@@ -99,15 +99,15 @@
     .image-stage { min-height:0; display:flex; align-items:center; justify-content:center; overflow:auto; padding:24px; background-image:linear-gradient(45deg,#dde4e8 25%,transparent 25%),linear-gradient(-45deg,#dde4e8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#dde4e8 75%),linear-gradient(-45deg,transparent 75%,#dde4e8 75%); background-position:0 0,0 8px,8px -8px,-8px 0; background-size:16px 16px; }
     .image-preview { display:block; max-width:100%; max-height:calc(100vh - 190px); object-fit:contain; box-shadow:0 8px 28px rgba(25,45,55,.2); }
     .image-preview.is-original { max-width:none; max-height:none; }
-    .code-shell { margin-top:18px; overflow:auto; border:1px solid #d3dce2; border-radius:8px; background:#f8fafc; box-shadow:inset 0 1px 0 #fff; }
-    .code-viewer { min-width:max-content; padding:12px 0 18px; counter-reset:code-line; color:#263b47; font:13px/1.7 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; tab-size:4; }
+    .code-shell { margin-top:18px; overflow:auto; border:1px solid #30363d; border-radius:8px; background:#0d1117; box-shadow:0 8px 24px rgba(13,17,23,.16); color-scheme:dark; }
+    .code-viewer { min-width:max-content; padding:12px 0 18px; counter-reset:code-line; color:#e6edf3; font:13px/1.7 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; tab-size:4; }
     .code-line { display:block; min-height:1.7em; padding:0 20px 0 0; white-space:pre; counter-increment:code-line; }
-    .code-line::before { content:counter(code-line); display:inline-block; width:52px; margin-right:16px; padding-right:12px; border-right:1px solid #e0e6ea; color:#99a7af; text-align:right; user-select:none; }
-    .code-token--tag, .code-token--keyword { color:#7b3fa1; font-weight:650; }
-    .code-token--variable { color:#0b6f87; }
-    .code-token--string { color:#9a4d16; }
-    .code-token--comment { color:#718b72; font-style:italic; }
-    .code-token--number { color:#1c62a3; }
+    .code-line::before { content:counter(code-line); display:inline-block; width:52px; margin-right:16px; padding-right:12px; border-right:1px solid #30363d; color:#6e7681; text-align:right; user-select:none; }
+    .code-token--tag, .code-token--keyword { color:#ff7b72; font-weight:650; }
+    .code-token--variable { color:#79c0ff; }
+    .code-token--string { color:#a5d6ff; }
+    .code-token--comment { color:#8b949e; font-style:italic; }
+    .code-token--number { color:#d2a8ff; }
     .usage-card[hidden] { display:none; }
     .usage-grid { display:grid; margin-top:10px; }
     .usage-grid div { padding:10px; border-radius:7px; background:#f3f7f8; }
