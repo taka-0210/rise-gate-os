@@ -183,12 +183,15 @@
     .ai-message.is-pending .ai-message__bubble { color:#61737c; background:#edf2f4; }
     .ai-chat-error { padding:9px 10px; border:1px solid #dfb5ad; border-radius:7px; color:#8a4338; background:#fff6f4; font-size:11px; }
     .ai-chat-form { display:grid; gap:8px; position:sticky; bottom:0; padding-top:4px; background:#fafcfc; }
-    .ai-chat-form textarea { min-height:88px; max-height:220px; resize:vertical; }
+    .ai-chat-form textarea { min-height:88px; max-height:220px; resize:vertical; font-size:13px; line-height:1.65; }
     .chat-image-preview { position:relative; width:max-content; max-width:100%; padding:5px; border:1px solid #cbd7dc; border-radius:8px; background:#fff; }
     .chat-image-preview[hidden] { display:none; }
     .chat-image-preview img { display:block; max-width:150px; max-height:100px; border-radius:5px; object-fit:contain; }
     .chat-image-preview button { position:absolute; top:-7px; right:-7px; width:22px; height:22px; padding:0; border:1px solid #c6d0d5; border-radius:50%; color:#536771; background:#fff; line-height:20px; }
-    .chat-attach-button { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+    .chat-attach-button { display:inline-flex; align-items:center; gap:6px; padding:5px 7px !important; border:0; color:#526974; background:transparent; font-size:11px; font-weight:700; cursor:pointer; }
+    .chat-attach-button:hover { color:#0f5968; background:#edf4f5; }
+    .chat-attach-button__icon { display:grid; width:22px; height:22px; place-items:center; border:1px solid #b9c9cf; border-radius:50%; background:#fff; font-size:13px; line-height:1; }
+    .chat-paste-hint { color:#71838c; font-size:10px; }
     .ai-chat-form__actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .ai-chat-form__actions button { padding:9px 13px; }
     .mobile-pane-switch { display:none; }
@@ -456,8 +459,8 @@
                     <input type="hidden" name="file_path" value="" data-chat-file-path>
                     <textarea name="file_content" hidden data-chat-file-content></textarea>
                     <div class="ai-chat-form__actions">
-                        <label class="meta chat-attach-button">📎 スクショ<input type="button" hidden data-chat-image-select></label>
-                        <span class="meta">貼り付けもできます</span>
+                        <button class="chat-attach-button" type="button" data-chat-image-select><span class="chat-attach-button__icon" aria-hidden="true">📎</span>画像を選択</button>
+                        <span class="chat-paste-hint">スクショは貼り付けもできます</span>
                         <button type="submit" @disabled(!$aiChatEnabled || !$aiChatConfigured)>送信</button>
                     </div>
                 </form>
