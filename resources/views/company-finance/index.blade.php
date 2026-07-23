@@ -5,7 +5,7 @@
         <div>
             <div class="meta">COMPANY OS / FINANCE</div>
             <h1>経営数値</h1>
-            <p>{{ $organization->name }}の年度別P/Lです。財務情報はWorkspaceではなく会社アカウントに属します。</p>
+            <p>{{ $organization->name }}の年度別P/Lです。{{ $organization->fiscal_year_end_month ? $organization->fiscal_year_end_month.'月決算' : '決算月未設定' }}。</p>
         </div>
     </div>
 
@@ -15,12 +15,33 @@
             <p>年度別損益計算書を取り込むと、ここに会社の財務履歴が表示されます。</p>
         </div>
     @else
-        @php($latest = $periods->first())
         <div class="stats">
-            <div class="stat"><span>最新実績</span><strong>{{ $latest->period_number }}期</strong><small>{{ $latest->fiscal_year }}年度</small></div>
+            <div class="stat"><span>最新実績</span><strong>{{ $latest->period_number }}期</strong><small>{{ $latest->fiscal_year }}年{{ $organization->fiscal_year_end_month ? $organization->fiscal_year_end_month.'月期' : '度' }}</small></div>
             <div class="stat"><span>売上高</span><strong>{{ number_format($latest->net_sales) }}</strong><small>円</small></div>
             <div class="stat"><span>粗利率</span><strong>{{ number_format((float) $latest->gross_profit_ratio * 100, 1) }}%</strong><small>売上総利益率</small></div>
             <div class="stat"><span>営業利益率</span><strong>{{ number_format((float) $latest->operating_profit_ratio * 100, 1) }}%</strong><small>{{ number_format($latest->operating_profit) }}円</small></div>
+        </div>
+
+        <div class="insight-grid">
+            <div class="card"><span>前期比売上</span><strong class="{{ ($salesGrowthRate ?? 0) < 0 ? 'negative' : '' }}">{{ $salesGrowthRate === null ? '—' : (($salesGrowthRate >= 0 ? '+' : '').number_format($salesGrowthRate, 1).'%') }}</strong><small>{{ $previous ? $previous->period_number.'期との比較' : '比較対象なし' }}</small></div>
+            <div class="card"><span>過去最高売上</span><strong>{{ $highestSales?->period_number }}期</strong><small>{{ $highestSales ? number_format($highestSales->net_sales).'円' : '—' }}</small></div>
+            <div class="card"><span>営業黒字</span><strong>{{ $profitablePeriodCount }}期</strong><small>全{{ $periods->count() }}期中</small></div>
+            <div class="card"><span>最新の最終利益率</span><strong class="{{ ($latestNetIncomeRatio ?? 0) < 0 ? 'negative' : '' }}">{{ $latestNetIncomeRatio === null ? '—' : number_format($latestNetIncomeRatio, 1).'%' }}</strong><small>当期純利益 ÷ 売上高</small></div>
+        </div>
+
+        <div class="chart-grid">
+            <section class="card chart-card">
+                <div><div class="meta">21-YEAR TREND</div><h2>売上・粗利益・販管費</h2></div>
+                @include('company-finance.partials.line-chart', ['title' => '売上・粗利益・販管費の推移', 'periods' => $chartPeriods, 'series' => $amountSeries, 'unit' => '円'])
+            </section>
+            <section class="card chart-card">
+                <div><div class="meta">PROFIT</div><h2>利益の推移</h2></div>
+                @include('company-finance.partials.line-chart', ['title' => '営業利益・経常利益・当期純利益の推移', 'periods' => $chartPeriods, 'series' => $profitSeries, 'unit' => '円'])
+            </section>
+            <section class="card chart-card chart-card--wide">
+                <div><div class="meta">MARGIN</div><h2>利益率の推移</h2></div>
+                @include('company-finance.partials.line-chart', ['title' => '粗利率・営業利益率・最終利益率の推移', 'periods' => $chartPeriods, 'series' => $marginSeries, 'unit' => '%'])
+            </section>
         </div>
 
         <div class="card finance-table-wrap">
@@ -71,6 +92,19 @@
         .stat { display:flex; flex-direction:column; gap:5px; padding:18px; border:1px solid var(--line); border-radius:12px; background:#fff; }
         .stat span,.stat small { color:var(--muted); }
         .stat strong { color:var(--accent-dark); font-size:24px; }
+        .insight-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+        .insight-grid .card { display:flex; flex-direction:column; gap:5px; }
+        .insight-grid span,.insight-grid small { color:var(--muted); }
+        .insight-grid strong { color:var(--accent-dark); font-size:22px; }
+        .chart-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-bottom:18px; }
+        .chart-card { overflow:hidden; }
+        .chart-card--wide { grid-column:1 / -1; }
+        .finance-chart { min-width:0; margin-top:12px; }
+        .finance-chart svg { display:block; width:100%; height:auto; overflow:visible; }
+        .finance-chart text { fill:#667983; font-size:12px; font-family:inherit; }
+        .finance-chart__legend { display:flex; flex-wrap:wrap; gap:14px; color:var(--muted); font-size:12px; }
+        .finance-chart__legend span { display:inline-flex; align-items:center; gap:6px; }
+        .finance-chart__legend i { width:18px; height:3px; border-radius:99px; }
         .finance-table-wrap { overflow-x:auto; }
         .section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:14px; }
         .finance-table { width:100%; min-width:1080px; border-collapse:collapse; font-variant-numeric:tabular-nums; }
@@ -78,6 +112,10 @@
         .finance-table th:first-child,.finance-table td:first-child,.finance-table th:nth-child(2),.finance-table td:nth-child(2) { text-align:left; }
         .finance-table tbody tr:hover { background:#f4f8f8; }
         .negative { color:#a33b3b; }
-        @media (max-width:900px) { .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @media (max-width:900px) {
+            .stats,.insight-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .chart-grid { grid-template-columns:1fr; }
+            .chart-card--wide { grid-column:auto; }
+        }
     </style>
 @endsection

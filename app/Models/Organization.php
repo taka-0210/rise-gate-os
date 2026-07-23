@@ -17,7 +17,15 @@ class Organization extends Model
         'public_id',
         'name',
         'slug',
+        'fiscal_year_end_month',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'fiscal_year_end_month' => 'integer',
+        ];
+    }
 
     protected static function booted(): void
     {

@@ -17,6 +17,7 @@ class CompanyFinanceAccessTest extends TestCase
     public function test_company_owner_can_view_finance_and_manage_company_members(): void
     {
         [$owner, $organization, $workspace] = $this->companyUser('owner');
+        $organization->update(['fiscal_year_end_month' => 11]);
         CompanyFinancialPeriod::create([
             'organization_id' => $organization->id,
             'period_number' => 21,
@@ -30,7 +31,10 @@ class CompanyFinanceAccessTest extends TestCase
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-finance.index'))
             ->assertOk()
-            ->assertSee('123,456,789');
+            ->assertSee('123,456,789')
+            ->assertSee('11月決算')
+            ->assertSee('売上・粗利益・販管費')
+            ->assertSee('利益率の推移');
 
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-members.index'))
