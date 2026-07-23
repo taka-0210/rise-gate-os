@@ -5,6 +5,9 @@
         .future-field { padding:16px; border:1px solid #b7dbc9; border-radius:10px; background:linear-gradient(145deg,#f8fffb,#eaf7f0); }
         .future-field label::before { content:"✦"; margin-right:7px; color:#3d966d; }
         .ai-enabled-badge { display:inline-flex; margin-left:8px; padding:3px 7px; border-radius:999px; background:#e8f4f2; color:var(--accent-dark); font-size:11px; font-weight:800; vertical-align:middle; }
+        .local-path-control { display:flex; gap:8px; align-items:stretch; }
+        .local-path-control input { flex:1 1 auto; min-width:0; }
+        .local-path-control button { flex:0 0 auto; }
     </style>
     <section class="panel stack">
         <div>
@@ -114,16 +117,22 @@
         </div>
         <form class="stack" method="POST" action="{{ route('projects.local-connection.store', $project) }}">
             @csrf
-            <div class="grid">
-                <div class="field">
-                    <label for="directory_name">フォルダ名</label>
-                    <input id="directory_name" name="directory_name" value="{{ old('directory_name', $localConnection?->directory_name) }}" placeholder="例：prohit-okinawa" required>
-                    @error('directory_name') <div class="error">{{ $message }}</div> @enderror
-                </div>
+            <div class="stack">
                 <div class="field">
                     <label for="local_path">ローカルパス</label>
-                    <input id="local_path" name="local_path" value="{{ old('local_path', $localConnection?->local_path) }}" placeholder="例：C:\xampp\htdocs\prohit-okinawa" required>
+                    <div class="local-path-control">
+                        <input id="local_path" name="local_path" value="{{ old('local_path', $localConnection?->local_path) }}" placeholder="例：C:\xampp\htdocs\prohit-okinawa" required data-local-path>
+                        <button class="secondary" type="button" data-folder-browse>BROWSE</button>
+                    </div>
+                    <input type="file" webkitdirectory directory multiple hidden data-folder-picker>
+                    <div class="meta" data-folder-browse-status>ブラウザで選択した場合、フォルダ名は自動取得されます。絶対パスは安全上ブラウザから取得できないため入力してください。</div>
                     @error('local_path') <div class="error">{{ $message }}</div> @enderror
+                </div>
+                <div class="field">
+                    <label for="directory_name">フォルダ名</label>
+                    <input id="directory_name" name="directory_name" value="{{ old('directory_name', $localConnection?->directory_name) }}" placeholder="ローカルパスから自動取得" required data-directory-name>
+                    <div class="meta">自動取得後も自由に変更できます。</div>
+                    @error('directory_name') <div class="error">{{ $message }}</div> @enderror
                 </div>
             </div>
             <div class="meta">現在は設定情報の保存まで対応しています。実ファイルとの接続には、次の段階で導入するPC側の接続アプリが必要です。</div>
@@ -139,6 +148,47 @@
             </form>
         @endif
     </section>
+    <script>
+        (() => {
+            const path = document.querySelector('[data-local-path]');
+            const name = document.querySelector('[data-directory-name]');
+            const browse = document.querySelector('[data-folder-browse]');
+            const picker = document.querySelector('[data-folder-picker]');
+            const status = document.querySelector('[data-folder-browse-status]');
+            if (!path || !name || !browse || !picker) return;
+
+            const applyFolderName = folderName => {
+                if (!folderName) return;
+                name.value = folderName;
+                name.dataset.manuallyEdited = '';
+            };
+            path.addEventListener('input', () => {
+                if (name.dataset.manuallyEdited === 'true') return;
+                const normalized = path.value.trim().replace(/[\\/]+$/, '');
+                applyFolderName(normalized.split(/[\\/]/).pop());
+            });
+            name.addEventListener('input', () => { name.dataset.manuallyEdited = 'true'; });
+            browse.addEventListener('click', async () => {
+                if ('showDirectoryPicker' in window) {
+                    try {
+                        const handle = await window.showDirectoryPicker({mode:'read'});
+                        applyFolderName(handle.name);
+                        status.textContent = `「${handle.name}」を選択しました。絶対パスを確認して入力してください。`;
+                    } catch (error) {
+                        if (error.name !== 'AbortError') status.textContent = 'フォルダを選択できませんでした。';
+                    }
+                    return;
+                }
+                picker.click();
+            });
+            picker.addEventListener('change', () => {
+                const relativePath = picker.files[0]?.webkitRelativePath || '';
+                const folderName = relativePath.split('/')[0];
+                applyFolderName(folderName);
+                if (folderName) status.textContent = `「${folderName}」を選択しました。絶対パスを確認して入力してください。`;
+            });
+        })();
+    </script>
 
     @if ($canMoveProject)
         <section class="panel stack" style="margin-top:24px;">
