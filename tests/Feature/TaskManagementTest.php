@@ -343,6 +343,7 @@ class TaskManagementTest extends TestCase
             ->assertSee('code-line', false)
             ->assertSee('data-pdf-frame', false)
             ->assertSee('PDFビューワー')
+            ->assertSee("ensureLocalFolderAccess().catch", false)
             ->assertDontSee('data-viewer-tab', false)
             ->assertSee('AI パートナー')
             ->assertDontSee('開いている仕事について相談する')

@@ -601,6 +601,26 @@
         workbench.querySelectorAll('[data-pane]').forEach(pane => pane.classList.toggle('is-mobile-current', pane.dataset.pane === name));
         workbench.querySelectorAll('[data-mobile-pane]').forEach(button => button.classList.toggle('is-current', button.dataset.mobilePane === name));
     };
+    workbench.addEventListener('click', event => {
+        const explorerTab = event.target.closest('[data-explorer-tab]');
+        if (explorerTab) {
+            const name = explorerTab.dataset.explorerTab;
+            workbench.querySelectorAll('[data-explorer-tab]').forEach(button => button.classList.toggle('is-current', button.dataset.explorerTab === name));
+            workbench.querySelectorAll('[data-explorer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.explorerPanel === name));
+            if (name === 'files') ensureLocalFolderAccess().catch(error => {
+                localStatus.textContent = error.name === 'SecurityError' ? 'BROWSEからフォルダを再選択してください。' : 'フォルダを開けませんでした。';
+            });
+        }
+        const treeToggle = event.target.closest('[data-tree-toggle]');
+        if (treeToggle) {
+            const branch = workbench.querySelector(`[data-tree-branch="${CSS.escape(treeToggle.dataset.treeToggle)}"]`);
+            if (branch) {
+                const open = branch.hidden;
+                branch.hidden = !open;
+                treeToggle.setAttribute('aria-expanded', String(open));
+            }
+        }
+    });
     workbench.addEventListener('click', async event => {
         const documentButton = event.target.closest('[data-document]');
         if (documentButton) openDocument(documentButton.dataset.document);
@@ -638,16 +658,6 @@
         }
         const paneButton = event.target.closest('[data-mobile-pane]');
         if (paneButton) showMobilePane(paneButton.dataset.mobilePane);
-        const explorerTab = event.target.closest('[data-explorer-tab]');
-        if (explorerTab) {
-            const name = explorerTab.dataset.explorerTab;
-            workbench.querySelectorAll('[data-explorer-tab]').forEach(button => button.classList.toggle('is-current', button.dataset.explorerTab === name));
-            workbench.querySelectorAll('[data-explorer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.explorerPanel === name));
-            if (name === 'files') {
-                try { await ensureLocalFolderAccess(); }
-                catch (error) { localStatus.textContent = error.name === 'SecurityError' ? 'BROWSEからフォルダを再選択してください。' : 'フォルダを開けませんでした。'; }
-            }
-        }
         const localDirectory = event.target.closest('[data-local-directory]');
         if (localDirectory) {
             const open = localDirectory.localBranch.hidden;
@@ -655,15 +665,6 @@
             localDirectory.setAttribute('aria-expanded', String(open));
             localDirectory.querySelector('.file-item__expander').textContent = open ? '▾' : '▸';
             if (open && !localDirectory.localBranch.hasChildNodes()) await renderLocalDirectory(localDirectory.localHandle, localDirectory.localBranch, localDirectory.dataset.localDirectory, localDirectory.dataset.localDirectory.split('/').length);
-        }
-        const treeToggle = event.target.closest('[data-tree-toggle]');
-        if (treeToggle) {
-            const branch = workbench.querySelector(`[data-tree-branch="${CSS.escape(treeToggle.dataset.treeToggle)}"]`);
-            if (branch) {
-                const open = branch.hidden;
-                branch.hidden = !open;
-                treeToggle.setAttribute('aria-expanded', String(open));
-            }
         }
         const fileToggle = event.target.closest('[data-file-toggle]');
         if (fileToggle) {
