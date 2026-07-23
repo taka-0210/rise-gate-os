@@ -321,7 +321,15 @@ class AiChatTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.ai-chat.messages.file-change.rejected', [$project, $message]), [], ['Accept' => 'application/json'])
             ->assertOk()
-            ->assertJsonPath('status', 'rejected');
+            ->assertJsonPath('status', 'rejected')
+            ->assertJsonPath('already_rejected', false);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-chat.messages.file-change.rejected', [$project, $message]), [], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('status', 'rejected')
+            ->assertJsonPath('already_rejected', true);
 
         $this->assertDatabaseHas('ai_chat_messages', ['id' => $message->id, 'file_change_status' => 'rejected']);
     }
@@ -367,6 +375,8 @@ class AiChatTest extends TestCase
             ->assertSee('更新日時：', false)
             ->assertSee('file-preview-title__time', false)
             ->assertSee('revealLocalFile', false)
+            ->assertSee('requestTerms', false)
+            ->assertSee('通信を確認して、もう一度', false)
             ->assertDontSee('推定利用料')
             ->assertDontSee('$0.0006');
     }

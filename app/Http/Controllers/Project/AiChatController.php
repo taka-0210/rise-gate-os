@@ -160,10 +160,13 @@ class AiChatController extends Controller
     public function markFileChangeRejected(Request $request, Project $project, AiChatMessage $message): JsonResponse
     {
         $this->authorizeFileChange($request, $project, $message);
+        if ($message->file_change_status === 'rejected') {
+            return response()->json(['status' => 'rejected', 'already_rejected' => true]);
+        }
         abort_unless($message->file_change_status === 'pending', 409, 'この変更提案は処理済みです。');
         $message->update(['file_change_status' => 'rejected', 'file_change_applied_at' => null]);
 
-        return response()->json(['status' => 'rejected']);
+        return response()->json(['status' => 'rejected', 'already_rejected' => false]);
     }
 
     private function authorizeFileChange(Request $request, Project $project, AiChatMessage $message): void

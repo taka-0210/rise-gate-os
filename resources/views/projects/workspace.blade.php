@@ -1340,15 +1340,20 @@
         await writeHandleText(await backup.getFileHandle('meta.json', {create:true}), `${JSON.stringify(meta, null, 2)}\n`);
         return {directoryName, meta, handle:backup};
     };
-    const collectProjectTextFiles = async () => {
+    const collectProjectTextFiles = async requestText => {
         if (!localDirectoryHandle || await localDirectoryHandle.queryPermission({mode:'read'}) !== 'granted') return [];
-        const files = [];
-        let totalBytes = 0;
+        const candidates = [];
+        let scannedBytes = 0;
         const allowed = /\.(?:php|html?|css|js|mjs|cjs|json|md|txt|xml|ya?ml|csv|ini|conf|sql)$/i;
         const ignoredDirectories = new Set(['.git', '.rise-gate', 'vendor', 'node_modules', 'deploy', 'deployment', 'bootstrap/cache']);
+        const quotedTerms = [...requestText.matchAll(/[「『"]([^」』"]{3,})[」』"]/g)].map(match => match[1]);
+        const requestTerms = [...new Set([
+            ...quotedTerms,
+            ...requestText.split(/[\s、。,.!！?？「」『』（）()]+/).filter(term => term.length >= 5),
+        ])].slice(0, 12);
         const walk = async (directory, prefix = '') => {
             for await (const [name, handle] of directory.entries()) {
-                if (files.length >= 100 || totalBytes >= 250000) return;
+                if (candidates.length >= 1000 || scannedBytes >= 10000000) return;
                 const path = prefix ? `${prefix}/${name}` : name;
                 if (handle.kind === 'directory') {
                     if (!ignoredDirectories.has(name) && !ignoredDirectories.has(path)) await walk(handle, path);
@@ -1356,13 +1361,26 @@
                 }
                 if (!allowed.test(name)) continue;
                 const file = await handle.getFile();
-                if (file.size > 100000 || totalBytes + file.size > 250000) continue;
+                if (file.size > 100000 || scannedBytes + file.size > 10000000) continue;
                 const content = await file.text();
-                files.push({path, content});
-                totalBytes += file.size;
+                let score = 0;
+                if (/^storage\/content\//i.test(path)) score += 800;
+                if (/\.json$/i.test(path)) score += 180;
+                if (/\.(?:php|html?)$/i.test(path)) score += 40;
+                requestTerms.forEach(term => { if (content.includes(term)) score += 10000 + term.length; });
+                candidates.push({path, content, size:file.size, score});
+                scannedBytes += file.size;
             }
         };
         await walk(localDirectoryHandle);
+        candidates.sort((left, right) => right.score - left.score || left.size - right.size || left.path.localeCompare(right.path, 'ja'));
+        const files = [];
+        let selectedBytes = 0;
+        for (const candidate of candidates) {
+            if (files.length >= 100 || selectedBytes + candidate.size > 250000) continue;
+            files.push({path:candidate.path, content:candidate.content});
+            selectedBytes += candidate.size;
+        }
         return files;
     };
     const saveLocalBackup = (path, content) => new Promise((resolve, reject) => {
@@ -1730,15 +1748,29 @@
     const rejectFileChange = async proposal => {
         if (!confirm(`「${proposalPath(proposal)}」の変更提案を破棄しますか？`)) return;
         const reject = proposal.querySelector('[data-file-change-reject]');
-        const response = await fetch(reject.dataset.rejectUrl, {
-            method:'POST',
-            headers:{'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
-        });
-        if (!response.ok) throw new Error('変更提案を破棄できませんでした。');
+        let response = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                response = await fetch(reject.dataset.rejectUrl, {
+                    method:'POST',
+                    headers:{'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
+                });
+                if (response.ok || response.status < 500) break;
+            } catch (error) {
+                response = null;
+            }
+            if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
+        }
+        if (!response) throw new Error('通信を確認して、もう一度「提案を破棄」を押してください。');
+        if (!response.ok) {
+            throw new Error(response.status === 419
+                ? 'ログインの有効期限を確認するため、画面を再読み込みしてもう一度お試しください。'
+                : '提案を破棄できませんでした。もう一度お試しください。');
+        }
         proposal.classList.add('is-rejected');
         proposal.querySelector('summary').textContent = '破棄済み';
         proposal.querySelector('[data-file-change-actions]')?.remove();
-        proposal.querySelector('[data-file-change-status]').textContent = 'この提案は破棄しました。';
+        proposal.querySelector('[data-file-change-status]').textContent = '提案を破棄しました。';
         if (activeDiffProposal === proposal) {
             workbench.querySelector('[data-diff-actions]').hidden = true;
             workbench.querySelector('[data-diff-status]').textContent = '破棄済み';
@@ -1782,7 +1814,7 @@
         submit.disabled = true;
         try {
             const changeRequest = /変更|修正|直し|直して|削除|追加|差し替|書き換|改行|見出し/.test(content);
-            const projectFiles = changeRequest ? await collectProjectTextFiles() : [];
+            const projectFiles = changeRequest ? await collectProjectTextFiles(content) : [];
             chatForm.querySelector('[data-chat-project-files]').value = projectFiles.length ? JSON.stringify(projectFiles) : '';
             const payload = new FormData(chatForm);
             payload.set('content', content);
