@@ -1,0 +1,7 @@
+@extends('layouts.app', ['title' => '借入一括入力の確認'])
+@section('content')
+<div class="page-header"><div><div class="meta">DEBT / BULK PREVIEW</div><h1>{{ count($rows) }}件を確認</h1><p>すべて下書きで保存し、確認後に確定します。</p></div></div>
+<div class="card" style="overflow-x:auto"><table class="loan-preview-table"><thead><tr><th>金融機関／No.</th><th>用途</th><th>当初借入額</th><th>現在残高</th><th>月額元金</th><th>年利</th><th>基準日</th><th>状態</th></tr></thead><tbody>@foreach($rows as $row)<tr><td>{{ $row['financial_institution'] }}<br>No.{{ $row['management_number'] }}</td><td>{{ $row['purpose'] }}</td><td>{{ number_format($row['original_amount']) }}</td><td>{{ number_format($row['current_balance']) }}</td><td>{{ number_format($row['monthly_principal_payment']) }}</td><td>{{ $row['annual_interest_rate'] }}%</td><td>{{ $row['balance_as_of'] }}</td><td>{{ $row['loan_status'] }}</td></tr>@endforeach</tbody></table></div>
+<form method="POST" action="{{ route('company-loans.bulk.store') }}">@csrf<textarea name="bulk_text" hidden>{{ $bulkText }}</textarea><button>{{ count($rows) }}件を下書き保存</button></form>
+<style>.loan-preview-table{width:100%;min-width:900px;border-collapse:collapse}.loan-preview-table th,.loan-preview-table td{padding:9px;border-bottom:1px solid var(--line);text-align:right}.loan-preview-table th:first-child,.loan-preview-table td:first-child,.loan-preview-table th:nth-child(2),.loan-preview-table td:nth-child(2){text-align:left}</style>
+@endsection

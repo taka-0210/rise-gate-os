@@ -27,6 +27,7 @@ class OrganizationUser extends Model
     public const PERMISSION_FINANCE_MANAGE_PL = 'finance.pl.manage';
     public const PERMISSION_FINANCE_VIEW_BS = 'finance.bs.view';
     public const PERMISSION_FINANCE_VIEW_DEBT = 'finance.debt.view';
+    public const PERMISSION_FINANCE_MANAGE_DEBT = 'finance.debt.manage';
 
     protected $fillable = [
         'organization_id',
@@ -65,6 +66,7 @@ class OrganizationUser extends Model
             self::PERMISSION_FINANCE_MANAGE_PL => '年度別P/Lを入力・編集・確定',
             self::PERMISSION_FINANCE_VIEW_BS => '全社B/Sを閲覧',
             self::PERMISSION_FINANCE_VIEW_DEBT => '借入・返済情報を閲覧',
+            self::PERMISSION_FINANCE_MANAGE_DEBT => '借入・返済情報を入力・編集・確定',
         ];
     }
 
@@ -75,6 +77,8 @@ class OrganizationUser extends Model
             self::PERMISSION_FINANCE_VIEW_PL,
             self::PERMISSION_FINANCE_IMPORT_PL,
             self::PERMISSION_FINANCE_MANAGE_PL,
+            self::PERMISSION_FINANCE_VIEW_DEBT,
+            self::PERMISSION_FINANCE_MANAGE_DEBT,
         ];
     }
 

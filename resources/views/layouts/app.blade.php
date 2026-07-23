@@ -304,6 +304,9 @@
                         @if ($canViewCompanyFinance ?? false)
                             <a href="{{ route('company-finance.index') }}">経営数値</a>
                         @endif
+                        @if ($canViewCompanyDebt ?? false)
+                            <a href="{{ route('company-loans.index') }}">借入管理</a>
+                        @endif
                         @if ($canManageCompanyMembers ?? false)
                             <a href="{{ route('company-members.index') }}">会社設定</a>
                         @endif

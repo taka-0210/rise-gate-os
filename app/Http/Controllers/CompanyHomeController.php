@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CompanyFinancialPeriod;
+use App\Models\CompanyLoan;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,6 +29,10 @@ class CompanyHomeController extends Controller
                 ->where('organization_id', $company->id)
                 ->where('status', CompanyFinancialPeriod::STATUS_ACTUAL)
                 ->count(),
+            'loanBalance' => CompanyLoan::query()
+                ->where('organization_id', $company->id)
+                ->where('loan_status', CompanyLoan::STATUS_ACTIVE)
+                ->sum('current_balance'),
         ]);
     }
 }

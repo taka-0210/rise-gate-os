@@ -53,6 +53,10 @@ class EnsureCurrentCompany
             'canManageCompanyMembers',
             $this->companyAccess->canManageMembers($user, $company)
         );
+        View::share(
+            'canViewCompanyDebt',
+            $this->companyAccess->allows($user, $company, OrganizationUser::PERMISSION_FINANCE_VIEW_DEBT)
+        );
 
         return $next($request);
     }

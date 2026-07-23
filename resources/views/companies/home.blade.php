@@ -23,7 +23,9 @@
                 </a>
             @endif
             <div class="card"><div class="meta">DIRECTION</div><h2>経営指針</h2><p>理念・未来・方針・計画（今後実装）</p></div>
-            <div class="card"><div class="meta">FINANCE</div><h2>借入・資金計画</h2><p>借入残高・返済・資金繰り（今後実装）</p></div>
+            @if ($canViewCompanyDebt ?? false)
+                <a class="card" href="{{ route('company-loans.index') }}"><div class="meta">DEBT / FUNDING</div><h2>借入・資金計画</h2><p>借入残高 {{ number_format($loanBalance) }}円</p></a>
+            @endif
         </div>
 
         <div class="panel stack">
