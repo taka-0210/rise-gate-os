@@ -6,6 +6,7 @@ use App\Models\AiChatMessage;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class OpenAiChatService
@@ -27,7 +28,7 @@ class OpenAiChatService
                     'instructions' => $this->instructions($projectContext),
                     'input' => $messages->map(fn (AiChatMessage $message): array => [
                         'role' => $message->role,
-                        'content' => $message->content,
+                        'content' => $this->messageContent($message),
                     ])->values()->all(),
                     'reasoning' => ['effort' => 'low'],
                     'text' => ['verbosity' => 'low'],
@@ -70,6 +71,18 @@ class OpenAiChatService
                 $inputTokens * (float) config('services.openai.input_usd_per_million')
                 + $outputTokens * (float) config('services.openai.output_usd_per_million')
             ),
+        ];
+    }
+
+    private function messageContent(AiChatMessage $message): string|array
+    {
+        if ($message->role !== AiChatMessage::ROLE_USER || ! $message->image_path || ! Storage::disk('local')->exists($message->image_path)) {
+            return $message->content;
+        }
+
+        return [
+            ['type' => 'input_text', 'text' => $message->content],
+            ['type' => 'input_image', 'image_url' => 'data:'.$message->image_mime.';base64,'.base64_encode(Storage::disk('local')->get($message->image_path))],
         ];
     }
 

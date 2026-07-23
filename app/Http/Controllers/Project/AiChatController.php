@@ -13,6 +13,8 @@ use App\Services\OpenAiChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use RuntimeException;
 
 class AiChatController extends Controller
@@ -31,6 +33,7 @@ class AiChatController extends Controller
             'content' => ['required', 'string', 'max:4000'],
             'context_key' => ['nullable', 'string', 'max:255'],
             'context_label' => ['nullable', 'string', 'max:255'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $thread = AiChatThread::firstOrCreate([
@@ -47,6 +50,15 @@ class AiChatController extends Controller
             'context_key' => $validated['context_key'] ?? null,
             'context_label' => $validated['context_label'] ?? null,
         ]);
+        if ($image = $request->file('image')) {
+            $path = $image->store("ai-chat/{$thread->id}", 'local');
+            $userMessage->update([
+                'image_path' => $path,
+                'image_name' => $image->getClientOriginalName(),
+                'image_mime' => $image->getMimeType(),
+                'image_size' => $image->getSize(),
+            ]);
+        }
 
         $startedAt = microtime(true);
         try {
@@ -94,6 +106,19 @@ class AiChatController extends Controller
 
             return response()->json(['message' => $exception->getMessage()], 502);
         }
+    }
+
+    public function image(Request $request, Project $project, AiChatMessage $message): StreamedResponse
+    {
+        Gate::authorize('view', $project);
+        abort_unless($message->thread?->project_id === $project->id && $message->image_path, 404);
+        abort_unless(Storage::disk('local')->exists($message->image_path), 404);
+
+        return Storage::disk('local')->response($message->image_path, $message->image_name, [
+            'Content-Type' => $message->image_mime,
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     private function projectContext(Request $request, Project $project, ?string $contextLabel): array
@@ -146,6 +171,7 @@ class AiChatController extends Controller
             'output_tokens' => $message->output_tokens,
             'estimated_cost_usd' => $message->estimated_cost_microusd / 1_000_000,
             'created_at' => $message->created_at->toIso8601String(),
+            'image_url' => $message->image_path ? route('projects.ai-chat.messages.image', [$message->thread->project_id, $message]) : null,
         ];
     }
 }

@@ -169,6 +169,7 @@
     .ai-message--user { justify-self:end; }
     .ai-message--assistant { justify-self:start; }
     .ai-message__bubble { padding:10px 12px; border-radius:11px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.65; }
+    .ai-message__image { display:block; width:auto; max-width:100%; max-height:220px; margin-bottom:7px; border-radius:7px; object-fit:contain; }
     .ai-message--user .ai-message__bubble { color:#fff; background:#155566; border-bottom-right-radius:3px; }
     .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
     .ai-message__meta { color:#7d8c94; font-size:9px; }
@@ -177,6 +178,11 @@
     .ai-chat-error { padding:9px 10px; border:1px solid #dfb5ad; border-radius:7px; color:#8a4338; background:#fff6f4; font-size:11px; }
     .ai-chat-form { display:grid; gap:8px; position:sticky; bottom:0; padding-top:4px; background:#fafcfc; }
     .ai-chat-form textarea { min-height:88px; max-height:220px; resize:vertical; }
+    .chat-image-preview { position:relative; width:max-content; max-width:100%; padding:5px; border:1px solid #cbd7dc; border-radius:8px; background:#fff; }
+    .chat-image-preview[hidden] { display:none; }
+    .chat-image-preview img { display:block; max-width:150px; max-height:100px; border-radius:5px; object-fit:contain; }
+    .chat-image-preview button { position:absolute; top:-7px; right:-7px; width:22px; height:22px; padding:0; border:1px solid #c6d0d5; border-radius:50%; color:#536771; background:#fff; line-height:20px; }
+    .chat-attach-button { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
     .ai-chat-form__actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .ai-chat-form__actions button { padding:9px 13px; }
     .mobile-pane-switch { display:none; }
@@ -412,7 +418,7 @@
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
                         <article class="ai-message ai-message--{{ $chatMessage->role }}">
-                            <div class="ai-message__bubble">{{ $chatMessage->content }}</div>
+                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@endif{{ $chatMessage->content }}</div>
                             <div class="ai-message__meta">
                                 {{ $chatMessage->created_at->format('m/d H:i') }}
                             </div>
@@ -422,12 +428,15 @@
                     @endforelse
                 </section>
                 <div class="ai-chat-error" data-chat-error hidden></div>
-                <form class="ai-chat-form" data-chat-form data-chat-url="{{ route('projects.ai-chat.messages.store', $project) }}">
+                <form class="ai-chat-form" data-chat-form data-chat-url="{{ route('projects.ai-chat.messages.store', $project) }}" enctype="multipart/form-data">
                     <textarea name="content" rows="3" maxlength="4000" placeholder="このProjectについて質問する…" @disabled(!$aiChatEnabled || !$aiChatConfigured) required></textarea>
+                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp" hidden data-chat-image-input>
+                    <div class="chat-image-preview" data-chat-image-preview hidden><img alt="添付するスクリーンショット"><button type="button" data-chat-image-remove aria-label="画像を削除">×</button></div>
                     <input type="hidden" name="context_key" value="project" data-chat-context-key>
                     <input type="hidden" name="context_label" value="{{ $project->name }} / Project Overview" data-chat-context-label>
                     <div class="ai-chat-form__actions">
-                        <span class="meta">AIは提案のみ・自動変更なし</span>
+                        <label class="meta chat-attach-button">📎 スクショ<input type="button" hidden data-chat-image-select></label>
+                        <span class="meta">貼り付けもできます</span>
                         <button type="submit" @disabled(!$aiChatEnabled || !$aiChatConfigured)>送信</button>
                     </div>
                 </form>
@@ -979,12 +988,19 @@
     const chatForm = workbench.querySelector('[data-chat-form]');
     const chatMessages = workbench.querySelector('[data-chat-messages]');
     const chatError = workbench.querySelector('[data-chat-error]');
-    const appendMessage = (role, content, meta = '', pending = false) => {
+    const appendMessage = (role, content, meta = '', pending = false, imageUrl = '') => {
         workbench.querySelector('[data-chat-empty]')?.remove();
         const article = document.createElement('article');
         article.className = `ai-message ai-message--${role}${pending ? ' is-pending' : ''}`;
         const bubble = document.createElement('div');
         bubble.className = 'ai-message__bubble';
+        if (imageUrl) {
+            const image = document.createElement('img');
+            image.className = 'ai-message__image';
+            image.src = imageUrl;
+            image.alt = '添付画像';
+            bubble.append(image);
+        }
         bubble.textContent = content;
         const metadata = document.createElement('div');
         metadata.className = 'ai-message__meta';
@@ -995,26 +1011,59 @@
         return article;
     };
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    const chatImageInput = chatForm?.querySelector('[data-chat-image-input]');
+    const chatImagePreview = chatForm?.querySelector('[data-chat-image-preview]');
+    let chatImageObjectUrl = '';
+    const setChatImage = file => {
+        if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) {
+            chatError.textContent = 'PNG・JPG・WebP画像を選択してください。';
+            chatError.hidden = false;
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            chatError.textContent = '画像は5MB以内にしてください。';
+            chatError.hidden = false;
+            return;
+        }
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        chatImageInput.files = transfer.files;
+        if (chatImageObjectUrl) URL.revokeObjectURL(chatImageObjectUrl);
+        chatImageObjectUrl = URL.createObjectURL(file);
+        chatImagePreview.querySelector('img').src = chatImageObjectUrl;
+        chatImagePreview.hidden = false;
+        chatError.hidden = true;
+    };
+    chatForm?.querySelector('[data-chat-image-select]')?.addEventListener('click', () => chatImageInput.click());
+    chatImageInput?.addEventListener('change', () => setChatImage(chatImageInput.files[0]));
+    chatForm?.querySelector('[data-chat-image-remove]')?.addEventListener('click', () => {
+        chatImageInput.value = '';
+        chatImagePreview.hidden = true;
+        if (chatImageObjectUrl) URL.revokeObjectURL(chatImageObjectUrl);
+        chatImageObjectUrl = '';
+    });
+    chatForm?.elements.content.addEventListener('paste', event => {
+        const image = [...event.clipboardData.files].find(file => file.type.startsWith('image/'));
+        if (image) setChatImage(image);
+    });
     chatForm?.addEventListener('submit', async event => {
         event.preventDefault();
         const textarea = chatForm.elements.content;
         const content = textarea.value.trim();
         if (!content) return;
         const submit = chatForm.querySelector('button[type="submit"]');
+        const payload = new FormData(chatForm);
         chatError.hidden = true;
-        appendMessage('user', content, '送信中');
+        const attachedImageUrl = chatImageObjectUrl;
+        appendMessage('user', content, '送信中', false, attachedImageUrl);
         const pending = appendMessage('assistant', '考えています…', '', true);
         textarea.value = '';
         submit.disabled = true;
         try {
             const response = await fetch(chatForm.dataset.chatUrl, {
                 method: 'POST',
-                headers: {'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
-                body: JSON.stringify({
-                    content,
-                    context_key: chatForm.elements.context_key.value,
-                    context_label: chatForm.elements.context_label.value,
-                }),
+                headers: {'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
+                body: payload,
             });
             const body = await response.json();
             if (!response.ok) throw new Error(body.message || 'AIから回答を取得できませんでした。');
@@ -1022,10 +1071,14 @@
             pending.remove();
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
             appendMessage('assistant', message.content, 'ただ今');
+            chatImageInput.value = '';
+            chatImagePreview.hidden = true;
+            chatImageObjectUrl = '';
             const currentTokens = Number((workbench.querySelector('[data-chat-tokens]').textContent || '0').replace(/[^0-9]/g, ''));
             workbench.querySelector('[data-chat-tokens]').textContent = `${(currentTokens + tokens).toLocaleString()} tokens`;
         } catch (error) {
             pending.remove();
+            textarea.value = content;
             chatError.textContent = error.message;
             chatError.hidden = false;
         } finally {

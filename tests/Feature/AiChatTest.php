@@ -11,7 +11,9 @@ use App\Models\Workspace;
 use App\Models\WorkspaceAiSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AiChatTest extends TestCase
@@ -91,6 +93,40 @@ class AiChatTest extends TestCase
         $this->assertDatabaseCount('ai_chat_messages', 0);
     }
 
+    public function test_project_member_can_paste_screenshot_into_ai_chat(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key', 'services.openai.chat_model' => 'gpt-5.6-terra']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'id' => 'resp_image',
+            'model' => 'gpt-5.6-terra',
+            'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => '画像を確認しました。']]]],
+            'usage' => ['input_tokens' => 100, 'output_tokens' => 20],
+        ])]);
+
+        $response = $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-chat.messages.store', $project), [
+                'content' => 'この画面を見て',
+                'image' => UploadedFile::fake()->image('screen.png', 800, 600),
+            ], ['Accept' => 'application/json']);
+
+        $response->assertOk()->assertJsonPath('message.content', '画像を確認しました。');
+        $message = $project->aiChatThreads()->firstOrFail()->messages()->where('role', 'user')->firstOrFail();
+        Storage::disk('local')->assertExists($message->image_path);
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.ai-chat.messages.image', [$project, $message]))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/png');
+        Http::assertSent(fn (Request $request): bool => str_contains(
+            data_get($request->data(), 'input.0.content.1.image_url', ''),
+            'data:image/png;base64,'
+        ));
+    }
+
     public function test_three_pane_workspace_shows_chat_history_and_tokens_on_demand(): void
     {
         [$user, $workspace, $project] = $this->projectUser();
@@ -116,6 +152,8 @@ class AiChatTest extends TestCase
             ->assertSee('読み取り専用AI：接続可能')
             ->assertSee('保存済みの会話です。')
             ->assertSee('data-chat-form', false)
+            ->assertSee('data-chat-image-input', false)
+            ->assertSee('貼り付けもできます')
             ->assertSee('利用料をチェックする')
             ->assertSee('利用トークン')
             ->assertSee('120 tokens')
