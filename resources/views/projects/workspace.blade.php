@@ -1119,12 +1119,14 @@
         const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
         return [...new Uint8Array(bytes)].map(value => value.toString(16).padStart(2, '0')).join('');
     };
+    const requestLocalWritePermission = () => {
+        if (!localDirectoryHandle) {
+            throw new Error('ローカルフォルダの準備ができていません。FILESを開いてから、もう一度お試しください。');
+        }
+        return localDirectoryHandle.requestPermission({mode:'readwrite'});
+    };
     const resolveLocalFileHandle = async path => {
-        localDirectoryHandle ||= await loadLocalHandle();
         if (!localDirectoryHandle) throw new Error('Project設定からローカルフォルダを選択してください。');
-        let permission = await localDirectoryHandle.queryPermission({mode:'readwrite'});
-        if (permission !== 'granted') permission = await localDirectoryHandle.requestPermission({mode:'readwrite'});
-        if (permission !== 'granted') throw new Error('ローカルファイルへの書き込み許可が必要です。');
         const parts = path.replaceAll('\\', '/').split('/').filter(Boolean);
         const fileName = parts.pop();
         let directory = localDirectoryHandle;
@@ -1152,10 +1154,17 @@
             status.textContent = 'このファイルは保護対象のため変更できません。';
             return;
         }
-        if (!confirm(`「${path}」へ、この変更案を反映しますか？`)) return;
         apply.disabled = true;
-        status.textContent = '現在のファイルを確認しています…';
+        status.textContent = '書き込み許可を確認しています…';
         try {
+            const permission = await requestLocalWritePermission();
+            if (permission !== 'granted') throw new Error('ローカルファイルへの書き込み許可が必要です。');
+            if (!confirm(`「${path}」へ、この変更案を反映しますか？`)) {
+                status.textContent = '';
+                apply.disabled = false;
+                return;
+            }
+            status.textContent = '現在のファイルを確認しています…';
             const handle = await resolveLocalFileHandle(path);
             const current = await (await handle.getFile()).text();
             if (await hashText(current) !== apply.dataset.originalHash) {
