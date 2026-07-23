@@ -89,6 +89,15 @@
     .viewer-panel { display:none; min-height:100%; }
     .viewer-panel.is-current { display:block; }
     .browser-frame { width:100%; height:100%; min-height:calc(100vh - 126px); border:0; background:#fff; }
+    .code-shell { margin-top:18px; overflow:auto; border:1px solid #d3dce2; border-radius:8px; background:#f8fafc; box-shadow:inset 0 1px 0 #fff; }
+    .code-viewer { min-width:max-content; padding:12px 0 18px; counter-reset:code-line; color:#263b47; font:13px/1.7 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; tab-size:4; }
+    .code-line { display:block; min-height:1.7em; padding:0 20px 0 0; white-space:pre; counter-increment:code-line; }
+    .code-line::before { content:counter(code-line); display:inline-block; width:52px; margin-right:16px; padding-right:12px; border-right:1px solid #e0e6ea; color:#99a7af; text-align:right; user-select:none; }
+    .code-token--tag, .code-token--keyword { color:#7b3fa1; font-weight:650; }
+    .code-token--variable { color:#0b6f87; }
+    .code-token--string { color:#9a4d16; }
+    .code-token--comment { color:#718b72; font-style:italic; }
+    .code-token--number { color:#1c62a3; }
     .usage-card[hidden] { display:none; }
     .usage-grid { display:grid; margin-top:10px; }
     .usage-grid div { padding:10px; border-radius:7px; background:#f3f7f8; }
@@ -340,7 +349,7 @@
             <article class="workbench-document" data-document-panel="ai-proposals"><div class="document-kicker">AI Proposals</div><h1 class="document-title">AI提案</h1><p class="document-summary">AIが作成した変更案は、人が確認・承認するまでプロジェクトへ反映されません。</p><div class="document-list">@forelse($pendingAiProposals as $proposal)<a class="document-row" href="{{ route('projects.ai-proposals.show', [$project,$proposal]) }}"><strong>{{ $proposal->title }}</strong><span class="meta">承認待ち / {{ $proposal->created_at->format('Y/m/d H:i') }}</span></a>@empty<p>承認待ちのAI提案はありません。</p>@endforelse</div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="file">
-                <article class="workbench-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title>ファイルを選択</h1><p class="document-summary" data-file-content>左のFILESからファイルを開くと、ここに内容を表示します。</p></article>
+                <article class="workbench-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title>ファイルを選択</h1><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
                 <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox hidden></iframe>
@@ -519,6 +528,27 @@
     const showViewer = name => {
         workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
     };
+    const renderCode = content => {
+        const viewer = workbench.querySelector('[data-file-content]');
+        viewer.replaceChildren();
+        const tokenPattern = /(<\?(?:php)?|\?>|\/\/.*$|#.*$|\/\*.*?\*\/|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\$[A-Za-z_]\w*|\b(?:function|return|if|else|elseif|foreach|for|while|class|public|private|protected|static|new|use|namespace|require|include|echo|true|false|null|fn|array|const)\b|\b\d+(?:\.\d+)?\b)/gm;
+        String(content ?? '').split(/\r?\n/).forEach(lineText => {
+            const line = document.createElement('span');
+            line.className = 'code-line';
+            let offset = 0;
+            for (const match of lineText.matchAll(tokenPattern)) {
+                line.append(document.createTextNode(lineText.slice(offset, match.index)));
+                const token = document.createElement('span');
+                const value = match[0];
+                token.className = 'code-token--' + (value.startsWith('//') || value.startsWith('#') || value.startsWith('/*') ? 'comment' : value.startsWith("'") || value.startsWith('"') ? 'string' : value.startsWith('$') ? 'variable' : value.startsWith('<?') || value === '?>' ? 'tag' : /^\d/.test(value) ? 'number' : 'keyword');
+                token.textContent = value;
+                line.append(token);
+                offset = match.index + value.length;
+            }
+            line.append(document.createTextNode(lineText.slice(offset)));
+            viewer.append(line);
+        });
+    };
     const tabs = workbench.querySelector('[data-workspace-tabs]');
     const tabType = key => key.startsWith('roadmap-') ? 'roadmap' : key.startsWith('improvement-') ? 'improvement' : key.startsWith('task-') ? 'task' : 'document';
     const ensureTab = ({id, kind, key, label, content = '', url = ''}) => {
@@ -589,7 +619,7 @@
                     const frame = workbench.querySelector('[data-browser-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('browser');
                 } else {
                     workbench.querySelector('[data-file-title]').textContent = workspaceTab.dataset.tabKey;
-                    workbench.querySelector('[data-file-content]').textContent = workspaceTab.dataset.tabContent;
+                    renderCode(workspaceTab.dataset.tabContent);
                     showViewer('file');
                 }
                 const contextLabel = `${@json($project->name)} / File / ${workspaceTab.dataset.tabKey}`;
@@ -648,7 +678,7 @@
             }
             workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
             workbench.querySelector('[data-file-title]').textContent = fileButton.dataset.fileName;
-            workbench.querySelector('[data-file-content]').textContent = fileButton.dataset.fileCopy;
+            renderCode(fileButton.dataset.fileCopy);
             const opensInBrowser = fileButton.dataset.fileView === 'browser' || /(^|\/)index\.html?$/i.test(fileButton.dataset.fileName);
             const previewUrl = opensInBrowser && fileButton.localFileHandle ? URL.createObjectURL(new Blob([fileButton.dataset.fileCopy], {type:'text/html'})) : (fileButton.dataset.previewUrl || '');
             ensureTab({id:`file:${fileButton.dataset.fileName}`, kind:opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl});

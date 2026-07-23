@@ -339,6 +339,8 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-local-handle-key', false)
             ->assertSee('file-item--directory', false)
             ->assertSee('📁')
+            ->assertSee('code-viewer', false)
+            ->assertSee('code-line', false)
             ->assertDontSee('data-viewer-tab', false)
             ->assertSee('AI パートナー')
             ->assertDontSee('開いている仕事について相談する')
