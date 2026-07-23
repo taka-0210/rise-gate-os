@@ -253,8 +253,8 @@ class AiChatTest extends TestCase
             ->assertSee('data-chat-file-content', false)
             ->assertSee('data-file-change-apply', false)
             ->assertSee('利用料をチェックする')
-            ->assertSee('利用トークン')
-            ->assertSee('120 tokens')
+            ->assertSee('AI利用ポイント')
+            ->assertSee('1ポイント')
             ->assertDontSee('推定利用料')
             ->assertDontSee('$0.0006');
     }

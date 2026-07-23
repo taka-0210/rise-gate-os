@@ -425,8 +425,9 @@
                 </div>
                 <section class="ai-card usage-card" data-usage-card hidden>
                     <h3>この会話の利用状況</h3>
-                    <div class="usage-grid"><div><span>利用トークン</span><strong data-chat-tokens>{{ number_format($aiChatMessages->sum(fn ($message) => ($message->input_tokens ?? 0) + ($message->output_tokens ?? 0))) }} tokens</strong></div></div>
-                    <p class="meta" style="margin-top:8px">COMPANY OS内のこの会話で使用したトークン数です。</p>
+                    @php($chatTokenTotal = $aiChatMessages->sum(fn ($message) => ($message->input_tokens ?? 0) + ($message->output_tokens ?? 0)))
+                    <div class="usage-grid"><div><span>AI利用ポイント</span><strong data-chat-points data-total-tokens="{{ $chatTokenTotal }}">{{ number_format($chatTokenTotal > 0 ? max(1, round($chatTokenTotal / 1000)) : 0) }}ポイント</strong></div></div>
+                    <p class="meta" style="margin-top:8px">AIとの会話や資料の読み取りに使用した利用量の目安です。</p>
                 </section>
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
@@ -1253,8 +1254,10 @@
             chatImageInput.value = '';
             chatImagePreview.hidden = true;
             chatImageObjectUrl = '';
-            const currentTokens = Number((workbench.querySelector('[data-chat-tokens]').textContent || '0').replace(/[^0-9]/g, ''));
-            workbench.querySelector('[data-chat-tokens]').textContent = `${(currentTokens + tokens).toLocaleString()} tokens`;
+            const points = workbench.querySelector('[data-chat-points]');
+            const totalTokens = Number(points.dataset.totalTokens || 0) + tokens;
+            points.dataset.totalTokens = totalTokens;
+            points.textContent = `${(totalTokens > 0 ? Math.max(1, Math.round(totalTokens / 1000)) : 0).toLocaleString()}ポイント`;
         } catch (error) {
             pending.remove();
             userMessage.querySelector('.ai-message__meta').textContent = '送信できませんでした';
