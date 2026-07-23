@@ -426,7 +426,7 @@
             <article class="workbench-document" data-document-panel="ai-proposals"><div class="document-kicker">AI Proposals</div><h1 class="document-title">AI提案</h1><p class="document-summary">AIが作成した変更案は、人が確認・承認するまでプロジェクトへ反映されません。</p><div class="document-list">@forelse($pendingAiProposals as $proposal)<a class="document-row" href="{{ route('projects.ai-proposals.show', [$project,$proposal]) }}"><strong>{{ $proposal->title }}</strong><span class="meta">承認待ち / {{ $proposal->created_at->format('Y/m/d H:i') }}</span></a>@empty<p>承認待ちのAI提案はありません。</p>@endforelse</div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="file">
-                <article class="workbench-document file-preview-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title title="ファイルを選択">ファイルを選択</h1><div class="file-preview-actions" data-file-preview-actions hidden><button type="button" data-open-local-browser>ブラウザで表示</button><a data-open-local-external target="_blank" rel="noopener">別タブで開く</a></div><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
+                <article class="workbench-document file-preview-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title data-file-path="" title="ファイルを選択">ファイルを選択</h1><div class="file-preview-actions" data-file-preview-actions hidden><button type="button" data-open-local-browser>ブラウザで表示</button><a data-open-local-external target="_blank" rel="noopener">別タブで開く</a></div><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
                 <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" hidden></iframe>
@@ -577,6 +577,7 @@
     const localStatus = workbench.querySelector('[data-local-file-status]');
     const localSiteUrl = @json($localConnection?->local_site_url);
     let localDirectoryHandle = null;
+    const updatedFilePaths = new Set();
     const loadLocalHandle = () => new Promise((resolve, reject) => {
         const request = indexedDB.open('rise-gate-local-folders', 1);
         request.onupgradeneeded = () => request.result.createObjectStore('handles');
@@ -612,6 +613,13 @@
             } else {
                 button.dataset.fileName = path;
                 button.localFileHandle = entry;
+                if (updatedFilePaths.has(path)) {
+                    button.classList.add('is-updated');
+                    const mark = document.createElement('span');
+                    mark.className = 'file-update-mark';
+                    mark.textContent = '更新';
+                    button.append(mark);
+                }
                 container.append(button);
             }
         });
@@ -731,6 +739,19 @@
         const external = actions.querySelector('[data-open-local-external]');
         external.href = url || '#';
     };
+    const formatFileSavedAt = value => {
+        const date = new Date(Number(value));
+        if (Number.isNaN(date.getTime())) return '';
+        const pad = number => String(number).padStart(2, '0');
+        return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    };
+    const setFilePreviewTitle = (path, modifiedAt = '') => {
+        const title = workbench.querySelector('[data-file-title]');
+        const savedAt = formatFileSavedAt(modifiedAt);
+        title.dataset.filePath = path;
+        title.textContent = `${path.split('/').pop()}${savedAt ? `（保存日時： ${savedAt}）` : ''}`;
+        title.title = path;
+    };
     const renderCode = content => {
         const viewer = workbench.querySelector('[data-file-content]');
         viewer.replaceChildren();
@@ -759,7 +780,7 @@
     };
     const tabs = workbench.querySelector('[data-workspace-tabs]');
     const tabType = key => key.startsWith('roadmap-') ? 'roadmap' : key.startsWith('improvement-') ? 'improvement' : key.startsWith('task-') ? 'task' : 'document';
-    const ensureTab = ({id, kind, key, label, content = '', url = ''}) => {
+    const ensureTab = ({id, kind, key, label, content = '', url = '', modifiedAt = ''}) => {
         let tab = tabs.querySelector(`[data-workspace-tab="${CSS.escape(id)}"]`);
         if (!tab) {
             tab = document.createElement('button');
@@ -770,6 +791,7 @@
             tab.dataset.tabKey = key;
             tab.dataset.tabContent = content;
             tab.dataset.tabUrl = url;
+            tab.dataset.tabModifiedAt = modifiedAt;
             const labelNode = document.createElement('span');
             labelNode.className = 'workspace-tab__label';
             labelNode.textContent = label;
@@ -780,6 +802,7 @@
             tab.append(labelNode, close);
             tabs.append(tab);
         }
+        if (modifiedAt) tab.dataset.tabModifiedAt = modifiedAt;
         tabs.querySelectorAll('[data-workspace-tab]').forEach(item => item.classList.toggle('is-current', item === tab));
         tab.scrollIntoView({inline:'nearest', block:'nearest'});
         return tab;
@@ -847,7 +870,7 @@
             const kind = workspaceTab.dataset.tabKind;
             if (kind === 'document') openDocument(workspaceTab.dataset.tabKey);
             else {
-                ensureTab({id:workspaceTab.dataset.workspaceTab, kind, key:workspaceTab.dataset.tabKey, label:workspaceTab.querySelector('.workspace-tab__label').textContent, content:workspaceTab.dataset.tabContent, url:workspaceTab.dataset.tabUrl});
+                ensureTab({id:workspaceTab.dataset.workspaceTab, kind, key:workspaceTab.dataset.tabKey, label:workspaceTab.querySelector('.workspace-tab__label').textContent, content:workspaceTab.dataset.tabContent, url:workspaceTab.dataset.tabUrl, modifiedAt:workspaceTab.dataset.tabModifiedAt});
                 if (kind === 'diff') {
                     const state = diffStates.get(workspaceTab.dataset.tabKey);
                     if (state) renderDiff(state);
@@ -871,9 +894,7 @@
                     showViewer('image');
                 } else {
                     setChatFileContext(workspaceTab.dataset.tabKey, workspaceTab.dataset.tabContent);
-                    const fileTitle = workbench.querySelector('[data-file-title]');
-                    fileTitle.textContent = workspaceTab.dataset.tabKey;
-                    fileTitle.title = workspaceTab.dataset.tabKey;
+                    setFilePreviewTitle(workspaceTab.dataset.tabKey, workspaceTab.dataset.tabModifiedAt);
                     setLocalBrowserActions(workspaceTab.dataset.tabKey);
                     renderCode(workspaceTab.dataset.tabContent);
                     showViewer('file');
@@ -917,9 +938,7 @@
                 fileButton.dataset.fileCopy = pdf || image ? '' : (localFile.size > 1024 * 1024 ? '1MBを超えるためプレビューできません。' : await localFile.text());
             }
             workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
-            const fileTitle = workbench.querySelector('[data-file-title]');
-            fileTitle.textContent = fileButton.dataset.fileName;
-            fileTitle.title = fileButton.dataset.fileName;
+            setFilePreviewTitle(fileButton.dataset.fileName, localFile?.lastModified);
             setLocalBrowserActions(fileButton.dataset.fileName);
             const opensAsPdf = localFile?.type === 'application/pdf' || /\.pdf$/i.test(fileButton.dataset.fileName);
             const opensAsImage = localFile?.type.startsWith('image/') || /\.(?:jpe?g|png|gif|webp|svg|bmp|ico|avif)$/i.test(fileButton.dataset.fileName);
@@ -928,7 +947,7 @@
             const tabId = `file:${fileButton.dataset.fileName}`;
             const existingUrl = tabs.querySelector(`[data-workspace-tab="${CSS.escape(tabId)}"]`)?.dataset.tabUrl;
             const previewUrl = existingUrl || ((opensAsPdf || opensAsImage) && localFile ? URL.createObjectURL(localFile) : opensInBrowser && fileButton.localFileHandle ? URL.createObjectURL(new Blob([fileButton.dataset.fileCopy], {type:'text/html'})) : (fileButton.dataset.previewUrl || ''));
-            ensureTab({id:tabId, kind:opensAsPdf ? 'pdf' : opensAsImage ? 'image' : opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl});
+            ensureTab({id:tabId, kind:opensAsPdf ? 'pdf' : opensAsImage ? 'image' : opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl, modifiedAt:localFile?.lastModified});
             if (opensAsPdf) {
                 setChatFileContext();
                 const frame = workbench.querySelector('[data-pdf-frame]');
@@ -969,7 +988,7 @@
             const actions = workbench.querySelector('[data-file-preview-actions]');
             const url = actions.dataset.browserUrl;
             if (url) {
-                const path = workbench.querySelector('[data-file-title]').textContent;
+                const path = workbench.querySelector('[data-file-title]').dataset.filePath;
                 ensureTab({id:`browser:${path}`, kind:'browser', key:path, label:`↗ ${path.split('/').pop()}`, url});
                 const frame = workbench.querySelector('[data-browser-frame]');
                 frame.src = url;
@@ -1499,12 +1518,19 @@
         const restored = await readBackupContent(record);
         showWorkbenchNotice(`${path}：バックアップから復元しています…`);
         await writeHandleText(handle, restored);
+        const restoredFile = await handle.getFile();
         const fileButton = [...workbench.querySelectorAll('[data-file-name]')].find(item => item.dataset.fileName === path);
         if (fileButton) fileButton.dataset.fileCopy = restored;
         const tab = tabs.querySelector(`[data-workspace-tab="${CSS.escape(`file:${path}`)}"]`);
-        if (tab) tab.dataset.tabContent = restored;
-        if (workbench.querySelector('[data-file-title]').textContent === path) renderCode(restored);
-        markFileUpdated(path);
+        if (tab) {
+            tab.dataset.tabContent = restored;
+            tab.dataset.tabModifiedAt = restoredFile.lastModified;
+        }
+        if (workbench.querySelector('[data-file-title]').dataset.filePath === path) {
+            renderCode(restored);
+            setFilePreviewTitle(path, restoredFile.lastModified);
+        }
+        await markFileUpdated(path);
         await refreshLocalChangeHistory();
         showWorkbenchNotice(`✓ ${path} を復元しました。復元前の内容もバックアップ済みです。`, 'info', 5000);
     };
@@ -1556,16 +1582,41 @@
         setChatFileContext(path, current);
         if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
     };
-    const markFileUpdated = path => {
-        const fileButton = [...workbench.querySelectorAll('[data-file-name]')].find(item => item.dataset.fileName === path);
+    const revealLocalFile = async path => {
+        const parts = path.split('/');
+        const fileName = parts.pop();
+        let container = localTree;
+        let prefix = '';
+        for (const part of parts) {
+            const directoryPath = prefix ? `${prefix}/${part}` : part;
+            let directoryButton = [...container.querySelectorAll(':scope > [data-local-directory]')]
+                .find(item => item.dataset.localDirectory === directoryPath);
+            if (!directoryButton) return null;
+            directoryButton.localBranch.hidden = false;
+            directoryButton.setAttribute('aria-expanded', 'true');
+            directoryButton.querySelector('.file-item__expander').textContent = '▾';
+            if (!directoryButton.localBranch.hasChildNodes()) {
+                await renderLocalDirectory(directoryButton.localHandle, directoryButton.localBranch, directoryPath, directoryPath.split('/').length);
+            }
+            container = directoryButton.localBranch;
+            prefix = directoryPath;
+        }
+        return [...container.querySelectorAll(':scope > [data-file-name]')]
+            .find(item => item.dataset.fileName === `${prefix ? `${prefix}/` : ''}${fileName}`) || null;
+    };
+    const markFileUpdated = async path => {
+        updatedFilePaths.add(path);
+        const fileButton = await revealLocalFile(path);
         if (!fileButton) return;
         fileButton.classList.add('is-updated');
+        workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
         if (!fileButton.querySelector('.file-update-mark')) {
             const mark = document.createElement('span');
             mark.className = 'file-update-mark';
             mark.textContent = '更新';
             fileButton.append(mark);
         }
+        fileButton.scrollIntoView({block:'nearest'});
     };
     const applyFileChange = async (proposal, apply) => {
         const path = apply.dataset.filePath;
@@ -1608,12 +1659,19 @@
             const writable = await handle.createWritable();
             await writable.write(proposed);
             await writable.close();
+            const updatedFile = await handle.getFile();
             const fileButton = [...workbench.querySelectorAll('[data-file-name]')].find(item => item.dataset.fileName === path);
             if (fileButton) fileButton.dataset.fileCopy = proposed;
             const tab = tabs.querySelector(`[data-workspace-tab="${CSS.escape(`file:${path}`)}"]`);
-            if (tab) tab.dataset.tabContent = proposed;
-            if (workbench.querySelector('[data-file-title]').textContent === path) renderCode(proposed);
-            markFileUpdated(path);
+            if (tab) {
+                tab.dataset.tabContent = proposed;
+                tab.dataset.tabModifiedAt = updatedFile.lastModified;
+            }
+            if (workbench.querySelector('[data-file-title]').dataset.filePath === path) {
+                renderCode(proposed);
+                setFilePreviewTitle(path, updatedFile.lastModified);
+            }
+            await markFileUpdated(path);
             await refreshLocalChangeHistory();
             const response = await fetch(apply.dataset.applyUrl, {
                 method:'POST',
