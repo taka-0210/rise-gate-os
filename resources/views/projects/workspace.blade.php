@@ -536,7 +536,7 @@
     const renderCode = content => {
         const viewer = workbench.querySelector('[data-file-content]');
         viewer.replaceChildren();
-        const tokenPattern = /(<\?(?:php)?|\?>|\/\/.*$|#.*$|\/\*.*?\*\/|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\$[A-Za-z_]\w*|\b(?:function|return|if|else|elseif|foreach|for|while|class|public|private|protected|static|new|use|namespace|require|include|echo|true|false|null|fn|array|const)\b|\b\d+(?:\.\d+)?\b)/gm;
+        const tokenPattern = /\/\/.*|#[^\r\n]*|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\$[A-Za-z_]\w*|\b(?:function|return|if|else|foreach|class|public|private|new|echo|true|false|null)\b|\b\d+(?:\.\d+)?\b/g;
         String(content ?? '').split(/\r?\n/).forEach(lineText => {
             const line = document.createElement('span');
             line.className = 'code-line';
@@ -545,7 +545,12 @@
                 line.append(document.createTextNode(lineText.slice(offset, match.index)));
                 const token = document.createElement('span');
                 const value = match[0];
-                token.className = 'code-token--' + (value.startsWith('//') || value.startsWith('#') || value.startsWith('/*') ? 'comment' : value.startsWith("'") || value.startsWith('"') ? 'string' : value.startsWith('$') ? 'variable' : value.startsWith('<?') || value === '?>' ? 'tag' : /^\d/.test(value) ? 'number' : 'keyword');
+                let tokenType = 'keyword';
+                if (value.startsWith('//') || value.startsWith('#')) tokenType = 'comment';
+                else if (value.startsWith("'") || value.startsWith('"')) tokenType = 'string';
+                else if (value.startsWith('$')) tokenType = 'variable';
+                else if (/^\d/.test(value)) tokenType = 'number';
+                token.className = `code-token--${tokenType}`;
                 token.textContent = value;
                 line.append(token);
                 offset = match.index + value.length;
