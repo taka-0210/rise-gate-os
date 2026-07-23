@@ -197,7 +197,7 @@ class AiChatController extends Controller
         }
         $protected = $filePath && (
             preg_match('~(^|/)\.env($|[./])~i', $filePath)
-            || preg_match('~^(vendor|\.git|\.rise-gate)(/|$)~i', $filePath)
+            || preg_match('~^(vendor|deploy|deployment|\.git|\.rise-gate)(/|$)~i', $filePath)
             || (preg_match('~^storage(/|$)~i', $filePath) && ! preg_match('~^storage/content(/|$)~i', $filePath))
         );
         $projectFiles = collect(json_decode($validated['project_files'] ?? '[]', true))
@@ -210,7 +210,7 @@ class AiChatController extends Controller
             })
             ->reject(fn (array $file): bool =>
                 preg_match('~(^|/)\.env($|[./])~i', $file['path'])
-                || preg_match('~^(vendor|\.git|\.rise-gate)(/|$)~i', $file['path'])
+                || preg_match('~^(vendor|deploy|deployment|\.git|\.rise-gate)(/|$)~i', $file['path'])
                 || (preg_match('~^storage(/|$)~i', $file['path']) && ! preg_match('~^storage/content(/|$)~i', $file['path']))
             )
             ->take(100)

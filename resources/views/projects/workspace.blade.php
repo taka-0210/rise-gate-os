@@ -1315,7 +1315,7 @@
         const files = [];
         let totalBytes = 0;
         const allowed = /\.(?:php|html?|css|js|mjs|cjs|json|md|txt|xml|ya?ml|csv|ini|conf|sql)$/i;
-        const ignoredDirectories = new Set(['.git', '.rise-gate', 'vendor', 'node_modules', 'bootstrap/cache']);
+        const ignoredDirectories = new Set(['.git', '.rise-gate', 'vendor', 'node_modules', 'deploy', 'deployment', 'bootstrap/cache']);
         const walk = async (directory, prefix = '') => {
             for await (const [name, handle] of directory.entries()) {
                 if (files.length >= 100 || totalBytes >= 250000) return;
@@ -1571,7 +1571,7 @@
         const path = apply.dataset.filePath;
         const status = proposal.querySelector('[data-file-change-status]');
         const originalLabel = apply.textContent;
-        const protectedPath = /(^|\/)\.env($|[./])|^(vendor|\.git|\.rise-gate)(\/|$)/i.test(path)
+        const protectedPath = /(^|\/)\.env($|[./])|^(vendor|deploy|deployment|\.git|\.rise-gate)(\/|$)/i.test(path)
             || (/^storage(\/|$)/i.test(path) && !/^storage\/content(\/|$)/i.test(path));
         if (protectedPath) {
             status.textContent = 'このファイルは保護対象のため変更できません。';

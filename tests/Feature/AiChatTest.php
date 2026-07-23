@@ -276,6 +276,7 @@ class AiChatTest extends TestCase
                 'context_key' => 'project',
                 'project_files' => json_encode([
                     ['path' => 'public_html/index.php', 'content' => "<?php load_content('hero');"],
+                    ['path' => 'deploy/oxserver-demo/storage-demo/content/hero.json', 'content' => $original],
                     ['path' => 'storage/content/hero.json', 'content' => $original],
                 ], JSON_UNESCAPED_UNICODE),
             ])
@@ -283,6 +284,11 @@ class AiChatTest extends TestCase
             ->assertJsonPath('message.file_change.path', 'storage/content/hero.json')
             ->assertJsonPath('message.file_change.content', $updated)
             ->assertJsonPath('message.file_change.original_hash', hash('sha256', $original));
+
+        Http::assertSent(fn (Request $request): bool =>
+            str_contains($request['instructions'], 'storage/content/hero.json')
+            && ! str_contains($request['instructions'], 'deploy/oxserver-demo')
+        );
     }
 
     public function test_owner_can_reject_a_pending_file_change(): void
