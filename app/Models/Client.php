@@ -16,6 +16,7 @@ class Client extends Model
     protected $fillable = [
         'public_id',
         'organization_id',
+        'linked_organization_id',
         'workspace_id',
         'name',
         'kana',
@@ -42,6 +43,11 @@ class Client extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    public function linkedOrganization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'linked_organization_id');
     }
 
     public function projects(): HasMany

@@ -294,6 +294,12 @@
                     @isset($currentWorkspace)
                         <span class="workspace-pill">{{ $currentWorkspace->name }} / {{ $currentWorkspaceRole }}</span>
                     @endisset
+                    @if ($canViewCompanyFinance ?? false)
+                        <a href="{{ route('company-finance.index') }}">経営数値</a>
+                    @endif
+                    @if ($canManageCompanyMembers ?? false)
+                        <a href="{{ route('company-members.index') }}">会社設定</a>
+                    @endif
                     <a href="{{ route('clients.index') }}">Clients</a>
                     <a href="{{ route('projects.index') }}">Projects</a>
                     <a href="{{ route('development-guide') }}">開発の進め方</a>

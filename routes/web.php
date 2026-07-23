@@ -4,6 +4,9 @@ use App\Http\Controllers\AiConnectionController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Client\ClientController;
+use App\Http\Controllers\Client\ClientCompanyAccountController;
+use App\Http\Controllers\CompanyFinanceController;
+use App\Http\Controllers\CompanyMemberAccessController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EstimateController;
@@ -76,6 +79,9 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
 
     Route::middleware(['workspace-mode', 'workspace'])->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
+        Route::get('/company/finance', [CompanyFinanceController::class, 'index'])->name('company-finance.index');
+        Route::get('/company/members', [CompanyMemberAccessController::class, 'index'])->name('company-members.index');
+        Route::put('/company/members/{user}', [CompanyMemberAccessController::class, 'update'])->name('company-members.update');
         Route::view('/development-guide', 'guides.development')->name('development-guide');
         Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
         Route::get('/estimates', [EstimateController::class, 'index'])->name('estimates.index');
@@ -98,6 +104,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::put('/workspace-business-profile', [WorkspaceBusinessProfileController::class, 'update'])->name('workspace-business-profile.update');
         Route::get('/workspace-business-profile/media/{type}', [WorkspaceBusinessProfileController::class, 'media'])->name('workspace-business-profile.media');
         Route::resource('clients', ClientController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+        Route::post('/clients/{client}/company-account', [ClientCompanyAccountController::class, 'store'])->name('clients.company-account.store');
         Route::get('/projects/schedule', [ProjectController::class, 'schedule'])->name('projects.schedule');
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::get('/projects/{project}/workspace', [ProjectController::class, 'workspace'])->name('projects.workspace');

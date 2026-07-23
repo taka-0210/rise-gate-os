@@ -29,12 +29,17 @@ class Organization extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'organization_users')
-            ->withPivot(['role', 'joined_at'])
+            ->withPivot(['role', 'company_role', 'permissions', 'joined_at'])
             ->withTimestamps();
     }
 
     public function workspaces(): HasMany
     {
         return $this->hasMany(Workspace::class);
+    }
+
+    public function financialPeriods(): HasMany
+    {
+        return $this->hasMany(CompanyFinancialPeriod::class);
     }
 }

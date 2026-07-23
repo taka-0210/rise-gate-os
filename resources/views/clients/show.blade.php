@@ -58,6 +58,35 @@
             <p class="meta">Client配下のProject一覧はPhase 1-5では作り込みません。Project一覧と詳細で関連を確認します。</p>
         </div>
 
+        <div class="panel stack">
+            <div>
+                <div class="meta">COMPANY OS</div>
+                <h2>会社アカウント</h2>
+                <p>経営指針・経営数値・所属ユーザー・Workspaceを所有する会社アカウントです。Clientと関連付けても、既存Projectは移動しません。</p>
+            </div>
+            @if ($client->linkedOrganization)
+                <div class="success">
+                    <strong>{{ $client->linkedOrganization->name }}</strong>と関連付いています。
+                    @if ($client->linkedOrganization->workspaces->isNotEmpty())
+                        経営Workspace: {{ $client->linkedOrganization->workspaces->pluck('name')->join('、') }}
+                    @endif
+                </div>
+            @elseif ($canPromote)
+                @if ($errors->has('company_account'))<div class="error">{{ $errors->first('company_account') }}</div>@endif
+                <form class="actions" method="POST" action="{{ route('clients.company-account.store', $client) }}">
+                    @csrf
+                    <div class="field" style="min-width:260px;">
+                        <label for="workspace_name">最初のWorkspace名</label>
+                        <input id="workspace_name" name="workspace_name" value="{{ old('workspace_name', '経営WS') }}" required>
+                        @error('workspace_name')<div class="error">{{ $message }}</div>@enderror
+                    </div>
+                    <button type="submit">会社アカウントへ昇格</button>
+                </form>
+            @else
+                <p class="meta">会社アカウントの作成には、現在のWorkspaceでOwnerまたはAdmin権限が必要です。</p>
+            @endif
+        </div>
+
         @if ($canDelete)
             <div class="panel stack" style="border-color:#e1bcbc;">
                 <div>

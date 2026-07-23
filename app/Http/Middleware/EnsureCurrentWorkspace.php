@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\OrganizationUser;
 use App\Models\Workspace;
+use App\Services\Company\CompanyAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\View;
@@ -10,6 +12,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureCurrentWorkspace
 {
+    public function __construct(private readonly CompanyAccess $companyAccess)
+    {
+    }
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
@@ -48,6 +54,14 @@ class EnsureCurrentWorkspace
 
         View::share('currentWorkspace', $currentWorkspace);
         View::share('currentWorkspaceRole', $membership->role);
+        View::share(
+            'canViewCompanyFinance',
+            $this->companyAccess->allows($user, $currentWorkspace->organization, OrganizationUser::PERMISSION_FINANCE_VIEW_PL)
+        );
+        View::share(
+            'canManageCompanyMembers',
+            $this->companyAccess->canManageMembers($user, $currentWorkspace->organization)
+        );
 
         return $next($request);
     }

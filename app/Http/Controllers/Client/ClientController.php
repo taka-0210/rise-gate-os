@@ -68,9 +68,11 @@ class ClientController extends Controller
         Gate::authorize('view', $client);
 
         return view('clients.show', [
-            'client' => $client,
+            'client' => $client->load('linkedOrganization.workspaces'),
             'projectsCount' => $client->projects()->count(),
             'canDelete' => Gate::allows('delete', $client),
+            'canPromote' => ! $client->linked_organization_id
+                && Gate::allows('create', [Client::class, $currentWorkspace]),
         ]);
     }
 
