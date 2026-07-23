@@ -163,16 +163,16 @@
     .ai-chat-status { display:inline-flex; align-items:center; gap:6px; }
     .ai-chat-status::before { content:""; width:7px; height:7px; border-radius:50%; background:#43a690; }
     .ai-chat-status.is-off::before { background:#b37b64; }
-    .ai-chat-messages { display:grid; align-content:start; gap:10px; min-height:180px; max-height:calc(100vh - 560px); overflow:auto; padding:2px; scroll-behavior:smooth; }
+    .ai-chat-messages { display:grid; align-content:start; gap:10px; min-height:180px; max-height:calc(100vh - 560px); overflow:auto; padding:2px; }
     .ai-chat-empty { padding:18px 12px; border:1px dashed #cbd6dc; border-radius:9px; color:#647680; text-align:center; font-size:12px; line-height:1.7; }
-    .ai-message { display:grid; gap:5px; max-width:92%; }
+    .ai-message { display:grid; gap:5px; min-width:0; max-width:92%; }
     .ai-message--user { justify-self:end; }
     .ai-message--assistant { justify-self:start; }
     .ai-message__bubble { padding:10px 12px; border-radius:11px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.65; }
     .ai-message__image { display:block; width:auto; max-width:100%; max-height:220px; margin-bottom:7px; border-radius:7px; object-fit:contain; }
-    .file-change-proposal { margin-top:7px; padding:9px; border:1px solid #9fc7bd; border-radius:8px; color:#294b45; background:#f1faf7; font-size:11px; }
+    .file-change-proposal { min-width:0; margin-top:7px; padding:9px; border:1px solid #9fc7bd; border-radius:8px; color:#294b45; background:#f1faf7; font-size:11px; }
     .file-change-proposal summary { cursor:pointer; font-weight:800; }
-    .file-change-proposal pre { max-height:260px; overflow:auto; padding:9px; border-radius:6px; color:#e6edf3; background:#0d1117; white-space:pre; font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .file-change-proposal pre { max-width:100%; max-height:260px; overflow-y:auto; overflow-x:hidden; padding:9px; border-radius:6px; color:#e6edf3; background:#0d1117; white-space:pre-wrap; overflow-wrap:anywhere; font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
     .file-change-proposal button { width:100%; margin-top:7px; padding:8px; }
     .file-change-proposal.is-applied { border-color:#b8c7cc; color:#687980; background:#f4f6f7; }
     .file-change-status { display:block; margin-top:6px; font-size:10px; }
@@ -1056,7 +1056,13 @@
         details.append(status);
         article.append(details);
     };
-    const appendMessage = (role, content, meta = '', pending = false, imageUrl = '', fileChange = null) => {
+    const scrollChatTo = (article, align = 'end') => requestAnimationFrame(() => {
+        const top = article.offsetTop - chatMessages.offsetTop;
+        chatMessages.scrollTop = align === 'start'
+            ? top
+            : Math.max(0, top + article.offsetHeight - chatMessages.clientHeight);
+    });
+    const appendMessage = (role, content, meta = '', pending = false, imageUrl = '', fileChange = null, scroll = true) => {
         workbench.querySelector('[data-chat-empty]')?.remove();
         const article = document.createElement('article');
         article.className = `ai-message ai-message--${role}${pending ? ' is-pending' : ''}`;
@@ -1076,7 +1082,7 @@
         article.append(bubble, metadata);
         appendFileChange(article, fileChange);
         chatMessages.append(article);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        if (scroll) scrollChatTo(article);
         return article;
     };
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -1219,7 +1225,8 @@
             pending.remove();
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
-            appendMessage('assistant', message.content, 'ただ今', false, '', message.file_change);
+            appendMessage('assistant', message.content, 'ただ今', false, '', message.file_change, false);
+            scrollChatTo(userMessage, 'start');
             chatImageInput.value = '';
             chatImagePreview.hidden = true;
             chatImageObjectUrl = '';
