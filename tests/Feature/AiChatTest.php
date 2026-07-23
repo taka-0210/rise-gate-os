@@ -357,6 +357,7 @@ class AiChatTest extends TestCase
             ->assertSee('.rise-gate/backups/')
             ->assertSee('data-change-history', false)
             ->assertSee('data-add-backup-gitignore', false)
+            ->assertSee('date.getFullYear()', false)
             ->assertDontSee('推定利用料')
             ->assertDontSee('$0.0006');
     }

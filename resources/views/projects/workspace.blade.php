@@ -1284,7 +1284,12 @@
         return (await (await directory.getFileHandle(fileName)).getFile()).text();
     };
     const backupDirectoryName = () => {
-        const stamp = new Date().toISOString().replaceAll(':', '-').replace('T', '_').replace('Z', '');
+        const date = new Date();
+        const pad = (value, length = 2) => String(value).padStart(length, '0');
+        const stamp = [
+            `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+            `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}-${pad(date.getMilliseconds(), 3)}`,
+        ].join('_');
         return `${stamp}_${crypto.randomUUID().slice(0, 8)}`;
     };
     const createPhysicalBackup = async (path, content, action = 'ai_apply') => {
