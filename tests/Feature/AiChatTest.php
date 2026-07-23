@@ -174,7 +174,7 @@ class AiChatTest extends TestCase
         [$user, $workspace, $project] = $this->projectUser();
         WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
         config(['services.openai.api_key' => 'test-key', 'services.openai.chat_model' => 'gpt-5.6-terra']);
-        $original = "<?php\n echo 'before';\n";
+        $original = "<?php\r\n echo 'before';\r\n";
         $updated = "<?php\n echo 'after';\n";
         Http::fake(['api.openai.com/v1/responses' => Http::response([
             'id' => 'resp_change',
@@ -205,7 +205,7 @@ class AiChatTest extends TestCase
             ->assertJsonPath('message.content', '文言を変更する案を作成しました。')
             ->assertJsonPath('message.file_change.path', 'public_html/index.php')
             ->assertJsonPath('message.file_change.content', $updated)
-            ->assertJsonPath('message.file_change.original_hash', hash('sha256', $original))
+            ->assertJsonPath('message.file_change.original_hash', hash('sha256', str_replace("\r\n", "\n", $original)))
             ->assertJsonPath('message.file_change.status', 'pending');
         $message = $project->aiChatThreads()->firstOrFail()->messages()->reorder()->latest('id')->firstOrFail();
         $this->assertSame('pending', $message->file_change_status);

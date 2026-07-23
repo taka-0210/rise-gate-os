@@ -161,6 +161,9 @@ class AiChatController extends Controller
 
         $filePath = $validated['file_path'] ?? null;
         $fileContent = $validated['file_content'] ?? null;
+        if ($fileContent !== null) {
+            $fileContent = str_replace(["\r\n", "\r"], "\n", $fileContent);
+        }
         $protected = $filePath && (
             preg_match('~(^|/)\.env($|[./])~i', $filePath)
             || preg_match('~^(vendor|storage|\.git)(/|$)~i', $filePath)

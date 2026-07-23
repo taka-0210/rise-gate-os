@@ -1226,6 +1226,15 @@
         const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
         return [...new Uint8Array(bytes)].map(value => value.toString(16).padStart(2, '0')).join('');
     };
+    const normalizeLineEndings = text => String(text ?? '').replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    const matchesFileHash = async (text, expectedHash) => {
+        const normalized = normalizeLineEndings(text);
+        const variants = [...new Set([String(text ?? ''), normalized, normalized.replaceAll('\n', '\r\n')])];
+        return (await Promise.all(variants.map(hashText))).includes(expectedHash);
+    };
+    const preserveLineEndings = (proposed, current) => current.includes('\r\n')
+        ? normalizeLineEndings(proposed).replaceAll('\n', '\r\n')
+        : normalizeLineEndings(proposed);
     const requestLocalWritePermission = () => {
         if (!localDirectoryHandle) {
             throw new Error('ローカルフォルダの準備ができていません。FILESを開いてから、もう一度お試しください。');
@@ -1304,7 +1313,7 @@
         const current = await (await handle.getFile()).text();
         const proposed = proposalContent(proposal);
         const originalHash = proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash;
-        const state = {proposal, path, current, proposed, changedAfterProposal:originalHash ? await hashText(current) !== originalHash : false};
+        const state = {proposal, path, current, proposed, changedAfterProposal:originalHash ? !await matchesFileHash(current, originalHash) : false};
         const id = proposal.dataset.fileChangeId || path;
         diffStates.set(id, state);
         ensureTab({id:`diff:${id}`, kind:'diff', key:id, label:`差分: ${path.split('/').pop()}`});
@@ -1353,13 +1362,13 @@
             showWorkbenchNotice(`${path}：変更前ファイルを確認しています…`);
             const handle = await resolveLocalFileHandle(path);
             const current = await (await handle.getFile()).text();
-            if (await hashText(current) !== apply.dataset.originalHash) {
+            if (!await matchesFileHash(current, apply.dataset.originalHash)) {
                 throw new Error('提案後にファイルが変更されています。最新内容でAIへ再度依頼してください。');
             }
             status.textContent = '反映中：バックアップを作成しています…';
             showWorkbenchNotice(`${path}：変更前ファイルをバックアップしています…`);
             await saveLocalBackup(path, current);
-            const proposed = proposalContent(proposal);
+            const proposed = preserveLineEndings(proposalContent(proposal), current);
             status.textContent = '反映中：ローカルファイルを書き換えています…';
             showWorkbenchNotice(`${path}：ローカルファイルへ反映しています…`);
             const writable = await handle.createWritable();
