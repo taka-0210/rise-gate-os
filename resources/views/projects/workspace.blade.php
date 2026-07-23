@@ -170,6 +170,12 @@
     .ai-message--assistant { justify-self:start; }
     .ai-message__bubble { padding:10px 12px; border-radius:11px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.65; }
     .ai-message__image { display:block; width:auto; max-width:100%; max-height:220px; margin-bottom:7px; border-radius:7px; object-fit:contain; }
+    .file-change-proposal { margin-top:7px; padding:9px; border:1px solid #9fc7bd; border-radius:8px; color:#294b45; background:#f1faf7; font-size:11px; }
+    .file-change-proposal summary { cursor:pointer; font-weight:800; }
+    .file-change-proposal pre { max-height:260px; overflow:auto; padding:9px; border-radius:6px; color:#e6edf3; background:#0d1117; white-space:pre; font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .file-change-proposal button { width:100%; margin-top:7px; padding:8px; }
+    .file-change-proposal.is-applied { border-color:#b8c7cc; color:#687980; background:#f4f6f7; }
+    .file-change-status { display:block; margin-top:6px; font-size:10px; }
     .ai-message--user .ai-message__bubble { color:#fff; background:#155566; border-bottom-right-radius:3px; }
     .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
     .ai-message__meta { color:#7d8c94; font-size:9px; }
@@ -419,6 +425,19 @@
                     @forelse($aiChatMessages as $chatMessage)
                         <article class="ai-message ai-message--{{ $chatMessage->role }}">
                             <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@endif{{ $chatMessage->content }}</div>
+                            @if($chatMessage->file_change_path)
+                                <details class="file-change-proposal {{ $chatMessage->file_change_status === 'applied' ? 'is-applied' : '' }}" data-file-change>
+                                    <summary>{{ $chatMessage->file_change_status === 'applied' ? '反映済み' : '変更案を確認' }}</summary>
+                                    <strong>{{ $chatMessage->file_change_path }}</strong>
+                                    <p>変更後のファイル全文</p>
+                                    <pre>{{ $chatMessage->file_change_content }}</pre>
+                                    <textarea hidden data-file-change-content>{{ $chatMessage->file_change_content }}</textarea>
+                                    @if($chatMessage->file_change_status !== 'applied')
+                                        <button type="button" data-file-change-apply data-file-path="{{ $chatMessage->file_change_path }}" data-original-hash="{{ $chatMessage->file_change_original_hash }}" data-apply-url="{{ route('projects.ai-chat.messages.file-change.applied', [$project, $chatMessage]) }}">承認してローカルへ反映</button>
+                                    @endif
+                                    <span class="file-change-status" data-file-change-status></span>
+                                </details>
+                            @endif
                             <div class="ai-message__meta">
                                 {{ $chatMessage->created_at->format('m/d H:i') }}
                             </div>
@@ -434,6 +453,8 @@
                     <div class="chat-image-preview" data-chat-image-preview hidden><img alt="添付するスクリーンショット"><button type="button" data-chat-image-remove aria-label="画像を削除">×</button></div>
                     <input type="hidden" name="context_key" value="project" data-chat-context-key>
                     <input type="hidden" name="context_label" value="{{ $project->name }} / Project Overview" data-chat-context-label>
+                    <input type="hidden" name="file_path" value="" data-chat-file-path>
+                    <textarea name="file_content" hidden data-chat-file-content></textarea>
                     <div class="ai-chat-form__actions">
                         <label class="meta chat-attach-button">📎 スクショ<input type="button" hidden data-chat-image-select></label>
                         <span class="meta">貼り付けもできます</span>
@@ -576,6 +597,10 @@
     const showViewer = name => {
         workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
     };
+    const setChatFileContext = (path = '', content = '') => {
+        workbench.querySelector('[data-chat-file-path]').value = path;
+        workbench.querySelector('[data-chat-file-content]').value = content;
+    };
     const setBranches = (prefix, open) => {
         workbench.querySelectorAll(`[data-tree-branch^="${prefix}-"]`).forEach(branch => { branch.hidden = !open; });
         workbench.querySelectorAll(`[data-tree-toggle^="${prefix}-"]`).forEach(button => button.setAttribute('aria-expanded', String(open)));
@@ -690,6 +715,7 @@
         workbench.querySelector('[data-ai-context]').textContent = contextLabel;
         workbench.querySelector('[data-chat-context-key]').value = key;
         workbench.querySelector('[data-chat-context-label]').value = contextLabel;
+        setChatFileContext();
         ensureTab({id:key, kind:'document', key, label:title});
         showViewer('document');
         workbench.querySelector('[data-pane="main"]').scrollTop = 0;
@@ -743,10 +769,13 @@
             else {
                 ensureTab({id:workspaceTab.dataset.workspaceTab, kind, key:workspaceTab.dataset.tabKey, label:workspaceTab.querySelector('.workspace-tab__label').textContent, content:workspaceTab.dataset.tabContent, url:workspaceTab.dataset.tabUrl});
                 if (kind === 'browser') {
+                    setChatFileContext();
                     const frame = workbench.querySelector('[data-browser-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('browser');
                 } else if (kind === 'pdf') {
+                    setChatFileContext();
                     const frame = workbench.querySelector('[data-pdf-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('pdf');
                 } else if (kind === 'image') {
+                    setChatFileContext();
                     const image = workbench.querySelector('[data-image-preview]');
                     image.src = workspaceTab.dataset.tabUrl;
                     image.alt = workspaceTab.dataset.tabKey;
@@ -758,6 +787,7 @@
                     download.download = workspaceTab.dataset.tabKey.split('/').pop();
                     showViewer('image');
                 } else {
+                    setChatFileContext(workspaceTab.dataset.tabKey, workspaceTab.dataset.tabContent);
                     const fileTitle = workbench.querySelector('[data-file-title]');
                     fileTitle.textContent = workspaceTab.dataset.tabKey;
                     fileTitle.title = workspaceTab.dataset.tabKey;
@@ -817,11 +847,13 @@
             const previewUrl = existingUrl || ((opensAsPdf || opensAsImage) && localFile ? URL.createObjectURL(localFile) : opensInBrowser && fileButton.localFileHandle ? URL.createObjectURL(new Blob([fileButton.dataset.fileCopy], {type:'text/html'})) : (fileButton.dataset.previewUrl || ''));
             ensureTab({id:tabId, kind:opensAsPdf ? 'pdf' : opensAsImage ? 'image' : opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl});
             if (opensAsPdf) {
+                setChatFileContext();
                 const frame = workbench.querySelector('[data-pdf-frame]');
                 frame.src = previewUrl;
                 frame.hidden = false;
                 showViewer('pdf');
             } else if (opensAsImage) {
+                setChatFileContext();
                 const image = workbench.querySelector('[data-image-preview]');
                 image.src = previewUrl;
                 image.alt = fileButton.dataset.fileName;
@@ -833,11 +865,13 @@
                 download.download = fileButton.dataset.fileName.split('/').pop();
                 showViewer('image');
             } else if (opensInBrowser) {
+                setChatFileContext();
                 const frame = workbench.querySelector('[data-browser-frame]');
                 frame.src = previewUrl;
                 frame.hidden = false;
                 showViewer('browser');
             } else {
+                setChatFileContext(fileButton.dataset.fileName, fileButton.dataset.fileCopy);
                 showViewer('file');
             }
             const contextLabel = `${@json($project->name)} / File / ${fileButton.dataset.fileName}`;
@@ -988,7 +1022,41 @@
     const chatForm = workbench.querySelector('[data-chat-form]');
     const chatMessages = workbench.querySelector('[data-chat-messages]');
     const chatError = workbench.querySelector('[data-chat-error]');
-    const appendMessage = (role, content, meta = '', pending = false, imageUrl = '') => {
+    const appendFileChange = (article, proposal) => {
+        if (!proposal) return;
+        const details = document.createElement('details');
+        details.className = `file-change-proposal${proposal.status === 'applied' ? ' is-applied' : ''}`;
+        details.dataset.fileChange = '';
+        const summary = document.createElement('summary');
+        summary.textContent = proposal.status === 'applied' ? '反映済み' : '変更案を確認';
+        const path = document.createElement('strong');
+        path.textContent = proposal.path;
+        const description = document.createElement('p');
+        description.textContent = '変更後のファイル全文';
+        const preview = document.createElement('pre');
+        preview.textContent = proposal.content;
+        const source = document.createElement('textarea');
+        source.hidden = true;
+        source.dataset.fileChangeContent = '';
+        source.value = proposal.content;
+        details.append(summary, path, description, preview, source);
+        if (proposal.status !== 'applied') {
+            const apply = document.createElement('button');
+            apply.type = 'button';
+            apply.dataset.fileChangeApply = '';
+            apply.dataset.filePath = proposal.path;
+            apply.dataset.originalHash = proposal.original_hash;
+            apply.dataset.applyUrl = proposal.apply_url;
+            apply.textContent = '承認してローカルへ反映';
+            details.append(apply);
+        }
+        const status = document.createElement('span');
+        status.className = 'file-change-status';
+        status.dataset.fileChangeStatus = '';
+        details.append(status);
+        article.append(details);
+    };
+    const appendMessage = (role, content, meta = '', pending = false, imageUrl = '', fileChange = null) => {
         workbench.querySelector('[data-chat-empty]')?.remove();
         const article = document.createElement('article');
         article.className = `ai-message ai-message--${role}${pending ? ' is-pending' : ''}`;
@@ -1006,6 +1074,7 @@
         metadata.className = 'ai-message__meta';
         metadata.textContent = meta;
         article.append(bubble, metadata);
+        appendFileChange(article, fileChange);
         chatMessages.append(article);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         return article;
@@ -1046,6 +1115,76 @@
         const image = [...event.clipboardData.files].find(file => file.type.startsWith('image/'));
         if (image) setChatImage(image);
     });
+    const hashText = async text => {
+        const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+        return [...new Uint8Array(bytes)].map(value => value.toString(16).padStart(2, '0')).join('');
+    };
+    const resolveLocalFileHandle = async path => {
+        localDirectoryHandle ||= await loadLocalHandle();
+        if (!localDirectoryHandle) throw new Error('Project設定からローカルフォルダを選択してください。');
+        let permission = await localDirectoryHandle.queryPermission({mode:'readwrite'});
+        if (permission !== 'granted') permission = await localDirectoryHandle.requestPermission({mode:'readwrite'});
+        if (permission !== 'granted') throw new Error('ローカルファイルへの書き込み許可が必要です。');
+        const parts = path.replaceAll('\\', '/').split('/').filter(Boolean);
+        const fileName = parts.pop();
+        let directory = localDirectoryHandle;
+        for (const part of parts) directory = await directory.getDirectoryHandle(part);
+        return directory.getFileHandle(fileName);
+    };
+    const saveLocalBackup = (path, content) => new Promise((resolve, reject) => {
+        const request = indexedDB.open('rise-gate-file-backups', 1);
+        request.onupgradeneeded = () => request.result.createObjectStore('backups', {keyPath:'id'});
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const transaction = request.result.transaction('backups', 'readwrite');
+            const id = `${workbench.dataset.localHandleKey}:${path}:${Date.now()}`;
+            transaction.objectStore('backups').put({id, path, content, createdAt:new Date().toISOString()});
+            transaction.oncomplete = () => resolve(id);
+            transaction.onerror = () => reject(transaction.error);
+        };
+    });
+    workbench.addEventListener('click', async event => {
+        const apply = event.target.closest('[data-file-change-apply]');
+        if (!apply) return;
+        const path = apply.dataset.filePath;
+        const status = apply.closest('[data-file-change]').querySelector('[data-file-change-status]');
+        if (/(^|\/)\.env($|[./])|^(vendor|storage|\.git)(\/|$)/i.test(path)) {
+            status.textContent = 'このファイルは保護対象のため変更できません。';
+            return;
+        }
+        if (!confirm(`「${path}」へ、この変更案を反映しますか？`)) return;
+        apply.disabled = true;
+        status.textContent = '現在のファイルを確認しています…';
+        try {
+            const handle = await resolveLocalFileHandle(path);
+            const current = await (await handle.getFile()).text();
+            if (await hashText(current) !== apply.dataset.originalHash) {
+                throw new Error('提案後にファイルが変更されています。最新内容でAIへ再度依頼してください。');
+            }
+            await saveLocalBackup(path, current);
+            const proposed = apply.closest('[data-file-change]').querySelector('[data-file-change-content]').value;
+            const writable = await handle.createWritable();
+            await writable.write(proposed);
+            await writable.close();
+            const fileButton = [...workbench.querySelectorAll('[data-file-name]')].find(item => item.dataset.fileName === path);
+            if (fileButton) fileButton.dataset.fileCopy = proposed;
+            const tab = tabs.querySelector(`[data-workspace-tab="${CSS.escape(`file:${path}`)}"]`);
+            if (tab) tab.dataset.tabContent = proposed;
+            if (workbench.querySelector('[data-file-title]').textContent === path) renderCode(proposed);
+            await fetch(apply.dataset.applyUrl, {
+                method:'POST',
+                headers:{'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
+            });
+            const proposal = apply.closest('[data-file-change]');
+            proposal.classList.add('is-applied');
+            proposal.querySelector('summary').textContent = '反映済み';
+            apply.remove();
+            status.textContent = 'ローカルファイルへ反映しました。変更前の内容はこのブラウザにバックアップ済みです。';
+        } catch (error) {
+            status.textContent = error.message;
+            apply.disabled = false;
+        }
+    });
     chatForm?.addEventListener('submit', async event => {
         event.preventDefault();
         const textarea = chatForm.elements.content;
@@ -1070,7 +1209,7 @@
             const message = body.message;
             pending.remove();
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
-            appendMessage('assistant', message.content, 'ただ今');
+            appendMessage('assistant', message.content, 'ただ今', false, '', message.file_change);
             chatImageInput.value = '';
             chatImagePreview.hidden = true;
             chatImageObjectUrl = '';

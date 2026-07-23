@@ -107,6 +107,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::delete('/projects/{project}/local-connection', [ProjectLocalConnectionController::class, 'destroy'])->name('projects.local-connection.destroy');
         Route::post('/projects/{project}/ai-chat/messages', [AiChatController::class, 'store'])->middleware('throttle:20,1')->name('projects.ai-chat.messages.store');
         Route::get('/projects/{project}/ai-chat/messages/{message}/image', [AiChatController::class, 'image'])->name('projects.ai-chat.messages.image');
+        Route::post('/projects/{project}/ai-chat/messages/{message}/file-change/applied', [AiChatController::class, 'markFileChangeApplied'])->name('projects.ai-chat.messages.file-change.applied');
         Route::get('/projects/{project}/client-plan', [ProjectController::class, 'clientPlan'])->name('projects.client-plan');
         Route::get('/projects/{project}/business-media/{type}', [WorkspaceBusinessProfileController::class, 'projectMedia'])->name('projects.business-media');
         Route::post('/projects/{project}/internal-notes', [ProjectInternalNoteController::class, 'store'])->name('projects.internal-notes.store');

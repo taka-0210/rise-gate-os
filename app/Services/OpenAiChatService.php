@@ -32,7 +32,7 @@ class OpenAiChatService
                     ])->values()->all(),
                     'reasoning' => ['effort' => 'low'],
                     'text' => ['verbosity' => 'low'],
-                    'max_output_tokens' => 1200,
+                    'max_output_tokens' => empty($projectContext['open_file']) ? 1200 : 12000,
                     'store' => false,
                     'safety_identifier' => hash('sha256', 'rise-gate-os-user-'.$userId),
                 ]);
@@ -58,6 +58,10 @@ class OpenAiChatService
             throw new RuntimeException('AIの回答本文を確認できませんでした。');
         }
 
+        $structured = $this->parseFileChange($content, $projectContext['open_file'] ?? null);
+        if ($structured) {
+            $content = $structured['answer'];
+        }
         $inputTokens = (int) data_get($data, 'usage.input_tokens', 0);
         $outputTokens = (int) data_get($data, 'usage.output_tokens', 0);
 
@@ -71,6 +75,41 @@ class OpenAiChatService
                 $inputTokens * (float) config('services.openai.input_usd_per_million')
                 + $outputTokens * (float) config('services.openai.output_usd_per_million')
             ),
+            ...(! empty($structured['path']) ? [
+                'file_change_path' => $structured['path'],
+                'file_change_content' => $structured['content'],
+                'file_change_original_hash' => $structured['original_hash'],
+                'file_change_status' => 'pending',
+            ] : []),
+        ];
+    }
+
+    private function parseFileChange(string $content, ?array $openFile): ?array
+    {
+        if (! $openFile) {
+            return null;
+        }
+        $json = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($content));
+        $decoded = json_decode($json, true);
+        if (! is_array($decoded) || ! is_string($decoded['answer'] ?? null)) {
+            return null;
+        }
+        $change = $decoded['file_change'] ?? null;
+        if ($change === null) {
+            return ['answer' => $decoded['answer'], 'path' => null];
+        }
+        if (! is_array($change) || ($change['path'] ?? null) !== $openFile['path'] || ! is_string($change['content'] ?? null)) {
+            return null;
+        }
+        if (strlen($change['content']) > 1_000_000) {
+            return null;
+        }
+
+        return [
+            'answer' => is_string($decoded['answer'] ?? null) ? $decoded['answer'] : '変更案を作成しました。内容を確認してください。',
+            'path' => $openFile['path'],
+            'content' => $change['content'],
+            'original_hash' => $openFile['sha256'],
         ];
     }
 
@@ -88,6 +127,13 @@ class OpenAiChatService
 
     private function instructions(array $context): string
     {
+        $fileChangeInstruction = empty($context['open_file']) ? '' : <<<'PROMPT'
+
+IMPORTANT: When open_file is present, return only valid JSON with no Markdown fence:
+{"answer":"short Japanese explanation","file_change":{"path":"exact open_file.path","content":"complete updated file content"}}
+If no file change is needed, return {"answer":"normal Japanese answer","file_change":null}.
+Never target another file.
+PROMPT;
         return <<<'PROMPT'
 あなたはRISE GATE OSの読み取り専用AIパートナーです。
 提供されたプロジェクト情報だけを事実として扱い、日本語で簡潔かつ具体的に回答してください。
@@ -96,6 +142,6 @@ OSのデータを変更した、保存した、承認したとは決して述べ
 変更が必要な場合は、実行せずに提案として説明してください。
 
 現在のプロジェクト情報:
-PROMPT."\n".json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+PROMPT."\n".json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).$fileChangeInstruction;
     }
 }

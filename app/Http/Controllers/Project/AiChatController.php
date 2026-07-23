@@ -34,6 +34,8 @@ class AiChatController extends Controller
             'context_key' => ['nullable', 'string', 'max:255'],
             'context_label' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'file_path' => ['nullable', 'string', 'max:500'],
+            'file_content' => ['nullable', 'string', 'max:1000000'],
         ]);
 
         $thread = AiChatThread::firstOrCreate([
@@ -64,7 +66,7 @@ class AiChatController extends Controller
         try {
             $result = $chat->respond(
                 $thread->messages()->reorder()->latest('id')->limit(20)->get()->reverse()->values(),
-                $this->projectContext($request, $project, $validated['context_label'] ?? null),
+                $this->projectContext($request, $project, $validated),
                 $request->user()->id,
             );
             $assistantMessage = $thread->messages()->create([
@@ -121,14 +123,50 @@ class AiChatController extends Controller
         ]);
     }
 
-    private function projectContext(Request $request, Project $project, ?string $contextLabel): array
+    public function markFileChangeApplied(Request $request, Project $project, AiChatMessage $message): JsonResponse
+    {
+        Gate::authorize('view', $project);
+        abort_unless(
+            $message->thread?->project_id === $project->id
+            && $message->thread->user_id === $request->user()->id
+            && $message->role === AiChatMessage::ROLE_ASSISTANT
+            && $message->file_change_path,
+            404
+        );
+        $message->update(['file_change_status' => 'applied', 'file_change_applied_at' => now()]);
+
+        return response()->json(['status' => 'applied']);
+    }
+
+    private function projectContext(Request $request, Project $project, array $validated): array
     {
         $memberRole = $project->members()->where('user_id', $request->user()->id)
             ->where('status', ProjectMember::STATUS_ACTIVE)->value('project_role');
         $project->load(['client', 'roadmaps.improvements.tasks']);
 
+        $filePath = $validated['file_path'] ?? null;
+        $fileContent = $validated['file_content'] ?? null;
+        $protected = $filePath && (
+            preg_match('~(^|/)\.env($|[./])~i', $filePath)
+            || preg_match('~^(vendor|storage|\.git)(/|$)~i', $filePath)
+        );
+
         return [
-            'currently_open' => $contextLabel,
+            'currently_open' => $validated['context_label'] ?? null,
+            'open_file' => $filePath && $fileContent !== null && ! $protected ? [
+                'path' => $filePath,
+                'content' => $fileContent,
+                'sha256' => hash('sha256', $fileContent),
+                'change_contract' => 'Return a complete replacement for this one file only. Never target another path.',
+                'response_format' => [
+                    'instruction' => 'Return only valid JSON. Do not use Markdown fences.',
+                    'schema' => [
+                        'answer' => 'Short Japanese explanation',
+                        'file_change' => ['path' => 'Exact open_file.path', 'content' => 'Complete updated file content'],
+                    ],
+                    'when_no_change' => ['answer' => 'Normal Japanese answer', 'file_change' => null],
+                ],
+            ] : null,
             'project' => [
                 'name' => $project->name,
                 'client' => $project->client?->name,
@@ -172,6 +210,14 @@ class AiChatController extends Controller
             'estimated_cost_usd' => $message->estimated_cost_microusd / 1_000_000,
             'created_at' => $message->created_at->toIso8601String(),
             'image_url' => $message->image_path ? route('projects.ai-chat.messages.image', [$message->thread->project_id, $message]) : null,
+            'file_change' => $message->file_change_path ? [
+                'message_id' => $message->id,
+                'path' => $message->file_change_path,
+                'content' => $message->file_change_content,
+                'original_hash' => $message->file_change_original_hash,
+                'status' => $message->file_change_status,
+                'apply_url' => route('projects.ai-chat.messages.file-change.applied', [$message->thread->project_id, $message]),
+            ] : null,
         ];
     }
 }

@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trimStrings(except: ['file_content']);
         $middleware->alias([
             'workspace' => EnsureCurrentWorkspace::class,
             'system-admin' => EnsureSystemAdmin::class,

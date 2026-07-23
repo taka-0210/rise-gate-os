@@ -12,6 +12,7 @@ class AiChatMessage extends Model
 
     protected $fillable = [
         'ai_chat_thread_id', 'role', 'content', 'image_path', 'image_name', 'image_mime', 'image_size', 'context_key', 'context_label', 'model',
+        'file_change_path', 'file_change_content', 'file_change_original_hash', 'file_change_status', 'file_change_applied_at',
         'provider_response_id', 'input_tokens', 'output_tokens', 'estimated_cost_microusd',
     ];
 
@@ -22,6 +23,7 @@ class AiChatMessage extends Model
             'output_tokens' => 'integer',
             'estimated_cost_microusd' => 'integer',
             'image_size' => 'integer',
+            'file_change_applied_at' => 'datetime',
         ];
     }
 

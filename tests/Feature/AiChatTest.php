@@ -169,6 +169,55 @@ class AiChatTest extends TestCase
             ->assertSeeInOrder(['会話番号6', '会話番号55']);
     }
 
+    public function test_ai_can_return_a_pending_single_file_change_for_human_approval(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key', 'services.openai.chat_model' => 'gpt-5.6-terra']);
+        $original = "<?php\n echo 'before';\n";
+        $updated = "<?php\n echo 'after';\n";
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'id' => 'resp_change',
+            'model' => 'gpt-5.6-terra',
+            'output' => [[
+                'type' => 'message',
+                'content' => [[
+                    'type' => 'output_text',
+                    'text' => json_encode([
+                        'answer' => '文言を変更する案を作成しました。',
+                        'file_change' => ['path' => 'public_html/index.php', 'content' => $updated],
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]],
+            ]],
+            'usage' => ['input_tokens' => 100, 'output_tokens' => 20],
+        ])]);
+
+        $response = $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), [
+                'content' => '文言を直して',
+                'context_key' => 'file:public_html/index.php',
+                'file_path' => 'public_html/index.php',
+                'file_content' => $original,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('message.content', '文言を変更する案を作成しました。')
+            ->assertJsonPath('message.file_change.path', 'public_html/index.php')
+            ->assertJsonPath('message.file_change.content', $updated)
+            ->assertJsonPath('message.file_change.original_hash', hash('sha256', $original))
+            ->assertJsonPath('message.file_change.status', 'pending');
+        $message = $project->aiChatThreads()->firstOrFail()->messages()->reorder()->latest('id')->firstOrFail();
+        $this->assertSame('pending', $message->file_change_status);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-chat.messages.file-change.applied', [$project, $message]), [], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('status', 'applied');
+        $this->assertDatabaseHas('ai_chat_messages', ['id' => $message->id, 'file_change_status' => 'applied']);
+    }
+
     public function test_three_pane_workspace_shows_chat_history_and_tokens_on_demand(): void
     {
         [$user, $workspace, $project] = $this->projectUser();
@@ -196,6 +245,8 @@ class AiChatTest extends TestCase
             ->assertSee('data-chat-form', false)
             ->assertSee('data-chat-image-input', false)
             ->assertSee('貼り付けもできます')
+            ->assertSee('data-chat-file-content', false)
+            ->assertSee('data-file-change-apply', false)
             ->assertSee('利用料をチェックする')
             ->assertSee('利用トークン')
             ->assertSee('120 tokens')
