@@ -24,6 +24,7 @@ class OrganizationUser extends Model
     public const PERMISSION_MEMBERS_MANAGE = 'company.members.manage';
     public const PERMISSION_FINANCE_VIEW_PL = 'finance.pl.view';
     public const PERMISSION_FINANCE_IMPORT_PL = 'finance.pl.import';
+    public const PERMISSION_FINANCE_MANAGE_PL = 'finance.pl.manage';
     public const PERMISSION_FINANCE_VIEW_BS = 'finance.bs.view';
     public const PERMISSION_FINANCE_VIEW_DEBT = 'finance.debt.view';
 
@@ -61,6 +62,7 @@ class OrganizationUser extends Model
             self::PERMISSION_MEMBERS_MANAGE => '会社ユーザーと権限を管理',
             self::PERMISSION_FINANCE_VIEW_PL => '全社P/Lを閲覧',
             self::PERMISSION_FINANCE_IMPORT_PL => '年度別P/Lを取り込む',
+            self::PERMISSION_FINANCE_MANAGE_PL => '年度別P/Lを入力・編集・確定',
             self::PERMISSION_FINANCE_VIEW_BS => '全社B/Sを閲覧',
             self::PERMISSION_FINANCE_VIEW_DEBT => '借入・返済情報を閲覧',
         ];
@@ -72,6 +74,7 @@ class OrganizationUser extends Model
             self::PERMISSION_MEMBERS_MANAGE,
             self::PERMISSION_FINANCE_VIEW_PL,
             self::PERMISSION_FINANCE_IMPORT_PL,
+            self::PERMISSION_FINANCE_MANAGE_PL,
         ];
     }
 

@@ -62,6 +62,18 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
     Route::middleware(['workspace-mode', 'company'])->group(function (): void {
         Route::get('/company', CompanyHomeController::class)->name('company.home');
         Route::get('/company/finance', [CompanyFinanceController::class, 'index'])->name('company-finance.index');
+        Route::put('/company/finance/settings', [CompanyFinanceController::class, 'updateSettings'])->name('company-finance.settings.update');
+        Route::get('/company/finance/pl', [CompanyFinanceController::class, 'profitLoss'])->name('company-finance.pl.index');
+        Route::get('/company/finance/pl/create', [CompanyFinanceController::class, 'create'])->name('company-finance.pl.create');
+        Route::post('/company/finance/pl/preview', [CompanyFinanceController::class, 'preview'])->name('company-finance.pl.preview');
+        Route::post('/company/finance/pl', [CompanyFinanceController::class, 'store'])->name('company-finance.pl.store');
+        Route::get('/company/finance/pl/bulk', [CompanyFinanceController::class, 'bulk'])->name('company-finance.pl.bulk');
+        Route::post('/company/finance/pl/bulk/preview', [CompanyFinanceController::class, 'bulkPreview'])->name('company-finance.pl.bulk.preview');
+        Route::post('/company/finance/pl/bulk', [CompanyFinanceController::class, 'bulkStore'])->name('company-finance.pl.bulk.store');
+        Route::get('/company/finance/pl/{period}/edit', [CompanyFinanceController::class, 'edit'])->name('company-finance.pl.edit');
+        Route::put('/company/finance/pl/{period}', [CompanyFinanceController::class, 'update'])->name('company-finance.pl.update');
+        Route::post('/company/finance/pl/{period}/confirm', [CompanyFinanceController::class, 'confirm'])->name('company-finance.pl.confirm');
+        Route::get('/company/finance/{section}', [CompanyFinanceController::class, 'placeholder'])->name('company-finance.section');
         Route::get('/company/members', [CompanyMemberAccessController::class, 'index'])->name('company-members.index');
         Route::put('/company/members/{user}', [CompanyMemberAccessController::class, 'update'])->name('company-members.update');
         Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');

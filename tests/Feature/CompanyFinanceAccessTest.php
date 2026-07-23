@@ -31,6 +31,16 @@ class CompanyFinanceAccessTest extends TestCase
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-finance.index'))
             ->assertOk()
+            ->assertSee('B/S')
+            ->assertSee('P/L')
+            ->assertSee('今年度計画と進捗')
+            ->assertSee('月次試算表')
+            ->assertSee('整合性・差異')
+            ->assertSee('11月');
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-finance.pl.index'))
+            ->assertOk()
             ->assertSee('123,456,789')
             ->assertSee('11月決算')
             ->assertSee('売上・粗利益・販管費')

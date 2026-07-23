@@ -3,16 +3,17 @@
 @section('content')
     <div class="page-header">
         <div>
-            <div class="meta">COMPANY OS / FINANCE</div>
-            <h1>経営数値</h1>
+            <div class="meta"><a href="{{ route('company-finance.index') }}">経営数値</a> / P/L</div>
+            <h1>P/L</h1>
             <p>{{ $organization->name }}の年度別P/Lです。{{ $organization->fiscal_year_end_month ? $organization->fiscal_year_end_month.'月決算' : '決算月未設定' }}。</p>
         </div>
+        @if($canManage)<div class="actions"><a class="button" href="{{ route('company-finance.pl.create') }}">1期分を入力</a><a class="button secondary" href="{{ route('company-finance.pl.bulk') }}">表を貼り付けて一括入力</a></div>@endif
     </div>
 
     @if ($periods->isEmpty())
         <div class="card">
             <h2>年度別P/Lはまだありません</h2>
-            <p>年度別損益計算書を取り込むと、ここに会社の財務履歴が表示されます。</p>
+            <p>「1期分を入力」または「表を貼り付けて一括入力」から登録できます。</p>
         </div>
     @else
         <div class="stats">
@@ -70,7 +71,7 @@
                 <tbody>
                     @foreach ($periods as $period)
                         <tr>
-                            <td>{{ $period->period_number }}期</td>
+                            <td>@if($canManage)<a href="{{ route('company-finance.pl.edit',$period) }}">{{ $period->period_number }}期</a>@else{{ $period->period_number }}期@endif<br><small>{{ $period->record_status === 'confirmed' ? '確定' : '下書き' }}</small></td>
                             <td>{{ $period->fiscal_year }}</td>
                             <td>{{ number_format($period->net_sales) }}</td>
                             <td>{{ number_format($period->gross_profit) }}</td>

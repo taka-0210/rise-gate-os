@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompanyFinancialPeriod extends Model
 {
@@ -11,12 +12,18 @@ class CompanyFinancialPeriod extends Model
     public const STATUS_PLAN = 'plan';
     public const STATUS_FORECAST = 'forecast';
     public const STATUS_UNCONFIRMED = 'unconfirmed';
+    public const RECORD_DRAFT = 'draft';
+    public const RECORD_CONFIRMED = 'confirmed';
+    public const SOURCE_MANUAL = 'manual';
+    public const SOURCE_BULK = 'bulk';
 
     protected $fillable = [
         'organization_id',
         'period_number',
         'fiscal_year',
         'status',
+        'record_status',
+        'source_type',
         'net_sales',
         'cost_of_sales',
         'cost_ratio',
@@ -37,6 +44,8 @@ class CompanyFinancialPeriod extends Model
         'source_filename',
         'source_hash',
         'imported_at',
+        'confirmed_at',
+        'confirmed_by',
     ];
 
     protected function casts(): array
@@ -47,11 +56,17 @@ class CompanyFinancialPeriod extends Model
             'sga_ratio' => 'decimal:6',
             'operating_profit_ratio' => 'decimal:6',
             'imported_at' => 'datetime',
+            'confirmed_at' => 'datetime',
         ];
     }
 
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(CompanyFinancialPeriodRevision::class);
     }
 }
