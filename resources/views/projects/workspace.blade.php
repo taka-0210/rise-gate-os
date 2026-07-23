@@ -1635,6 +1635,10 @@
     };
     const markFileUpdated = async path => {
         updatedFilePaths.add(path);
+        workbench.querySelectorAll('[data-explorer-tab]')
+            .forEach(button => button.classList.toggle('is-current', button.dataset.explorerTab === 'files'));
+        workbench.querySelectorAll('[data-explorer-panel]')
+            .forEach(panel => panel.classList.toggle('is-current', panel.dataset.explorerPanel === 'files'));
         const fileButton = await revealLocalFile(path);
         if (!fileButton) return;
         fileButton.classList.add('is-updated');

@@ -375,6 +375,7 @@ class AiChatTest extends TestCase
             ->assertSee('更新日時：', false)
             ->assertSee('file-preview-title__time', false)
             ->assertSee('revealLocalFile', false)
+            ->assertSee("button.dataset.explorerTab === 'files'", false)
             ->assertSee('requestTerms', false)
             ->assertSee('通信を確認して、もう一度', false)
             ->assertDontSee('推定利用料')
