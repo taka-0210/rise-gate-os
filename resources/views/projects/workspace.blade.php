@@ -43,6 +43,13 @@
     .pane-head strong { display:block; font-size:13px; }
     .pane-head span { color:var(--muted); font-size:11px; }
     .tree-body { padding:10px 8px 24px; }
+    .hierarchy-controls { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; padding:9px 8px; border-bottom:1px solid var(--wb-line); background:#fff; }
+    .hierarchy-control { min-width:0; padding:7px 4px; border:1px solid transparent; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer; }
+    .hierarchy-control--roadmap { color:#204f6d; border-color:#8ab5d2; background:#cfe3f2; }
+    .hierarchy-control--improvement { color:#64806f; border-color:#d0e4d7; background:#eff7f2; }
+    .hierarchy-control--improvement.is-active { color:#28583e; border-color:#86bb9c; background:#cfe9da; }
+    .hierarchy-control--task { color:#8c6d6b; border-color:#ead7d5; background:#fbf1f0; }
+    .hierarchy-control--task.is-active { color:#6b3835; border-color:#d39c98; background:#efd2d0; }
     .reorder-preference { display:grid; gap:5px; padding:10px 10px 8px; border-bottom:1px solid var(--wb-line); background:#fff; }
     .reorder-preference label { color:#63747d; font-size:10px; font-weight:800; }
     .reorder-preference select { width:100%; padding:7px 9px; border:1px solid #cbd6db; border-radius:6px; color:#29434e; background:#f8fafb; font-size:11px; }
@@ -218,6 +225,11 @@
                 <button class="explorer-tab" type="button" data-explorer-tab="files">FILES</button>
             </div>
             <nav class="workbench-tree is-current" data-explorer-panel="work" aria-label="プロジェクト構造">
+                <div class="hierarchy-controls" aria-label="WORKの表示階層">
+                    <button class="hierarchy-control hierarchy-control--roadmap" type="button" data-hierarchy-level="roadmap" aria-pressed="true">ロードマップ</button>
+                    <button class="hierarchy-control hierarchy-control--improvement" type="button" data-hierarchy-level="improvement" aria-pressed="false">取組み</button>
+                    <button class="hierarchy-control hierarchy-control--task" type="button" data-hierarchy-level="task" aria-pressed="false">タスク</button>
+                </div>
                 @if($canEditProject)
                     <div class="reorder-preference">
                         <label for="workspace-reorder-mode">ドラッグ時の時間軸</label>
@@ -555,6 +567,38 @@
     const showViewer = name => {
         workbench.querySelectorAll('[data-viewer-panel]').forEach(panel => panel.classList.toggle('is-current', panel.dataset.viewerPanel === name));
     };
+    const setBranches = (prefix, open) => {
+        workbench.querySelectorAll(`[data-tree-branch^="${prefix}-"]`).forEach(branch => { branch.hidden = !open; });
+        workbench.querySelectorAll(`[data-tree-toggle^="${prefix}-"]`).forEach(button => button.setAttribute('aria-expanded', String(open)));
+    };
+    const syncHierarchyControls = () => {
+        const roadmapBranches = [...workbench.querySelectorAll('[data-tree-branch^="roadmap-"]')];
+        const improvementBranches = [...workbench.querySelectorAll('[data-tree-branch^="improvement-"]')];
+        const improvementsOpen = roadmapBranches.length > 0 && roadmapBranches.every(branch => !branch.hidden);
+        const tasksOpen = improvementBranches.length > 0 && improvementsOpen && improvementBranches.every(branch => !branch.hidden);
+        const improvementButton = workbench.querySelector('[data-hierarchy-level="improvement"]');
+        const taskButton = workbench.querySelector('[data-hierarchy-level="task"]');
+        improvementButton.classList.toggle('is-active', improvementsOpen);
+        improvementButton.setAttribute('aria-pressed', String(improvementsOpen));
+        taskButton.classList.toggle('is-active', tasksOpen);
+        taskButton.setAttribute('aria-pressed', String(tasksOpen));
+    };
+    const setHierarchyLevel = level => {
+        if (level === 'roadmap') {
+            setBranches('roadmap', false);
+            setBranches('improvement', false);
+        } else if (level === 'improvement') {
+            const allOpen = [...workbench.querySelectorAll('[data-tree-branch^="roadmap-"]')].every(branch => !branch.hidden);
+            setBranches('roadmap', !allOpen);
+            if (allOpen) setBranches('improvement', false);
+        } else if (level === 'task') {
+            const branches = [...workbench.querySelectorAll('[data-tree-branch^="improvement-"]')];
+            const allOpen = branches.length > 0 && branches.every(branch => !branch.hidden);
+            setBranches('roadmap', true);
+            setBranches('improvement', !allOpen);
+        }
+        syncHierarchyControls();
+    };
     const localBrowserUrl = path => {
         if (!localSiteUrl) return '';
         let relative = String(path || '').replaceAll('\\', '/').replace(/^\/+/, '');
@@ -663,8 +707,11 @@
                 const open = branch.hidden;
                 branch.hidden = !open;
                 treeToggle.setAttribute('aria-expanded', String(open));
+                syncHierarchyControls();
             }
         }
+        const hierarchyControl = event.target.closest('[data-hierarchy-level]');
+        if (hierarchyControl) setHierarchyLevel(hierarchyControl.dataset.hierarchyLevel);
     });
     workbench.addEventListener('click', async event => {
         const documentButton = event.target.closest('[data-document]');
