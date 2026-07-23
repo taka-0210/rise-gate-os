@@ -32,6 +32,7 @@
     .workspace-tab--file { box-shadow:inset 0 3px #98a7af; }
     .workspace-tab--browser { box-shadow:inset 0 3px #60abb6; }
     .workspace-tab--pdf { box-shadow:inset 0 3px #c06b66; }
+    .workspace-tab--image { box-shadow:inset 0 3px #9b82bb; }
     .workbench-ai { border-left:1px solid var(--wb-line); background:#fafcfc; }
     .pane-resizer { position:absolute; z-index:8; top:0; bottom:0; width:9px; padding:0; border:0; border-radius:0; background:transparent; cursor:col-resize; transform:translateX(-50%); touch-action:none; }
     .pane-resizer::after { content:""; position:absolute; top:0; bottom:0; left:4px; width:1px; background:transparent; }
@@ -91,6 +92,13 @@
     .viewer-panel.is-current { display:block; }
     .browser-frame { width:100%; height:100%; min-height:calc(100vh - 126px); border:0; background:#fff; }
     .pdf-frame { width:100%; height:calc(100vh - 112px); min-height:640px; border:0; background:#525659; }
+    .image-viewer { min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto minmax(0,1fr); background:#e9eef1; }
+    .image-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 14px; border-bottom:1px solid #cbd5da; color:#425660; background:#f8fafb; font-size:12px; }
+    .image-toolbar__actions { display:flex; gap:7px; }
+    .image-toolbar button, .image-toolbar a { padding:6px 10px; border:1px solid #bccbd2; border-radius:6px; color:#294752; background:#fff; font:inherit; font-weight:700; text-decoration:none; cursor:pointer; }
+    .image-stage { min-height:0; display:flex; align-items:center; justify-content:center; overflow:auto; padding:24px; background-image:linear-gradient(45deg,#dde4e8 25%,transparent 25%),linear-gradient(-45deg,#dde4e8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#dde4e8 75%),linear-gradient(-45deg,transparent 75%,#dde4e8 75%); background-position:0 0,0 8px,8px -8px,-8px 0; background-size:16px 16px; }
+    .image-preview { display:block; max-width:100%; max-height:calc(100vh - 190px); object-fit:contain; box-shadow:0 8px 28px rgba(25,45,55,.2); }
+    .image-preview.is-original { max-width:none; max-height:none; }
     .code-shell { margin-top:18px; overflow:auto; border:1px solid #d3dce2; border-radius:8px; background:#f8fafc; box-shadow:inset 0 1px 0 #fff; }
     .code-viewer { min-width:max-content; padding:12px 0 18px; counter-reset:code-line; color:#263b47; font:13px/1.7 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; tab-size:4; }
     .code-line { display:block; min-height:1.7em; padding:0 20px 0 0; white-space:pre; counter-increment:code-line; }
@@ -358,6 +366,12 @@
             </div>
             <div class="viewer-panel" data-viewer-panel="pdf">
                 <iframe class="pdf-frame" data-pdf-frame title="PDFビューワー" hidden></iframe>
+            </div>
+            <div class="viewer-panel" data-viewer-panel="image">
+                <div class="image-viewer">
+                    <div class="image-toolbar"><span data-image-name>画像プレビュー</span><div class="image-toolbar__actions"><button type="button" data-image-size="fit">画面に合わせる</button><button type="button" data-image-size="original">原寸</button><a data-image-download download>ダウンロード</a></div></div>
+                    <div class="image-stage"><img class="image-preview" data-image-preview alt="" hidden></div>
+                </div>
             </div>
         </section>
 
@@ -650,6 +664,17 @@
                     const frame = workbench.querySelector('[data-browser-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('browser');
                 } else if (kind === 'pdf') {
                     const frame = workbench.querySelector('[data-pdf-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('pdf');
+                } else if (kind === 'image') {
+                    const image = workbench.querySelector('[data-image-preview]');
+                    image.src = workspaceTab.dataset.tabUrl;
+                    image.alt = workspaceTab.dataset.tabKey;
+                    image.hidden = false;
+                    image.classList.remove('is-original');
+                    workbench.querySelector('[data-image-name]').textContent = workspaceTab.dataset.tabKey;
+                    const download = workbench.querySelector('[data-image-download]');
+                    download.href = workspaceTab.dataset.tabUrl;
+                    download.download = workspaceTab.dataset.tabKey.split('/').pop();
+                    showViewer('image');
                 } else {
                     workbench.querySelector('[data-file-title]').textContent = workspaceTab.dataset.tabKey;
                     renderCode(workspaceTab.dataset.tabContent);
@@ -690,22 +715,35 @@
             if (fileButton.localFileHandle) {
                 localFile = await fileButton.localFileHandle.getFile();
                 const pdf = localFile.type === 'application/pdf' || /\.pdf$/i.test(fileButton.dataset.fileName);
-                fileButton.dataset.fileCopy = pdf ? '' : (localFile.size > 1024 * 1024 ? '1MBを超えるためプレビューできません。' : await localFile.text());
+                const image = localFile.type.startsWith('image/') || /\.(?:jpe?g|png|gif|webp|svg|bmp|ico|avif)$/i.test(fileButton.dataset.fileName);
+                fileButton.dataset.fileCopy = pdf || image ? '' : (localFile.size > 1024 * 1024 ? '1MBを超えるためプレビューできません。' : await localFile.text());
             }
             workbench.querySelectorAll('[data-file-name]').forEach(button => button.classList.toggle('is-current', button === fileButton));
             workbench.querySelector('[data-file-title]').textContent = fileButton.dataset.fileName;
             const opensAsPdf = localFile?.type === 'application/pdf' || /\.pdf$/i.test(fileButton.dataset.fileName);
-            if (!opensAsPdf) renderCode(fileButton.dataset.fileCopy);
+            const opensAsImage = localFile?.type.startsWith('image/') || /\.(?:jpe?g|png|gif|webp|svg|bmp|ico|avif)$/i.test(fileButton.dataset.fileName);
+            if (!opensAsPdf && !opensAsImage) renderCode(fileButton.dataset.fileCopy);
             const opensInBrowser = fileButton.dataset.fileView === 'browser' || /(^|\/)index\.html?$/i.test(fileButton.dataset.fileName);
             const tabId = `file:${fileButton.dataset.fileName}`;
             const existingUrl = tabs.querySelector(`[data-workspace-tab="${CSS.escape(tabId)}"]`)?.dataset.tabUrl;
-            const previewUrl = existingUrl || (opensAsPdf && localFile ? URL.createObjectURL(localFile) : opensInBrowser && fileButton.localFileHandle ? URL.createObjectURL(new Blob([fileButton.dataset.fileCopy], {type:'text/html'})) : (fileButton.dataset.previewUrl || ''));
-            ensureTab({id:tabId, kind:opensAsPdf ? 'pdf' : opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl});
+            const previewUrl = existingUrl || ((opensAsPdf || opensAsImage) && localFile ? URL.createObjectURL(localFile) : opensInBrowser && fileButton.localFileHandle ? URL.createObjectURL(new Blob([fileButton.dataset.fileCopy], {type:'text/html'})) : (fileButton.dataset.previewUrl || ''));
+            ensureTab({id:tabId, kind:opensAsPdf ? 'pdf' : opensAsImage ? 'image' : opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl});
             if (opensAsPdf) {
                 const frame = workbench.querySelector('[data-pdf-frame]');
                 frame.src = previewUrl;
                 frame.hidden = false;
                 showViewer('pdf');
+            } else if (opensAsImage) {
+                const image = workbench.querySelector('[data-image-preview]');
+                image.src = previewUrl;
+                image.alt = fileButton.dataset.fileName;
+                image.hidden = false;
+                image.classList.remove('is-original');
+                workbench.querySelector('[data-image-name]').textContent = fileButton.dataset.fileName;
+                const download = workbench.querySelector('[data-image-download]');
+                download.href = previewUrl;
+                download.download = fileButton.dataset.fileName.split('/').pop();
+                showViewer('image');
             } else if (opensInBrowser) {
                 const frame = workbench.querySelector('[data-browser-frame]');
                 frame.src = previewUrl;
@@ -720,6 +758,8 @@
             workbench.querySelector('[data-chat-context-label]').value = contextLabel;
             if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
         }
+        const imageSize = event.target.closest('[data-image-size]');
+        if (imageSize) workbench.querySelector('[data-image-preview]').classList.toggle('is-original', imageSize.dataset.imageSize === 'original');
         if (event.target.closest('[data-usage-toggle]')) {
             const card = workbench.querySelector('[data-usage-card]');
             card.hidden = !card.hidden;
