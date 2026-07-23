@@ -1194,7 +1194,7 @@
         const payload = new FormData(chatForm);
         chatError.hidden = true;
         const attachedImageUrl = chatImageObjectUrl;
-        appendMessage('user', content, '送信中', false, attachedImageUrl);
+        const userMessage = appendMessage('user', content, '送信中', false, attachedImageUrl);
         const pending = appendMessage('assistant', '考えています…', '', true);
         textarea.value = '';
         submit.disabled = true;
@@ -1208,6 +1208,7 @@
             if (!response.ok) throw new Error(body.message || 'AIから回答を取得できませんでした。');
             const message = body.message;
             pending.remove();
+            userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
             appendMessage('assistant', message.content, 'ただ今', false, '', message.file_change);
             chatImageInput.value = '';
@@ -1217,6 +1218,7 @@
             workbench.querySelector('[data-chat-tokens]').textContent = `${(currentTokens + tokens).toLocaleString()} tokens`;
         } catch (error) {
             pending.remove();
+            userMessage.querySelector('.ai-message__meta').textContent = '送信できませんでした';
             textarea.value = content;
             chatError.textContent = error.message;
             chatError.hidden = false;

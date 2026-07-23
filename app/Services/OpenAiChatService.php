@@ -31,7 +31,7 @@ class OpenAiChatService
                         'content' => $this->messageContent($message),
                     ])->values()->all(),
                     'reasoning' => ['effort' => 'low'],
-                    'text' => ['verbosity' => 'low'],
+                    'text' => $this->textConfiguration($projectContext),
                     'max_output_tokens' => empty($projectContext['open_file']) ? 1200 : 12000,
                     'store' => false,
                     'safety_identifier' => hash('sha256', 'rise-gate-os-user-'.$userId),
@@ -81,6 +81,45 @@ class OpenAiChatService
                 'file_change_original_hash' => $structured['original_hash'],
                 'file_change_status' => 'pending',
             ] : []),
+        ];
+    }
+
+    private function textConfiguration(array $projectContext): array
+    {
+        if (empty($projectContext['open_file'])) {
+            return ['verbosity' => 'low'];
+        }
+
+        return [
+            'verbosity' => 'low',
+            'format' => [
+                'type' => 'json_schema',
+                'name' => 'file_change_proposal',
+                'description' => 'A Japanese answer and an optional complete replacement for the currently open file.',
+                'strict' => true,
+                'schema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'answer' => ['type' => 'string'],
+                        'file_change' => [
+                            'anyOf' => [
+                                [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'path' => ['type' => 'string'],
+                                        'content' => ['type' => 'string'],
+                                    ],
+                                    'required' => ['path', 'content'],
+                                    'additionalProperties' => false,
+                                ],
+                                ['type' => 'null'],
+                            ],
+                        ],
+                    ],
+                    'required' => ['answer', 'file_change'],
+                    'additionalProperties' => false,
+                ],
+            ],
         ];
     }
 

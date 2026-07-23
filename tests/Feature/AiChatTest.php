@@ -209,6 +209,11 @@ class AiChatTest extends TestCase
             ->assertJsonPath('message.file_change.status', 'pending');
         $message = $project->aiChatThreads()->firstOrFail()->messages()->reorder()->latest('id')->firstOrFail();
         $this->assertSame('pending', $message->file_change_status);
+        Http::assertSent(fn (Request $request): bool =>
+            data_get($request['text'], 'format.type') === 'json_schema'
+            && data_get($request['text'], 'format.strict') === true
+            && data_get($request['text'], 'format.name') === 'file_change_proposal'
+        );
 
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
