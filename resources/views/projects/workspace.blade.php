@@ -220,6 +220,13 @@
     .chat-paste-hint { color:#71838c; font-size:10px; }
     .ai-chat-form__actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .ai-chat-form__actions button { padding:9px 13px; }
+    .change-history { display:grid; gap:7px; margin-top:10px; }
+    .change-history__item { padding:9px; border:1px solid #d6e0e4; border-radius:7px; background:#fff; }
+    .change-history__item strong { display:block; overflow:hidden; margin-bottom:3px; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+    .change-history__meta { color:#71838c; font-size:9px; }
+    .change-history__actions { display:flex; gap:5px; margin-top:7px; }
+    .change-history__actions button { flex:1; padding:6px 5px; font-size:9px; }
+    .history-note { margin-top:8px !important; color:#6e8089; font-size:10px !important; }
     .mobile-pane-switch { display:none; }
     @media (max-width:900px) {
         .company-workbench { min-height:720px; height:calc(100vh - 69px); grid-template-rows:auto auto minmax(0,1fr); }
@@ -520,6 +527,12 @@
                 @if($pendingAiProposalCount)
                     <section class="ai-card"><h3>承認待ちの提案 {{ $pendingAiProposalCount }}件</h3><div class="ai-history">@foreach($pendingAiProposals as $proposal)<article><strong>{{ $proposal->title }}</strong><div class="meta">{{ $proposal->created_at->format('Y/m/d H:i') }}</div><a href="{{ route('projects.ai-proposals.show', [$project,$proposal]) }}">内容を確認する →</a></article>@endforeach</div></section>
                 @endif
+                <details class="ai-card" data-change-history-card>
+                    <summary style="cursor:pointer;font-weight:700">変更履歴 <span class="meta" data-change-history-count></span></summary>
+                    <p class="history-note">変更前の実ファイルを <code>.rise-gate/backups/</code> に保存します。</p>
+                    <div class="change-history" data-change-history><p class="meta">FILESを開くと履歴を確認できます。</p></div>
+                    <button class="secondary" type="button" data-add-backup-gitignore style="margin-top:8px;width:100%">バックアップをGit管理から除外</button>
+                </details>
                 <details class="ai-card">
                     <summary style="cursor:pointer;font-weight:700">AIへ長い作業を依頼する</summary>
                     <div class="stack" style="margin-top:14px">
@@ -610,11 +623,15 @@
         if (permission !== 'granted') permission = await localDirectoryHandle.requestPermission({mode:'read'});
         if (permission !== 'granted') { localStatus.textContent = 'フォルダへのアクセス許可が必要です。'; return; }
         await renderLocalDirectory(localDirectoryHandle, localTree);
+        await refreshLocalChangeHistory();
     };
     loadLocalHandle().then(async handle => {
         localDirectoryHandle = handle;
         if (!handle) { localTree.innerHTML = '<p class="file-note">Project設定からBROWSEでフォルダを選択してください。</p>'; return; }
-        if (await handle.queryPermission({mode:'read'}) === 'granted') await renderLocalDirectory(handle, localTree);
+        if (await handle.queryPermission({mode:'read'}) === 'granted') {
+            await renderLocalDirectory(handle, localTree);
+            await refreshLocalChangeHistory();
+        }
         else localTree.innerHTML = '<p class="file-note">FILESをクリックしてフォルダへのアクセスを再開してください。</p>';
     }).catch(() => { localStatus.textContent = 'ローカルフォルダ設定を読み込めませんでした。'; });
     const paneWidthKey = `rise-gate-os-pane-widths-${@json($project->public_id)}`;
@@ -1249,6 +1266,44 @@
         for (const part of parts) directory = await directory.getDirectoryHandle(part);
         return directory.getFileHandle(fileName);
     };
+    const getNestedDirectoryHandle = async (root, parts, create = false) => {
+        let directory = root;
+        for (const part of parts) directory = await directory.getDirectoryHandle(part, {create});
+        return directory;
+    };
+    const writeHandleText = async (handle, content) => {
+        const writable = await handle.createWritable();
+        await writable.write(content);
+        await writable.close();
+    };
+    const readBackupContent = async record => {
+        const path = record.meta.path.replaceAll('\\', '/').split('/').filter(Boolean);
+        const fileName = path.pop();
+        const directory = await getNestedDirectoryHandle(record.handle, path);
+        return (await (await directory.getFileHandle(fileName)).getFile()).text();
+    };
+    const backupDirectoryName = () => {
+        const stamp = new Date().toISOString().replaceAll(':', '-').replace('T', '_').replace('Z', '');
+        return `${stamp}_${crypto.randomUUID().slice(0, 8)}`;
+    };
+    const createPhysicalBackup = async (path, content, action = 'ai_apply') => {
+        const backups = await getNestedDirectoryHandle(localDirectoryHandle, ['.rise-gate', 'backups'], true);
+        const directoryName = backupDirectoryName();
+        const backup = await backups.getDirectoryHandle(directoryName, {create:true});
+        const parts = path.replaceAll('\\', '/').split('/').filter(Boolean);
+        const fileName = parts.pop();
+        const targetDirectory = await getNestedDirectoryHandle(backup, parts, true);
+        await writeHandleText(await targetDirectory.getFileHandle(fileName, {create:true}), content);
+        const meta = {
+            version: 1,
+            path,
+            created_at: new Date().toISOString(),
+            action,
+            label: action === 'before_restore' ? '復元する前' : action === 'before_gitignore' ? '.gitignore変更前' : 'AI変更を反映する前',
+        };
+        await writeHandleText(await backup.getFileHandle('meta.json', {create:true}), `${JSON.stringify(meta, null, 2)}\n`);
+        return {directoryName, meta, handle:backup};
+    };
     const saveLocalBackup = (path, content) => new Promise((resolve, reject) => {
         const request = indexedDB.open('rise-gate-file-backups', 1);
         request.onupgradeneeded = () => request.result.createObjectStore('backups', {keyPath:'id'});
@@ -1262,6 +1317,7 @@
         };
     });
     const diffStates = new Map();
+    const backupHistory = new Map();
     let activeDiffProposal = null;
     const proposalPath = proposal => proposal.querySelector('[data-file-change-apply]')?.dataset.filePath || proposal.querySelector('strong')?.textContent.trim() || '';
     const proposalContent = proposal => proposal.querySelector('[data-file-change-content]').value;
@@ -1280,10 +1336,10 @@
         container.append(line);
     };
     const renderDiff = state => {
-        activeDiffProposal = state.proposal;
+        activeDiffProposal = state.proposal || null;
         workbench.querySelector('[data-diff-title]').textContent = state.path;
         const status = workbench.querySelector('[data-diff-status]');
-        status.textContent = state.changedAfterProposal ? '提案後にローカルファイルが変更されています' : '変更前と変更後の差分';
+        status.textContent = state.statusText || (state.changedAfterProposal ? '提案後にローカルファイルが変更されています' : '変更前と変更後の差分');
         const container = workbench.querySelector('[data-diff-content]');
         container.replaceChildren();
         const before = state.current.replaceAll('\r\n', '\n').split('\n');
@@ -1301,8 +1357,152 @@
         for (let index = suffixStart; index < Math.min(before.length, suffixStart + 3); index++) renderDiffLine(container, 'context', index + 1, before[index]);
         if (suffix > 3) renderDiffLine(container, 'context', '', `… ${suffix - 3}行省略 …`);
         if (prefix === before.length && prefix === after.length) renderDiffLine(container, 'context', '', '変更はありません。');
-        workbench.querySelector('[data-diff-actions]').hidden = !state.proposal.querySelector('[data-file-change-actions]');
+        workbench.querySelector('[data-diff-actions]').hidden = !state.proposal?.querySelector('[data-file-change-actions]');
         showViewer('diff');
+    };
+    const formatBackupDate = value => {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('ja-JP', {
+            year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit',
+        }).format(date);
+    };
+    const loadPhysicalBackups = async () => {
+        backupHistory.clear();
+        let backups;
+        try {
+            backups = await getNestedDirectoryHandle(localDirectoryHandle, ['.rise-gate', 'backups']);
+        } catch (error) {
+            if (error.name === 'NotFoundError') return [];
+            throw error;
+        }
+        const records = [];
+        for await (const [directoryName, handle] of backups.entries()) {
+            if (handle.kind !== 'directory') continue;
+            try {
+                const metaHandle = await handle.getFileHandle('meta.json');
+                const metaFile = await metaHandle.getFile();
+                const meta = JSON.parse(await metaFile.text());
+                if (!meta.path || !meta.created_at) continue;
+                const record = {directoryName, meta, handle};
+                records.push(record);
+                backupHistory.set(directoryName, record);
+            } catch (error) {}
+        }
+        return records.sort((left, right) => right.meta.created_at.localeCompare(left.meta.created_at)).slice(0, 100);
+    };
+    const refreshLocalChangeHistory = async () => {
+        const container = workbench.querySelector('[data-change-history]');
+        const count = workbench.querySelector('[data-change-history-count]');
+        if (!localDirectoryHandle || await localDirectoryHandle.queryPermission({mode:'read'}) !== 'granted') {
+            count.textContent = '';
+            container.innerHTML = '<p class="meta">FILESを開くと履歴を確認できます。</p>';
+            return;
+        }
+        const records = await loadPhysicalBackups();
+        count.textContent = records.length ? `${records.length}件` : '';
+        container.replaceChildren();
+        if (!records.length) {
+            container.innerHTML = '<p class="meta">変更履歴はまだありません。</p>';
+            return;
+        }
+        records.forEach(record => {
+            const item = document.createElement('article');
+            item.className = 'change-history__item';
+            const title = document.createElement('strong');
+            title.textContent = record.meta.path;
+            title.title = record.meta.path;
+            const meta = document.createElement('div');
+            meta.className = 'change-history__meta';
+            meta.textContent = `${record.meta.label || '変更前'} / ${formatBackupDate(record.meta.created_at)}`;
+            const actions = document.createElement('div');
+            actions.className = 'change-history__actions';
+            const diff = document.createElement('button');
+            diff.type = 'button';
+            diff.className = 'secondary';
+            diff.dataset.historyDiff = record.directoryName;
+            diff.textContent = '差分を見る';
+            const restore = document.createElement('button');
+            restore.type = 'button';
+            restore.dataset.historyRestore = record.directoryName;
+            restore.textContent = '元に戻す';
+            actions.append(diff, restore);
+            item.append(title, meta, actions);
+            container.append(item);
+        });
+    };
+    const openBackupDiff = async directoryName => {
+        const permission = await localDirectoryHandle.requestPermission({mode:'read'});
+        if (permission !== 'granted') throw new Error('履歴の確認にはローカルフォルダの読み取り許可が必要です。');
+        await refreshLocalChangeHistory();
+        const record = backupHistory.get(directoryName);
+        if (!record) throw new Error('選択したバックアップが見つかりません。');
+        const current = await (await (await resolveLocalFileHandle(record.meta.path)).getFile()).text();
+        const proposed = await readBackupContent(record);
+        const id = `history:${directoryName}`;
+        const state = {
+            proposal:null,
+            path:record.meta.path,
+            current,
+            proposed,
+            changedAfterProposal:false,
+            statusText:`現在のファイル → ${formatBackupDate(record.meta.created_at)} のバックアップ`,
+        };
+        diffStates.set(id, state);
+        ensureTab({id:`diff:${id}`, kind:'diff', key:id, label:`履歴: ${record.meta.path.split('/').pop()}`});
+        renderDiff(state);
+        if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
+    };
+    const restorePhysicalBackup = async directoryName => {
+        const permission = await requestLocalWritePermission();
+        if (permission !== 'granted') throw new Error('復元にはローカルファイルへの書き込み許可が必要です。');
+        await refreshLocalChangeHistory();
+        const record = backupHistory.get(directoryName);
+        if (!record) throw new Error('選択したバックアップが見つかりません。');
+        const path = record.meta.path;
+        if (!confirm(`「${path}」を ${formatBackupDate(record.meta.created_at)} の状態に戻しますか？\n現在の内容も復元前バックアップとして保存します。`)) return;
+        showWorkbenchNotice(`${path}：現在のファイルを退避しています…`);
+        const handle = await resolveLocalFileHandle(path);
+        const current = await (await handle.getFile()).text();
+        await saveLocalBackup(path, current);
+        await createPhysicalBackup(path, current, 'before_restore');
+        const restored = await readBackupContent(record);
+        showWorkbenchNotice(`${path}：バックアップから復元しています…`);
+        await writeHandleText(handle, restored);
+        const fileButton = [...workbench.querySelectorAll('[data-file-name]')].find(item => item.dataset.fileName === path);
+        if (fileButton) fileButton.dataset.fileCopy = restored;
+        const tab = tabs.querySelector(`[data-workspace-tab="${CSS.escape(`file:${path}`)}"]`);
+        if (tab) tab.dataset.tabContent = restored;
+        if (workbench.querySelector('[data-file-title]').textContent === path) renderCode(restored);
+        markFileUpdated(path);
+        await refreshLocalChangeHistory();
+        showWorkbenchNotice(`✓ ${path} を復元しました。復元前の内容もバックアップ済みです。`, 'info', 5000);
+    };
+    const addBackupGitignore = async () => {
+        const permission = await requestLocalWritePermission();
+        if (permission !== 'granted') throw new Error('.gitignoreの更新には書き込み許可が必要です。');
+        if (!confirm('「.rise-gate/backups/」を .gitignore に追加しますか？')) return;
+        let handle;
+        let current = '';
+        try {
+            handle = await localDirectoryHandle.getFileHandle('.gitignore');
+            current = await (await handle.getFile()).text();
+        } catch (error) {
+            if (error.name !== 'NotFoundError') throw error;
+            handle = await localDirectoryHandle.getFileHandle('.gitignore', {create:true});
+        }
+        if (normalizeLineEndings(current).split('\n').map(line => line.trim()).includes('.rise-gate/backups/')) {
+            showWorkbenchNotice('バックアップフォルダはすでにGit管理から除外されています。', 'info');
+            return;
+        }
+        if (current) {
+            await saveLocalBackup('.gitignore', current);
+            await createPhysicalBackup('.gitignore', current, 'before_gitignore');
+        }
+        const newline = current.includes('\r\n') ? '\r\n' : '\n';
+        const separator = current && !current.endsWith('\n') && !current.endsWith('\r') ? newline : '';
+        await writeHandleText(handle, `${current}${separator}.rise-gate/backups/${newline}`);
+        await refreshLocalChangeHistory();
+        showWorkbenchNotice('✓ .rise-gate/backups/ を .gitignore に追加しました。', 'info');
     };
     const openFileChangeDiff = async proposal => {
         if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
@@ -1340,7 +1540,7 @@
         const path = apply.dataset.filePath;
         const status = proposal.querySelector('[data-file-change-status]');
         const originalLabel = apply.textContent;
-        if (/(^|\/)\.env($|[./])|^(vendor|storage|\.git)(\/|$)/i.test(path)) {
+        if (/(^|\/)\.env($|[./])|^(vendor|storage|\.git|\.rise-gate)(\/|$)/i.test(path)) {
             status.textContent = 'このファイルは保護対象のため変更できません。';
             showWorkbenchNotice(status.textContent, 'error');
             return;
@@ -1368,6 +1568,7 @@
             status.textContent = '反映中：バックアップを作成しています…';
             showWorkbenchNotice(`${path}：変更前ファイルをバックアップしています…`);
             await saveLocalBackup(path, current);
+            await createPhysicalBackup(path, current, 'ai_apply');
             const proposed = preserveLineEndings(proposalContent(proposal), current);
             status.textContent = '反映中：ローカルファイルを書き換えています…';
             showWorkbenchNotice(`${path}：ローカルファイルへ反映しています…`);
@@ -1380,6 +1581,7 @@
             if (tab) tab.dataset.tabContent = proposed;
             if (workbench.querySelector('[data-file-title]').textContent === path) renderCode(proposed);
             markFileUpdated(path);
+            await refreshLocalChangeHistory();
             const response = await fetch(apply.dataset.applyUrl, {
                 method:'POST',
                 headers:{'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
@@ -1388,11 +1590,11 @@
             proposal.classList.add('is-applied');
             proposal.querySelector('summary').textContent = '反映済み';
             proposal.querySelector('[data-file-change-actions]')?.remove();
-            status.textContent = `✓ ${path} を更新しました。変更前の内容はこのブラウザにバックアップ済みです。`;
+            status.textContent = `✓ ${path} を更新しました。変更前の実ファイルは .rise-gate/backups/ に保存しました。`;
             showWorkbenchNotice(status.textContent, 'info', 5000);
             if (activeDiffProposal === proposal) {
                 workbench.querySelector('[data-diff-actions]').hidden = true;
-                workbench.querySelector('[data-diff-status]').textContent = '反映済み・変更前ファイルはバックアップ済み';
+                workbench.querySelector('[data-diff-status]').textContent = '反映済み・変更前の実ファイルはバックアップ済み';
             }
         } catch (error) {
             status.textContent = error.message;
@@ -1443,6 +1645,11 @@
     workbench.addEventListener('click', async event => {
         const proposal = event.target.closest('[data-file-change]');
         try {
+            const historyDiff = event.target.closest('[data-history-diff]');
+            if (historyDiff) await openBackupDiff(historyDiff.dataset.historyDiff);
+            const historyRestore = event.target.closest('[data-history-restore]');
+            if (historyRestore) await restorePhysicalBackup(historyRestore.dataset.historyRestore);
+            if (event.target.closest('[data-add-backup-gitignore]')) await addBackupGitignore();
             if (event.target.closest('[data-file-change-diff]')) await openFileChangeDiff(proposal);
             if (event.target.closest('[data-file-change-revise]')) await reviseFileChange(proposal);
             if (event.target.closest('[data-file-change-reject]')) await rejectFileChange(proposal);
@@ -1456,6 +1663,7 @@
         } catch (error) {
             const status = proposal?.querySelector('[data-file-change-status]') || workbench.querySelector('[data-diff-status]');
             status.textContent = error.message;
+            showWorkbenchNotice(error.message, 'error');
         }
     });
     chatForm?.addEventListener('submit', async event => {

@@ -290,6 +290,10 @@ class AiChatTest extends TestCase
             ->assertSee('利用料をチェックする')
             ->assertSee('AI利用ポイント')
             ->assertSee('1ポイント')
+            ->assertSee('変更履歴')
+            ->assertSee('.rise-gate/backups/')
+            ->assertSee('data-change-history', false)
+            ->assertSee('data-add-backup-gitignore', false)
             ->assertDontSee('推定利用料')
             ->assertDontSee('$0.0006');
     }
