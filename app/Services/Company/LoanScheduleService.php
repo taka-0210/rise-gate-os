@@ -34,6 +34,10 @@ class LoanScheduleService
         if ($executionMonth && $month->lessThan($executionMonth)) {
             return ['balance' => null, 'actual' => false];
         }
+        $completedMonth = $loan->completed_on ? CarbonImmutable::parse($loan->completed_on)->startOfMonth() : null;
+        if ($completedMonth && $month->greaterThanOrEqualTo($completedMonth)) {
+            return ['balance' => 0, 'actual' => false];
+        }
 
         $snapshots = $loan->balanceSnapshots
             ->sortBy('balance_as_of')

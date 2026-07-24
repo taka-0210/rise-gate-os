@@ -56,6 +56,10 @@ class CompanyLoanController extends Controller
             };
             $loans = ($direction === 'desc' ? $loans->sortByDesc($selector) : $loans->sortBy($selector))->values();
         }
+        $loans = $loans
+            ->reject(fn ($loan) => $loan->loan_status === CompanyLoan::STATUS_COMPLETED)
+            ->concat($loans->filter(fn ($loan) => $loan->loan_status === CompanyLoan::STATUS_COMPLETED))
+            ->values();
 
         return view('company-loans.schedule', [
             'organization' => $organization,
@@ -230,6 +234,7 @@ class CompanyLoanController extends Controller
             ])],
             'annual_interest_rate' => ['nullable', 'numeric', 'between:0,100'], 'interest_type' => ['nullable', Rule::in(['fixed', 'variable', 'other'])],
             'recent_interest_amount' => ['nullable', 'integer', 'min:0'], 'maturity_on' => ['nullable', 'date'],
+            'completed_on' => ['nullable', 'date', 'required_if:loan_status,completed'],
             'guarantee_type' => ['nullable', 'string', 'max:255'], 'repayment_day' => ['nullable', 'string', 'max:20'],
             'balance_as_of' => ['required', 'date'], 'loan_status' => ['required', Rule::in(['active', 'completed', 'planned'])],
             'notes' => ['nullable', 'string', 'max:2000'],

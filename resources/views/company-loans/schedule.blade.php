@@ -38,7 +38,7 @@
                     <tr>
                         <th class="sticky-year">年度</th>
                         <th class="sticky-month">月</th>
-                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}"><span class="loan-no">No.{{ $loan->management_number }}</span>@if($loan->loan_status === 'completed')<small class="completed-label">完済</small>@endif</th>@endforeach
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}"><span class="loan-no">No.{{ $loan->management_number }}</span>@if($loan->loan_status === 'completed')<small class="completed-label">完済{{ $loan->completed_on ? ' '.$loan->completed_on->format('Y.m') : '' }}</small>@endif</th>@endforeach
                         <th class="total-column">残高合計</th>
                     </tr>
                     <tr>

@@ -89,7 +89,10 @@ class CompanyLoanManagementTest extends TestCase
             ->post(route('company-loans.confirm-drafts'), ['scope' => 'all'])
             ->assertRedirect();
         $this->assertSame(CompanyLoan::RECORD_CONFIRMED, $loans->last()->fresh()->record_status);
-        $loans->last()->update(['loan_status' => CompanyLoan::STATUS_COMPLETED]);
+        $loans->last()->update([
+            'loan_status' => CompanyLoan::STATUS_COMPLETED,
+            'completed_on' => '2026-06-30',
+        ]);
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-loans.index'))
             ->assertOk()->assertDontSee('<input type="checkbox" data-check-all', false);
@@ -99,8 +102,9 @@ class CompanyLoanManagementTest extends TestCase
                 'sort' => 'institution', 'direction' => 'desc',
             ]))
             ->assertOk()
-            ->assertSeeInOrder(['No.2', 'No.1'])
+            ->assertSeeInOrder(['No.1', 'No.2'])
             ->assertSee('loan-completed')
+            ->assertSee('完済 2026.06')
             ->assertSee('金融機関 ▼');
 
         $this->actingAs($owner)->withSession($session)
@@ -142,6 +146,23 @@ class CompanyLoanManagementTest extends TestCase
             ->assertSeeInOrder(['2026年', '50,000,000', '50,000,000', '50,000,000', '50,000,000']);
     }
 
+    public function test_completed_loan_requires_an_actual_completion_date(): void
+    {
+        [$owner, $organization, $session] = $this->companyUser('owner');
+        $input = $this->loanInput();
+        $input['loan_status'] = CompanyLoan::STATUS_COMPLETED;
+        $input['completed_on'] = null;
+
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.preview'), $input)
+            ->assertSessionHasErrors('completed_on');
+
+        $input['completed_on'] = '2026-06-30';
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.preview'), $input)
+            ->assertOk()->assertSee('2026-06-30');
+    }
+
     private function loanInput(): array
     {
         return [
@@ -154,6 +175,7 @@ class CompanyLoanManagementTest extends TestCase
             'maturity_on' => '2036-03-01', 'guarantee_type' => '保証協付',
             'repayment_day' => '25', 'balance_as_of' => '2026-05-31',
             'loan_status' => 'active', 'notes' => null,
+            'completed_on' => null,
         ];
     }
 

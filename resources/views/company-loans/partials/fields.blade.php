@@ -2,7 +2,7 @@
 $fields=[
 ['financial_institution','金融機関','text'],['management_number','管理番号','text'],['purpose','資金用途','text'],['executed_on','借入実行日','date'],['term_label','返済期間','text'],
 ['original_amount','当初借入額','number'],['current_balance','現在残高','number'],['monthly_principal_payment','月額元金返済','number'],['annual_interest_rate','年利（%）','number'],['recent_interest_amount','直近利息','number'],
-['maturity_on','完済予定日','date'],['guarantee_type','保証・区分','text'],['repayment_day','返済日','text'],['balance_as_of','残高基準日','date'],
+['maturity_on','完済予定日','date'],['completed_on','完済日（実績）','date'],['guarantee_type','保証・区分','text'],['repayment_day','返済日','text'],['balance_as_of','残高基準日','date'],
 ];
 @endphp
 @if($errors->any())<div class="alert error">{{ $errors->first() }}</div>@endif

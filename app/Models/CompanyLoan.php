@@ -24,7 +24,7 @@ class CompanyLoan extends Model
         'organization_id', 'financial_institution', 'management_number', 'purpose',
         'executed_on', 'term_label', 'original_amount', 'current_balance',
         'monthly_principal_payment', 'balance_projection_mode', 'annual_interest_rate', 'interest_type',
-        'recent_interest_amount', 'maturity_on', 'guarantee_type', 'repayment_day',
+        'recent_interest_amount', 'maturity_on', 'completed_on', 'guarantee_type', 'repayment_day',
         'balance_as_of', 'loan_status', 'record_status', 'source_type', 'notes',
         'confirmed_at', 'confirmed_by',
     ];
@@ -32,7 +32,7 @@ class CompanyLoan extends Model
     protected function casts(): array
     {
         return [
-            'executed_on' => 'date', 'maturity_on' => 'date', 'balance_as_of' => 'date',
+            'executed_on' => 'date', 'maturity_on' => 'date', 'completed_on' => 'date', 'balance_as_of' => 'date',
             'annual_interest_rate' => 'decimal:4', 'confirmed_at' => 'datetime',
         ];
     }
