@@ -67,6 +67,10 @@ class CompanyLoanManagementTest extends TestCase
             'organization_id' => $organization->id, 'financial_institution' => 'A銀行',
             'record_status' => CompanyLoan::RECORD_DRAFT, 'source_type' => CompanyLoan::SOURCE_BULK,
         ]);
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.bulk'))
+            ->assertOk()->assertSee('1</b><span>金融機関', false)->assertSee('16</b><span>状態', false);
     }
 
     public function test_member_needs_explicit_debt_permission(): void

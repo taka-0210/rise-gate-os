@@ -72,6 +72,10 @@ class CompanyFinanceEntryTest extends TestCase
             'source_type' => CompanyFinancialPeriod::SOURCE_BULK,
             'record_status' => CompanyFinancialPeriod::RECORD_DRAFT,
         ]);
+
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.pl.bulk'))
+            ->assertOk()->assertSee('1</b><span>期', false)->assertSee('10</b><span>法人税等', false);
     }
 
     private function input(): array
