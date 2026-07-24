@@ -79,6 +79,9 @@ class CompanyLoanManagementTest extends TestCase
             ->post(route('company-loans.confirm-drafts'), ['scope' => 'all'])
             ->assertRedirect();
         $this->assertSame(CompanyLoan::RECORD_CONFIRMED, $loans->last()->fresh()->record_status);
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.index'))
+            ->assertOk()->assertDontSee('<input type="checkbox" data-check-all', false);
 
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-loans.bulk'))

@@ -84,6 +84,9 @@ class CompanyFinanceEntryTest extends TestCase
             ->post(route('company-finance.pl.confirm-drafts'), ['scope' => 'all'])
             ->assertRedirect();
         $this->assertSame(CompanyFinancialPeriod::RECORD_CONFIRMED, $periods->last()->fresh()->record_status);
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.pl.index'))
+            ->assertOk()->assertDontSee('<input type="checkbox" data-check-all', false);
 
         $this->actingAs($user)->withSession($session)
             ->get(route('company-finance.pl.bulk'))

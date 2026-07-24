@@ -69,7 +69,7 @@
             <table class="finance-table">
                 <thead>
                     <tr>
-                        @if($canManage)<th><input type="checkbox" data-check-all aria-label="すべて選択"></th>@endif
+                        @if($canManage && $periods->contains('record_status', 'draft'))<th><input type="checkbox" data-check-all aria-label="下書きをすべて選択"></th>@endif
                         <th>期</th>
                         <th>年度</th>
                         <th>売上高</th>
@@ -85,7 +85,7 @@
                 <tbody>
                     @foreach ($periods as $period)
                         <tr>
-                            @if($canManage)<td>@if($period->record_status === 'draft')<input type="checkbox" name="ids[]" value="{{ $period->id }}" data-check-item aria-label="{{ $period->period_number }}期を選択">@endif</td>@endif
+                            @if($canManage && $periods->contains('record_status', 'draft'))<td>@if($period->record_status === 'draft')<input type="checkbox" name="ids[]" value="{{ $period->id }}" data-check-item aria-label="{{ $period->period_number }}期を選択">@endif</td>@endif
                             <td>@if($canManage)<a href="{{ route('company-finance.pl.edit',$period) }}">{{ $period->period_number }}期</a>@else{{ $period->period_number }}期@endif<br><small>{{ $period->record_status === 'confirmed' ? '確定' : '下書き' }}</small></td>
                             <td>{{ $period->fiscal_year }}</td>
                             <td>{{ number_format($period->net_sales) }}</td>
