@@ -86,6 +86,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/company/loans/bulk', [CompanyLoanController::class, 'bulkStore'])->name('company-loans.bulk.store');
         Route::post('/company/loans/confirm-drafts', [CompanyLoanController::class, 'confirmDrafts'])->name('company-loans.confirm-drafts');
         Route::get('/company/loans/{loan}/edit', [CompanyLoanController::class, 'edit'])->name('company-loans.edit');
+        Route::post('/company/loans/{loan}/save', [CompanyLoanController::class, 'update'])->name('company-loans.save');
         Route::put('/company/loans/{loan}', [CompanyLoanController::class, 'update'])->name('company-loans.update');
         Route::post('/company/loans/{loan}/confirm', [CompanyLoanController::class, 'confirm'])->name('company-loans.confirm');
         Route::get('/company/members', [CompanyMemberAccessController::class, 'index'])->name('company-members.index');

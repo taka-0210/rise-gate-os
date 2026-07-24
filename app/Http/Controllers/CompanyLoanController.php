@@ -132,7 +132,8 @@ class CompanyLoanController extends Controller
         [$organization] = $this->manageContext($request, $access);
         $this->owned($loan, $organization->id);
         $this->saveLoan($organization->id, $request->user()->id, $loan, $this->validated($request, $organization->id, $loan->id), CompanyLoan::SOURCE_MANUAL);
-        return back()->with('status', '変更を下書き保存しました。再確認後に確定してください。');
+        return redirect()->route('company-loans.edit', $loan)
+            ->with('status', '変更を下書き保存しました。再確認後に確定してください。');
     }
 
     public function confirm(Request $request, CompanyLoan $loan, CompanyAccess $access): RedirectResponse
@@ -254,14 +255,24 @@ class CompanyLoanController extends Controller
             ]);
             $loan ? $loan->update($values) : $loan = CompanyLoan::create($values);
             if ($loan->balance_as_of) {
-                CompanyLoanBalanceSnapshot::updateOrCreate(
-                    ['company_loan_id' => $loan->id, 'balance_as_of' => $loan->balance_as_of->toDateString()],
-                    [
-                        'organization_id' => $organizationId, 'balance' => $loan->current_balance,
-                        'monthly_principal_payment' => $loan->monthly_principal_payment,
-                        'interest_amount' => $loan->recent_interest_amount, 'recorded_by' => $userId,
-                    ]
-                );
+                $balanceDate = $loan->balance_as_of->toDateString();
+                $snapshot = CompanyLoanBalanceSnapshot::query()
+                    ->where('company_loan_id', $loan->id)
+                    ->whereDate('balance_as_of', $balanceDate)
+                    ->first();
+                $snapshotValues = [
+                    'organization_id' => $organizationId, 'balance' => $loan->current_balance,
+                    'monthly_principal_payment' => $loan->monthly_principal_payment,
+                    'interest_amount' => $loan->recent_interest_amount, 'recorded_by' => $userId,
+                ];
+                if ($snapshot) {
+                    $snapshot->update($snapshotValues);
+                } else {
+                    CompanyLoanBalanceSnapshot::create(array_merge($snapshotValues, [
+                        'company_loan_id' => $loan->id,
+                        'balance_as_of' => $balanceDate,
+                    ]));
+                }
             }
             $this->revision($loan, $userId, $before ? 'updated' : 'created', $before);
             return $loan;

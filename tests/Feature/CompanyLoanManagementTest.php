@@ -163,6 +163,32 @@ class CompanyLoanManagementTest extends TestCase
             ->assertOk()->assertSee('2026-06-30');
     }
 
+    public function test_completed_date_can_be_saved_from_the_preview_with_post(): void
+    {
+        [$owner, $organization, $session] = $this->companyUser('owner');
+        $input = $this->loanInput();
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.store'), $input)
+            ->assertRedirect();
+        $loan = CompanyLoan::firstOrFail();
+
+        $input['loan_id'] = $loan->id;
+        $input['loan_status'] = CompanyLoan::STATUS_COMPLETED;
+        $input['completed_on'] = '2026-06-30';
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.preview'), $input)
+            ->assertOk()
+            ->assertSee(route('company-loans.save', $loan), false)
+            ->assertDontSee('name="_method"', false);
+
+        unset($input['loan_id']);
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.save', $loan), $input)
+            ->assertRedirect(route('company-loans.edit', $loan));
+        $this->assertSame(CompanyLoan::STATUS_COMPLETED, $loan->fresh()->loan_status);
+        $this->assertSame('2026-06-30', $loan->fresh()->completed_on->toDateString());
+    }
+
     private function loanInput(): array
     {
         return [
