@@ -60,7 +60,8 @@ class LoanScheduleService
             return ['balance' => null, 'actual' => false];
         }
         $completedMonth = $loan->completed_on ? CarbonImmutable::parse($loan->completed_on)->startOfMonth() : null;
-        if ($completedMonth && $month->greaterThanOrEqualTo($completedMonth)) {
+        $zeroMonth = $completedMonth?->addMonth();
+        if ($zeroMonth && $month->greaterThanOrEqualTo($zeroMonth)) {
             return ['balance' => 0, 'actual' => false];
         }
 
@@ -77,11 +78,11 @@ class LoanScheduleService
             ?: ($payment === 0 ? 'hold' : 'amortizing');
         $projectedPayment = in_array($mode, ['hold', 'bullet', 'revolving'], true) ? 0 : $payment;
         $before = $snapshots->last(fn ($snapshot) => $snapshot->balance_as_of->startOfMonth()->lessThan($month));
-        $after = $snapshots->first(function ($snapshot) use ($month, $completedMonth): bool {
+        $after = $snapshots->first(function ($snapshot) use ($month, $zeroMonth): bool {
             $snapshotMonth = $snapshot->balance_as_of->startOfMonth();
 
             return $snapshotMonth->greaterThan($month)
-                && (! $completedMonth || $snapshotMonth->lessThan($completedMonth));
+                && (! $zeroMonth || $snapshotMonth->lessThan($zeroMonth));
         });
 
         if ($before) {
@@ -90,10 +91,16 @@ class LoanScheduleService
         } elseif ($after) {
             $distance = $month->diffInMonths($after->balance_as_of->startOfMonth());
             $balance = (int) $after->balance + ($projectedPayment * $distance);
-        } elseif ($completedMonth) {
-            $distance = $month->diffInMonths($completedMonth);
+        } elseif ($completedMonth && $executionMonth) {
+            $distance = $executionMonth->diffInMonths($month);
             $balance = match ($mode) {
-                'amortizing' => $payment * $distance,
+                'amortizing' => (int) $loan->original_amount - ($projectedPayment * $distance),
+                default => (int) $loan->original_amount,
+            };
+        } elseif ($zeroMonth) {
+            $distance = $month->diffInMonths($zeroMonth);
+            $balance = match ($mode) {
+                'amortizing' => $projectedPayment * $distance,
                 default => (int) $loan->original_amount,
             };
         } else {
