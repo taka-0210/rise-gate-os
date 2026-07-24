@@ -2,6 +2,7 @@
 
 namespace App\Services\Company;
 
+use App\Models\CompanyLoan;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -44,7 +45,9 @@ class LoanScheduleService
             foreach ($loans as $loan) {
                 $cell = $this->balanceForMonth($loan, $month);
                 $cells[$loan->id] = $cell;
-                $total += $cell['balance'] ?? 0;
+                if ($loan->loan_status !== CompanyLoan::STATUS_COMPLETED) {
+                    $total += $cell['balance'] ?? 0;
+                }
             }
 
             $rows[] = ['month' => $month, 'cells' => $cells, 'total' => $total];

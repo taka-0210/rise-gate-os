@@ -234,7 +234,8 @@ class CompanyLoanManagementTest extends TestCase
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-loans.schedule', ['start' => '2026-03', 'end' => '2026-07']))
             ->assertOk()
-            ->assertSeeInOrder(['800,000', '700,000', '600,000', '500,000', '0']);
+            ->assertSeeInOrder(['800,000', '700,000', '600,000', '500,000', '0'])
+            ->assertSee('<td class="total-column"><strong>0</strong></td>', false);
     }
 
     private function loanInput(): array
