@@ -89,9 +89,19 @@ class CompanyLoanManagementTest extends TestCase
             ->post(route('company-loans.confirm-drafts'), ['scope' => 'all'])
             ->assertRedirect();
         $this->assertSame(CompanyLoan::RECORD_CONFIRMED, $loans->last()->fresh()->record_status);
+        $loans->last()->update(['loan_status' => CompanyLoan::STATUS_COMPLETED]);
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-loans.index'))
             ->assertOk()->assertDontSee('<input type="checkbox" data-check-all', false);
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.schedule', [
+                'start' => '2026-05', 'end' => '2026-06',
+                'sort' => 'institution', 'direction' => 'desc',
+            ]))
+            ->assertOk()
+            ->assertSeeInOrder(['No.2', 'No.1'])
+            ->assertSee('loan-completed')
+            ->assertSee('金融機関 ▼');
 
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-loans.bulk'))

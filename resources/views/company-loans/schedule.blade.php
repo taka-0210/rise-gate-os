@@ -23,38 +23,47 @@
     @if($loans->isEmpty())
         <div class="card"><h2>借入情報がありません</h2><p>借入を登録すると、ここに月別の残高推移が表示されます。</p></div>
     @else
+        @php
+            $sortUrl = fn(string $key) => route('company-loans.schedule', [
+                'start' => $start->format('Y-m'),
+                'end' => $end->format('Y-m'),
+                'sort' => $key,
+                'direction' => $sort === $key && $direction === 'asc' ? 'desc' : 'asc',
+            ]);
+            $sortMark = fn(string $key) => $sort === $key ? ($direction === 'asc' ? '▲' : '▼') : '↕';
+        @endphp
         <div class="card schedule-wrap">
             <table class="schedule-table">
                 <thead>
                     <tr>
                         <th class="sticky-year">年度</th>
                         <th class="sticky-month">月</th>
-                        @foreach($loans as $loan)<th><span class="loan-no">No.{{ $loan->management_number }}</span></th>@endforeach
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}"><span class="loan-no">No.{{ $loan->management_number }}</span>@if($loan->loan_status === 'completed')<small class="completed-label">完済</small>@endif</th>@endforeach
                         <th class="total-column">残高合計</th>
                     </tr>
                     <tr>
-                        <th class="sticky-year"></th><th class="sticky-month">金融機関</th>
-                        @foreach($loans as $loan)<th>{{ $loan->financial_institution }}</th>@endforeach
+                        <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('institution') }}">金融機関 {{ $sortMark('institution') }}</a></th>
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ $loan->financial_institution }}</th>@endforeach
                         <th class="total-column"></th>
                     </tr>
                     <tr>
-                        <th class="sticky-year"></th><th class="sticky-month">借入額</th>
-                        @foreach($loans as $loan)<th>{{ number_format($loan->original_amount) }}</th>@endforeach
+                        <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('amount') }}">借入額 {{ $sortMark('amount') }}</a></th>
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($loan->original_amount) }}</th>@endforeach
                         <th class="total-column">{{ number_format($loans->sum('original_amount')) }}</th>
                     </tr>
                     <tr>
-                        <th class="sticky-year"></th><th class="sticky-month">返済／月</th>
-                        @foreach($loans as $loan)<th>{{ number_format($loan->monthly_principal_payment) }}</th>@endforeach
+                        <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('monthly') }}">返済／月 {{ $sortMark('monthly') }}</a></th>
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($loan->monthly_principal_payment) }}</th>@endforeach
                         <th class="total-column">{{ number_format($loans->sum('monthly_principal_payment')) }}</th>
                     </tr>
                     <tr>
-                        <th class="sticky-year"></th><th class="sticky-month">期間</th>
-                        @foreach($loans as $loan)<th>{{ $loan->term_label ?: '—' }}</th>@endforeach
+                        <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('term') }}">期間 {{ $sortMark('term') }}</a></th>
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ $loan->term_label ?: '—' }}</th>@endforeach
                         <th class="total-column"></th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month">計算方式</th>
-                        @foreach($loans as $loan)<th>{{ ['amortizing'=>'元金返済','hold'=>'据置','bullet'=>'期日一括','revolving'=>'当座貸越'][$loan->balance_projection_mode] ?? '元金返済' }}</th>@endforeach
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ ['amortizing'=>'元金返済','hold'=>'据置','bullet'=>'期日一括','revolving'=>'当座貸越'][$loan->balance_projection_mode] ?? '元金返済' }}</th>@endforeach
                         <th class="total-column"></th>
                     </tr>
                 </thead>
@@ -66,7 +75,7 @@
                             <th class="sticky-month">{{ $row['month']->month }}</th>
                             @foreach($loans as $loan)
                                 @php($cell = $row['cells'][$loan->id])
-                                <td class="{{ $cell['actual'] ? 'is-actual' : '' }}">
+                                <td class="{{ $cell['actual'] ? 'is-actual ' : '' }}{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">
                                     @if($cell['balance'] !== null)
                                         @if($cell['actual'])<span class="actual-mark" title="実績">●</span>@endif{{ number_format($cell['balance']) }}
                                     @endif
@@ -93,8 +102,8 @@
 .schedule-wrap{padding:0;overflow:auto;max-height:calc(100vh - 250px)}
 .schedule-table{border-collapse:separate;border-spacing:0;min-width:max-content;font-size:12px;font-variant-numeric:tabular-nums}
 .schedule-table th,.schedule-table td{min-width:118px;padding:7px 9px;border-right:1px solid #dce4e7;border-bottom:1px solid #dce4e7;text-align:right;white-space:nowrap;background:#fff}
-.schedule-table thead th{position:sticky;z-index:4;background:#edf3f4;text-align:center;font-weight:700}
-.schedule-table thead tr:nth-child(1) th{top:0}.schedule-table thead tr:nth-child(2) th{top:33px}.schedule-table thead tr:nth-child(3) th{top:66px}.schedule-table thead tr:nth-child(4) th{top:99px}.schedule-table thead tr:nth-child(5) th{top:132px}.schedule-table thead tr:nth-child(6) th{top:165px}
+.schedule-table thead{position:sticky;top:0;z-index:8}
+.schedule-table thead th{position:relative;z-index:4;background:#edf3f4;text-align:center;font-weight:700}
 .schedule-table .sticky-year{position:sticky;left:0;z-index:3;min-width:76px;width:76px;text-align:center;background:#f5f7f8}
 .schedule-table .sticky-month{position:sticky;left:76px;z-index:3;min-width:80px;width:80px;text-align:center;background:#f5f7f8;box-shadow:2px 0 0 #cbd7dc}
 .schedule-table thead .sticky-year,.schedule-table thead .sticky-month{z-index:7;background:#e5edef}
@@ -102,8 +111,9 @@
 .schedule-table thead .total-column{z-index:7}
 .schedule-table tbody tr.year-start th,.schedule-table tbody tr.year-start td{border-top:2px solid #7c929b}
 .schedule-table td.is-actual{background:#eef8f4;color:#135f50;font-weight:700}
+.schedule-table .loan-completed,.schedule-table td.is-actual.loan-completed{background:#e5e8ea;color:#78848a}
 .actual-mark{margin-right:4px;color:#2b9b82;font-size:8px;vertical-align:middle}
-.loan-no{color:var(--accent-dark);font-size:13px}.schedule-note{margin-top:16px}.schedule-note p{margin-bottom:0;color:var(--muted)}
+.loan-no{color:var(--accent-dark);font-size:13px}.completed-label{display:block;margin-top:2px;color:#6d787e}.sort-link{display:inline-flex;gap:4px;align-items:center;color:var(--accent-dark);text-decoration:none}.sort-link:hover{text-decoration:underline}.schedule-note{margin-top:16px}.schedule-note p{margin-bottom:0;color:var(--muted)}
 @media(max-width:700px){.loan-schedule-page{width:calc(100vw - 12px)}.schedule-wrap{max-height:calc(100vh - 210px)}}
 </style>
 @endsection

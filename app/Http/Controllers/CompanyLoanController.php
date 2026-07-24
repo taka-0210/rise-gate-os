@@ -27,6 +27,8 @@ class CompanyLoanController extends Controller
         $validated = $request->validate([
             'start' => ['nullable', 'date_format:Y-m'],
             'end' => ['nullable', 'date_format:Y-m'],
+            'sort' => ['nullable', Rule::in(['institution', 'amount', 'monthly', 'term'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
         $start = isset($validated['start'])
             ? CarbonImmutable::createFromFormat('Y-m', $validated['start'])->startOfMonth()
@@ -43,6 +45,17 @@ class CompanyLoanController extends Controller
             ->orderBy('financial_institution')
             ->orderBy('management_number')
             ->get();
+        $sort = $validated['sort'] ?? null;
+        $direction = $validated['direction'] ?? 'asc';
+        if ($sort) {
+            $selector = match ($sort) {
+                'institution' => fn ($loan) => $loan->financial_institution,
+                'amount' => fn ($loan) => (int) $loan->original_amount,
+                'monthly' => fn ($loan) => (int) $loan->monthly_principal_payment,
+                'term' => fn ($loan) => (float) (preg_replace('/[^\d.]/', '', (string) $loan->term_label) ?: 0),
+            };
+            $loans = ($direction === 'desc' ? $loans->sortByDesc($selector) : $loans->sortBy($selector))->values();
+        }
 
         return view('company-loans.schedule', [
             'organization' => $organization,
@@ -50,6 +63,8 @@ class CompanyLoanController extends Controller
             'rows' => $schedule->build($loans, $start, $end),
             'start' => $start,
             'end' => $end,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
