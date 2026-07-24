@@ -72,6 +72,18 @@ class CompanyFinanceEntryTest extends TestCase
             'source_type' => CompanyFinancialPeriod::SOURCE_BULK,
             'record_status' => CompanyFinancialPeriod::RECORD_DRAFT,
         ]);
+        $periods = CompanyFinancialPeriod::orderBy('fiscal_year')->get();
+        $this->actingAs($user)->withSession($session)
+            ->post(route('company-finance.pl.confirm-drafts'), [
+                'scope' => 'selected', 'ids' => [$periods->first()->id],
+            ])->assertRedirect();
+        $this->assertSame(CompanyFinancialPeriod::RECORD_CONFIRMED, $periods->first()->fresh()->record_status);
+        $this->assertSame(CompanyFinancialPeriod::RECORD_DRAFT, $periods->last()->fresh()->record_status);
+
+        $this->actingAs($user)->withSession($session)
+            ->post(route('company-finance.pl.confirm-drafts'), ['scope' => 'all'])
+            ->assertRedirect();
+        $this->assertSame(CompanyFinancialPeriod::RECORD_CONFIRMED, $periods->last()->fresh()->record_status);
 
         $this->actingAs($user)->withSession($session)
             ->get(route('company-finance.pl.bulk'))

@@ -124,6 +124,41 @@ class CompanyFinanceController extends Controller
         return back()->with('status', $period->period_number.'期を確定しました。');
     }
 
+    public function confirmDrafts(Request $request, CompanyAccess $access): RedirectResponse
+    {
+        [$organization] = $this->manageContext($request, $access);
+        $validated = $request->validate([
+            'scope' => ['required', Rule::in(['selected', 'all'])],
+            'ids' => ['nullable', 'array'],
+            'ids.*' => ['integer'],
+        ]);
+        $query = CompanyFinancialPeriod::query()
+            ->where('organization_id', $organization->id)
+            ->where('status', CompanyFinancialPeriod::STATUS_ACTUAL)
+            ->where('record_status', CompanyFinancialPeriod::RECORD_DRAFT);
+        if ($validated['scope'] === 'selected') {
+            $ids = collect($validated['ids'] ?? [])->map(fn ($id) => (int) $id)->unique();
+            if ($ids->isEmpty()) {
+                return back()->withErrors(['ids' => '確定するP/Lを選択してください。']);
+            }
+            $query->whereIn('id', $ids);
+        }
+        $periods = $query->get();
+        DB::transaction(function () use ($periods, $request): void {
+            foreach ($periods as $period) {
+                $before = $period->toArray();
+                $period->update([
+                    'record_status' => CompanyFinancialPeriod::RECORD_CONFIRMED,
+                    'confirmed_at' => now(),
+                    'confirmed_by' => $request->user()->id,
+                ]);
+                $this->revision($period, $request->user()->id, 'confirmed', $before);
+            }
+        });
+
+        return back()->with('status', $periods->count().'期分のP/Lを確定しました。');
+    }
+
     public function bulk(Request $request, CompanyAccess $access): View
     {
         [$organization] = $this->manageContext($request, $access);

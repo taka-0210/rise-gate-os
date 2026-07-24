@@ -67,6 +67,18 @@ class CompanyLoanManagementTest extends TestCase
             'organization_id' => $organization->id, 'financial_institution' => 'A銀行',
             'record_status' => CompanyLoan::RECORD_DRAFT, 'source_type' => CompanyLoan::SOURCE_BULK,
         ]);
+        $loans = CompanyLoan::orderBy('management_number')->get();
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.confirm-drafts'), [
+                'scope' => 'selected', 'ids' => [$loans->first()->id],
+            ])->assertRedirect();
+        $this->assertSame(CompanyLoan::RECORD_CONFIRMED, $loans->first()->fresh()->record_status);
+        $this->assertSame(CompanyLoan::RECORD_DRAFT, $loans->last()->fresh()->record_status);
+
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.confirm-drafts'), ['scope' => 'all'])
+            ->assertRedirect();
+        $this->assertSame(CompanyLoan::RECORD_CONFIRMED, $loans->last()->fresh()->record_status);
 
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-loans.bulk'))

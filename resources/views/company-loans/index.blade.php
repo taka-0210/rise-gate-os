@@ -6,6 +6,7 @@
         <div class="actions"><a class="button secondary" href="{{ route('company.home') }}">← 会社ホームへ</a>@if($canManage)<a class="button" href="{{ route('company-loans.create') }}">借入を登録</a><a class="button secondary" href="{{ route('company-loans.bulk') }}">表を貼り付けて一括入力</a>@endif</div>
     </div>
     @if(session('status'))<div class="alert success">{{ session('status') }}</div>@endif
+    @if($errors->any())<div class="alert error">{{ $errors->first() }}</div>@endif
 
     <div class="loan-stats">
         <div class="card"><span>借入残高</span><strong>{{ number_format($totalBalance) }}</strong><small>円</small></div>
@@ -45,10 +46,12 @@
             </section>
         </div>
 
-        <div class="card loan-table-wrap">
-            <div class="section-heading"><div><h2>借入一覧</h2><p class="meta">完済済みも削除せず、会社の借入履歴として残します。</p></div><span class="badge">{{ $loans->count() }}件</span></div>
-            <table class="loan-table"><thead><tr><th>金融機関／No.</th><th>状態</th><th>用途</th><th>実行</th><th>当初借入額</th><th>現在残高</th><th>月額元金</th><th>金利</th><th>直近利息</th><th>完済予定</th><th>基準日</th></tr></thead><tbody>
+        <form class="card loan-table-wrap" method="POST" action="{{ route('company-loans.confirm-drafts') }}">
+            @csrf
+            <div class="section-heading"><div><h2>借入一覧</h2><p class="meta">金融機関名・No.をクリックすると編集できます。完済済みも会社の借入履歴として残します。</p></div><div class="actions"><span class="badge">{{ $loans->count() }}件</span>@if($canManage && $loans->contains('record_status','draft'))<button type="submit" name="scope" value="selected" class="secondary">選択した下書きを確定</button><button type="submit" name="scope" value="all" onclick="return confirm('借入の下書きをすべて確定しますか？')">下書きをすべて確定</button>@endif</div></div>
+            <table class="loan-table"><thead><tr>@if($canManage)<th><input type="checkbox" data-check-all aria-label="すべて選択"></th>@endif<th>金融機関／No.</th><th>状態</th><th>用途</th><th>実行</th><th>当初借入額</th><th>現在残高</th><th>月額元金</th><th>金利</th><th>直近利息</th><th>完済予定</th><th>基準日</th></tr></thead><tbody>
             @foreach($loans as $loan)<tr class="{{ $loan->loan_status==='completed'?'is-completed':'' }}">
+                @if($canManage)<td>@if($loan->record_status==='draft')<input type="checkbox" name="ids[]" value="{{ $loan->id }}" data-check-item aria-label="{{ $loan->financial_institution }} No.{{ $loan->management_number }}を選択">@endif</td>@endif
                 <td>@if($canManage)<a href="{{ route('company-loans.edit',$loan) }}"><strong>{{ $loan->financial_institution }}</strong><br>No.{{ $loan->management_number }}</a>@else<strong>{{ $loan->financial_institution }}</strong><br>No.{{ $loan->management_number }}@endif</td>
                 <td><span class="status status--{{ $loan->loan_status }}">{{ ['active'=>'借入中','completed'=>'完済','planned'=>'実行予定'][$loan->loan_status] }}</span><br><small>{{ $loan->record_status==='confirmed'?'確定':'下書き' }}</small></td>
                 <td>{{ $loan->purpose ?: '—' }}<br><small>{{ $loan->guarantee_type }}</small></td>
@@ -56,10 +59,17 @@
                 <td>{{ $loan->annual_interest_rate===null?'—':number_format((float)$loan->annual_interest_rate,3).'%' }}<br><small>{{ ['fixed'=>'固定','variable'=>'変動','other'=>'その他'][$loan->interest_type] ?? '' }}</small></td>
                 <td>{{ number_format($loan->recent_interest_amount) }}</td><td>{{ $loan->maturity_on?->format('Y.m') ?: '—' }}</td><td>{{ $loan->balance_as_of?->format('Y.m.d') ?: '—' }}</td>
             </tr>@endforeach</tbody></table>
-        </div>
+        </form>
     @endif
 </div>
 <style>
 .loan-page{width:min(1580px,calc(100vw - 32px));position:relative;left:50%;transform:translateX(-50%)}.loan-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}.loan-stats .card{display:flex;flex-direction:column;gap:5px}.loan-stats span,.loan-stats small{color:var(--muted)}.loan-stats strong{font-size:22px;color:var(--accent-dark)}.loan-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:16px;margin-bottom:16px}.compact-table,.loan-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.compact-table th,.compact-table td,.loan-table th,.loan-table td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.compact-table th:first-child,.compact-table td:first-child,.loan-table th:first-child,.loan-table td:first-child,.loan-table th:nth-child(3),.loan-table td:nth-child(3){text-align:left}.loan-chart{display:block;width:100%;height:auto;margin-top:12px}.loan-chart text{fill:#667983;font-size:12px}.loan-table-wrap{overflow-x:auto}.loan-table{min-width:1200px;font-size:13px}.section-heading{display:flex;justify-content:space-between;gap:20px;margin-bottom:12px}.status{display:inline-flex;padding:4px 7px;border-radius:999px;font-size:11px;font-weight:700}.status--active{background:#e5f4ef;color:#176653}.status--planned{background:#fff1d8;color:#8a5c12}.status--completed{background:#edf0f2;color:#64747d}.is-completed{opacity:.65}@media(max-width:1000px){.loan-stats{grid-template-columns:repeat(2,1fr)}.loan-grid{grid-template-columns:1fr}}@media(max-width:600px){.loan-page{width:calc(100vw - 20px)}}
 </style>
+<script>
+document.querySelectorAll('[data-check-all]').forEach((toggle)=>{
+    toggle.addEventListener('change',()=>{
+        toggle.closest('form').querySelectorAll('[data-check-item]').forEach((item)=>item.checked=toggle.checked);
+    });
+});
+</script>
 @endsection

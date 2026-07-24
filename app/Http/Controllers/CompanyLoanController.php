@@ -92,6 +92,40 @@ class CompanyLoanController extends Controller
         return back()->with('status', '借入契約を確定しました。');
     }
 
+    public function confirmDrafts(Request $request, CompanyAccess $access): RedirectResponse
+    {
+        [$organization] = $this->manageContext($request, $access);
+        $validated = $request->validate([
+            'scope' => ['required', Rule::in(['selected', 'all'])],
+            'ids' => ['nullable', 'array'],
+            'ids.*' => ['integer'],
+        ]);
+        $query = CompanyLoan::query()
+            ->where('organization_id', $organization->id)
+            ->where('record_status', CompanyLoan::RECORD_DRAFT);
+        if ($validated['scope'] === 'selected') {
+            $ids = collect($validated['ids'] ?? [])->map(fn ($id) => (int) $id)->unique();
+            if ($ids->isEmpty()) {
+                return back()->withErrors(['ids' => '確定する借入を選択してください。']);
+            }
+            $query->whereIn('id', $ids);
+        }
+        $loans = $query->get();
+        DB::transaction(function () use ($loans, $request): void {
+            foreach ($loans as $loan) {
+                $before = $loan->toArray();
+                $loan->update([
+                    'record_status' => CompanyLoan::RECORD_CONFIRMED,
+                    'confirmed_at' => now(),
+                    'confirmed_by' => $request->user()->id,
+                ]);
+                $this->revision($loan, $request->user()->id, 'confirmed', $before);
+            }
+        });
+
+        return back()->with('status', $loans->count().'件の借入を確定しました。');
+    }
+
     public function bulk(Request $request, CompanyAccess $access): View
     {
         [$organization] = $this->manageContext($request, $access);

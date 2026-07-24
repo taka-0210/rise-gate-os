@@ -13,6 +13,8 @@
             @if($canManage)<a class="button" href="{{ route('company-finance.pl.create') }}">1期分を入力</a><a class="button secondary" href="{{ route('company-finance.pl.bulk') }}">表を貼り付けて一括入力</a>@endif
         </div>
     </div>
+    @if(session('status'))<div class="alert success">{{ session('status') }}</div>@endif
+    @if($errors->any())<div class="alert error">{{ $errors->first() }}</div>@endif
 
     @if ($periods->isEmpty())
         <div class="card">
@@ -49,17 +51,25 @@
             </section>
         </div>
 
-        <div class="card finance-table-wrap">
+        <form class="card finance-table-wrap" method="POST" action="{{ route('company-finance.pl.confirm-drafts') }}">
+            @csrf
             <div class="section-heading">
                 <div>
                     <h2>年度別損益推移</h2>
                     <p class="meta">確定実績のみ表示。計画・見込・未確定とは区別して保存します。</p>
                 </div>
-                <span class="badge">{{ $periods->count() }}期分</span>
+                <div class="actions">
+                    <span class="badge">{{ $periods->count() }}期分</span>
+                    @if($canManage && $periods->contains('record_status', 'draft'))
+                        <button type="submit" name="scope" value="selected" class="secondary">選択した下書きを確定</button>
+                        <button type="submit" name="scope" value="all" onclick="return confirm('P/Lの下書きをすべて確定しますか？')">下書きをすべて確定</button>
+                    @endif
+                </div>
             </div>
             <table class="finance-table">
                 <thead>
                     <tr>
+                        @if($canManage)<th><input type="checkbox" data-check-all aria-label="すべて選択"></th>@endif
                         <th>期</th>
                         <th>年度</th>
                         <th>売上高</th>
@@ -75,6 +85,7 @@
                 <tbody>
                     @foreach ($periods as $period)
                         <tr>
+                            @if($canManage)<td>@if($period->record_status === 'draft')<input type="checkbox" name="ids[]" value="{{ $period->id }}" data-check-item aria-label="{{ $period->period_number }}期を選択">@endif</td>@endif
                             <td>@if($canManage)<a href="{{ route('company-finance.pl.edit',$period) }}">{{ $period->period_number }}期</a>@else{{ $period->period_number }}期@endif<br><small>{{ $period->record_status === 'confirmed' ? '確定' : '下書き' }}</small></td>
                             <td>{{ $period->fiscal_year }}</td>
                             <td>{{ number_format($period->net_sales) }}</td>
@@ -89,7 +100,7 @@
                     @endforeach
                 </tbody>
             </table>
-        </div>
+        </form>
     @endif
 </div>
 
@@ -136,4 +147,11 @@
             .finance-page { width:calc(100vw - 20px); }
         }
     </style>
+    <script>
+        document.querySelectorAll('[data-check-all]').forEach((toggle) => {
+            toggle.addEventListener('change', () => {
+                toggle.closest('form').querySelectorAll('[data-check-item]').forEach((item) => item.checked = toggle.checked);
+            });
+        });
+    </script>
 @endsection

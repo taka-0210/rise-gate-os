@@ -71,6 +71,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/company/finance/pl/bulk', [CompanyFinanceController::class, 'bulk'])->name('company-finance.pl.bulk');
         Route::post('/company/finance/pl/bulk/preview', [CompanyFinanceController::class, 'bulkPreview'])->name('company-finance.pl.bulk.preview');
         Route::post('/company/finance/pl/bulk', [CompanyFinanceController::class, 'bulkStore'])->name('company-finance.pl.bulk.store');
+        Route::post('/company/finance/pl/confirm-drafts', [CompanyFinanceController::class, 'confirmDrafts'])->name('company-finance.pl.confirm-drafts');
         Route::get('/company/finance/pl/{period}/edit', [CompanyFinanceController::class, 'edit'])->name('company-finance.pl.edit');
         Route::put('/company/finance/pl/{period}', [CompanyFinanceController::class, 'update'])->name('company-finance.pl.update');
         Route::post('/company/finance/pl/{period}/confirm', [CompanyFinanceController::class, 'confirm'])->name('company-finance.pl.confirm');
@@ -82,6 +83,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/company/loans/bulk', [CompanyLoanController::class, 'bulk'])->name('company-loans.bulk');
         Route::post('/company/loans/bulk/preview', [CompanyLoanController::class, 'bulkPreview'])->name('company-loans.bulk.preview');
         Route::post('/company/loans/bulk', [CompanyLoanController::class, 'bulkStore'])->name('company-loans.bulk.store');
+        Route::post('/company/loans/confirm-drafts', [CompanyLoanController::class, 'confirmDrafts'])->name('company-loans.confirm-drafts');
         Route::get('/company/loans/{loan}/edit', [CompanyLoanController::class, 'edit'])->name('company-loans.edit');
         Route::put('/company/loans/{loan}', [CompanyLoanController::class, 'update'])->name('company-loans.update');
         Route::post('/company/loans/{loan}/confirm', [CompanyLoanController::class, 'confirm'])->name('company-loans.confirm');
