@@ -9,7 +9,9 @@
 </div>
 <p class="meta">10 金利区分：fixed / variable / other　　16 状態：active / completed / planned</p>
 <form method="POST" action="{{ route('company-loans.bulk.preview') }}">@csrf @if($errors->any())<div class="alert error">{{ $errors->first() }}</div>@endif
-<textarea name="bulk_text" rows="14" style="width:100%;font-family:monospace" placeholder="○○銀行	1	運転資金	2026-03	10年	30000000	29250000	250000	1.996	variable	0	2036-03	保証協付	25	2026-05-31	active">{{ old('bulk_text') }}</textarea><div class="actions"><button>内容を確認</button></div></form></div>
+<textarea name="bulk_text" rows="14" style="width:100%;font-family:monospace" placeholder="○○銀行	1	運転資金	2026-03	10年	30000000	29250000	250000	1.996	variable	0	2036-03	保証協付	25	2026-05-31	active">{{ old('bulk_text') }}</textarea>
+<p class="meta">15 残高基準日が空欄の場合は、取込日を自動設定します。Excelの結合セルで金融機関が空欄の行は、直前の金融機関を引き継ぎます。</p>
+<div class="actions"><button>内容を確認</button></div></form></div>
 <style>
 .bulk-columns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}.bulk-columns div{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#f7fafb}.bulk-columns b{display:grid;place-items:center;flex:0 0 24px;height:24px;border-radius:50%;color:#fff;background:var(--accent-dark);font-size:12px}.bulk-columns span{font-size:13px;font-weight:700}@media(max-width:700px){.bulk-columns{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>

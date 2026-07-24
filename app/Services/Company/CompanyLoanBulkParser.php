@@ -16,6 +16,7 @@ class CompanyLoanBulkParser
     public function parse(string $text): array
     {
         $rows = [];
+        $lastFinancialInstitution = null;
         foreach (preg_split('/\R/u', trim($text)) ?: [] as $index => $line) {
             if (trim($line) === '') continue;
             $delimiter = str_contains($line, "\t") ? "\t" : ',';
@@ -25,6 +26,17 @@ class CompanyLoanBulkParser
                 throw new InvalidArgumentException(($index + 1).'行目は16項目で入力してください。');
             }
             $row = array_combine(self::FIELDS, array_map('trim', $values));
+            if ($row['financial_institution'] === '') {
+                $row['financial_institution'] = $lastFinancialInstitution;
+            } else {
+                $lastFinancialInstitution = $row['financial_institution'];
+            }
+            if (! $row['financial_institution']) {
+                throw new InvalidArgumentException(($index + 1).'行目の金融機関を入力してください。');
+            }
+            if ($row['management_number'] === '') {
+                throw new InvalidArgumentException(($index + 1).'行目の管理番号を入力してください。');
+            }
             foreach (['original_amount', 'current_balance', 'monthly_principal_payment', 'recent_interest_amount'] as $field) {
                 $number = str_replace([',', '¥', '￥'], '', $row[$field]);
                 if (! preg_match('/^\d+$/', $number)) throw new InvalidArgumentException(($index + 1).'行目の金額に数値でない項目があります。');
@@ -37,7 +49,9 @@ class CompanyLoanBulkParser
             $row['interest_type'] = $row['interest_type'] ?: null;
             $row['executed_on'] = $this->month($row['executed_on']);
             $row['maturity_on'] = $this->month($row['maturity_on']);
-            $row['balance_as_of'] = $this->date($row['balance_as_of']);
+            $row['balance_as_of'] = $row['balance_as_of'] === ''
+                ? now()->toDateString()
+                : $this->date($row['balance_as_of']);
             if (! in_array($row['loan_status'], ['active', 'completed', 'planned'], true)) {
                 throw new InvalidArgumentException(($index + 1).'行目の状態は active・completed・planned のいずれかです。');
             }

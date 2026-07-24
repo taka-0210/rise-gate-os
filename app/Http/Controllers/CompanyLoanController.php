@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
+use Throwable;
 
 class CompanyLoanController extends Controller
 {
@@ -120,7 +121,15 @@ class CompanyLoanController extends Controller
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['bulk_text' => $e->getMessage()]);
         }
-        DB::transaction(fn () => collect($rows)->each(fn ($row) => $this->saveLoan($organization->id, $request->user()->id, null, $row, CompanyLoan::SOURCE_BULK)));
+        try {
+            DB::transaction(fn () => collect($rows)->each(fn ($row) => $this->saveLoan($organization->id, $request->user()->id, null, $row, CompanyLoan::SOURCE_BULK)));
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withInput()->withErrors([
+                'bulk_text' => '保存処理に失敗しました。入力内容を確認して、もう一度お試しください。',
+            ]);
+        }
         return redirect()->route('company-loans.index')->with('status', count($rows).'件を下書き保存しました。');
     }
 
@@ -149,14 +158,16 @@ class CompanyLoanController extends Controller
                 'source_type' => $source, 'confirmed_at' => null, 'confirmed_by' => null,
             ]);
             $loan ? $loan->update($values) : $loan = CompanyLoan::create($values);
-            CompanyLoanBalanceSnapshot::updateOrCreate(
-                ['company_loan_id' => $loan->id, 'balance_as_of' => $loan->balance_as_of?->toDateString()],
-                [
-                    'organization_id' => $organizationId, 'balance' => $loan->current_balance,
-                    'monthly_principal_payment' => $loan->monthly_principal_payment,
-                    'interest_amount' => $loan->recent_interest_amount, 'recorded_by' => $userId,
-                ]
-            );
+            if ($loan->balance_as_of) {
+                CompanyLoanBalanceSnapshot::updateOrCreate(
+                    ['company_loan_id' => $loan->id, 'balance_as_of' => $loan->balance_as_of->toDateString()],
+                    [
+                        'organization_id' => $organizationId, 'balance' => $loan->current_balance,
+                        'monthly_principal_payment' => $loan->monthly_principal_payment,
+                        'interest_amount' => $loan->recent_interest_amount, 'recorded_by' => $userId,
+                    ]
+                );
+            }
             $this->revision($loan, $userId, $before ? 'updated' : 'created', $before);
             return $loan;
         });
