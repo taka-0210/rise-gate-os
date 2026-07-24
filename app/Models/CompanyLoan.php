@@ -15,11 +15,15 @@ class CompanyLoan extends Model
     public const RECORD_CONFIRMED = 'confirmed';
     public const SOURCE_MANUAL = 'manual';
     public const SOURCE_BULK = 'bulk';
+    public const PROJECTION_AMORTIZING = 'amortizing';
+    public const PROJECTION_HOLD = 'hold';
+    public const PROJECTION_BULLET = 'bullet';
+    public const PROJECTION_REVOLVING = 'revolving';
 
     protected $fillable = [
         'organization_id', 'financial_institution', 'management_number', 'purpose',
         'executed_on', 'term_label', 'original_amount', 'current_balance',
-        'monthly_principal_payment', 'annual_interest_rate', 'interest_type',
+        'monthly_principal_payment', 'balance_projection_mode', 'annual_interest_rate', 'interest_type',
         'recent_interest_amount', 'maturity_on', 'guarantee_type', 'repayment_day',
         'balance_as_of', 'loan_status', 'record_status', 'source_type', 'notes',
         'confirmed_at', 'confirmed_by',

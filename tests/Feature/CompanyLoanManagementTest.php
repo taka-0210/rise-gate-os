@@ -110,6 +110,28 @@ class CompanyLoanManagementTest extends TestCase
         $this->actingAs($member)->withSession($session)->get(route('company-loans.create'))->assertForbidden();
     }
 
+    public function test_hold_projection_keeps_the_balance_after_the_maturity_month(): void
+    {
+        [$owner, $organization, $session] = $this->companyUser('owner');
+        $input = $this->loanInput();
+        $input['management_number'] = '2';
+        $input['original_amount'] = 50_000_000;
+        $input['current_balance'] = 50_000_000;
+        $input['monthly_principal_payment'] = 0;
+        $input['balance_projection_mode'] = CompanyLoan::PROJECTION_HOLD;
+        $input['maturity_on'] = '2026-06-01';
+
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.store'), $input)
+            ->assertRedirect();
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.schedule', ['start' => '2026-05', 'end' => '2026-08']))
+            ->assertOk()
+            ->assertSee('据置')
+            ->assertSeeInOrder(['2026年', '50,000,000', '50,000,000', '50,000,000', '50,000,000']);
+    }
+
     private function loanInput(): array
     {
         return [
@@ -117,6 +139,7 @@ class CompanyLoanManagementTest extends TestCase
             'purpose' => '運転資金', 'executed_on' => '2026-03-01', 'term_label' => '10年',
             'original_amount' => 30_000_000, 'current_balance' => 29_250_000,
             'monthly_principal_payment' => 250_000, 'annual_interest_rate' => 1.996,
+            'balance_projection_mode' => CompanyLoan::PROJECTION_AMORTIZING,
             'interest_type' => 'variable', 'recent_interest_amount' => 0,
             'maturity_on' => '2036-03-01', 'guarantee_type' => '保証協付',
             'repayment_day' => '25', 'balance_as_of' => '2026-05-31',

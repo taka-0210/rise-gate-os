@@ -46,24 +46,27 @@ class LoanScheduleService
         $before = $snapshots->last(fn ($snapshot) => $snapshot->balance_as_of->startOfMonth()->lessThan($month));
         $after = $snapshots->first(fn ($snapshot) => $snapshot->balance_as_of->startOfMonth()->greaterThan($month));
         $payment = max(0, (int) $loan->monthly_principal_payment);
+        $mode = $loan->balance_projection_mode
+            ?: ($payment === 0 ? 'hold' : 'amortizing');
+        $projectedPayment = in_array($mode, ['hold', 'bullet', 'revolving'], true) ? 0 : $payment;
 
         if ($before) {
             $distance = $before->balance_as_of->startOfMonth()->diffInMonths($month);
-            $balance = (int) $before->balance - ($payment * $distance);
+            $balance = (int) $before->balance - ($projectedPayment * $distance);
         } elseif ($after) {
             $distance = $month->diffInMonths($after->balance_as_of->startOfMonth());
-            $balance = (int) $after->balance + ($payment * $distance);
+            $balance = (int) $after->balance + ($projectedPayment * $distance);
         } else {
             $anchor = $loan->balance_as_of
                 ? CarbonImmutable::parse($loan->balance_as_of)->startOfMonth()
                 : CarbonImmutable::now()->startOfMonth();
             $distance = $anchor->diffInMonths($month, false);
-            $balance = (int) $loan->current_balance - ($payment * $distance);
+            $balance = (int) $loan->current_balance - ($projectedPayment * $distance);
         }
 
         $balance = min((int) $loan->original_amount, max(0, $balance));
         $maturityMonth = $loan->maturity_on ? CarbonImmutable::parse($loan->maturity_on)->startOfMonth() : null;
-        if ($maturityMonth && $month->greaterThanOrEqualTo($maturityMonth)) {
+        if ($maturityMonth && $month->greaterThanOrEqualTo($maturityMonth) && in_array($mode, ['amortizing', 'bullet'], true)) {
             $balance = 0;
         }
 

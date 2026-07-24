@@ -209,6 +209,10 @@ class CompanyLoanController extends Controller
             'purpose' => ['nullable', 'string', 'max:255'], 'executed_on' => ['nullable', 'date'],
             'term_label' => ['nullable', 'string', 'max:50'], 'original_amount' => ['required', 'integer', 'min:0'],
             'current_balance' => ['required', 'integer', 'min:0'], 'monthly_principal_payment' => ['required', 'integer', 'min:0'],
+            'balance_projection_mode' => ['required', Rule::in([
+                CompanyLoan::PROJECTION_AMORTIZING, CompanyLoan::PROJECTION_HOLD,
+                CompanyLoan::PROJECTION_BULLET, CompanyLoan::PROJECTION_REVOLVING,
+            ])],
             'annual_interest_rate' => ['nullable', 'numeric', 'between:0,100'], 'interest_type' => ['nullable', Rule::in(['fixed', 'variable', 'other'])],
             'recent_interest_amount' => ['nullable', 'integer', 'min:0'], 'maturity_on' => ['nullable', 'date'],
             'guarantee_type' => ['nullable', 'string', 'max:255'], 'repayment_day' => ['nullable', 'string', 'max:20'],
@@ -221,6 +225,9 @@ class CompanyLoanController extends Controller
     {
         return DB::transaction(function () use ($organizationId, $userId, $loan, $data, $source) {
             $before = $loan?->toArray();
+            $data['balance_projection_mode'] ??= ((int) ($data['monthly_principal_payment'] ?? 0) === 0
+                ? CompanyLoan::PROJECTION_HOLD
+                : CompanyLoan::PROJECTION_AMORTIZING);
             $values = array_merge($data, [
                 'organization_id' => $organizationId, 'record_status' => CompanyLoan::RECORD_DRAFT,
                 'source_type' => $source, 'confirmed_at' => null, 'confirmed_by' => null,

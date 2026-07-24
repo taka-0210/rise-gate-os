@@ -19,9 +19,11 @@ class LoanProjectionService
                 foreach ($loans as $loan) {
                     $balance = $balances[$loan->id];
                     if ($balance <= 0 || $loan->loan_status !== 'active') continue;
-                    if ($loan->maturity_on && $date->greaterThanOrEqualTo(CarbonImmutable::parse($loan->maturity_on)->startOfMonth())) {
+                    $mode = $loan->balance_projection_mode
+                        ?? ((int) $loan->monthly_principal_payment === 0 ? 'hold' : 'amortizing');
+                    if ($loan->maturity_on && $date->greaterThanOrEqualTo(CarbonImmutable::parse($loan->maturity_on)->startOfMonth()) && in_array($mode, ['amortizing', 'bullet'], true)) {
                         $balances[$loan->id] = 0;
-                    } elseif ($loan->monthly_principal_payment > 0) {
+                    } elseif ($mode === 'amortizing' && $loan->monthly_principal_payment > 0) {
                         $balances[$loan->id] = max(0, $balance - (int) $loan->monthly_principal_payment);
                     }
                 }

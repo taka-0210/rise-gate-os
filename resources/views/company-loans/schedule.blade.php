@@ -52,6 +52,11 @@
                         @foreach($loans as $loan)<th>{{ $loan->term_label ?: '—' }}</th>@endforeach
                         <th class="total-column"></th>
                     </tr>
+                    <tr>
+                        <th class="sticky-year"></th><th class="sticky-month">計算方式</th>
+                        @foreach($loans as $loan)<th>{{ ['amortizing'=>'元金返済','hold'=>'据置','bullet'=>'期日一括','revolving'=>'当座貸越'][$loan->balance_projection_mode] ?? '元金返済' }}</th>@endforeach
+                        <th class="total-column"></th>
+                    </tr>
                 </thead>
                 <tbody>
                     @foreach($rows as $row)
@@ -89,7 +94,7 @@
 .schedule-table{border-collapse:separate;border-spacing:0;min-width:max-content;font-size:12px;font-variant-numeric:tabular-nums}
 .schedule-table th,.schedule-table td{min-width:118px;padding:7px 9px;border-right:1px solid #dce4e7;border-bottom:1px solid #dce4e7;text-align:right;white-space:nowrap;background:#fff}
 .schedule-table thead th{position:sticky;z-index:4;background:#edf3f4;text-align:center;font-weight:700}
-.schedule-table thead tr:nth-child(1) th{top:0}.schedule-table thead tr:nth-child(2) th{top:33px}.schedule-table thead tr:nth-child(3) th{top:66px}.schedule-table thead tr:nth-child(4) th{top:99px}.schedule-table thead tr:nth-child(5) th{top:132px}
+.schedule-table thead tr:nth-child(1) th{top:0}.schedule-table thead tr:nth-child(2) th{top:33px}.schedule-table thead tr:nth-child(3) th{top:66px}.schedule-table thead tr:nth-child(4) th{top:99px}.schedule-table thead tr:nth-child(5) th{top:132px}.schedule-table thead tr:nth-child(6) th{top:165px}
 .schedule-table .sticky-year{position:sticky;left:0;z-index:3;min-width:76px;width:76px;text-align:center;background:#f5f7f8}
 .schedule-table .sticky-month{position:sticky;left:76px;z-index:3;min-width:80px;width:80px;text-align:center;background:#f5f7f8;box-shadow:2px 0 0 #cbd7dc}
 .schedule-table thead .sticky-year,.schedule-table thead .sticky-month{z-index:7;background:#e5edef}
