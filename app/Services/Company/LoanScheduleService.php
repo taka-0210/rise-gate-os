@@ -47,12 +47,17 @@ class LoanScheduleService
             return ['balance' => (int) $exact->balance, 'actual' => true];
         }
 
-        $before = $snapshots->last(fn ($snapshot) => $snapshot->balance_as_of->startOfMonth()->lessThan($month));
-        $after = $snapshots->first(fn ($snapshot) => $snapshot->balance_as_of->startOfMonth()->greaterThan($month));
         $payment = max(0, (int) $loan->monthly_principal_payment);
         $mode = $loan->balance_projection_mode
             ?: ($payment === 0 ? 'hold' : 'amortizing');
         $projectedPayment = in_array($mode, ['hold', 'bullet', 'revolving'], true) ? 0 : $payment;
+        $before = $snapshots->last(fn ($snapshot) => $snapshot->balance_as_of->startOfMonth()->lessThan($month));
+        $after = $snapshots->first(function ($snapshot) use ($month, $completedMonth): bool {
+            $snapshotMonth = $snapshot->balance_as_of->startOfMonth();
+
+            return $snapshotMonth->greaterThan($month)
+                && (! $completedMonth || $snapshotMonth->lessThan($completedMonth));
+        });
 
         if ($before) {
             $distance = $before->balance_as_of->startOfMonth()->diffInMonths($month);
@@ -60,6 +65,12 @@ class LoanScheduleService
         } elseif ($after) {
             $distance = $month->diffInMonths($after->balance_as_of->startOfMonth());
             $balance = (int) $after->balance + ($projectedPayment * $distance);
+        } elseif ($completedMonth) {
+            $distance = $month->diffInMonths($completedMonth);
+            $balance = match ($mode) {
+                'amortizing' => $payment * $distance,
+                default => (int) $loan->original_amount,
+            };
         } else {
             $anchor = $loan->balance_as_of
                 ? CarbonImmutable::parse($loan->balance_as_of)->startOfMonth()
@@ -70,7 +81,7 @@ class LoanScheduleService
 
         $balance = min((int) $loan->original_amount, max(0, $balance));
         $maturityMonth = $loan->maturity_on ? CarbonImmutable::parse($loan->maturity_on)->startOfMonth() : null;
-        if ($maturityMonth && $month->greaterThanOrEqualTo($maturityMonth) && in_array($mode, ['amortizing', 'bullet'], true)) {
+        if (! $completedMonth && $maturityMonth && $month->greaterThanOrEqualTo($maturityMonth) && in_array($mode, ['amortizing', 'bullet'], true)) {
             $balance = 0;
         }
 

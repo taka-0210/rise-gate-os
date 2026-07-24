@@ -189,6 +189,29 @@ class CompanyLoanManagementTest extends TestCase
         $this->assertSame('2026-06-30', $loan->fresh()->completed_on->toDateString());
     }
 
+    public function test_completed_loan_reconstructs_monthly_balances_before_completion(): void
+    {
+        [$owner, $organization, $session] = $this->companyUser('owner');
+        $input = $this->loanInput();
+        $input['management_number'] = '4';
+        $input['executed_on'] = '2026-01-01';
+        $input['original_amount'] = 1_000_000;
+        $input['current_balance'] = 0;
+        $input['monthly_principal_payment'] = 250_000;
+        $input['balance_as_of'] = '2026-07-31';
+        $input['loan_status'] = CompanyLoan::STATUS_COMPLETED;
+        $input['completed_on'] = '2026-06-30';
+
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.store'), $input)
+            ->assertRedirect();
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.schedule', ['start' => '2026-03', 'end' => '2026-06']))
+            ->assertOk()
+            ->assertSeeInOrder(['750,000', '500,000', '250,000', '0']);
+    }
+
     private function loanInput(): array
     {
         return [
