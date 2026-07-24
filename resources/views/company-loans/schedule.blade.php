@@ -24,6 +24,7 @@
         <div class="card"><h2>借入情報がありません</h2><p>借入を登録すると、ここに月別の残高推移が表示されます。</p></div>
     @else
         @php
+            $outstandingLoans = $loans->reject(fn($loan) => $loan->loan_status === \App\Models\CompanyLoan::STATUS_COMPLETED);
             $sortUrl = fn(string $key) => route('company-loans.schedule', [
                 'start' => $start->format('Y-m'),
                 'end' => $end->format('Y-m'),
@@ -49,12 +50,12 @@
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('amount') }}">借入額 {{ $sortMark('amount') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($loan->original_amount) }}</th>@endforeach
-                        <th class="total-column">{{ number_format($loans->sum('original_amount')) }}</th>
+                        <th class="total-column">{{ number_format($outstandingLoans->sum('original_amount')) }}</th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('monthly') }}">返済／月 {{ $sortMark('monthly') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($schedulePayments[$loan->id]) }}@if((int)$loan->monthly_principal_payment === 0 && $schedulePayments[$loan->id] > 0)<small class="calculated-label">自動計算</small>@endif</th>@endforeach
-                        <th class="total-column">{{ number_format($schedulePayments->sum()) }}</th>
+                        <th class="total-column">{{ number_format($outstandingLoans->sum(fn($loan) => $schedulePayments[$loan->id] ?? 0)) }}</th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('term') }}">期間 {{ $sortMark('term') }}</a></th>
