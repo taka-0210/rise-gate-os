@@ -51,7 +51,7 @@ class CompanyLoanController extends Controller
             $selector = match ($sort) {
                 'institution' => fn ($loan) => $loan->financial_institution,
                 'amount' => fn ($loan) => (int) $loan->original_amount,
-                'monthly' => fn ($loan) => (int) $loan->monthly_principal_payment,
+                'monthly' => fn ($loan) => $schedule->effectiveMonthlyPayment($loan),
                 'term' => fn ($loan) => (float) (preg_replace('/[^\d.]/', '', (string) $loan->term_label) ?: 0),
             };
             $loans = ($direction === 'desc' ? $loans->sortByDesc($selector) : $loans->sortBy($selector))->values();
@@ -60,6 +60,9 @@ class CompanyLoanController extends Controller
             ->reject(fn ($loan) => $loan->loan_status === CompanyLoan::STATUS_COMPLETED)
             ->concat($loans->filter(fn ($loan) => $loan->loan_status === CompanyLoan::STATUS_COMPLETED))
             ->values();
+        $schedulePayments = $loans->mapWithKeys(
+            fn ($loan) => [$loan->id => $schedule->effectiveMonthlyPayment($loan)]
+        );
 
         return view('company-loans.schedule', [
             'organization' => $organization,
@@ -69,6 +72,7 @@ class CompanyLoanController extends Controller
             'end' => $end,
             'sort' => $sort,
             'direction' => $direction,
+            'schedulePayments' => $schedulePayments,
         ]);
     }
 

@@ -7,6 +7,31 @@ use Illuminate\Support\Collection;
 
 class LoanScheduleService
 {
+    public function effectiveMonthlyPayment(object $loan): int
+    {
+        $registered = max(0, (int) $loan->monthly_principal_payment);
+        if ($registered > 0) {
+            return $registered;
+        }
+        if (($loan->balance_projection_mode ?? 'amortizing') !== 'amortizing' || ! $loan->completed_on) {
+            return 0;
+        }
+
+        $months = 0;
+        if ($loan->executed_on) {
+            $executed = CarbonImmutable::parse($loan->executed_on)->startOfMonth();
+            $completed = CarbonImmutable::parse($loan->completed_on)->startOfMonth();
+            $months = (int) $executed->diffInMonths($completed);
+        }
+        if ($months <= 0 && preg_match('/([\d.]+)\s*年/u', (string) $loan->term_label, $matches)) {
+            $months = (int) round(((float) $matches[1]) * 12);
+        } elseif ($months <= 0 && preg_match('/(\d+)\s*(?:か月|ヶ月|ケ月|月)/u', (string) $loan->term_label, $matches)) {
+            $months = (int) $matches[1];
+        }
+
+        return $months > 0 ? (int) ceil(((int) $loan->original_amount) / $months) : 0;
+    }
+
     public function build(Collection $loans, CarbonImmutable $start, CarbonImmutable $end): array
     {
         $loans->loadMissing('balanceSnapshots');
@@ -47,7 +72,7 @@ class LoanScheduleService
             return ['balance' => (int) $exact->balance, 'actual' => true];
         }
 
-        $payment = max(0, (int) $loan->monthly_principal_payment);
+        $payment = $this->effectiveMonthlyPayment($loan);
         $mode = $loan->balance_projection_mode
             ?: ($payment === 0 ? 'hold' : 'amortizing');
         $projectedPayment = in_array($mode, ['hold', 'bullet', 'revolving'], true) ? 0 : $payment;
