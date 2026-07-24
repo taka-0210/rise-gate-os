@@ -9,6 +9,8 @@ use App\Models\OrganizationUser;
 use App\Services\Company\CompanyAccess;
 use App\Services\Company\CompanyLoanBulkParser;
 use App\Services\Company\LoanProjectionService;
+use App\Services\Company\LoanScheduleService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +21,38 @@ use Throwable;
 
 class CompanyLoanController extends Controller
 {
+    public function schedule(Request $request, CompanyAccess $access, LoanScheduleService $schedule): View
+    {
+        [$organization] = $this->viewContext($request, $access);
+        $validated = $request->validate([
+            'start' => ['nullable', 'date_format:Y-m'],
+            'end' => ['nullable', 'date_format:Y-m'],
+        ]);
+        $start = isset($validated['start'])
+            ? CarbonImmutable::createFromFormat('Y-m', $validated['start'])->startOfMonth()
+            : CarbonImmutable::now()->subYears(4)->startOfYear();
+        $end = isset($validated['end'])
+            ? CarbonImmutable::createFromFormat('Y-m', $validated['end'])->startOfMonth()
+            : CarbonImmutable::now()->addYears(5)->endOfYear()->startOfMonth();
+        abort_if($end->lessThan($start), 422, '終了年月は開始年月以降にしてください。');
+        abort_if($start->diffInMonths($end) > 180, 422, '表示期間は15年以内にしてください。');
+
+        $loans = CompanyLoan::query()
+            ->where('organization_id', $organization->id)
+            ->with('balanceSnapshots')
+            ->orderBy('financial_institution')
+            ->orderBy('management_number')
+            ->get();
+
+        return view('company-loans.schedule', [
+            'organization' => $organization,
+            'loans' => $loans,
+            'rows' => $schedule->build($loans, $start, $end),
+            'start' => $start,
+            'end' => $end,
+        ]);
+    }
+
     public function index(Request $request, CompanyAccess $access, LoanProjectionService $projection): View
     {
         [$organization, $canManage] = $this->viewContext($request, $access);

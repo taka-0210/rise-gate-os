@@ -3,7 +3,7 @@
 <div class="loan-page">
     <div class="page-header">
         <div><div class="meta">COMPANY OS / DEBT & FUNDING</div><h1>借入・資金計画</h1><p>借入残高、毎月の返済、将来の残高を会社の正式情報として管理します。</p></div>
-        <div class="actions"><a class="button secondary" href="{{ route('company.home') }}">← 会社ホームへ</a>@if($canManage)<a class="button" href="{{ route('company-loans.create') }}">借入を登録</a><a class="button secondary" href="{{ route('company-loans.bulk') }}">表を貼り付けて一括入力</a>@endif</div>
+        <div class="actions"><a class="button secondary" href="{{ route('company.home') }}">← 会社ホームへ</a><a class="button secondary" href="{{ route('company-loans.schedule') }}">月別残高推移表</a>@if($canManage)<a class="button" href="{{ route('company-loans.create') }}">借入を登録</a><a class="button secondary" href="{{ route('company-loans.bulk') }}">表を貼り付けて一括入力</a>@endif</div>
     </div>
     @if(session('status'))<div class="alert success">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="alert error">{{ $errors->first() }}</div>@endif

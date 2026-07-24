@@ -77,6 +77,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/company/finance/pl/{period}/confirm', [CompanyFinanceController::class, 'confirm'])->name('company-finance.pl.confirm');
         Route::get('/company/finance/{section}', [CompanyFinanceController::class, 'placeholder'])->name('company-finance.section');
         Route::get('/company/loans', [CompanyLoanController::class, 'index'])->name('company-loans.index');
+        Route::get('/company/loans/schedule', [CompanyLoanController::class, 'schedule'])->name('company-loans.schedule');
         Route::get('/company/loans/create', [CompanyLoanController::class, 'create'])->name('company-loans.create');
         Route::post('/company/loans/preview', [CompanyLoanController::class, 'preview'])->name('company-loans.preview');
         Route::post('/company/loans', [CompanyLoanController::class, 'store'])->name('company-loans.store');

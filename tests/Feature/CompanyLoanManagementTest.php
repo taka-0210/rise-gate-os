@@ -42,7 +42,17 @@ class CompanyLoanManagementTest extends TestCase
             ->get(route('company-loans.index'))->assertOk()
             ->assertSee('借入・資金計画')->assertSee('29,250,000')
             ->assertSee('250,000')->assertSee('加重平均金利')
-            ->assertSee('5年間の借入残高見通し', false);
+            ->assertSee('5年間の借入残高見通し', false)
+            ->assertSee('月別残高推移表');
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.schedule', ['start' => '2026-05', 'end' => '2026-07']))
+            ->assertOk()
+            ->assertSee('借入残高推移表')
+            ->assertSee('29,250,000')
+            ->assertSee('29,000,000')
+            ->assertSee('28,750,000')
+            ->assertSee('●');
 
         $this->actingAs($owner)->withSession($session)
             ->get(route('company.home'))->assertOk()->assertSee('借入残高 29,250,000円');
