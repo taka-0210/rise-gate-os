@@ -8,6 +8,30 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('project_actuals')) {
+            $requiredColumns = [
+                'id', 'public_id', 'project_id', 'source_proposal_id',
+                'related_entity_type', 'related_entity_public_id', 'title',
+                'description', 'result', 'actual_started_at', 'actual_completed_at',
+                'effort_minutes', 'status', 'recorded_by', 'recorded_at',
+                'created_at', 'updated_at',
+            ];
+
+            if (! Schema::hasColumns('project_actuals', $requiredColumns)) {
+                throw new RuntimeException(
+                    'project_actuals exists but is incomplete. Refusing to mark the migration as complete.'
+                );
+            }
+
+            if (Schema::getColumnType('project_actuals', 'recorded_at') !== 'datetime') {
+                Schema::table('project_actuals', function (Blueprint $table): void {
+                    $table->dateTime('recorded_at')->change();
+                });
+            }
+
+            return;
+        }
+
         Schema::create('project_actuals', function (Blueprint $table): void {
             $table->id();
             $table->ulid('public_id')->unique();
