@@ -4,6 +4,9 @@
 
 @section('content')
 <style>
+    .plan-actual-switches{display:flex;gap:18px;flex-wrap:wrap}
+    .plan-actual-switch{display:flex;align-items:center;gap:8px}
+    .plan-actual-switch>span{font-size:12px;font-weight:900;letter-spacing:.12em;color:var(--muted)}
     .plan-actual-tabs{display:flex;gap:8px;padding:6px;border:1px solid var(--line);border-radius:12px;background:#f3f6f7;width:max-content}
     .plan-actual-tabs a{padding:10px 24px;border-radius:8px;color:var(--muted);font-weight:900;text-decoration:none}
     .plan-actual-tabs a.is-current{color:#fff;background:#0f5565}
@@ -23,6 +26,16 @@
     .actual-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
     .actual-summary>div{padding:15px;border:1px solid var(--line);border-radius:9px;background:#fff}
     .actual-summary strong{display:block;font-size:26px}
+    .actual-time{overflow-x:auto;padding-bottom:8px}
+    .actual-time-chart{min-width:850px}
+    .actual-time-axis,.actual-time-row{display:grid;grid-template-columns:260px minmax(560px,1fr);gap:14px;align-items:center}
+    .actual-time-axis{padding-bottom:10px;border-bottom:1px solid var(--line)}
+    .actual-time-axis-track{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+    .actual-time-row{padding:12px 0;border-bottom:1px solid var(--line)}
+    .actual-time-label strong,.actual-time-label span{display:block}
+    .actual-time-track{position:relative;height:38px;border-radius:8px;background:repeating-linear-gradient(90deg,#f2f5f6 0,#f2f5f6 calc(12.5% - 1px),#dce3e6 calc(12.5% - 1px),#dce3e6 12.5%)}
+    .actual-time-bar{position:absolute;top:7px;height:24px;min-width:12px;border-radius:999px;background:#0f5565;box-shadow:0 4px 10px rgba(15,85,101,.18)}
+    .actual-time-bar.is-unplanned{background:#ec5d3b}
     @media(max-width:760px){
         .actual-form-grid,.actual-summary{grid-template-columns:1fr}
         .actual-form-grid .wide{grid-column:auto}
@@ -50,10 +63,22 @@
         <a class="button secondary" href="{{ route('projects.index') }}">PROJECT一覧へ</a>
     </div>
 
-    <nav class="plan-actual-tabs" aria-label="予定と実績の切り替え">
-        <a href="{{ route('projects.show', $project) }}">予定</a>
-        <a class="is-current" href="{{ route('projects.actuals.index', $project) }}" aria-current="page">実績</a>
-    </nav>
+    <div class="plan-actual-switches">
+        <div class="plan-actual-switch">
+            <span>対象</span>
+            <nav class="plan-actual-tabs" aria-label="予定と実績の切り替え">
+                <a href="{{ route('projects.show', ['project' => $project, 'view' => $displayView === 'time' ? 'time' : null]) }}">予定</a>
+                <a class="is-current" href="{{ route('projects.actuals.index', ['project' => $project, 'view' => $displayView]) }}" aria-current="page">実績</a>
+            </nav>
+        </div>
+        <div class="plan-actual-switch">
+            <span>表示</span>
+            <nav class="plan-actual-tabs" aria-label="表示形式の切り替え">
+                <a class="{{ $displayView === 'focus' ? 'is-current' : '' }}" href="{{ route('projects.actuals.index', $project) }}">フォーカス</a>
+                <a class="{{ $displayView === 'time' ? 'is-current' : '' }}" href="{{ route('projects.actuals.index', ['project' => $project, 'view' => 'time']) }}">時間</a>
+            </nav>
+        </div>
+    </div>
 
     <div class="card stack">
         <div class="eyebrow">実績の扱い</div>
@@ -83,6 +108,44 @@
         </details>
     @endif
 
+    @if($displayView === 'time')
+        <section class="card stack">
+            <div>
+                <div class="eyebrow">ACTUAL TIMELINE</div>
+                <h2>実績の時間表示</h2>
+                <p>実開始日・実完了日を基準に表示します。オレンジは計画外の実績です。</p>
+            </div>
+            @if($timelineRows->isEmpty())
+                <p class="meta">日付が登録された実績はまだありません。</p>
+            @else
+                <div class="actual-time">
+                    <div class="actual-time-chart">
+                        <div class="actual-time-axis">
+                            <strong>実績</strong>
+                            <div class="actual-time-axis-track">
+                                <span>{{ $axisStart?->format('Y/m/d') }}</span>
+                                <span>{{ $axisEnd?->format('Y/m/d') }}</span>
+                            </div>
+                        </div>
+                        @foreach($timelineRows as $row)
+                            @php($actual = $row['actual'])
+                            <div class="actual-time-row">
+                                <div class="actual-time-label">
+                                    <strong>{{ $actual->title }}</strong>
+                                    <span class="meta">{{ $actual->related_entity_type === 'task' ? 'Task実績' : '計画外' }}・{{ $formatHours($actual->effort_minutes) }}</span>
+                                </div>
+                                <div class="actual-time-track">
+                                    <span class="actual-time-bar {{ $actual->related_entity_type === 'task' ? '' : 'is-unplanned' }}"
+                                          style="left:{{ $row['left'] }}%;width:{{ $row['width'] }}%"
+                                          title="{{ $row['start']->format('Y/m/d') }}〜{{ $row['end']->format('Y/m/d') }}"></span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+        </section>
+    @else
     @if($unplannedActuals->isNotEmpty())
         <section class="card stack">
             <div><div class="eyebrow">UNPLANNED ACTUALS</div><h2>計画外の実績</h2></div>
@@ -149,5 +212,6 @@
             <div class="card"><p>Roadmapはありません。</p></div>
         @endforelse
     </div>
+    @endif
 </section>
 @endsection

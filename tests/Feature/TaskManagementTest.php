@@ -55,6 +55,14 @@ class TaskManagementTest extends TestCase
             'status' => ProjectActual::STATUS_CONFIRMED,
         ]);
 
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.actuals.index', ['project' => $project, 'view' => 'time']))
+            ->assertOk()
+            ->assertSee('ACTUAL TIMELINE')
+            ->assertSee($task->title)
+            ->assertSee('actual-time-bar', false);
+
         $task->refresh();
         $this->assertNull($task->planned_start_date);
         $this->assertNull($task->due_date);

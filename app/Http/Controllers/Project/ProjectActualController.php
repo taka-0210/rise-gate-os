@@ -14,7 +14,7 @@ use Illuminate\View\View;
 
 class ProjectActualController extends Controller
 {
-    public function index(Project $project): View
+    public function index(Request $request, Project $project): View
     {
         Gate::authorize('view', $project);
 
@@ -25,6 +25,35 @@ class ProjectActualController extends Controller
         ]);
 
         $actuals = $project->actuals()->with('recorder')->get();
+        $displayView = $request->query('view') === 'time' ? 'time' : 'focus';
+        $datedActuals = $actuals
+            ->filter(fn (ProjectActual $actual) => $actual->actual_started_at || $actual->actual_completed_at)
+            ->map(function (ProjectActual $actual): array {
+                $start = ($actual->actual_started_at ?: $actual->actual_completed_at)->copy()->startOfDay();
+                $end = ($actual->actual_completed_at ?: $actual->actual_started_at)->copy()->startOfDay();
+                if ($end->lt($start)) {
+                    [$start, $end] = [$end, $start];
+                }
+
+                return ['actual' => $actual, 'start' => $start, 'end' => $end];
+            })
+            ->sortBy('start')
+            ->values();
+        $axisStart = $datedActuals->min('start');
+        $axisEnd = $datedActuals->max('end');
+        if ($axisStart && $axisEnd && $axisEnd->lte($axisStart)) {
+            $axisEnd = $axisStart->copy()->addDay();
+        }
+        $axisDays = $axisStart && $axisEnd ? max(1, $axisStart->diffInDays($axisEnd)) : 1;
+        $timelineRows = $datedActuals->map(function (array $row) use ($axisStart, $axisDays): array {
+            $left = $axisStart->diffInDays($row['start']) / $axisDays * 100;
+            $duration = max(1, $row['start']->diffInDays($row['end']) + 1);
+
+            return $row + [
+                'left' => max(0, min(100, $left)),
+                'width' => max(1.5, min(100 - $left, $duration / ($axisDays + 1) * 100)),
+            ];
+        });
 
         return view('projects.actuals.index', [
             'project' => $project,
@@ -36,6 +65,10 @@ class ProjectActualController extends Controller
             ),
             'actualCount' => $actuals->count(),
             'actualEffortMinutes' => (int) $actuals->sum('effort_minutes'),
+            'displayView' => $displayView,
+            'timelineRows' => $timelineRows,
+            'axisStart' => $axisStart,
+            'axisEnd' => $axisEnd,
             'canEdit' => Gate::allows('update', $project),
         ]);
     }

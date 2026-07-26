@@ -367,16 +367,18 @@
                     </div>
                 </div>
                 <div class="focus-view-switch">
-                    <a class="is-current" href="{{ route('projects.show', $project) }}">予定</a>
-                    <a href="{{ route('projects.actuals.index', $project) }}">実績</a>
+                    <span class="meta" style="align-self:center;font-weight:900;">対象</span>
+                    <a class="is-current" href="{{ route('projects.show', ['project' => $project, 'view' => $isTimeView ? 'time' : null]) }}">予定</a>
+                    <a href="{{ route('projects.actuals.index', ['project' => $project, 'view' => $isTimeView ? 'time' : 'focus']) }}">実績</a>
+                    <span class="meta" style="align-self:center;font-weight:900;">表示</span>
+                    <a class="{{ $isTimeView ? '' : 'is-current' }}" href="{{ route('projects.show', $project) }}">フォーカス表示</a>
+                    <a class="{{ $isTimeView ? 'is-current' : '' }}" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">時間表示</a>
                     <a href="{{ route('projects.workspace', $project) }}">3ペイン表示</a>
                     <a href="{{ route('projects.estimates.create', ['project' => $project, 'source' => 'effort']) }}">見積書を作成</a>
                     <button type="button" class="focus-ai-trigger" data-ai-drawer-open aria-controls="ai-assistant-drawer" aria-expanded="false">
                         AIアシスタント
                         @if ($pendingAiProposalCount > 0)<span class="focus-ai-count" aria-label="承認待ち {{ $pendingAiProposalCount }}件">{{ $pendingAiProposalCount }}</span>@endif
                     </button>
-                    <a class="{{ $isTimeView ? '' : 'is-current' }}" href="{{ route('projects.show', $project) }}">フォーカス表示</a>
-                    <a class="{{ $isTimeView ? 'is-current' : '' }}" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">時間表示</a>
                     @if ($isTimeView)
                         <a href="{{ route('projects.client-plan', $project) }}" target="_blank" rel="noopener">お客さま提出資料</a>
                     @endif
