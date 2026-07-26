@@ -6,6 +6,7 @@ use App\Models\AiProposal;
 use App\Models\Project;
 use App\Models\ProjectPlanVersion;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class ProjectPlanSnapshotService
 {
@@ -38,11 +39,54 @@ class ProjectPlanSnapshotService
                     'tasks' => $improvement->tasks->map(fn ($task) => $task->only([
                         'public_id', 'title', 'description', 'status', 'priority',
                         'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
-                        'completed_at',
+                        'completed_at', 'sort_order',
                     ]))->values()->all(),
                 ])->values()->all(),
             ])->values()->all(),
+            'unclassified_improvements' => $project->improvements()
+                ->whereNull('roadmap_id')
+                ->orderBy('id')
+                ->with(['tasks' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')])
+                ->get()
+                ->map(fn ($improvement) => [
+                    ...$improvement->only([
+                        'public_id', 'title', 'current_state', 'desired_state', 'problem',
+                        'hypothesis', 'action', 'result', 'impact', 'next_action',
+                        'planned_effort_days', 'status', 'visibility',
+                        'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
+                    ]),
+                    'tasks' => $improvement->tasks->map(fn ($task) => $task->only([
+                        'public_id', 'title', 'description', 'status', 'priority',
+                        'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
+                        'completed_at', 'sort_order',
+                    ]))->values()->all(),
+                ])->values()->all(),
         ];
+    }
+
+    public function storeManualTimelineVersion(
+        Project $project,
+        User $creator,
+        string $title,
+        ?string $note = null,
+    ): ProjectPlanVersion {
+        return DB::transaction(function () use ($project, $creator, $title, $note): ProjectPlanVersion {
+            $latest = $project->planVersions()->lockForUpdate()->first();
+            $versionNumber = ((int) $project->planVersions()->lockForUpdate()->max('version_number')) + 1;
+            $snapshot = $this->capture($project->fresh());
+
+            return ProjectPlanVersion::create([
+                'project_id' => $project->id,
+                'version_number' => $versionNumber,
+                'version_type' => ProjectPlanVersion::TYPE_TIMELINE,
+                'title' => $title,
+                'note' => $note,
+                'change_summary' => $title,
+                'previous_snapshot' => $latest?->plan_snapshot ?? [],
+                'plan_snapshot' => $snapshot,
+                'created_by' => $creator->id,
+            ]);
+        });
     }
 
     public function storeAppliedVersion(
@@ -57,6 +101,8 @@ class ProjectPlanSnapshotService
             'project_id' => $project->id,
             'version_number' => $versionNumber,
             'source_proposal_id' => $proposal->id,
+            'version_type' => ProjectPlanVersion::TYPE_PROPOSAL,
+            'title' => $proposal->title,
             'change_summary' => $proposal->summary ?: $proposal->title,
             'previous_snapshot' => $previousSnapshot,
             'plan_snapshot' => $this->capture($project->fresh()),

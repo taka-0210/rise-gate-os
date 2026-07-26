@@ -8,9 +8,13 @@ use Illuminate\Support\Str;
 
 class ProjectPlanVersion extends Model
 {
+    public const TYPE_PROPOSAL = 'proposal';
+    public const TYPE_TIMELINE = 'timeline';
+
     protected $fillable = [
         'public_id', 'project_id', 'version_number', 'source_proposal_id',
-        'change_summary', 'previous_snapshot', 'plan_snapshot', 'created_by', 'created_at',
+        'version_type', 'title', 'note', 'change_summary',
+        'previous_snapshot', 'plan_snapshot', 'created_by', 'created_at',
     ];
 
     public $timestamps = false;

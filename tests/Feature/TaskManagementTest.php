@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectActual;
+use App\Models\ProjectPlanVersion;
 use App\Models\ProjectMember;
 use App\Models\ProjectLocalConnection;
 use App\Models\Roadmap;
@@ -20,6 +21,47 @@ use Tests\TestCase;
 class TaskManagementTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_current_timeline_can_be_saved_and_viewed_as_an_immutable_snapshot(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['start_date' => '2026-08-01', 'due_date' => '2026-08-31']);
+        $task = $this->createTask($project, $owner);
+        $task->update(['planned_start_date' => '2026-08-10', 'due_date' => '2026-08-15']);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.timeline-snapshots.store', $project), [
+                'title' => '初回見積提出時',
+                'note' => 'お客さまへ時間軸資料を提出',
+            ])
+            ->assertRedirect();
+
+        $version = ProjectPlanVersion::query()->firstOrFail();
+        $this->assertSame(ProjectPlanVersion::TYPE_TIMELINE, $version->version_type);
+        $this->assertSame('初回見積提出時', $version->title);
+        $this->assertStringStartsWith('2026-08-10', $version->plan_snapshot['roadmaps'][0]['improvements'][0]['tasks'][0]['planned_start_date']);
+
+        $task->update(['planned_start_date' => '2026-08-20', 'due_date' => '2026-08-25']);
+
+        $version->refresh();
+        $this->assertStringStartsWith('2026-08-10', $version->plan_snapshot['roadmaps'][0]['improvements'][0]['tasks'][0]['planned_start_date']);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.timeline-snapshots.index', $project))
+            ->assertOk()
+            ->assertSee('初回見積提出時')
+            ->assertSee('お客さまへ時間軸資料を提出');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.timeline-snapshots.show', [$project, $version]))
+            ->assertOk()
+            ->assertSee($task->title)
+            ->assertSee('2026/08/01')
+            ->assertSee('2026/08/31');
+    }
 
     public function test_project_uses_same_task_hierarchy_for_plan_and_actual_tabs(): void
     {

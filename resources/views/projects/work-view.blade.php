@@ -88,6 +88,8 @@
         .focus-view-switch { display:flex; align-items:center; gap:5px; margin-left:auto; }
         .focus-view-switch a,.focus-view-switch button { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--accent-dark); font-size:12px; font-weight:inherit; text-decoration:none; white-space:nowrap; }
         .focus-view-switch a.is-current { background:var(--accent-dark); color:#fff; }
+        .timeline-save-panel { display:grid; grid-template-columns:minmax(260px,.7fr) minmax(320px,1.3fr) auto; gap:12px; align-items:end; padding:16px; border:2px solid #3f956f; border-radius:10px; background:#f6fcf8; }
+        .timeline-save-panel .field { margin:0; }
         .focus-ai-trigger { display:inline-flex; align-items:center; gap:6px; }
         .focus-ai-count { display:inline-flex; min-width:19px; height:19px; padding:0 5px; align-items:center; justify-content:center; border-radius:999px; background:#c65a46; color:#fff; font-size:11px; font-weight:900; }
         .schedule-integrity { padding:14px 18px; border:2px solid #d5a22f; border-radius:10px; background:#fffaf0; }
@@ -194,6 +196,7 @@
             .focus-toolbar-context { gap:8px; flex-wrap:wrap; }
             .focus-toolbar-inner { flex-wrap:wrap; }
             .focus-view-switch { order:3; width:100%; margin-left:0; }
+            .timeline-save-panel { grid-template-columns:1fr; }
             .ai-drawer { width:100vw; padding:18px; }
             .ai-drawer-head { top:-18px; margin:-18px -18px 18px; padding:16px 18px; }
             .focus-project { padding:14px; }
@@ -367,9 +370,9 @@
                     </div>
                 </div>
                 <div class="focus-view-switch">
-                    <span class="meta" style="align-self:center;font-weight:900;">対象</span>
-                    <a class="is-current" href="{{ route('projects.show', ['project' => $project, 'view' => $isTimeView ? 'time' : null]) }}">予定</a>
-                    <a href="{{ route('projects.actuals.index', ['project' => $project, 'view' => $isTimeView ? 'time' : 'focus']) }}">実績</a>
+                    <span class="meta" style="align-self:center;font-weight:900;">タイムライン</span>
+                    <a class="is-current" href="{{ route('projects.show', ['project' => $project, 'view' => $isTimeView ? 'time' : null]) }}">現在</a>
+                    <a href="{{ route('projects.timeline-snapshots.index', $project) }}">保存履歴</a>
                     <span class="meta" style="align-self:center;font-weight:900;">表示</span>
                     <a class="{{ $isTimeView ? '' : 'is-current' }}" href="{{ route('projects.show', $project) }}">フォーカス表示</a>
                     <a class="{{ $isTimeView ? 'is-current' : '' }}" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">時間表示</a>
@@ -386,6 +389,21 @@
                 <a class="button secondary focus-manage-link" href="{{ route('projects.legacy', $project) }}">メンバー・詳細管理</a>
             </div>
         </div>
+
+        @if($isTimeView && $canEditProject)
+            <form class="timeline-save-panel" method="POST" action="{{ route('projects.timeline-snapshots.store', $project) }}">
+                @csrf
+                <div class="field">
+                    <label for="timeline_snapshot_title">保存名</label>
+                    <input id="timeline_snapshot_title" name="title" value="{{ now()->format('Y年n月j日 H:i').' 時点' }}" required maxlength="255">
+                </div>
+                <div class="field">
+                    <label for="timeline_snapshot_note">メモ（任意）</label>
+                    <input id="timeline_snapshot_note" name="note" maxlength="3000" placeholder="例：初回見積提出時、仕様変更後、最終承認時">
+                </div>
+                <button type="submit">現在のタイムラインを保存</button>
+            </form>
+        @endif
 
         @if ($scheduleIntegrity['status'] !== \App\Services\ScheduleIntegrityService::STATUS_OK)
             <details class="schedule-integrity is-{{ $scheduleIntegrity['status'] }}">

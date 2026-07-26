@@ -25,6 +25,7 @@ use App\Http\Controllers\Project\ProjectInternalNoteController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\ProjectLocalConnectionController;
 use App\Http\Controllers\Project\ProjectActualController;
+use App\Http\Controllers\Project\ProjectTimelineSnapshotController;
 use App\Http\Controllers\Project\RoadmapController;
 use App\Http\Controllers\Project\TaskController;
 use App\Http\Controllers\Project\WorkspaceOrderController;
@@ -147,6 +148,9 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/{project}/actuals', [ProjectActualController::class, 'index'])->name('projects.actuals.index');
         Route::post('/projects/{project}/actuals', [ProjectActualController::class, 'store'])->name('projects.actuals.store');
         Route::delete('/projects/{project}/actuals/{actual}', [ProjectActualController::class, 'destroy'])->name('projects.actuals.destroy');
+        Route::get('/projects/{project}/timeline-snapshots', [ProjectTimelineSnapshotController::class, 'index'])->name('projects.timeline-snapshots.index');
+        Route::post('/projects/{project}/timeline-snapshots', [ProjectTimelineSnapshotController::class, 'store'])->name('projects.timeline-snapshots.store');
+        Route::get('/projects/{project}/timeline-snapshots/{timelineSnapshot}', [ProjectTimelineSnapshotController::class, 'show'])->name('projects.timeline-snapshots.show');
         Route::patch('/projects/{project}/workspace/order', [WorkspaceOrderController::class, 'update'])->name('projects.workspace.order');
         Route::patch('/projects/{project}/workspace/preference', [WorkspaceOrderController::class, 'preference'])->name('projects.workspace.preference');
         Route::post('/projects/{project}/local-connection', [ProjectLocalConnectionController::class, 'store'])->name('projects.local-connection.store');
