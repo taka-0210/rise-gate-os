@@ -7,6 +7,7 @@ use App\Models\AiProposal;
 use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
+use App\Models\ProjectActual;
 use App\Models\ProjectMember;
 use App\Models\ProjectLocalConnection;
 use App\Models\Roadmap;
@@ -19,6 +20,71 @@ use Tests\TestCase;
 class TaskManagementTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_project_uses_same_task_hierarchy_for_plan_and_actual_tabs(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $task = $this->createTask($project, $owner);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.actuals.index', $project))
+            ->assertOk()
+            ->assertSee($task->title)
+            ->assertSee('予定')
+            ->assertSee('実績');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.actuals.store', $project), [
+                'task_public_id' => $task->public_id,
+                'description' => 'Implemented the actual work.',
+                'result' => 'Released successfully.',
+                'actual_started_at' => '2026-07-25',
+                'actual_completed_at' => '2026-07-27',
+                'effort_hours' => '2.5',
+                'status' => ProjectActual::STATUS_CONFIRMED,
+            ])
+            ->assertRedirect(route('projects.actuals.index', $project));
+
+        $this->assertDatabaseHas('project_actuals', [
+            'project_id' => $project->id,
+            'related_entity_type' => 'task',
+            'related_entity_public_id' => $task->public_id,
+            'effort_minutes' => 150,
+            'status' => ProjectActual::STATUS_CONFIRMED,
+        ]);
+
+        $task->refresh();
+        $this->assertNull($task->planned_start_date);
+        $this->assertNull($task->due_date);
+    }
+
+    public function test_unplanned_actual_can_be_recorded_without_changing_the_plan(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.actuals.store', $project), [
+                'title' => 'Unexpected production fix',
+                'description' => 'Recovered a failed migration.',
+                'effort_hours' => '1.25',
+                'status' => ProjectActual::STATUS_RECORDED,
+            ])
+            ->assertRedirect(route('projects.actuals.index', $project));
+
+        $this->assertDatabaseHas('project_actuals', [
+            'project_id' => $project->id,
+            'related_entity_type' => null,
+            'related_entity_public_id' => null,
+            'title' => 'Unexpected production fix',
+            'effort_minutes' => 75,
+        ]);
+        $this->assertDatabaseCount('roadmaps', 0);
+        $this->assertDatabaseCount('improvements', 0);
+        $this->assertDatabaseCount('tasks', 0);
+    }
 
     public function test_unscheduled_project_can_set_its_period_from_the_time_view(): void
     {

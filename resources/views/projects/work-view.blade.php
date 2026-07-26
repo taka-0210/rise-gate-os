@@ -367,6 +367,8 @@
                     </div>
                 </div>
                 <div class="focus-view-switch">
+                    <a class="is-current" href="{{ route('projects.show', $project) }}">予定</a>
+                    <a href="{{ route('projects.actuals.index', $project) }}">実績</a>
                     <a href="{{ route('projects.workspace', $project) }}">3ペイン表示</a>
                     <a href="{{ route('projects.estimates.create', ['project' => $project, 'source' => 'effort']) }}">見積書を作成</a>
                     <button type="button" class="focus-ai-trigger" data-ai-drawer-open aria-controls="ai-assistant-drawer" aria-expanded="false">
