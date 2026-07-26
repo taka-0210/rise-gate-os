@@ -23,7 +23,10 @@ return new class extends Migration
             $table->unsignedInteger('effort_minutes')->nullable();
             $table->string('status', 20)->default('recorded');
             $table->foreignId('recorded_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('recorded_at');
+            // Older production MySQL configurations reject a required TIMESTAMP
+            // without a server-side default. The application always supplies this
+            // value, so DATETIME is the compatible and semantically correct type.
+            $table->dateTime('recorded_at');
             $table->timestamps();
             $table->index(['project_id', 'actual_completed_at']);
             $table->index(['related_entity_type', 'related_entity_public_id']);
