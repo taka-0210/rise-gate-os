@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\AiProposal;
 use App\Models\Project;
 use App\Models\ProjectPlanVersion;
+use App\Models\Task;
 use App\Models\User;
+use App\Support\EffortProgress;
 use Illuminate\Support\Facades\DB;
 
 class ProjectPlanSnapshotService
@@ -53,10 +55,35 @@ class ProjectPlanSnapshotService
         $projectData['start_date'] = $this->dateString($project->start_date);
         $projectData['due_date'] = $this->dateString($project->due_date);
 
+        $unclassifiedImprovements = $project->improvements()
+            ->whereNull('roadmap_id')
+            ->orderBy('id')
+            ->with(['tasks' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')])
+            ->get();
+        $improvements = $project->roadmaps->flatMap->improvements
+            ->concat($unclassifiedImprovements)
+            ->values();
+        $tasks = $improvements->flatMap->tasks
+            ->where('status', '!=', Task::STATUS_ARCHIVED)
+            ->values();
+        $progress = EffortProgress::calculate($improvements);
+        $actualEffortMinutes = (int) $project->actuals()->sum('effort_minutes');
+
         return [
             'captured_at' => now()->toIso8601String(),
             'timezone' => config('app.timezone'),
             'project' => $projectData,
+            'metrics' => [
+                'calculation_version' => 1,
+                'planned_effort_days' => (float) $progress['total'],
+                'earned_effort_days' => (float) $progress['completed'],
+                'progress_percentage' => (int) $progress['percentage'],
+                'completed_tasks' => $tasks->where('status', Task::STATUS_DONE)->count(),
+                'total_tasks' => $tasks->count(),
+                'unset_effort_count' => (int) $progress['unset_effort_count'],
+                'actual_effort_minutes' => $actualEffortMinutes,
+                'actual_effort_hours' => round($actualEffortMinutes / 60, 2),
+            ],
             'roadmaps' => $project->roadmaps->map(fn ($roadmap) => [
                 ...$roadmap->only([
                     'public_id', 'title', 'purpose', 'status', 'sort_order',
@@ -83,29 +110,24 @@ class ProjectPlanSnapshotService
                     ]))->values()->all(),
                 ])->values()->all(),
             ])->values()->all(),
-            'unclassified_improvements' => $project->improvements()
-                ->whereNull('roadmap_id')
-                ->orderBy('id')
-                ->with(['tasks' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')])
-                ->get()
-                ->map(fn ($improvement) => [
-                    ...$improvement->only([
-                        'public_id', 'title', 'current_state', 'desired_state', 'problem',
-                        'hypothesis', 'action', 'result', 'impact', 'next_action',
-                        'planned_effort_days', 'status', 'visibility',
-                        'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
-                    ]),
-                    'planned_start_date' => $this->dateString($improvement->planned_start_date),
-                    'target_date' => $this->dateString($improvement->target_date),
-                    'tasks' => $improvement->tasks->map(fn ($task) => array_replace($task->only([
-                        'public_id', 'title', 'description', 'status', 'priority',
-                        'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
-                        'completed_at', 'sort_order',
-                    ]), [
-                        'planned_start_date' => $this->dateString($task->planned_start_date),
-                        'due_date' => $this->dateString($task->due_date),
-                    ]))->values()->all(),
-                ])->values()->all(),
+            'unclassified_improvements' => $unclassifiedImprovements->map(fn ($improvement) => [
+                ...$improvement->only([
+                    'public_id', 'title', 'current_state', 'desired_state', 'problem',
+                    'hypothesis', 'action', 'result', 'impact', 'next_action',
+                    'planned_effort_days', 'status', 'visibility',
+                    'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
+                ]),
+                'planned_start_date' => $this->dateString($improvement->planned_start_date),
+                'target_date' => $this->dateString($improvement->target_date),
+                'tasks' => $improvement->tasks->map(fn ($task) => array_replace($task->only([
+                    'public_id', 'title', 'description', 'status', 'priority',
+                    'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
+                    'completed_at', 'sort_order',
+                ]), [
+                    'planned_start_date' => $this->dateString($task->planned_start_date),
+                    'due_date' => $this->dateString($task->due_date),
+                ]))->values()->all(),
+            ])->values()->all(),
         ];
     }
 

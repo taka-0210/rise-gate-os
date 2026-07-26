@@ -27,7 +27,22 @@ class TaskManagementTest extends TestCase
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $project->update(['start_date' => '2026-08-01', 'due_date' => '2026-08-31']);
         $task = $this->createTask($project, $owner);
-        $task->update(['planned_start_date' => '2026-08-10', 'due_date' => '2026-08-15']);
+        $task->improvement->update(['planned_effort_days' => 2.5]);
+        $task->update([
+            'planned_start_date' => '2026-08-10',
+            'due_date' => '2026-08-15',
+            'status' => Task::STATUS_DONE,
+            'completed_at' => '2026-08-15 12:00:00',
+        ]);
+        ProjectActual::create([
+            'project_id' => $project->id,
+            'related_entity_type' => 'task',
+            'related_entity_public_id' => $task->public_id,
+            'title' => '実装作業',
+            'effort_minutes' => 150,
+            'status' => ProjectActual::STATUS_CONFIRMED,
+            'recorded_by' => $owner->id,
+        ]);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])
@@ -41,6 +56,14 @@ class TaskManagementTest extends TestCase
         $this->assertSame(ProjectPlanVersion::TYPE_TIMELINE, $version->version_type);
         $this->assertSame('初回見積提出時', $version->title);
         $this->assertSame('2026-08-10', $version->plan_snapshot['roadmaps'][0]['improvements'][0]['tasks'][0]['planned_start_date']);
+        $this->assertSame(2.5, $version->plan_snapshot['metrics']['planned_effort_days']);
+        $this->assertSame(2.5, $version->plan_snapshot['metrics']['earned_effort_days']);
+        $this->assertSame(100, $version->plan_snapshot['metrics']['progress_percentage']);
+        $this->assertSame(1, $version->plan_snapshot['metrics']['completed_tasks']);
+        $this->assertSame(1, $version->plan_snapshot['metrics']['total_tasks']);
+        $this->assertSame(0, $version->plan_snapshot['metrics']['unset_effort_count']);
+        $this->assertSame(150, $version->plan_snapshot['metrics']['actual_effort_minutes']);
+        $this->assertSame(2.5, $version->plan_snapshot['metrics']['actual_effort_hours']);
 
         $task->update(['planned_start_date' => '2026-08-20', 'due_date' => '2026-08-25']);
 
@@ -60,7 +83,13 @@ class TaskManagementTest extends TestCase
             ->assertOk()
             ->assertSee($task->title)
             ->assertSee('2026/08/01')
-            ->assertSee('2026/08/31');
+            ->assertSee('2026/08/31')
+            ->assertSee('予定工数')
+            ->assertSee('2.5 人日')
+            ->assertSee('進捗率')
+            ->assertSee('100%')
+            ->assertSee('実績工数')
+            ->assertSee('2.5 時間');
     }
 
     public function test_snapshot_and_client_document_follow_the_visible_timeline_order(): void

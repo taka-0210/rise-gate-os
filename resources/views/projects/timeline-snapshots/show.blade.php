@@ -6,6 +6,11 @@
     .saved-timeline-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
     .saved-timeline-meta{display:flex;flex-wrap:wrap;gap:8px}
     .saved-timeline-meta span{padding:5px 9px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px}
+    .saved-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+    .saved-metric{min-width:0;padding:16px;border:1px solid var(--line);border-radius:10px;background:#fff}
+    .saved-metric span{display:block;margin-bottom:7px;color:var(--muted);font-size:11px;font-weight:800}
+    .saved-metric strong{display:block;color:var(--accent-dark);font-size:24px;line-height:1.15}
+    .saved-metric small{display:block;margin-top:5px;color:var(--muted);font-size:11px}
     .saved-timeline-scroll{overflow-x:auto}
     .saved-timeline-chart{min-width:850px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
     .saved-timeline-axis,.saved-timeline-row{display:grid;grid-template-columns:260px minmax(560px,1fr)}
@@ -26,6 +31,7 @@
     @media(max-width:760px){
         .saved-timeline-page{width:calc(100vw - 28px)}
         .saved-timeline-head{display:grid}
+        .saved-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
     }
 </style>
 
@@ -48,6 +54,23 @@
     </div>
 
     @if(session('status'))<div class="panel" style="border-color:#b7d8c2;background:#f3fbf6;">{{ session('status') }}</div>@endif
+
+    @php
+        $metrics = $snapshot['metrics'] ?? null;
+        $metricNumber = fn ($value, int $decimals = 2) => rtrim(rtrim(number_format((float) $value, $decimals), '0'), '.');
+    @endphp
+    @if($metrics)
+        <section class="saved-metrics" aria-label="保存時点の工数と進捗">
+            <article class="saved-metric"><span>予定工数</span><strong>{{ $metricNumber($metrics['planned_effort_days'] ?? 0) }} 人日</strong></article>
+            <article class="saved-metric"><span>完了相当工数</span><strong>{{ $metricNumber($metrics['earned_effort_days'] ?? 0) }} 人日</strong></article>
+            <article class="saved-metric"><span>進捗率</span><strong>{{ (int) ($metrics['progress_percentage'] ?? 0) }}%</strong></article>
+            <article class="saved-metric"><span>タスク完了</span><strong>{{ (int) ($metrics['completed_tasks'] ?? 0) }} / {{ (int) ($metrics['total_tasks'] ?? 0) }}</strong><small>完了数 / 対象数</small></article>
+            <article class="saved-metric"><span>実績工数</span><strong>{{ $metricNumber($metrics['actual_effort_hours'] ?? 0) }} 時間</strong><small>保存時点の記録合計</small></article>
+            <article class="saved-metric"><span>工数未設定</span><strong>{{ (int) ($metrics['unset_effort_count'] ?? 0) }} 件</strong></article>
+        </section>
+    @else
+        <div class="panel"><p class="meta" style="margin:0;">この保存履歴は工数・進捗スナップショット機能の追加前に作成されたため、集計情報は記録されていません。</p></div>
+    @endif
 
     <div class="panel">
         <p class="meta">この画面は保存時点の固定版です。現在のタイムラインを変更しても、この内容は書き換わりません。</p>
