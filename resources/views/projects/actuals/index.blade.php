@@ -36,7 +36,9 @@
     .actual-time-track{position:relative;height:38px;border-radius:8px;background:repeating-linear-gradient(90deg,#f2f5f6 0,#f2f5f6 calc(12.5% - 1px),#dce3e6 calc(12.5% - 1px),#dce3e6 12.5%)}
     .actual-time-bar{position:absolute;top:7px;height:24px;min-width:12px;border-radius:999px;background:#0f5565;box-shadow:0 4px 10px rgba(15,85,101,.18)}
     .actual-time-bar.is-unplanned{background:#ec5d3b}
+    .project-actual-page{position:relative;left:50%;width:min(1560px,calc(100vw - 40px));transform:translateX(-50%)}
     @media(max-width:760px){
+        .project-actual-page{width:calc(100vw - 28px)}
         .actual-form-grid,.actual-summary{grid-template-columns:1fr}
         .actual-form-grid .wide{grid-column:auto}
         .actual-entry{grid-template-columns:1fr}
@@ -53,7 +55,7 @@
     };
 @endphp
 
-<section class="stack" style="max-width:1440px;margin:0 auto;">
+<section class="stack project-actual-page">
     <div class="actions" style="justify-content:space-between;align-items:center;">
         <div>
             <div class="eyebrow">PROJECT / 予定と実績</div>

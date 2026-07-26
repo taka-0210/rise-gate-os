@@ -2,9 +2,9 @@
 
 @section('content')
     <style>
-        .project-index-page { gap:20px; margin-top:-18px; }
+        .project-index-page { position:relative; left:50%; width:min(1560px,calc(100vw - 40px)); gap:20px; margin-top:-18px; transform:translateX(-50%); }
         .project-index-toolbar { position:sticky; top:0; z-index:20; width:100vw; margin-left:calc(50% - 50vw); padding:8px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:rgba(255,255,255,.96); }
-        .project-index-toolbar-inner { width:min(1040px,calc(100% - 40px)); margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:16px; }
+        .project-index-toolbar-inner { width:min(1560px,calc(100% - 40px)); margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:16px; }
         .project-index-context { display:flex; align-items:center; gap:12px; min-width:0; }
         .project-index-toolbar-title { color:var(--muted); font-size:13px; white-space:nowrap; }
         .project-index-path { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--accent-dark); color:#fff; font-size:13px; }
@@ -17,7 +17,7 @@
         .project-filters label { margin:0; font-size:12px; color:var(--muted); }
         .project-filters select { margin-top:5px; }
         .project-filter-clear { grid-column:1/-1; font-size:13px; }
-        .project-focus-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+        .project-focus-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
         .project-focus-card { --status-color:#7b8790; min-width:0; padding:16px; border:2px solid #66717a; border-left:7px solid var(--status-color); border-radius:10px; background:#fafbfc; transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
         .project-focus-card.status-draft { --status-color:#7b8790; }
         .project-focus-card.status-proposed { --status-color:#4f82c4; }
@@ -42,9 +42,12 @@
         .schedule-badge { display:inline-flex; margin-top:9px; padding:5px 9px; border-radius:999px; font-size:12px; font-weight:900; }
         .schedule-badge.is-missing { background:#fff4d6; color:#8a5b00; }
         .schedule-badge.is-invalid { background:#fff0ed; color:#a33f2d; }
+        @media (max-width:1250px) {
+            .project-focus-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
         @media (max-width:760px) {
-            .project-index-page { margin-top:-10px; }
-            .project-index-toolbar-inner { width:min(100% - 28px,1040px); gap:10px; }
+            .project-index-page { width:calc(100vw - 28px); margin-top:-10px; }
+            .project-index-toolbar-inner { width:calc(100% - 28px); gap:10px; }
             .project-index-context { gap:8px; }
             .project-index-frame { padding:14px; }
             .project-index-head { grid-template-columns:1fr; }
