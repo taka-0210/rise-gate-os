@@ -121,6 +121,16 @@ class Project extends Model
         return $this->hasMany(AiProposal::class);
     }
 
+    public function planVersions(): HasMany
+    {
+        return $this->hasMany(ProjectPlanVersion::class)->latest('version_number');
+    }
+
+    public function actuals(): HasMany
+    {
+        return $this->hasMany(ProjectActual::class)->latest('recorded_at');
+    }
+
     public function aiRequests(): HasMany
     {
         return $this->hasMany(AiRequest::class)->latest();

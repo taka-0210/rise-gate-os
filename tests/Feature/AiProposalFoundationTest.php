@@ -368,6 +368,13 @@ class AiProposalFoundationTest extends TestCase
         $this->assertSame($roadmap->id, $improvement->roadmap_id);
         $this->assertSame($improvement->id, $task->improvement_id);
         $this->assertSame(AiProposal::STATUS_APPLIED, $proposal->fresh()->status);
+        $this->assertDatabaseCount('project_plan_versions', 1);
+        $this->assertDatabaseHas('project_plan_versions', [
+            'project_id' => $project->id,
+            'version_number' => 1,
+            'source_proposal_id' => $proposal->id,
+        ]);
+        $this->assertNotNull($proposal->fresh()->applied_plan_version_id);
 
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])

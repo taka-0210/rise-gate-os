@@ -24,6 +24,7 @@ class AiProposal extends Model
         'idempotency_key', 'title', 'summary', 'status', 'evidence',
         'requested_by', 'reviewed_by', 'reviewed_at', 'applied_at',
         'handed_off_by', 'handed_off_at', 'failure_reason',
+        'applied_plan_version_id',
     ];
 
     protected function casts(): array
@@ -48,6 +49,7 @@ class AiProposal extends Model
     public function project(): BelongsTo { return $this->belongsTo(Project::class); }
     public function requester(): BelongsTo { return $this->belongsTo(User::class, 'requested_by'); }
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
+    public function appliedPlanVersion(): BelongsTo { return $this->belongsTo(ProjectPlanVersion::class, 'applied_plan_version_id'); }
     public function items(): HasMany { return $this->hasMany(AiProposalItem::class)->orderBy('sort_order')->orderBy('id'); }
     public function aiRequest() { return $this->hasOne(AiRequest::class); }
 

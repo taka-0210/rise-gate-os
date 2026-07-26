@@ -200,6 +200,17 @@
         @endif
 
         @if ($proposal->status === \App\Models\AiProposal::STATUS_APPLIED)
+            <div class="card stack" style="border:2px solid #0f5565; background:#f4fbfc;">
+                <div>
+                    <div class="eyebrow">承認・反映が完了しました</div>
+                    <h2>プロジェクトの現在地を確認する</h2>
+                    <p>提案時点の内容は履歴として保存され、反映後の計画は新しい計画版として記録されています。</p>
+                </div>
+                <div class="actions">
+                    <a class="button" href="{{ route('projects.show', $project) }}">プロジェクトへ戻る →</a>
+                    <a class="button secondary" href="{{ route('projects.workspace', $project) }}">計画と進捗を確認する</a>
+                </div>
+            </div>
             @php($continuationText = "RISE GATE OSのプロジェクト「{$project->name}」でAI提案「{$proposal->title}」を承認・反映しました。現在のプロジェクト計画を確認し、承認内容に基づく次の作業を開始してください。")
             <div class="card stack proposal-next-action">
                 <div>
@@ -249,6 +260,17 @@
         <div class="grid">
             <div class="card"><div class="meta">状態</div><h2>{{ $statuses[$proposal->status] ?? $proposal->status }}</h2></div>
             <div class="card"><div class="meta">変更合計</div><h2>{{ $proposal->items->count() }}</h2></div>
+        </div>
+
+        <div class="card stack">
+            <div class="eyebrow">計画・提案・実績の考え方</div>
+            <h2>計画は仮説。実績は事実。</h2>
+            <p>最初の計画に実際の仕事を無理に合わせません。提案は「なぜ変えるのか」を残し、承認時には過去を上書きせず新しい計画版を作ります。実際に行った作業は計画とは別の実績として保存し、その事実をもとに次の計画を組み直します。</p>
+            <div class="grid">
+                <div><strong>計画版</strong><p class="meta">その時点で承認された見通し</p></div>
+                <div><strong>提案</strong><p class="meta">変更理由と変更前後の記録</p></div>
+                <div><strong>実績</strong><p class="meta">実際に行った作業・工数・成果</p></div>
+            </div>
         </div>
 
         <div class="card stack">

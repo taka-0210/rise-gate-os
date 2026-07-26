@@ -18,6 +18,7 @@ class AiProposalApplier
     public function __construct(
         private readonly AiProposalValidator $validator,
         private readonly ScheduleIntegrityService $scheduleIntegrity,
+        private readonly ProjectPlanSnapshotService $planSnapshots,
     ) {}
 
     public function apply(AiProposal $proposal, User $reviewer): AiProposal
@@ -38,6 +39,7 @@ class AiProposalApplier
                 throw ValidationException::withMessages(['proposal' => 'この提案はすでに処理されています。']);
             }
 
+            $previousSnapshot = $this->planSnapshots->capture($locked->project->fresh());
             $invalidBefore = $this->scheduleIntegrity->inspect($locked->project->fresh())['invalid'];
 
             $references = [];
@@ -67,11 +69,19 @@ class AiProposalApplier
                 ]);
             }
 
+            $planVersion = $this->planSnapshots->storeAppliedVersion(
+                $locked->project->fresh(),
+                $locked,
+                $reviewer,
+                $previousSnapshot,
+            );
+
             $locked->update([
                 'status' => AiProposal::STATUS_APPLIED,
                 'reviewed_by' => $reviewer->id,
                 'reviewed_at' => now(),
                 'applied_at' => now(),
+                'applied_plan_version_id' => $planVersion->id,
                 'failure_reason' => null,
             ]);
             $locked->aiRequest?->update(['status' => \App\Models\AiRequest::STATUS_COMPLETED, 'completed_at' => now()]);
