@@ -95,7 +95,7 @@ class ProjectPlanSnapshotService
                     ...$improvement->only([
                         'public_id', 'title', 'current_state', 'desired_state', 'problem',
                         'hypothesis', 'action', 'result', 'impact', 'next_action',
-                        'planned_effort_days', 'status', 'visibility',
+                        'planned_effort_days', 'status', 'visibility', 'roadmap_sort_order',
                         'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
                     ]),
                     'planned_start_date' => $this->dateString($improvement->planned_start_date),
@@ -114,7 +114,7 @@ class ProjectPlanSnapshotService
                 ...$improvement->only([
                     'public_id', 'title', 'current_state', 'desired_state', 'problem',
                     'hypothesis', 'action', 'result', 'impact', 'next_action',
-                    'planned_effort_days', 'status', 'visibility',
+                    'planned_effort_days', 'status', 'visibility', 'roadmap_sort_order',
                     'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
                 ]),
                 'planned_start_date' => $this->dateString($improvement->planned_start_date),

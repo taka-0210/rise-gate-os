@@ -151,6 +151,8 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/{project}/timeline-snapshots', [ProjectTimelineSnapshotController::class, 'index'])->name('projects.timeline-snapshots.index');
         Route::post('/projects/{project}/timeline-snapshots', [ProjectTimelineSnapshotController::class, 'store'])->name('projects.timeline-snapshots.store');
         Route::get('/projects/{project}/timeline-snapshots/{timelineSnapshot}', [ProjectTimelineSnapshotController::class, 'show'])->name('projects.timeline-snapshots.show');
+        Route::get('/projects/{project}/timeline-snapshots/{timelineSnapshot}/restore', [ProjectTimelineSnapshotController::class, 'restoreConfirmation'])->name('projects.timeline-snapshots.restore-confirmation');
+        Route::post('/projects/{project}/timeline-snapshots/{timelineSnapshot}/restore', [ProjectTimelineSnapshotController::class, 'restore'])->name('projects.timeline-snapshots.restore');
         Route::patch('/projects/{project}/workspace/order', [WorkspaceOrderController::class, 'update'])->name('projects.workspace.order');
         Route::patch('/projects/{project}/workspace/preference', [WorkspaceOrderController::class, 'preference'])->name('projects.workspace.preference');
         Route::post('/projects/{project}/local-connection', [ProjectLocalConnectionController::class, 'store'])->name('projects.local-connection.store');

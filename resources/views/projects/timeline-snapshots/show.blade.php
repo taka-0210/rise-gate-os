@@ -49,6 +49,7 @@
         </div>
         <div class="actions">
             <a class="button secondary" href="{{ route('projects.timeline-snapshots.index', $project) }}">保存履歴へ</a>
+            @can('update', $project)<a class="button secondary" href="{{ route('projects.timeline-snapshots.restore-confirmation', [$project, $version]) }}">この履歴から復元</a>@endcan
             <a class="button" href="{{ route('projects.show', ['project' => $project, 'view' => 'time']) }}">現在のタイムライン</a>
         </div>
     </div>

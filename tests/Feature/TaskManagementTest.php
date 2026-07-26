@@ -136,6 +136,97 @@ class TaskManagementTest extends TestCase
             ->assertSeeInOrder(['Earlier roadmap', 'Later roadmap']);
     }
 
+    public function test_saved_plan_can_be_restored_without_reverting_progress_or_actuals(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['start_date' => '2026-08-01', 'due_date' => '2026-08-31']);
+        $task = $this->createTask($project, $owner);
+        $task->improvement->update([
+            'title' => '保存時の取り組み',
+            'planned_effort_days' => 2.5,
+            'planned_start_date' => '2026-08-03',
+            'target_date' => '2026-08-18',
+        ]);
+        $task->update([
+            'title' => '保存時のタスク',
+            'planned_start_date' => '2026-08-05',
+            'due_date' => '2026-08-10',
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.timeline-snapshots.store', $project), ['title' => '復元対象'])
+            ->assertRedirect();
+        $target = ProjectPlanVersion::query()->firstOrFail();
+
+        $project->update(['start_date' => '2026-09-01', 'due_date' => '2026-09-30']);
+        $task->improvement->update([
+            'title' => '変更後の取り組み',
+            'planned_effort_days' => 7,
+            'planned_start_date' => '2026-09-03',
+            'target_date' => '2026-09-18',
+            'status' => Improvement::STATUS_IN_PROGRESS,
+        ]);
+        $task->update([
+            'title' => '変更後のタスク',
+            'planned_start_date' => '2026-09-05',
+            'due_date' => '2026-09-10',
+            'status' => Task::STATUS_DONE,
+            'completed_at' => '2026-09-10 12:00:00',
+        ]);
+        $extraRoadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => '保存後に追加したロードマップ',
+            'sort_order' => 99,
+            'created_by' => $owner->id,
+        ]);
+        $actual = ProjectActual::create([
+            'project_id' => $project->id,
+            'related_entity_type' => 'task',
+            'related_entity_public_id' => $task->public_id,
+            'title' => '復元しても残る実績',
+            'effort_minutes' => 90,
+            'status' => ProjectActual::STATUS_CONFIRMED,
+            'recorded_by' => $owner->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.timeline-snapshots.restore-confirmation', [$project, $target]))
+            ->assertOk()
+            ->assertSee('保存履歴から予定を復元')
+            ->assertSee('復元されないもの')
+            ->assertSee('削除 1件');
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.timeline-snapshots.restore', [$project, $target]))
+            ->assertSessionHasErrors('confirmed');
+        $this->assertSame('変更後のタスク', $task->fresh()->title);
+        $this->assertSame(1, ProjectPlanVersion::query()->count());
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.timeline-snapshots.restore', [$project, $target]), ['confirmed' => '1'])
+            ->assertRedirect();
+
+        $this->assertSame('2026-08-01', $project->fresh()->start_date?->toDateString());
+        $this->assertSame('保存時の取り組み', $task->improvement->fresh()->title);
+        $this->assertSame('2.50', $task->improvement->fresh()->planned_effort_days);
+        $this->assertSame(Improvement::STATUS_IN_PROGRESS, $task->improvement->fresh()->status);
+        $this->assertSame('保存時のタスク', $task->fresh()->title);
+        $this->assertSame('2026-08-05', $task->fresh()->planned_start_date?->toDateString());
+        $this->assertSame(Task::STATUS_DONE, $task->fresh()->status);
+        $this->assertNotNull($task->fresh()->completed_at);
+        $this->assertSoftDeleted('roadmaps', ['id' => $extraRoadmap->id]);
+        $this->assertDatabaseHas('project_actuals', ['id' => $actual->id, 'effort_minutes' => 90]);
+        $this->assertSame(3, ProjectPlanVersion::query()->count());
+        $this->assertDatabaseHas('project_plan_versions', ['title' => '復元前：復元対象']);
+        $this->assertDatabaseHas('project_plan_versions', ['title' => '復元：復元対象']);
+    }
+
     public function test_project_uses_same_task_hierarchy_for_plan_and_actual_tabs(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

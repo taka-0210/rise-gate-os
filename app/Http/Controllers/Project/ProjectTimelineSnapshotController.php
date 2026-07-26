@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectPlanVersion;
 use App\Services\ProjectPlanSnapshotService;
+use App\Services\ProjectPlanRestoreService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,38 @@ class ProjectTimelineSnapshotController extends Controller
             'rows' => $rows,
             'axis' => $axis,
         ]);
+    }
+
+    public function restoreConfirmation(
+        Project $project,
+        ProjectPlanVersion $timelineSnapshot,
+        ProjectPlanRestoreService $restore,
+    ): View {
+        Gate::authorize('update', $project);
+        abort_unless($timelineSnapshot->project_id === $project->id, 404);
+
+        return view('projects.timeline-snapshots.restore', [
+            'project' => $project,
+            'version' => $timelineSnapshot,
+            'changes' => $restore->preview($project, $timelineSnapshot),
+        ]);
+    }
+
+    public function restore(
+        Request $request,
+        Project $project,
+        ProjectPlanVersion $timelineSnapshot,
+        ProjectPlanRestoreService $restore,
+    ): RedirectResponse {
+        Gate::authorize('update', $project);
+        abort_unless($timelineSnapshot->project_id === $project->id, 404);
+        $request->validate(['confirmed' => ['accepted']]);
+
+        $restoredVersion = $restore->restore($project, $timelineSnapshot, $request->user());
+
+        return redirect()
+            ->route('projects.timeline-snapshots.show', [$project, $restoredVersion])
+            ->with('status', '保存履歴から予定内容を復元しました。復元前の状態も自動保存しています。');
     }
 
     private function timeline(array $snapshot): array
