@@ -29,6 +29,8 @@ class DevelopmentGuideTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('development-guide'))
             ->assertOk()
+            ->assertSee('日付・時刻は、必ず日本時間で扱う')
+            ->assertSee('Asia/Tokyo（JST）')
             ->assertSee('新しい案件は、この順番で進めます。')
             ->assertSee('Pushだけではサイトは変わりません')
             ->assertSee('見せた後は、いったん止める')
@@ -38,5 +40,11 @@ class DevelopmentGuideTest extends TestCase
     public function test_guest_cannot_open_the_development_guide(): void
     {
         $this->get('/development-guide')->assertRedirect('/login');
+    }
+
+    public function test_application_timezone_is_japan_standard_time(): void
+    {
+        $this->assertSame('Asia/Tokyo', config('app.timezone'));
+        $this->assertSame('Asia/Tokyo', now()->timezoneName);
     }
 }

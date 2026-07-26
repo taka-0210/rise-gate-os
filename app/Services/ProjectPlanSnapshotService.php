@@ -18,17 +18,24 @@ class ProjectPlanSnapshotService
             'roadmaps.improvements.tasks' => fn ($query) => $query->orderBy('id'),
         ]);
 
+        $projectData = $project->only([
+            'public_id', 'name', 'summary', 'current_state', 'desired_future_state',
+            'status', 'priority', 'start_date', 'due_date', 'duration_days',
+        ]);
+        $projectData['start_date'] = $this->dateString($project->start_date);
+        $projectData['due_date'] = $this->dateString($project->due_date);
+
         return [
             'captured_at' => now()->toIso8601String(),
-            'project' => $project->only([
-                'public_id', 'name', 'summary', 'current_state', 'desired_future_state',
-                'status', 'priority', 'start_date', 'due_date', 'duration_days',
-            ]),
+            'timezone' => config('app.timezone'),
+            'project' => $projectData,
             'roadmaps' => $project->roadmaps->map(fn ($roadmap) => [
                 ...$roadmap->only([
                     'public_id', 'title', 'purpose', 'status', 'sort_order',
                     'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
                 ]),
+                'planned_start_date' => $this->dateString($roadmap->planned_start_date),
+                'target_date' => $this->dateString($roadmap->target_date),
                 'improvements' => $roadmap->improvements->map(fn ($improvement) => [
                     ...$improvement->only([
                         'public_id', 'title', 'current_state', 'desired_state', 'problem',
@@ -36,10 +43,15 @@ class ProjectPlanSnapshotService
                         'planned_effort_days', 'status', 'visibility',
                         'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
                     ]),
-                    'tasks' => $improvement->tasks->map(fn ($task) => $task->only([
+                    'planned_start_date' => $this->dateString($improvement->planned_start_date),
+                    'target_date' => $this->dateString($improvement->target_date),
+                    'tasks' => $improvement->tasks->map(fn ($task) => array_replace($task->only([
                         'public_id', 'title', 'description', 'status', 'priority',
                         'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
                         'completed_at', 'sort_order',
+                    ]), [
+                        'planned_start_date' => $this->dateString($task->planned_start_date),
+                        'due_date' => $this->dateString($task->due_date),
                     ]))->values()->all(),
                 ])->values()->all(),
             ])->values()->all(),
@@ -55,13 +67,27 @@ class ProjectPlanSnapshotService
                         'planned_effort_days', 'status', 'visibility',
                         'planned_start_date', 'target_date', 'planned_start_day', 'target_day',
                     ]),
-                    'tasks' => $improvement->tasks->map(fn ($task) => $task->only([
+                    'planned_start_date' => $this->dateString($improvement->planned_start_date),
+                    'target_date' => $this->dateString($improvement->target_date),
+                    'tasks' => $improvement->tasks->map(fn ($task) => array_replace($task->only([
                         'public_id', 'title', 'description', 'status', 'priority',
                         'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
                         'completed_at', 'sort_order',
+                    ]), [
+                        'planned_start_date' => $this->dateString($task->planned_start_date),
+                        'due_date' => $this->dateString($task->due_date),
                     ]))->values()->all(),
                 ])->values()->all(),
         ];
+    }
+
+    private function dateString(mixed $value): ?string
+    {
+        if ($value === null || $value === '') return null;
+
+        if ($value instanceof \DateTimeInterface) return $value->format('Y-m-d');
+
+        return substr((string) $value, 0, 10);
     }
 
     public function storeManualTimelineVersion(

@@ -40,12 +40,12 @@ class TaskManagementTest extends TestCase
         $version = ProjectPlanVersion::query()->firstOrFail();
         $this->assertSame(ProjectPlanVersion::TYPE_TIMELINE, $version->version_type);
         $this->assertSame('初回見積提出時', $version->title);
-        $this->assertStringStartsWith('2026-08-10', $version->plan_snapshot['roadmaps'][0]['improvements'][0]['tasks'][0]['planned_start_date']);
+        $this->assertSame('2026-08-10', $version->plan_snapshot['roadmaps'][0]['improvements'][0]['tasks'][0]['planned_start_date']);
 
         $task->update(['planned_start_date' => '2026-08-20', 'due_date' => '2026-08-25']);
 
         $version->refresh();
-        $this->assertStringStartsWith('2026-08-10', $version->plan_snapshot['roadmaps'][0]['improvements'][0]['tasks'][0]['planned_start_date']);
+        $this->assertSame('2026-08-10', $version->plan_snapshot['roadmaps'][0]['improvements'][0]['tasks'][0]['planned_start_date']);
 
         $this->actingAs($owner)
             ->withSession(['current_workspace_id' => $workspace->id])

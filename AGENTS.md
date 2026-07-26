@@ -18,6 +18,7 @@
 ## Project-specific configuration
 
 - Application: Laravel with Composer and Node dependencies.
+- Date and time standard: all application defaults, UI displays, histories, notifications, and generated documents must use Japan Standard Time (`Asia/Tokyo`). Any feature that adds or changes dates must include a JST verification.
 - Validation: run the relevant focused tests and, before delivery, `php artisan test` when the environment permits.
 - Production URL: `https://os.rise-gate.com/`
 - Production workflow: `.github/workflows/deploy-production.yml` (`本番へデプロイ`).
