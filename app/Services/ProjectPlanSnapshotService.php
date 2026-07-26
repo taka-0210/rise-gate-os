@@ -12,10 +12,38 @@ class ProjectPlanSnapshotService
 {
     public function capture(Project $project): array
     {
+        $relative = ! $project->start_date && (int) $project->duration_days > 0;
+
         $project->load([
-            'roadmaps' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
-            'roadmaps.improvements' => fn ($query) => $query->orderBy('roadmap_sort_order')->orderBy('id'),
-            'roadmaps.improvements.tasks' => fn ($query) => $query->orderBy('id'),
+            'roadmaps' => function ($query) use ($relative): void {
+                $query->reorder()
+                    ->orderByRaw($relative
+                        ? 'CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END'
+                        : 'CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                    ->orderBy($relative ? 'planned_start_day' : 'planned_start_date')
+                    ->orderBy($relative ? 'target_day' : 'target_date')
+                    ->orderBy('sort_order')
+                    ->orderBy('id');
+            },
+            'roadmaps.improvements' => function ($query) use ($relative): void {
+                $query->reorder()
+                    ->orderByRaw($relative
+                        ? 'CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END'
+                        : 'CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                    ->orderBy($relative ? 'planned_start_day' : 'planned_start_date')
+                    ->orderBy($relative ? 'target_day' : 'target_date')
+                    ->orderBy('roadmap_sort_order')
+                    ->orderBy('id');
+            },
+            'roadmaps.improvements.tasks' => function ($query) use ($relative): void {
+                $query->reorder()
+                    ->orderByRaw($relative
+                        ? 'CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END'
+                        : 'CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                    ->orderBy($relative ? 'planned_start_day' : 'planned_start_date')
+                    ->orderBy($relative ? 'due_day' : 'due_date')
+                    ->orderBy('id');
+            },
         ]);
 
         $projectData = $project->only([

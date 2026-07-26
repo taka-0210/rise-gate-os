@@ -63,6 +63,50 @@ class TaskManagementTest extends TestCase
             ->assertSee('2026/08/31');
     }
 
+    public function test_snapshot_and_client_document_follow_the_visible_timeline_order(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['start_date' => '2026-08-01', 'due_date' => '2026-08-31']);
+
+        $later = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Later roadmap',
+            'sort_order' => 1,
+            'planned_start_date' => '2026-08-10',
+            'target_date' => '2026-08-20',
+        ]);
+        $earlier = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Earlier roadmap',
+            'sort_order' => 2,
+            'planned_start_date' => '2026-08-02',
+            'target_date' => '2026-08-08',
+        ]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.timeline-snapshots.store', $project), [
+                'title' => 'Visible order snapshot',
+            ])
+            ->assertRedirect();
+
+        $version = ProjectPlanVersion::query()->firstOrFail();
+        $this->assertSame(
+            [$earlier->public_id, $later->public_id],
+            collect($version->plan_snapshot['roadmaps'])->pluck('public_id')->all()
+        );
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.client-plan', $project))
+            ->assertOk()
+            ->assertSeeInOrder(['Earlier roadmap', 'Later roadmap']);
+    }
+
     public function test_project_uses_same_task_hierarchy_for_plan_and_actual_tabs(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

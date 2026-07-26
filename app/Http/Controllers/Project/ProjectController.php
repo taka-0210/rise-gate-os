@@ -343,6 +343,12 @@ class ProjectController extends Controller
 
         $project->load(['client', 'owner', 'owningWorkspace.businessProfile', 'owningWorkspace.bankAccounts']);
         $roadmaps = $project->roadmaps()
+            ->reorder()
+            ->when(! $project->start_date && $project->duration_days, fn ($query) => $query
+                ->orderByRaw('CASE WHEN planned_start_day IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('planned_start_day')->orderBy('target_day'), fn ($query) => $query
+                ->orderByRaw('CASE WHEN planned_start_date IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('planned_start_date')->orderBy('target_date'))
             ->orderBy('sort_order')
             ->orderBy('id')
             ->with(['improvements' => function ($query) use ($project): void {
