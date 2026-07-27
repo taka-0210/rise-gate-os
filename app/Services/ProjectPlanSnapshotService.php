@@ -171,17 +171,19 @@ class ProjectPlanSnapshotService
         User $reviewer,
         array $previousSnapshot,
     ): ProjectPlanVersion {
+        $latest = $project->planVersions()->lockForUpdate()->first();
         $versionNumber = ((int) $project->planVersions()->lockForUpdate()->max('version_number')) + 1;
 
         return ProjectPlanVersion::create([
             'project_id' => $project->id,
             'version_number' => $versionNumber,
             'source_proposal_id' => $proposal->id,
-            'version_type' => ProjectPlanVersion::TYPE_PROPOSAL,
+            'version_type' => ProjectPlanVersion::TYPE_PROPOSAL_BEFORE,
             'title' => $proposal->title,
+            'note' => 'AI提案を反映する直前のタイムラインを自動保存しました。',
             'change_summary' => $proposal->summary ?: $proposal->title,
-            'previous_snapshot' => $previousSnapshot,
-            'plan_snapshot' => $this->capture($project->fresh()),
+            'previous_snapshot' => $latest?->plan_snapshot ?? [],
+            'plan_snapshot' => $previousSnapshot,
             'created_by' => $reviewer->id,
         ]);
     }

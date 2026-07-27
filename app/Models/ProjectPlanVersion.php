@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 class ProjectPlanVersion extends Model
 {
     public const TYPE_PROPOSAL = 'proposal';
+    public const TYPE_PROPOSAL_BEFORE = 'proposal_before';
     public const TYPE_TIMELINE = 'timeline';
 
     protected $fillable = [

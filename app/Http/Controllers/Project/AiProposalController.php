@@ -67,7 +67,7 @@ class AiProposalController extends Controller
                 $isApplied = $aiProposal->status === AiProposal::STATUS_APPLIED;
                 $before = $isApplied
                     ? $this->snapshotEntityCount(
-                        $aiProposal->appliedPlanVersion?->previous_snapshot ?? [],
+                        $aiProposal->appliedPlanVersion?->plan_snapshot ?? [],
                         $entityType,
                     )
                     : $current;

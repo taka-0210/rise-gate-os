@@ -58,8 +58,12 @@
                     <span class="meta">{{ $version->created_at?->format('H:i') }}</span>
                 </time>
                 <div>
-                    <span class="timeline-history-type {{ $version->version_type === \App\Models\ProjectPlanVersion::TYPE_PROPOSAL ? 'is-proposal' : '' }}">
-                        {{ $version->version_type === \App\Models\ProjectPlanVersion::TYPE_PROPOSAL ? 'AI提案反映時' : '手動保存' }}
+                    <span class="timeline-history-type {{ in_array($version->version_type, [\App\Models\ProjectPlanVersion::TYPE_PROPOSAL, \App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE], true) ? 'is-proposal' : '' }}">
+                        {{ match ($version->version_type) {
+                            \App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE => 'AI提案反映直前',
+                            \App\Models\ProjectPlanVersion::TYPE_PROPOSAL => 'AI提案反映直後',
+                            default => '手動保存',
+                        } }}
                     </span>
                     <h2>{{ $version->title ?: $version->change_summary ?: 'バージョン '.$version->version_number }}</h2>
                     @if($version->note)<p style="margin:0;">{{ $version->note }}</p>@endif

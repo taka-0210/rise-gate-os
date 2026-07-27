@@ -699,8 +699,22 @@ class AiProposalFoundationTest extends TestCase
         $this->assertNotNull($newTask->completed_at);
 
         $version = $proposal->fresh()->appliedPlanVersion;
-        $this->assertSame('Old Roadmap', data_get($version->previous_snapshot, 'roadmaps.0.title'));
-        $this->assertSame('Domain and server preparation', data_get($version->plan_snapshot, 'roadmaps.0.title'));
+        $this->assertSame(\App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE, $version->version_type);
+        $this->assertSame('Old Roadmap', data_get($version->plan_snapshot, 'roadmaps.0.title'));
+        $newRoadmap = $project->roadmaps()->firstOrFail();
+        $this->assertSame('Domain and server preparation', $newRoadmap->title);
+        $this->assertSame('AI提案を反映する直前のタイムラインを自動保存しました。', $version->note);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.timeline-snapshots.restore', [$project, $version]), [
+                'confirmed' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->assertNotSoftDeleted($oldRoadmap->fresh());
+        $this->assertSoftDeleted($newRoadmap);
+        $this->assertSame('Old Roadmap', $project->roadmaps()->firstOrFail()->title);
     }
 
     public function test_timeline_replacement_requires_at_least_one_new_roadmap(): void

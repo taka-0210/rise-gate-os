@@ -44,7 +44,11 @@
             <div class="saved-timeline-meta">
                 <span>{{ $version->created_at?->format('Y年n月j日 H:i') }}</span>
                 <span>保存者 {{ $version->creator?->name ?? 'SYSTEM' }}</span>
-                <span>{{ $version->version_type === \App\Models\ProjectPlanVersion::TYPE_PROPOSAL ? 'AI提案反映時' : '手動保存' }}</span>
+                <span>{{ match ($version->version_type) {
+                    \App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE => 'AI提案反映直前',
+                    \App\Models\ProjectPlanVersion::TYPE_PROPOSAL => 'AI提案反映直後',
+                    default => '手動保存',
+                } }}</span>
             </div>
         </div>
         <div class="actions">
