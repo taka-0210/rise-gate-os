@@ -1,6 +1,8 @@
 @php
     $businessProfile = $project->owningWorkspace->businessProfile;
     $issuerName = $businessProfile?->trade_name ?: ($businessProfile?->legal_name ?: $project->owningWorkspace->name);
+    $clientPlanEffort = \App\Support\EffortProgress::calculate($visibleImprovements);
+    $formatEffort = fn (float $value) => rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
 @endphp
 <!DOCTYPE html>
 <html lang="ja">
@@ -54,9 +56,10 @@
         .vision-card.future h3,.vision-card.future p { position:relative; z-index:1; }
         .vision-card h3 { color:var(--navy); font-size:21px; }
         .vision-card p { margin-top:18px; color:#394a55; font-size:16px; white-space:pre-line; }
-        .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0 28px; }
+        .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:20px 0 28px; }
         .stat { padding:16px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; text-align:center; }
         .stat strong { display:block; color:var(--navy); font-size:30px; }
+        .stat small { display:block; margin-top:4px; color:var(--muted); font-size:10px; }
         .roadmap-overview { display:grid; gap:11px; }
         .roadmap-overview article { padding:14px 16px; border-left:6px solid var(--blue); background:#f5f8fc; break-inside:avoid; }
         .period { color:var(--muted); font-size:12px; }
@@ -236,14 +239,21 @@
                     <div class="stat"><strong>{{ $roadmaps->count() }}</strong>ロードマップ</div>
                     <div class="stat"><strong>{{ $visibleImprovements->count() }}</strong>取り組み</div>
                     <div class="stat"><strong>{{ $visibleTasks->count() }}</strong>タスク</div>
+                    <div class="stat">
+                        <strong>{{ $formatEffort($clientPlanEffort['total']) }}</strong>予定工数（人日）
+                        @if($clientPlanEffort['unset_effort_count'] > 0)<small>工数未設定 {{ $clientPlanEffort['unset_effort_count'] }}件</small>@endif
+                    </div>
                 </div>
             @endif
             <div class="roadmap-overview">
                 @foreach($overviewChunk as $roadmap)
+                    @php
+                        $roadmapEffort = \App\Support\EffortProgress::calculate($roadmap->improvements);
+                    @endphp
                     <article>
                         <h3>{{ $roadmaps->search(fn($item)=>$item->id===$roadmap->id)+1 }}. {{ $roadmapDisplayTitle($roadmap->title) }}</h3>
                         @if($roadmap->purpose)<p>{{ $roadmap->purpose }}</p>@endif
-                        <div class="period">予定：{{ $relativeSchedule ? (($roadmap->planned_start_day ? $roadmap->planned_start_day.'日目' : '未設定').' 〜 '.($roadmap->target_day ? $roadmap->target_day.'日目' : '未設定')) : (($roadmap->planned_start_date?->format('Y/n/j') ?? '未設定').' 〜 '.($roadmap->target_date?->format('Y/n/j') ?? '未設定')) }} / 取り組み {{ $roadmap->improvements->count() }}件</div>
+                        <div class="period">予定：{{ $relativeSchedule ? (($roadmap->planned_start_day ? $roadmap->planned_start_day.'日目' : '未設定').' 〜 '.($roadmap->target_day ? $roadmap->target_day.'日目' : '未設定')) : (($roadmap->planned_start_date?->format('Y/n/j') ?? '未設定').' 〜 '.($roadmap->target_date?->format('Y/n/j') ?? '未設定')) }} / 取り組み {{ $roadmap->improvements->count() }}件 / 予定工数 {{ $formatEffort($roadmapEffort['total']) }}人日@if($roadmapEffort['unset_effort_count'] > 0)（未設定 {{ $roadmapEffort['unset_effort_count'] }}件）@endif</div>
                     </article>
                 @endforeach
             </div>

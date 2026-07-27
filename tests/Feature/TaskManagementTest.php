@@ -420,8 +420,9 @@ class TaskManagementTest extends TestCase
             ->get(route('projects.show', ['project' => $project, 'view' => 'time']))
             ->assertOk()
             ->assertSee('工数を一括入力')
-            ->assertSee('4.5人日')
-            ->assertSee('現在の予定工数')
+            ->assertSee('0/4.5')
+            ->assertSee('完了／タスク')
+            ->assertSee('進捗／工数')
             ->assertSee('data-effort-editor', false)
             ->assertSee('name="efforts['.$improvement->id.']"', false)
             ->assertSee('未設定のみ表示');
@@ -911,6 +912,7 @@ class TaskManagementTest extends TestCase
         $task = $this->createTask($project, $owner);
         $task->improvement->update([
             'visibility' => Improvement::VISIBILITY_CLIENT,
+            'planned_effort_days' => 4.5,
             'planned_start_date' => '2026-08-02',
             'target_date' => '2026-08-20',
         ]);
@@ -945,6 +947,9 @@ class TaskManagementTest extends TestCase
             ->assertSee('プロジェクト実施計画書')
             ->assertSee('提出先株式会社 御中')
             ->assertSee('お客さまへ提出する計画概要')
+            ->assertSee('予定工数（人日）')
+            ->assertSee('4.5')
+            ->assertSee('予定工数 4.5人日')
             ->assertSee('注文情報が複数の台帳に分かれている。')
             ->assertSee('注文から発送まで、迷わずひとつの流れで進められる。')
             ->assertSee($task->improvement->roadmap->title)
