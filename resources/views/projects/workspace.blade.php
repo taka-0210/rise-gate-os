@@ -105,7 +105,12 @@
     .file-note { margin:12px 10px; padding:10px; border:1px dashed #c7d3d9; border-radius:7px; color:#6a7b84; background:#fff; font-size:10px; line-height:1.55; }
     .viewer-panel { display:none; min-height:100%; }
     .viewer-panel.is-current { display:block; }
-    .browser-frame { width:100%; height:100%; min-height:calc(100vh - 126px); border:0; background:#fff; }
+    .browser-preview { min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto minmax(0,1fr); background:#fff; }
+    .browser-external-notice { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:11px 14px; border-bottom:1px solid #d5dde3; color:#294752; background:#f4f8f9; font-size:12px; }
+    .browser-external-notice strong { display:block; margin-bottom:2px; }
+    .browser-external-notice span { color:#687b84; font-size:10px; }
+    .browser-external-notice .button { flex:0 0 auto; }
+    .browser-frame { width:100%; height:100%; min-height:calc(100vh - 170px); border:0; background:#fff; }
     .pdf-frame { width:100%; height:calc(100vh - 112px); min-height:640px; border:0; background:#525659; }
     .image-viewer { min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto minmax(0,1fr); background:#e9eef1; }
     .image-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 14px; border-bottom:1px solid #cbd5da; color:#425660; background:#f8fafb; font-size:12px; }
@@ -454,7 +459,13 @@
                 <article class="workbench-document file-preview-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title data-file-path="" title="ファイルを選択">ファイルを選択</h1><div class="file-preview-actions" data-file-preview-actions hidden><button type="button" data-open-local-browser>ブラウザで表示</button><a data-open-local-external target="_blank" rel="noopener">別タブで開く</a></div><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
-                <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" hidden></iframe>
+                <div class="browser-preview">
+                    <div class="browser-external-notice" data-browser-external-notice hidden>
+                        <div><strong>管理画面は別タブで操作してください</strong><span>ログインセッションを安全に維持するため、作業ペイン内では閲覧確認のみ行えます。</span></div>
+                        <a class="button" data-browser-external-link target="_blank" rel="noopener">管理画面を別タブで開く</a>
+                    </div>
+                    <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" hidden></iframe>
+                </div>
             </div>
             <div class="viewer-panel" data-viewer-panel="pdf">
                 <iframe class="pdf-frame" data-pdf-frame title="PDFビューワー" hidden></iframe>
@@ -764,6 +775,18 @@
         const external = actions.querySelector('[data-open-local-external]');
         external.href = url || '#';
     };
+    const showBrowserPreview = (url, path = '') => {
+        const frame = workbench.querySelector('[data-browser-frame]');
+        const notice = workbench.querySelector('[data-browser-external-notice]');
+        const external = workbench.querySelector('[data-browser-external-link]');
+        const target = String(path || url || '').replaceAll('\\', '/');
+        const isAdminPage = /(?:^|\/)[^/]*admin[^/]*\.php(?:$|[?#])/i.test(target);
+        frame.src = url;
+        frame.hidden = false;
+        notice.hidden = !isAdminPage;
+        external.href = isAdminPage ? url : '#';
+        showViewer('browser');
+    };
     const formatFileSavedAt = value => {
         const date = new Date(Number(value));
         if (Number.isNaN(date.getTime())) return '';
@@ -910,7 +933,7 @@
                     if (state) renderDiff(state);
                 } else if (kind === 'browser') {
                     setChatFileContext();
-                    const frame = workbench.querySelector('[data-browser-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('browser');
+                    showBrowserPreview(workspaceTab.dataset.tabUrl, workspaceTab.dataset.tabKey);
                 } else if (kind === 'pdf') {
                     setChatFileContext();
                     const frame = workbench.querySelector('[data-pdf-frame]'); frame.src = workspaceTab.dataset.tabUrl; frame.hidden = false; showViewer('pdf');
@@ -1002,10 +1025,7 @@
                 showViewer('image');
             } else if (opensInBrowser) {
                 setChatFileContext();
-                const frame = workbench.querySelector('[data-browser-frame]');
-                frame.src = previewUrl;
-                frame.hidden = false;
-                showViewer('browser');
+                showBrowserPreview(previewUrl, fileButton.dataset.fileName);
             } else {
                 setChatFileContext(fileButton.dataset.fileName, fileButton.dataset.fileCopy);
                 showViewer('file');
@@ -1024,10 +1044,7 @@
             if (url) {
                 const path = workbench.querySelector('[data-file-title]').dataset.filePath;
                 ensureTab({id:`browser:${path}`, kind:'browser', key:path, label:`↗ ${path.split('/').pop()}`, url});
-                const frame = workbench.querySelector('[data-browser-frame]');
-                frame.src = url;
-                frame.hidden = false;
-                showViewer('browser');
+                showBrowserPreview(url, path);
             }
         }
         if (event.target.closest('[data-usage-toggle]')) {
