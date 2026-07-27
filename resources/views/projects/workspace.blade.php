@@ -67,6 +67,14 @@
     [aria-expanded="true"] > .tree-expander { transform:rotate(90deg); }
     .tree-icon { flex:0 0 16px; color:#78909b; text-align:center; }
     .tree-count { margin-left:auto; color:#82939c; font-size:10px; }
+    .tree-progress { margin-left:auto; color:#667b85; font-size:9px; font-weight:800; white-space:nowrap; }
+    .tree-task-status { margin-left:auto; padding:2px 6px; border-radius:999px; color:#6d7b82; background:#edf1f3; font-size:9px; font-weight:800; white-space:nowrap; }
+    .tree-item--task.is-status-todo .tree-icon { color:#8b989e; }
+    .tree-item--task.is-status-in_progress .tree-icon { color:#397fa8; }
+    .tree-item--task.is-status-in_progress .tree-task-status { color:#286a8d; background:#dfedf5; }
+    .tree-item--task.is-status-done .tree-icon { color:#32835a; }
+    .tree-item--task.is-status-done .tree-task-status { color:#267149; background:#dff1e7; }
+    .tree-item--task.is-status-archived .tree-icon { color:#8b989e; }
     .tree-item--roadmap { border-left:3px solid #75a7ca; color:#294f68; background:#dfedf7; }
     .tree-item--roadmap .tree-icon { color:#4f8bb5; }
     .tree-item--roadmap:hover, .tree-item--roadmap.is-current { color:#1f465f; background:#cfe3f2; }
@@ -295,13 +303,27 @@
                     <div class="tree-group">
                         <div class="tree-group__label">Roadmaps</div>
                         @forelse($roadmaps as $roadmap)
-                            <button class="tree-item tree-item--roadmap" type="button" @can('update',$roadmap) draggable="true" @endcan data-reorder-type="roadmap" data-reorder-id="{{ $roadmap->id }}" data-reorder-parent="project" data-document="roadmap-{{ $roadmap->id }}" data-tree-toggle="roadmap-{{ $roadmap->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $roadmap->title }}<span class="tree-count">{{ $roadmap->improvements->count() }}</span></button>
+                            @php
+                                $roadmapTreeProgress = $roadmap->taskProgress();
+                            @endphp
+                            <button class="tree-item tree-item--roadmap" type="button" @can('update',$roadmap) draggable="true" @endcan data-reorder-type="roadmap" data-reorder-id="{{ $roadmap->id }}" data-reorder-parent="project" data-document="roadmap-{{ $roadmap->id }}" data-tree-toggle="roadmap-{{ $roadmap->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $roadmap->title }}<span class="tree-progress">{{ $roadmapTreeProgress['completed'] }}/{{ $roadmapTreeProgress['total'] }}・{{ $roadmapTreeProgress['percentage'] }}%</span></button>
                             <div class="tree-branch" data-tree-branch="roadmap-{{ $roadmap->id }}" hidden>
                                 @foreach($roadmap->improvements as $improvement)
-                                    <button class="tree-item tree-item--grandchild tree-item--improvement" type="button" @can('update',$improvement) draggable="true" @endcan data-reorder-type="improvement" data-reorder-id="{{ $improvement->id }}" data-reorder-parent="{{ $roadmap->id }}" data-document="improvement-{{ $improvement->id }}" data-tree-toggle="improvement-{{ $improvement->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $improvement->title }}<span class="tree-count">{{ $improvement->tasks->count() }}</span></button>
+                                    @php
+                                        $improvementTreeProgress = $improvement->taskProgress();
+                                    @endphp
+                                    <button class="tree-item tree-item--grandchild tree-item--improvement" type="button" @can('update',$improvement) draggable="true" @endcan data-reorder-type="improvement" data-reorder-id="{{ $improvement->id }}" data-reorder-parent="{{ $roadmap->id }}" data-document="improvement-{{ $improvement->id }}" data-tree-toggle="improvement-{{ $improvement->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $improvement->title }}<span class="tree-progress">{{ $improvementTreeProgress['completed'] }}/{{ $improvementTreeProgress['total'] }}・{{ $improvementTreeProgress['percentage'] }}%</span></button>
                                     <div class="tree-branch" data-tree-branch="improvement-{{ $improvement->id }}" hidden>
                                         @foreach($improvement->tasks as $task)
-                                            <button class="tree-item tree-item--task-child tree-item--task" type="button" @can('update',$task) draggable="true" @endcan data-reorder-type="task" data-reorder-id="{{ $task->id }}" data-reorder-parent="{{ $improvement->id }}" data-document="task-{{ $task->id }}"><span class="tree-icon">✓</span>{{ $task->title }}</button>
+                                            @php
+                                                $taskTreeSymbol = match ($task->status) {
+                                                    \App\Models\Task::STATUS_IN_PROGRESS => '◐',
+                                                    \App\Models\Task::STATUS_DONE => '✓',
+                                                    \App\Models\Task::STATUS_ARCHIVED => '―',
+                                                    default => '○',
+                                                };
+                                            @endphp
+                                            <button class="tree-item tree-item--task-child tree-item--task is-status-{{ $task->status }}" type="button" @can('update',$task) draggable="true" @endcan data-reorder-type="task" data-reorder-id="{{ $task->id }}" data-reorder-parent="{{ $improvement->id }}" data-document="task-{{ $task->id }}"><span class="tree-icon" aria-hidden="true">{{ $taskTreeSymbol }}</span>{{ $task->title }}<span class="tree-task-status">{{ $taskStatuses[$task->status] ?? $task->status }}</span></button>
                                         @endforeach
                                     </div>
                                 @endforeach

@@ -679,7 +679,11 @@ class TaskManagementTest extends TestCase
             ->assertSee('data-pane="ai"', false)
             ->assertSee('tree-item--roadmap', false)
             ->assertSee('tree-item--improvement', false)
-            ->assertSee('tree-item--task', false);
+            ->assertSee('tree-item--task', false)
+            ->assertSee('is-status-todo', false)
+            ->assertSee('<span class="tree-icon" aria-hidden="true">○</span>', false)
+            ->assertSee('<span class="tree-task-status">未着手</span>', false)
+            ->assertSee('0/1・0%');
     }
 
     public function test_workspace_reorders_tasks_and_updates_the_schedule_within_its_parent(): void
