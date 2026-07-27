@@ -56,7 +56,7 @@ class ProjectTimelineSnapshotController extends Controller
         Gate::authorize('view', $project);
         abort_unless($timelineSnapshot->project_id === $project->id, 404);
 
-        $snapshot = $timelineSnapshot->plan_snapshot;
+        $snapshot = $timelineSnapshot->timelineSnapshot();
         [$rows, $axis] = $this->timeline($snapshot);
 
         return view('projects.timeline-snapshots.show', [

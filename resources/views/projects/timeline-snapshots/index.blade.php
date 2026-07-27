@@ -61,7 +61,7 @@
                     <span class="timeline-history-type {{ in_array($version->version_type, [\App\Models\ProjectPlanVersion::TYPE_PROPOSAL, \App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE], true) ? 'is-proposal' : '' }}">
                         {{ match ($version->version_type) {
                             \App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE => 'AI提案反映直前',
-                            \App\Models\ProjectPlanVersion::TYPE_PROPOSAL => 'AI提案反映直後',
+                            \App\Models\ProjectPlanVersion::TYPE_PROPOSAL => 'AI提案反映直前',
                             default => '手動保存',
                         } }}
                     </span>

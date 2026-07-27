@@ -46,7 +46,7 @@
                 <span>保存者 {{ $version->creator?->name ?? 'SYSTEM' }}</span>
                 <span>{{ match ($version->version_type) {
                     \App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE => 'AI提案反映直前',
-                    \App\Models\ProjectPlanVersion::TYPE_PROPOSAL => 'AI提案反映直後',
+                    \App\Models\ProjectPlanVersion::TYPE_PROPOSAL => 'AI提案反映直前',
                     default => '手動保存',
                 } }}</span>
             </div>

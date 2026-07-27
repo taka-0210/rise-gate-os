@@ -40,4 +40,13 @@ class ProjectPlanVersion extends Model
     public function project(): BelongsTo { return $this->belongsTo(Project::class); }
     public function sourceProposal(): BelongsTo { return $this->belongsTo(AiProposal::class, 'source_proposal_id'); }
     public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+
+    public function timelineSnapshot(): array
+    {
+        if ($this->version_type === self::TYPE_PROPOSAL) {
+            return $this->previous_snapshot ?? [];
+        }
+
+        return $this->plan_snapshot ?? [];
+    }
 }

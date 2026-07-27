@@ -21,7 +21,7 @@ class ProjectPlanRestoreService
 
     public function preview(Project $project, ProjectPlanVersion $version): array
     {
-        $target = $this->entities($version->plan_snapshot);
+        $target = $this->entities($version->timelineSnapshot());
         $current = $this->entities($this->snapshots->capture($project->fresh()));
 
         return [
@@ -33,7 +33,7 @@ class ProjectPlanRestoreService
 
     public function restore(Project $project, ProjectPlanVersion $version, User $actor): ProjectPlanVersion
     {
-        $snapshot = $version->plan_snapshot;
+        $snapshot = $version->timelineSnapshot();
         $snapshotProjectId = (string) data_get($snapshot, 'project.public_id', '');
         if ($snapshotProjectId === '' || $snapshotProjectId !== $project->public_id) {
             throw new RuntimeException('この保存履歴は対象Projectのものではありません。');
