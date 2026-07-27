@@ -82,6 +82,16 @@
             <p>{{ $proposal->summary ?: '概要はありません。' }}</p>
         </div>
 
+        @if ($proposal->replacesTimeline())
+            <div class="card stack" style="border:2px solid #b36b35;background:#fff9f3;">
+                <div>
+                    <div class="eyebrow" style="color:#9a5424;">タイムライン全面置換</div>
+                    <h2>現在の計画を保存して、1番から再構成します</h2>
+                </div>
+                <p>承認直前のタイムラインを計画版として保存したうえで、下記のRoadmap・取り組み・Taskへ全面置換します。既存番号の続きには追加せず、提案されたRoadmapを1番から表示します。</p>
+            </div>
+        @endif
+
         @if ($projectMetadataItem)
             @php($metadataLabels = ['summary' => '概要', 'current_state' => '現状', 'desired_future_state' => '目指す未来のカタチ'])
             <div class="card stack proposal-project-metadata">
@@ -184,7 +194,7 @@
                 @if ($itemCounts['invalid'] > 0)
                     <p class="error">検証エラーがあるため反映できません。提案内容を修正して再送してください。</p>
                 @else
-                    <p>承認すると、下記の変更を一つの処理として本データへ反映します。</p>
+                    <p>{{ $proposal->replacesTimeline() ? '承認すると、現在のタイムラインを保存したあと、下記の内容へ全面置換します。' : '承認すると、下記の変更を一つの処理として本データへ反映します。' }}</p>
                 @endif
                 <div class="actions">
                     <form method="POST" action="{{ route('projects.ai-proposals.apply', [$project, $proposal]) }}">
@@ -259,6 +269,7 @@
 
         <div class="grid">
             <div class="card"><div class="meta">状態</div><h2>{{ $statuses[$proposal->status] ?? $proposal->status }}</h2></div>
+            <div class="card"><div class="meta">提案方式</div><h2>{{ $proposalModes[$proposal->mode] ?? $proposal->mode }}</h2></div>
             <div class="card"><div class="meta">変更合計</div><h2>{{ $proposal->items->count() }}</h2></div>
         </div>
 

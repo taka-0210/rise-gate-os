@@ -40,7 +40,15 @@ class AiProposalApplier
             }
 
             $previousSnapshot = $this->planSnapshots->capture($locked->project->fresh());
-            $invalidBefore = $this->scheduleIntegrity->inspect($locked->project->fresh())['invalid'];
+            $invalidBefore = $locked->replacesTimeline()
+                ? collect()
+                : $this->scheduleIntegrity->inspect($locked->project->fresh())['invalid'];
+
+            if ($locked->replacesTimeline()) {
+                $locked->project->tasks()->delete();
+                $locked->project->improvements()->delete();
+                $locked->project->roadmaps()->delete();
+            }
 
             $references = [];
             $items = $locked->items()->orderBy('sort_order')->orderBy('id')->get()
@@ -62,7 +70,9 @@ class AiProposalApplier
             }
 
             $invalidAfter = $this->scheduleIntegrity->inspect($locked->project->fresh())['invalid'];
-            $newInvalid = $invalidAfter->diff($invalidBefore);
+            $newInvalid = $locked->replacesTimeline()
+                ? $invalidAfter
+                : $invalidAfter->diff($invalidBefore);
             if ($newInvalid->isNotEmpty()) {
                 throw ValidationException::withMessages([
                     'proposal' => 'この提案を反映すると日程が上位期間から外れます。'.PHP_EOL.$newInvalid->implode(PHP_EOL),
@@ -94,12 +104,13 @@ class AiProposalApplier
     {
         $attributes = $item->attributes;
 
-        return match ($item->entity_type) {
+        $model = match ($item->entity_type) {
             'roadmap' => Roadmap::create(Arr::only($attributes, ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day']) + [
                 'organization_id' => $proposal->organization_id,
                 'workspace_id' => $proposal->workspace_id,
                 'project_id' => $proposal->project_id,
                 'status' => $attributes['status'] ?? Roadmap::STATUS_DRAFT,
+                'sort_order' => $attributes['sort_order'] ?? $item->sort_order,
                 'created_by' => $reviewer->id,
             ]),
             'improvement' => Improvement::create(Arr::only($attributes, ['title', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'planned_effort_days', 'status', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day']) + [
@@ -109,6 +120,7 @@ class AiProposalApplier
                 'roadmap_id' => $this->parentId($proposal, $item, $references, 'roadmap', $attributes['roadmap_public_id'] ?? null),
                 'status' => $attributes['status'] ?? Improvement::STATUS_PROPOSED,
                 'visibility' => $attributes['visibility'] ?? Improvement::VISIBILITY_INTERNAL,
+                'roadmap_sort_order' => $item->sort_order,
                 'proposed_by' => $reviewer->id,
                 'assigned_to' => $reviewer->id,
             ]),
@@ -119,10 +131,17 @@ class AiProposalApplier
                 'improvement_id' => $this->parentId($proposal, $item, $references, 'improvement', $attributes['improvement_public_id'] ?? null),
                 'status' => $attributes['status'] ?? Task::STATUS_TODO,
                 'priority' => $attributes['priority'] ?? Task::PRIORITY_NORMAL,
+                'sort_order' => $item->sort_order,
                 'created_by' => $reviewer->id,
                 'assigned_to' => $reviewer->id,
             ]),
         };
+
+        if ($model instanceof Task && $model->status === Task::STATUS_DONE) {
+            $model->update(['completed_at' => now()]);
+        }
+
+        return $model;
     }
 
     private function update(AiProposal $proposal, AiProposalItem $item): Model

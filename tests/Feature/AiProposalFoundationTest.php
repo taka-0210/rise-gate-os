@@ -590,6 +590,150 @@ class AiProposalFoundationTest extends TestCase
         return $proposal;
     }
 
+    public function test_project_admin_can_replace_the_entire_timeline_and_keep_the_previous_snapshot(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('replace-timeline');
+        $project->update(['duration_days' => 30]);
+
+        $oldRoadmap = Roadmap::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Old Roadmap',
+            'sort_order' => 99,
+            'created_by' => $user->id,
+        ]);
+        $oldImprovement = Improvement::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'roadmap_id' => $oldRoadmap->id,
+            'title' => 'Old Improvement',
+            'proposed_by' => $user->id,
+            'assigned_to' => $user->id,
+        ]);
+        $oldTask = Task::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'improvement_id' => $oldImprovement->id,
+            'title' => 'Old Task',
+            'created_by' => $user->id,
+            'assigned_to' => $user->id,
+        ]);
+
+        $proposal = AiProposal::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'source' => 'codex',
+            'mode' => AiProposal::MODE_REPLACE_TIMELINE,
+            'idempotency_key' => 'replace-timeline-001',
+            'title' => 'Replace the complete timeline',
+            'status' => AiProposal::STATUS_PENDING,
+        ]);
+        $proposal->items()->createMany([
+            [
+                'operation' => 'create',
+                'entity_type' => 'roadmap',
+                'reference_key' => 'roadmap-1',
+                'attributes' => [
+                    'title' => 'Domain and server preparation',
+                    'status' => Roadmap::STATUS_COMPLETED,
+                    'planned_start_day' => 1,
+                    'target_day' => 5,
+                ],
+                'sort_order' => 10,
+            ],
+            [
+                'operation' => 'create',
+                'entity_type' => 'improvement',
+                'reference_key' => 'improvement-1',
+                'parent_reference' => 'roadmap-1',
+                'attributes' => [
+                    'title' => 'Acquire the domain',
+                    'status' => Improvement::STATUS_IMPLEMENTED,
+                    'planned_start_day' => 1,
+                    'target_day' => 3,
+                    'planned_effort_days' => 1,
+                ],
+                'sort_order' => 20,
+            ],
+            [
+                'operation' => 'create',
+                'entity_type' => 'task',
+                'parent_reference' => 'improvement-1',
+                'attributes' => [
+                    'title' => 'Complete the domain contract',
+                    'status' => Task::STATUS_DONE,
+                    'planned_start_day' => 1,
+                    'due_day' => 2,
+                ],
+                'sort_order' => 30,
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
+
+        $this->assertSoftDeleted($oldTask);
+        $this->assertSoftDeleted($oldImprovement);
+        $this->assertSoftDeleted($oldRoadmap);
+        $this->assertDatabaseHas('roadmaps', [
+            'project_id' => $project->id,
+            'title' => 'Domain and server preparation',
+            'status' => Roadmap::STATUS_COMPLETED,
+            'sort_order' => 10,
+        ]);
+        $this->assertDatabaseHas('improvements', [
+            'project_id' => $project->id,
+            'title' => 'Acquire the domain',
+            'status' => Improvement::STATUS_IMPLEMENTED,
+        ]);
+        $newTask = Task::where('project_id', $project->id)
+            ->where('title', 'Complete the domain contract')
+            ->firstOrFail();
+        $this->assertSame(Task::STATUS_DONE, $newTask->status);
+        $this->assertNotNull($newTask->completed_at);
+
+        $version = $proposal->fresh()->appliedPlanVersion;
+        $this->assertSame('Old Roadmap', data_get($version->previous_snapshot, 'roadmaps.0.title'));
+        $this->assertSame('Domain and server preparation', data_get($version->plan_snapshot, 'roadmaps.0.title'));
+    }
+
+    public function test_timeline_replacement_requires_at_least_one_new_roadmap(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('replace-empty');
+        $proposal = AiProposal::create([
+            'organization_id' => $project->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'source' => 'codex',
+            'mode' => AiProposal::MODE_REPLACE_TIMELINE,
+            'idempotency_key' => 'replace-empty-001',
+            'title' => 'Unsafe empty replacement',
+            'status' => AiProposal::STATUS_PENDING,
+        ]);
+        $proposal->items()->create([
+            'operation' => 'update',
+            'entity_type' => 'project',
+            'target_public_id' => $project->public_id,
+            'attributes' => ['summary' => 'Only project metadata'],
+        ]);
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->assertSessionHasErrors('proposal');
+
+        $this->assertStringContainsString(
+            'Roadmap',
+            $proposal->items()->firstOrFail()->fresh()->validation_message,
+        );
+    }
+
     private function projectOwner(string $slug): array
     {
         $user = User::factory()->create();

@@ -25,6 +25,7 @@ class AiProposalController extends Controller
             'project_public_id' => ['required', 'string'],
             'idempotency_key' => ['required', 'string', 'max:120'],
             'title' => ['required', 'string', 'max:255'],
+            'mode' => ['sometimes', Rule::in(array_keys(AiProposal::modes()))],
             'summary' => ['nullable', 'string'],
             'evidence' => ['nullable', 'array'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
@@ -77,6 +78,7 @@ class AiProposalController extends Controller
                 'workspace_id' => $accessKey->workspace_id,
                 'project_id' => $project->id,
                 'source' => 'codex',
+                'mode' => $validated['mode'] ?? AiProposal::MODE_DIFFERENTIAL,
                 'idempotency_key' => $validated['idempotency_key'],
                 'title' => $validated['title'],
                 'summary' => $validated['summary'] ?? null,
@@ -110,6 +112,7 @@ class AiProposalController extends Controller
     {
         return [
             'proposal_id' => $proposal->public_id,
+            'mode' => $proposal->mode,
             'status' => $proposal->status,
             'duplicate' => $duplicate,
             'items_count' => $proposal->items()->count(),

@@ -13,6 +13,9 @@ class AiProposal extends Model
 {
     use SoftDeletes;
 
+    public const MODE_DIFFERENTIAL = 'differential';
+    public const MODE_REPLACE_TIMELINE = 'replace_timeline';
+
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
@@ -20,7 +23,7 @@ class AiProposal extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
-        'public_id', 'organization_id', 'workspace_id', 'project_id', 'source',
+        'public_id', 'organization_id', 'workspace_id', 'project_id', 'source', 'mode',
         'idempotency_key', 'title', 'summary', 'status', 'evidence',
         'requested_by', 'reviewed_by', 'reviewed_at', 'applied_at',
         'handed_off_by', 'handed_off_at', 'failure_reason',
@@ -67,5 +70,18 @@ class AiProposal extends Model
             self::STATUS_APPLIED => '反映済み',
             self::STATUS_FAILED => '反映失敗',
         ];
+    }
+
+    public static function modes(): array
+    {
+        return [
+            self::MODE_DIFFERENTIAL => '差分更新',
+            self::MODE_REPLACE_TIMELINE => 'タイムライン全面置換',
+        ];
+    }
+
+    public function replacesTimeline(): bool
+    {
+        return $this->mode === self::MODE_REPLACE_TIMELINE;
     }
 }

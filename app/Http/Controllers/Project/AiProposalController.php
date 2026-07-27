@@ -59,6 +59,26 @@ class AiProposalController extends Controller
             'task' => $project->tasks()->count(),
         ];
         $impactCounts = collect($currentEntityCounts)->mapWithKeys(function (int $current, string $entityType) use ($aiProposal, $validItems): array {
+            if ($aiProposal->replacesTimeline()) {
+                $replacementCount = $validItems
+                    ->where('entity_type', $entityType)
+                    ->where('operation', 'create')
+                    ->count();
+                $isApplied = $aiProposal->status === AiProposal::STATUS_APPLIED;
+                $before = $isApplied
+                    ? $this->snapshotEntityCount(
+                        $aiProposal->appliedPlanVersion?->previous_snapshot ?? [],
+                        $entityType,
+                    )
+                    : $current;
+
+                return [$entityType => [
+                    'before' => $before,
+                    'after' => $isApplied ? $current : $replacementCount,
+                    'delta' => ($isApplied ? $current : $replacementCount) - $before,
+                ]];
+            }
+
             $delta = $validItems
                 ->where('entity_type', $entityType)
                 ->sum(fn ($item): int => match ($item->operation) {
@@ -86,7 +106,25 @@ class AiProposalController extends Controller
             'reviewActions' => \App\Models\AiProposalItemReview::actions(),
             'unresolvedReviewCount' => $aiProposal->items->pluck('review')->filter()->whereNull('resolved_at')->count(),
             'projectMetadataItem' => $aiProposal->items->firstWhere('entity_type', 'project'),
+            'proposalModes' => AiProposal::modes(),
         ]);
+    }
+
+    private function snapshotEntityCount(array $snapshot, string $entityType): int
+    {
+        $roadmaps = collect($snapshot['roadmaps'] ?? []);
+        $unclassified = collect($snapshot['unclassified_improvements'] ?? []);
+
+        return match ($entityType) {
+            'roadmap' => $roadmaps->count(),
+            'improvement' => $roadmaps->sum(
+                fn (array $roadmap): int => count($roadmap['improvements'] ?? [])
+            ) + $unclassified->count(),
+            'task' => $roadmaps->sum(fn (array $roadmap): int => collect($roadmap['improvements'] ?? [])
+                ->sum(fn (array $improvement): int => count($improvement['tasks'] ?? [])))
+                + $unclassified->sum(fn (array $improvement): int => count($improvement['tasks'] ?? [])),
+            default => 0,
+        };
     }
 
     public function apply(Request $request, Project $project, AiProposal $aiProposal, AiProposalApplier $applier): RedirectResponse

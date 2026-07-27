@@ -231,6 +231,7 @@ class AiMcpToolService
                 'workspace_id' => $key->workspace_id,
                 'project_id' => $project->id,
                 'source' => 'codex',
+                'mode' => $arguments['mode'] ?? AiProposal::MODE_DIFFERENTIAL,
                 'idempotency_key' => $arguments['idempotency_key'],
                 'title' => $arguments['title'],
                 'summary' => $arguments['summary'] ?? null,
@@ -313,6 +314,7 @@ class AiMcpToolService
     {
         return [
             'proposal_id' => $proposal->public_id,
+            'mode' => $proposal->mode,
             'status' => $proposal->status,
             'duplicate' => $duplicate,
             'valid_items_count' => $proposal->items()->where('validation_status', AiProposalValidator::STATUS_VALID)->count(),
