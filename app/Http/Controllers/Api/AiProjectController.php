@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiAccessKey;
 use App\Models\Project;
+use App\Models\ProjectHandoff;
 use App\Models\ProjectMember;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,10 @@ class AiProjectController extends Controller
             ->where('public_id', $projectPublicId)
             ->with(['roadmaps.improvements.tasks'])
             ->firstOrFail();
+        $latestHandoff = $project->handoffs()
+            ->where('status', ProjectHandoff::STATUS_APPROVED)
+            ->latest('reviewed_at')
+            ->first();
 
         return response()->json([
             'project' => [
@@ -54,6 +59,14 @@ class AiProjectController extends Controller
                 'summary' => $project->summary,
                 'status' => $project->status,
                 'priority' => $project->priority,
+                'handoff' => [
+                    'completed_work' => $latestHandoff?->completed_work,
+                    'next_work' => $latestHandoff?->next_work,
+                    'approved_at' => $latestHandoff?->reviewed_at?->toIso8601String(),
+                    'pending_proposals_count' => $project->handoffs()
+                        ->where('status', ProjectHandoff::STATUS_PENDING)
+                        ->count(),
+                ],
                 'roadmaps' => $project->roadmaps->map(fn ($roadmap) => [
                     'public_id' => $roadmap->public_id,
                     'title' => $roadmap->title,

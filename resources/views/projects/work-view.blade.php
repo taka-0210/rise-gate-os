@@ -697,6 +697,7 @@
                     <p>{{ $project->summary ?: 'このProjectの目的から、具体的な行動までを内側へたどります。' }}</p>
                 </div>
                 <div class="actions">
+                    <a class="button secondary" href="{{ route('projects.handoffs.index', $project) }}">引継ぎ</a>
                     @if($canCreateRoadmap)<a class="button" href="{{ route('projects.roadmaps.create',$project) }}">ロードマップを登録</a>@endif
                     @if ($canEditProject)<a class="button secondary" href="{{ route('projects.edit', $project) }}">Projectを編集</a>@endif
                 </div>

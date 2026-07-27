@@ -7,6 +7,7 @@ use App\Models\AiProposal;
 use App\Models\AiRequest;
 use App\Models\AiRequestAttachment;
 use App\Models\Project;
+use App\Models\ProjectHandoff;
 use App\Models\ProjectMember;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -43,6 +44,10 @@ class AiMcpToolService
             ->where('public_id', $publicId)
             ->with(['roadmaps.improvements.tasks'])
             ->firstOrFail();
+        $latestHandoff = $project->handoffs()
+            ->where('status', ProjectHandoff::STATUS_APPROVED)
+            ->latest('reviewed_at')
+            ->first();
 
         return [
             'public_id' => $project->public_id,
@@ -55,6 +60,14 @@ class AiMcpToolService
             'start_date' => $project->start_date?->toDateString(),
             'due_date' => $project->due_date?->toDateString(),
             'duration_days' => $project->duration_days,
+            'handoff' => [
+                'completed_work' => $latestHandoff?->completed_work,
+                'next_work' => $latestHandoff?->next_work,
+                'approved_at' => $latestHandoff?->reviewed_at?->toIso8601String(),
+                'pending_proposals_count' => $project->handoffs()
+                    ->where('status', ProjectHandoff::STATUS_PENDING)
+                    ->count(),
+            ],
             'roadmaps' => $project->roadmaps->map(fn ($roadmap) => [
                 'public_id' => $roadmap->public_id,
                 'title' => $roadmap->title,
@@ -251,6 +264,49 @@ class AiMcpToolService
         });
 
         return $this->proposalResult($this->validator->validate($proposal), false);
+    }
+
+    public function submitHandoffProposal(AiAccessKey $key, array $arguments): array
+    {
+        $this->requireScope($key, AiAccessKey::SCOPE_PROPOSALS_CREATE);
+        $project = $this->visibleProjects($key)
+            ->where('public_id', $arguments['project_public_id'])
+            ->whereHas('members', fn ($members) => $members
+                ->when($key->user_id, fn ($query) => $query->where('user_id', $key->user_id))
+                ->whereIn('permission_level', [
+                    ProjectMember::PERMISSION_ADMIN,
+                    ProjectMember::PERMISSION_EDIT,
+                    ProjectMember::PERMISSION_COMMENT,
+                ]))
+            ->firstOrFail();
+
+        $existing = $project->handoffs()
+            ->where('idempotency_key', $arguments['idempotency_key'])
+            ->first();
+        if ($existing) {
+            return $this->handoffResult($project, $existing, true);
+        }
+
+        $handoff = $project->handoffs()->create([
+            'source' => ProjectHandoff::SOURCE_CODEX,
+            'status' => ProjectHandoff::STATUS_PENDING,
+            'completed_work' => $arguments['completed_work'],
+            'next_work' => $arguments['next_work'],
+            'idempotency_key' => $arguments['idempotency_key'],
+            'proposed_by' => $key->user_id,
+        ]);
+
+        return $this->handoffResult($project, $handoff, false);
+    }
+
+    private function handoffResult(Project $project, ProjectHandoff $handoff, bool $duplicate): array
+    {
+        return [
+            'handoff_proposal_id' => $handoff->public_id,
+            'status' => $handoff->status,
+            'duplicate' => $duplicate,
+            'review_url' => route('projects.handoffs.index', $project),
+        ];
     }
 
     private function proposalResult(AiProposal $proposal, bool $duplicate): array

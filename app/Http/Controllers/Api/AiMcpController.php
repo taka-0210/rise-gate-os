@@ -80,6 +80,7 @@ class AiMcpController extends Controller
                 'claim_ai_request' => $tools->claimAiRequest($key, Validator::validate($arguments, ['request_public_id' => ['required', 'string']])['request_public_id']),
                 'get_ai_request_attachment' => $this->getAiRequestAttachment($tools, $key, $arguments),
                 'submit_proposal' => $this->submitProposal($tools, $key, $arguments),
+                'submit_handoff_proposal' => $this->submitHandoffProposal($tools, $key, $arguments),
                 default => throw new \InvalidArgumentException('存在しないツールです。'),
             };
 
@@ -174,6 +175,25 @@ class AiMcpController extends Controller
         return $tools->submitProposal($key, $validated);
     }
 
+    private function submitHandoffProposal(AiMcpToolService $tools, AiAccessKey $key, array $arguments): array
+    {
+        $validated = Validator::validate($arguments, [
+            'project_public_id' => ['required', 'string'],
+            'idempotency_key' => ['required', 'string', 'max:120'],
+            'completed_work' => ['required', 'string', 'max:10000'],
+            'next_work' => ['required', 'string', 'max:10000'],
+        ]);
+
+        if (AiTextIntegrity::containsMojibake([
+            $validated['completed_work'],
+            $validated['next_work'],
+        ])) {
+            throw ValidationException::withMessages(['handoff' => AiTextIntegrity::ERROR_MESSAGE]);
+        }
+
+        return $tools->submitHandoffProposal($key, $validated);
+    }
+
     private function getAiRequestAttachment(AiMcpToolService $tools, AiAccessKey $key, array $arguments): array
     {
         $validated = Validator::validate($arguments, [
@@ -237,6 +257,23 @@ class AiMcpController extends Controller
                     'additionalProperties' => false,
                 ],
                 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true],
+            ],
+            [
+                'name' => 'submit_handoff_proposal',
+                'title' => '作業引継ぎを提案',
+                'description' => 'Projectの「前回作業ではここまで」と「次回作業はここから」を、専用画面で承認されるまで正式記録へ反映せずに提案します。',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'project_public_id' => ['type' => 'string'],
+                        'idempotency_key' => ['type' => 'string'],
+                        'completed_work' => ['type' => 'string', 'description' => '① 前回作業ではここまで'],
+                        'next_work' => ['type' => 'string', 'description' => '② 次回作業はここから'],
+                    ],
+                    'required' => ['project_public_id', 'idempotency_key', 'completed_work', 'next_work'],
+                    'additionalProperties' => false,
+                ],
+                'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true],
             ],
             [
                 'name' => 'list_ai_requests',

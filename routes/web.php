@@ -21,6 +21,7 @@ use App\Http\Controllers\Project\ImprovementController;
 use App\Http\Controllers\Project\ImprovementEffortController;
 use App\Http\Controllers\Project\ImprovementOutputController;
 use App\Http\Controllers\Project\ProjectController;
+use App\Http\Controllers\Project\ProjectHandoffController;
 use App\Http\Controllers\Project\ProjectInternalNoteController;
 use App\Http\Controllers\Project\ProjectMemberController;
 use App\Http\Controllers\Project\ProjectLocalConnectionController;
@@ -145,6 +146,10 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/projects/schedule', [ProjectController::class, 'schedule'])->name('projects.schedule');
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::get('/projects/{project}/workspace', [ProjectController::class, 'workspace'])->name('projects.workspace');
+        Route::get('/projects/{project}/handoffs', [ProjectHandoffController::class, 'index'])->name('projects.handoffs.index');
+        Route::post('/projects/{project}/handoffs', [ProjectHandoffController::class, 'store'])->name('projects.handoffs.store');
+        Route::post('/projects/{project}/handoffs/{handoff}/approve', [ProjectHandoffController::class, 'approve'])->name('projects.handoffs.approve');
+        Route::post('/projects/{project}/handoffs/{handoff}/reject', [ProjectHandoffController::class, 'reject'])->name('projects.handoffs.reject');
         Route::get('/projects/{project}/actuals', [ProjectActualController::class, 'index'])->name('projects.actuals.index');
         Route::post('/projects/{project}/actuals', [ProjectActualController::class, 'store'])->name('projects.actuals.store');
         Route::delete('/projects/{project}/actuals/{actual}', [ProjectActualController::class, 'destroy'])->name('projects.actuals.destroy');

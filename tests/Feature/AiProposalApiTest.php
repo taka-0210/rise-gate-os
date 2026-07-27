@@ -257,7 +257,9 @@ class AiProposalApiTest extends TestCase
 
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
             'jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list', 'params' => new \stdClass,
-        ])->assertOk()->assertJsonCount(6, 'result.tools');
+        ])->assertOk()
+            ->assertJsonCount(7, 'result.tools')
+            ->assertJsonPath('result.tools.3.name', 'submit_handoff_proposal');
 
         $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
             'jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/call',
