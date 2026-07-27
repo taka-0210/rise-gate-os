@@ -309,7 +309,9 @@
                         <div class="tree-group__label">Roadmaps</div>
                         @forelse($roadmaps as $roadmap)
                             @php
-                                $roadmapTreeProgress = $roadmap->taskProgress();
+                                $roadmapTreeProgress = \App\Support\TaskProgress::calculate(
+                                    $roadmap->improvements->flatMap->tasks
+                                );
                             @endphp
                             <button class="tree-item tree-item--roadmap" type="button" @can('update',$roadmap) draggable="true" @endcan data-reorder-type="roadmap" data-reorder-id="{{ $roadmap->id }}" data-reorder-parent="project" data-document="roadmap-{{ $roadmap->id }}" data-tree-toggle="roadmap-{{ $roadmap->id }}" aria-expanded="false"><span class="tree-icon tree-expander">▸</span>{{ $roadmap->title }}<span class="tree-progress">{{ $roadmapTreeProgress['completed'] }}/{{ $roadmapTreeProgress['total'] }}・{{ $roadmapTreeProgress['percentage'] }}%</span></button>
                             <div class="tree-branch" data-tree-branch="roadmap-{{ $roadmap->id }}" hidden>

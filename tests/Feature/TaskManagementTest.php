@@ -597,7 +597,10 @@ class TaskManagementTest extends TestCase
         [$owner, $workspace, $project] = $this->createProjectOwner();
         $task = $this->createTask($project, $owner);
         $task->update(['title' => '中央に表示するタスク']);
-        $task->improvement->update(['title' => '商品化の取組み']);
+        $task->improvement->update([
+            'title' => '商品化の取組み',
+            'planned_effort_days' => 6,
+        ]);
         $roadmap = $task->improvement->roadmap;
         $roadmap->update(['title' => '商品化ロードマップ']);
         ProjectLocalConnection::create([
