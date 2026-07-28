@@ -399,6 +399,8 @@ class ProjectFoundationTest extends TestCase
             ->assertSeeInOrder(['ローカルフォルダ', '表示名'])
             ->assertSee('BROWSE')
             ->assertSee('data-folder-browse', false)
+            ->assertSee('http://localhost/${encodeURIComponent(folderName)}/', false)
+            ->assertDontSee('http://localhost/${encodeURIComponent(folderName)}/public_html/', false)
             ->assertDontSee('name="local_path"', false)
             ->assertSee(route('projects.local-connection.store', $project), false);
 

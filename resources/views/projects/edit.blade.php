@@ -130,8 +130,8 @@
                 </div>
                 <div class="field">
                     <label for="local_site_url">ローカルサイトURL</label>
-                    <input id="local_site_url" name="local_site_url" type="url" value="{{ old('local_site_url', $localConnection?->local_site_url) }}" placeholder="http://localhost/prohit-okinawa/public_html/">
-                    <div class="meta">XAMPPなどで表示できるURLを入力します。末尾の / は自動で補います。</div>
+                    <input id="local_site_url" name="local_site_url" type="url" value="{{ old('local_site_url', $localConnection?->local_site_url) }}" placeholder="http://localhost/prohit-okinawa/">
+                    <div class="meta">XAMPPなどで表示できるプロジェクト直下のURLを入力します。公開フォルダ名は付けず、末尾の / は自動で補います。</div>
                     @error('local_site_url') <div class="error">{{ $message }}</div> @enderror
                 </div>
             </div>
@@ -173,7 +173,7 @@
                 if (!folderName) return;
                 name.value = folderName;
                 name.dataset.manuallyEdited = '';
-                if (siteUrl && !siteUrl.value.trim()) siteUrl.value = `http://localhost/${encodeURIComponent(folderName)}/public_html/`;
+                if (siteUrl && !siteUrl.value.trim()) siteUrl.value = `http://localhost/${encodeURIComponent(folderName)}/`;
             };
             name.addEventListener('input', () => { name.dataset.manuallyEdited = 'true'; });
             browse.addEventListener('click', async () => {
