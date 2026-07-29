@@ -55,14 +55,28 @@
                             @if($row['principal_repayment_loans']->isEmpty())
                                 0円
                             @else
-                                <details class="repayment-details">
-                                    <summary>{{ number_format($row['principal_repayment']) }}円</summary>
-                                    <div>
+                                <button type="button" class="repayment-breakdown-button" onclick="document.getElementById('repayment-modal-{{ $row['year'] }}').showModal()">{{ number_format($row['principal_repayment']) }}円</button>
+                                <dialog id="repayment-modal-{{ $row['year'] }}" class="repayment-modal">
+                                    <div class="repayment-modal__header">
+                                        <div><span class="meta">{{ $row['year'] }}年度</span><h3>年間元本返済額の内訳</h3></div>
+                                        <button type="button" class="secondary repayment-modal__close" onclick="this.closest('dialog').close()" aria-label="閉じる">×</button>
+                                    </div>
+                                    <div class="repayment-modal__summary">
+                                        <div><span>通常返済</span><strong>{{ number_format($row['scheduled_principal_repayment']) }}円</strong></div>
+                                        <div><span>一括・完済返済</span><strong>{{ number_format($row['extra_principal_repayment']) }}円</strong></div>
+                                        <div><span>合計</span><strong>{{ number_format($row['principal_repayment']) }}円</strong></div>
+                                    </div>
+                                    <div class="repayment-modal__loans">
                                         @foreach($row['principal_repayment_loans'] as $loan)
-                                            <p><span>No.{{ $loan['management_number'] }} {{ $loan['financial_institution'] }}</span><strong>{{ number_format($loan['amount']) }}円</strong>@if($loan['includes_extra_repayment'])<small>一括・完済差額を含む</small>@endif</p>
+                                            <p>
+                                                <span>No.{{ $loan['management_number'] }} {{ $loan['financial_institution'] }}</span>
+                                                <strong>{{ number_format($loan['amount']) }}円</strong>
+                                                @if($loan['includes_extra_repayment'])<small>通常 {{ number_format($loan['scheduled_repayment']) }}円／一括・完済 {{ number_format($loan['extra_repayment']) }}円</small>@endif
+                                            </p>
                                         @endforeach
                                     </div>
-                                </details>
+                                    <div class="actions repayment-modal__footer"><button type="button" onclick="this.closest('dialog').close()">閉じる</button></div>
+                                </dialog>
                             @endif
                         </td>
                         <td>{{ $row['interest_expense'] === null ? '—' : number_format($row['annual_debt_service']).'円' }}</td>
@@ -76,11 +90,11 @@
 
     <div class="card capacity-note">
         <h3>数字の見方</h3>
-        <p>支払利息がP/Lに入力済みの年度は「（当期純利益＋減価償却費＋支払利息）÷（年間元本返済額＋支払利息）」でDSCRを計算します。未入力年度は元本だけを使う簡易DSCRです。1.00倍以上が返済を賄える目安ですが、設備投資、運転資金の増減、税金などによる実際の資金移動は別途確認してください。</p>
+        <p>年間元本返済額と返済後余力には、通常返済に加えて一括返済・完済時の返済も含みます。金額を押すと内訳を確認できます。支払利息がP/Lに入力済みの年度は「（当期純利益＋減価償却費＋支払利息）÷（年間元本返済額＋支払利息）」でDSCRを計算します。借換資金による返済や、設備投資・運転資金などの資金移動は別途確認してください。</p>
     </div>
 </div>
 
 <style>
-.capacity-page{width:min(1580px,calc(100vw - 32px));position:relative;left:50%;transform:translateX(-50%)}.capacity-formula{display:flex;align-items:stretch;gap:14px;margin-bottom:18px}.capacity-formula>div{flex:1;display:flex;flex-direction:column;gap:5px;padding:18px;border:1px solid #b7d5ce;border-radius:12px;background:#f2faf7}.capacity-formula span{color:var(--muted);font-size:13px}.capacity-formula strong{color:var(--accent-dark);font-size:18px}.capacity-formula>b{display:flex;align-items:center;color:#4d8a94;font-size:24px}.capacity-table-wrap{overflow:auto}.capacity-table{width:100%;min-width:1420px;border-collapse:collapse}.capacity-table th,.capacity-table td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.capacity-table th:first-child,.capacity-table td:first-child,.capacity-table th:nth-child(2),.capacity-table td:nth-child(2){text-align:left}.capacity-table input{width:150px;text-align:right}.capacity-type{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:12px}.capacity-type.actual{color:#126452;background:#e5f5ef}.capacity-type.current{color:#fff;background:var(--accent-dark)}.capacity-type.plan{color:#66551c;background:#fbf4d8}.capacity-type.missing{color:#7a3d28;background:#fae9df}.repayment-details summary{color:var(--accent-dark);font-weight:700;cursor:pointer}.repayment-details>div{min-width:290px;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#f8fafb}.repayment-details p{display:grid;grid-template-columns:1fr auto;gap:3px 12px;margin:0;padding:7px 0;border-bottom:1px solid var(--line);color:var(--ink);font-size:12px;text-align:left}.repayment-details p:last-child{border-bottom:0}.repayment-details small{grid-column:1/-1;color:#9a5d2e}.capacity-note{margin-top:18px}.capacity-note h3{margin-top:0}.capacity-note p{margin-bottom:0;color:var(--muted)}@media(max-width:700px){.capacity-formula{flex-direction:column}.capacity-formula>b{justify-content:center;transform:rotate(90deg)}}
+.capacity-page{width:min(1580px,calc(100vw - 32px));position:relative;left:50%;transform:translateX(-50%)}.capacity-formula{display:flex;align-items:stretch;gap:14px;margin-bottom:18px}.capacity-formula>div{flex:1;display:flex;flex-direction:column;gap:5px;padding:18px;border:1px solid #b7d5ce;border-radius:12px;background:#f2faf7}.capacity-formula span{color:var(--muted);font-size:13px}.capacity-formula strong{color:var(--accent-dark);font-size:18px}.capacity-formula>b{display:flex;align-items:center;color:#4d8a94;font-size:24px}.capacity-table-wrap{overflow:auto}.capacity-table{width:100%;min-width:1420px;border-collapse:collapse}.capacity-table th,.capacity-table td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.capacity-table th:first-child,.capacity-table td:first-child,.capacity-table th:nth-child(2),.capacity-table td:nth-child(2){text-align:left}.capacity-table input{width:150px;text-align:right}.capacity-type{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:12px}.capacity-type.actual{color:#126452;background:#e5f5ef}.capacity-type.current{color:#fff;background:var(--accent-dark)}.capacity-type.plan{color:#66551c;background:#fbf4d8}.capacity-type.missing{color:#7a3d28;background:#fae9df}.repayment-breakdown-button{padding:0;border:0;color:var(--accent-dark);background:transparent;font-weight:800;text-decoration:underline;text-underline-offset:3px}.repayment-modal{width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 48px);padding:0;border:0;border-radius:14px;box-shadow:0 24px 80px rgba(13,35,45,.28);white-space:normal}.repayment-modal::backdrop{background:rgba(13,30,39,.48)}.repayment-modal__header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid var(--line)}.repayment-modal__header h3{margin:3px 0 0;font-size:22px}.repayment-modal__close{width:40px;height:40px;padding:0;font-size:24px}.repayment-modal__summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:18px 22px;background:#f4f8f8}.repayment-modal__summary div{display:flex;flex-direction:column;gap:5px}.repayment-modal__summary span{color:var(--muted);font-size:12px}.repayment-modal__summary strong{font-size:18px}.repayment-modal__loans{padding:8px 22px}.repayment-modal__loans p{display:grid;grid-template-columns:1fr auto;gap:3px 12px;margin:0;padding:12px 0;border-bottom:1px solid var(--line);color:var(--ink);font-size:14px;text-align:left}.repayment-modal__loans p:last-child{border-bottom:0}.repayment-modal__loans small{grid-column:1/-1;color:#9a5d2e}.repayment-modal__footer{justify-content:flex-end;padding:14px 22px 20px}.capacity-note{margin-top:18px}.capacity-note h3{margin-top:0}.capacity-note p{margin-bottom:0;color:var(--muted)}@media(max-width:700px){.capacity-formula{flex-direction:column}.capacity-formula>b{justify-content:center;transform:rotate(90deg)}.repayment-modal__summary{grid-template-columns:1fr}}
 </style>
 @endsection

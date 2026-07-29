@@ -77,6 +77,8 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertSee('1,400,000円')
             ->assertSee('2,800,000円')
             ->assertSee('No.1 テスト銀行')
+            ->assertSee('id="repayment-modal-2024"', false)
+            ->assertDontSee('<details', false)
             ->assertSee('3.00倍');
     }
 
@@ -101,14 +103,34 @@ class CompanyRepaymentCapacityTest extends TestCase
             'record_status' => CompanyLoan::RECORD_CONFIRMED,
             'source_type' => CompanyLoan::SOURCE_MANUAL,
         ]);
+        CompanyLoan::create([
+            'organization_id' => $organization->id,
+            'financial_institution' => '一括返済銀行',
+            'management_number' => '23',
+            'executed_on' => '2025-12-01',
+            'term_label' => '一括',
+            'original_amount' => 500_000,
+            'current_balance' => 0,
+            'monthly_principal_payment' => 0,
+            'balance_projection_mode' => CompanyLoan::PROJECTION_HOLD,
+            'completed_on' => '2026-03-31',
+            'balance_as_of' => '2026-03-31',
+            'loan_status' => CompanyLoan::STATUS_COMPLETED,
+            'record_status' => CompanyLoan::RECORD_CONFIRMED,
+            'source_type' => CompanyLoan::SOURCE_MANUAL,
+        ]);
 
         $this->actingAs($user)->withSession($session)
             ->get(route('company-finance.repayment-capacity.index'))
             ->assertOk()
             ->assertSee('2025年度')
             ->assertSee('今期')
+            ->assertSee('1,700,000円')
             ->assertSee('1,200,000円')
+            ->assertSee('500,000円')
+            ->assertSee('一括・完済返済')
             ->assertSee('No.22 年度境界銀行')
+            ->assertSee('No.23 一括返済銀行')
             ->assertSee('2027年度')
             ->assertDontSee('2028年度');
     }

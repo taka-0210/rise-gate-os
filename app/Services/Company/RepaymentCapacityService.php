@@ -31,14 +31,17 @@ class RepaymentCapacityService
             $schedule = collect($this->loanSchedule->build($loan->newCollection([$loan]), $start, $end));
             $amount = (int) $schedule->sum('principal_repaid');
             $monthlyPayment = $this->loanSchedule->effectiveMonthlyPayment($loan);
+            $extraRepayment = (int) $schedule->sum(
+                fn (array $row) => max(0, $row['principal_repaid'] - $monthlyPayment)
+            );
 
             return [
                 'management_number' => $loan->management_number,
                 'financial_institution' => $loan->financial_institution,
                 'amount' => $amount,
-                'includes_extra_repayment' => $schedule->contains(
-                    fn (array $row) => $row['principal_repaid'] > $monthlyPayment
-                ),
+                'scheduled_repayment' => $amount - $extraRepayment,
+                'extra_repayment' => $extraRepayment,
+                'includes_extra_repayment' => $extraRepayment > 0,
             ];
         })
             ->filter(fn (array $loan) => $loan['amount'] > 0)
@@ -47,6 +50,8 @@ class RepaymentCapacityService
 
         return [
             'total' => (int) $loans->sum('amount'),
+            'scheduled_total' => (int) $loans->sum('scheduled_repayment'),
+            'extra_total' => (int) $loans->sum('extra_repayment'),
             'loans' => $loans,
         ];
     }

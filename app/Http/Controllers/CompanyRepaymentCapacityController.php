@@ -90,6 +90,8 @@ class CompanyRepaymentCapacityController extends Controller
                 'interest_expense' => $interestExpense,
                 'repayment_source' => $repaymentSource,
                 'principal_repayment' => $principalRepayment,
+                'scheduled_principal_repayment' => $principalDetails['scheduled_total'],
+                'extra_principal_repayment' => $principalDetails['extra_total'],
                 'principal_repayment_loans' => $principalDetails['loans'],
                 'annual_debt_service' => $annualDebtService,
                 'remaining_capacity' => $repaymentSource !== null ? $repaymentSource - $annualDebtService : null,
