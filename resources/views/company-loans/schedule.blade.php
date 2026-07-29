@@ -25,6 +25,7 @@
         <div class="card"><h2>借入情報がありません</h2><p>借入を登録すると、ここに月別の残高推移が表示されます。</p></div>
     @else
         @php
+            $activeLoans = $loans->where('loan_status', \App\Models\CompanyLoan::STATUS_ACTIVE);
             $sortUrl = fn(string $key) => route('company-loans.schedule', [
                 'start' => $start->format('Y-m'),
                 'years' => $durationYears,
@@ -52,13 +53,13 @@
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('amount') }}">借入額 {{ $sortMark('amount') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($loan->original_amount) }}</th>@endforeach
-                        <th class="total-column">{{ number_format($loans->sum('original_amount')) }}</th>
+                        <th class="total-column">{{ number_format($activeLoans->sum('original_amount')) }}</th>
                         <th class="repayment-column"></th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('monthly') }}">返済／月 {{ $sortMark('monthly') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($schedulePayments[$loan->id]) }}@if((int)$loan->monthly_principal_payment === 0 && $schedulePayments[$loan->id] > 0)<small class="calculated-label">自動計算</small>@endif</th>@endforeach
-                        <th class="total-column">{{ number_format($loans->sum(fn($loan) => $schedulePayments[$loan->id] ?? 0)) }}</th>
+                        <th class="total-column">{{ number_format($activeLoans->sum(fn($loan) => $schedulePayments[$loan->id] ?? 0)) }}</th>
                         <th class="repayment-column"></th>
                     </tr>
                     <tr>

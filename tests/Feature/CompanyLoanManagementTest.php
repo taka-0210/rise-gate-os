@@ -389,8 +389,7 @@ class CompanyLoanManagementTest extends TestCase
             ->assertSee('<td class="repayment-column"><strong>100,000</strong></td>', false)
             ->assertSee('<td class="repayment-column"><strong>500,000</strong></td>', false);
 
-        $this->assertStringContainsString('<th class="total-column">1,000,000</th>', $response->getContent());
-        $this->assertStringContainsString('<th class="total-column">100,000</th>', $response->getContent());
+        $this->assertSame(2, substr_count($response->getContent(), '<th class="total-column">0</th>'));
     }
 
     private function loanInput(): array
