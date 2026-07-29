@@ -34,14 +34,22 @@ class RepaymentCapacityService
             $extraRepayment = (int) $schedule->sum(
                 fn (array $row) => max(0, $row['principal_repaid'] - $monthlyPayment)
             );
+            $isRefinanced = $extraRepayment > 0
+                && $loan->extra_repayment_funding === CompanyLoan::EXTRA_REPAYMENT_REFINANCE;
+            $scheduledRepayment = $amount - $extraRepayment;
+            $includedAmount = $scheduledRepayment + ($isRefinanced ? 0 : $extraRepayment);
 
             return [
+                'id' => $loan->id,
                 'management_number' => $loan->management_number,
                 'financial_institution' => $loan->financial_institution,
                 'amount' => $amount,
-                'scheduled_repayment' => $amount - $extraRepayment,
+                'included_amount' => $includedAmount,
+                'scheduled_repayment' => $scheduledRepayment,
                 'extra_repayment' => $extraRepayment,
                 'includes_extra_repayment' => $extraRepayment > 0,
+                'extra_repayment_funding' => $loan->extra_repayment_funding,
+                'is_refinanced' => $isRefinanced,
             ];
         })
             ->filter(fn (array $loan) => $loan['amount'] > 0)
@@ -49,9 +57,10 @@ class RepaymentCapacityService
             ->values();
 
         return [
-            'total' => (int) $loans->sum('amount'),
+            'total' => (int) $loans->sum('included_amount'),
             'scheduled_total' => (int) $loans->sum('scheduled_repayment'),
-            'extra_total' => (int) $loans->sum('extra_repayment'),
+            'extra_total' => (int) $loans->where('is_refinanced', false)->sum('extra_repayment'),
+            'refinanced_total' => (int) $loans->where('is_refinanced', true)->sum('extra_repayment'),
             'loans' => $loans,
         ];
     }

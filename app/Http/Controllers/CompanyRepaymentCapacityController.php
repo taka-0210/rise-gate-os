@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CompanyDepreciationPeriod;
 use App\Models\CompanyFinancialPeriod;
+use App\Models\CompanyLoan;
 use App\Models\OrganizationUser;
 use App\Services\Company\CompanyAccess;
 use App\Services\Company\RepaymentCapacityService;
@@ -11,6 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CompanyRepaymentCapacityController extends Controller
@@ -20,7 +22,7 @@ class CompanyRepaymentCapacityController extends Controller
         CompanyAccess $access,
         RepaymentCapacityService $capacity,
     ): View {
-        [$organization, $canManage] = $this->context($request, $access);
+        [$organization, $canManage, $canManageDebt] = $this->context($request, $access);
         $closingMonth = $organization->fiscal_year_end_month ?: 12;
         $now = CarbonImmutable::now('Asia/Tokyo');
         $currentFiscalYear = $closingMonth === 12 || $now->month > $closingMonth
@@ -92,6 +94,7 @@ class CompanyRepaymentCapacityController extends Controller
                 'principal_repayment' => $principalRepayment,
                 'scheduled_principal_repayment' => $principalDetails['scheduled_total'],
                 'extra_principal_repayment' => $principalDetails['extra_total'],
+                'refinanced_principal_repayment' => $principalDetails['refinanced_total'],
                 'principal_repayment_loans' => $principalDetails['loans'],
                 'annual_debt_service' => $annualDebtService,
                 'remaining_capacity' => $repaymentSource !== null ? $repaymentSource - $annualDebtService : null,
@@ -105,6 +108,7 @@ class CompanyRepaymentCapacityController extends Controller
         return view('company-finance.repayment-capacity', compact(
             'organization',
             'canManage',
+            'canManageDebt',
             'closingMonth',
             'rows',
         ));
@@ -140,6 +144,29 @@ class CompanyRepaymentCapacityController extends Controller
         return back()->with('status', '年度別の減価償却費を保存しました。');
     }
 
+    public function updateExtraRepaymentFunding(
+        Request $request,
+        CompanyLoan $loan,
+        CompanyAccess $access,
+    ): RedirectResponse {
+        $organization = $request->attributes->get('currentCompany');
+        abort_unless(
+            $loan->organization_id === $organization->id
+            && $access->allows($request->user(), $organization, OrganizationUser::PERMISSION_FINANCE_MANAGE_DEBT),
+            403,
+        );
+        $validated = $request->validate([
+            'extra_repayment_funding' => ['required', Rule::in([
+                CompanyLoan::EXTRA_REPAYMENT_SELF_FUNDED,
+                CompanyLoan::EXTRA_REPAYMENT_REFINANCE,
+            ])],
+        ]);
+
+        $loan->update($validated);
+
+        return back()->with('status', '一括返済の資金区分を更新しました。');
+    }
+
     private function context(Request $request, CompanyAccess $access): array
     {
         $organization = $request->attributes->get('currentCompany');
@@ -152,6 +179,7 @@ class CompanyRepaymentCapacityController extends Controller
         return [
             $organization,
             $access->allows($request->user(), $organization, OrganizationUser::PERMISSION_FINANCE_MANAGE_PL),
+            $access->allows($request->user(), $organization, OrganizationUser::PERMISSION_FINANCE_MANAGE_DEBT),
         ];
     }
 

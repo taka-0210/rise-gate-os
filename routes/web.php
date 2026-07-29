@@ -94,6 +94,7 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/company/loans/{loan}/edit', [CompanyLoanController::class, 'edit'])->name('company-loans.edit');
         Route::post('/company/loans/{loan}/save', [CompanyLoanController::class, 'update'])->name('company-loans.save');
         Route::put('/company/loans/{loan}', [CompanyLoanController::class, 'update'])->name('company-loans.update');
+        Route::put('/company/finance/repayment-capacity/loans/{loan}/extra-repayment-funding', [CompanyRepaymentCapacityController::class, 'updateExtraRepaymentFunding'])->name('company-finance.repayment-capacity.extra-repayment-funding');
         Route::delete('/company/loans/{loan}/balance-snapshots/{snapshot}', [CompanyLoanController::class, 'destroyBalanceSnapshot'])->name('company-loans.balance-snapshots.destroy');
         Route::post('/company/loans/{loan}/confirm', [CompanyLoanController::class, 'confirm'])->name('company-loans.confirm');
         Route::get('/company/members', [CompanyMemberAccessController::class, 'index'])->name('company-members.index');

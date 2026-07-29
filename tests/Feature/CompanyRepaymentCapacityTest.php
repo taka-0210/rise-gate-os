@@ -114,6 +114,7 @@ class CompanyRepaymentCapacityTest extends TestCase
             'monthly_principal_payment' => 0,
             'balance_projection_mode' => CompanyLoan::PROJECTION_HOLD,
             'completed_on' => '2026-03-31',
+            'extra_repayment_funding' => CompanyLoan::EXTRA_REPAYMENT_REFINANCE,
             'balance_as_of' => '2026-03-31',
             'loan_status' => CompanyLoan::STATUS_COMPLETED,
             'record_status' => CompanyLoan::RECORD_CONFIRMED,
@@ -125,14 +126,29 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertOk()
             ->assertSee('2025年度')
             ->assertSee('今期')
-            ->assertSee('1,700,000円')
+            ->assertDontSee('1,700,000円')
             ->assertSee('1,200,000円')
             ->assertSee('500,000円')
-            ->assertSee('一括・完済返済')
+            ->assertSee('借換え（計算対象外）')
+            ->assertSee('借換えのため計算対象外')
+            ->assertSee('extra-repayment-form-2025-', false)
             ->assertSee('No.22 年度境界銀行')
             ->assertSee('No.23 一括返済銀行')
             ->assertSee('2027年度')
             ->assertDontSee('2028年度');
+
+        $completedLoan = CompanyLoan::where('management_number', '23')->firstOrFail();
+        $this->actingAs($user)->withSession($session)
+            ->put(route('company-finance.repayment-capacity.extra-repayment-funding', $completedLoan), [
+                'extra_repayment_funding' => CompanyLoan::EXTRA_REPAYMENT_SELF_FUNDED,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', '一括返済の資金区分を更新しました。');
+
+        $this->assertSame(
+            CompanyLoan::EXTRA_REPAYMENT_SELF_FUNDED,
+            $completedLoan->fresh()->extra_repayment_funding,
+        );
     }
 
     protected function tearDown(): void
