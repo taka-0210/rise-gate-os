@@ -112,6 +112,7 @@ class CompanyLoanController extends Controller
     {
         [$organization] = $this->manageContext($request, $access);
         $this->owned($loan, $organization->id);
+        $loan->load(['balanceSnapshots' => fn ($query) => $query->orderByDesc('balance_as_of')]);
         return view('company-loans.form', compact('organization', 'loan'));
     }
 
@@ -148,6 +149,48 @@ class CompanyLoanController extends Controller
         $loan->update(['record_status' => CompanyLoan::RECORD_CONFIRMED, 'confirmed_at' => now(), 'confirmed_by' => $request->user()->id]);
         $this->revision($loan, $request->user()->id, 'confirmed', $before);
         return back()->with('status', '借入契約を確定しました。');
+    }
+
+    public function destroyBalanceSnapshot(
+        Request $request,
+        CompanyLoan $loan,
+        CompanyLoanBalanceSnapshot $snapshot,
+        CompanyAccess $access
+    ): RedirectResponse {
+        [$organization] = $this->manageContext($request, $access);
+        $this->owned($loan, $organization->id);
+        abort_unless(
+            $snapshot->company_loan_id === $loan->id && $snapshot->organization_id === $organization->id,
+            404
+        );
+
+        if ($loan->balanceSnapshots()->count() <= 1) {
+            return back()->withErrors([
+                'balance_snapshot' => '基準日時点の残高は最低1件必要です。削除せず、現在残高と残高基準日を修正してください。',
+            ]);
+        }
+
+        DB::transaction(function () use ($loan, $snapshot, $request): void {
+            $before = array_merge($loan->toArray(), [
+                'deleted_balance_snapshot' => $snapshot->toArray(),
+            ]);
+            $snapshot->delete();
+
+            $latest = $loan->balanceSnapshots()->latest('balance_as_of')->firstOrFail();
+            $loan->update([
+                'current_balance' => $latest->balance,
+                'balance_as_of' => $latest->balance_as_of,
+                'monthly_principal_payment' => $latest->monthly_principal_payment,
+                'recent_interest_amount' => $latest->interest_amount ?? $loan->recent_interest_amount,
+                'record_status' => CompanyLoan::RECORD_DRAFT,
+                'confirmed_at' => null,
+                'confirmed_by' => null,
+            ]);
+            $this->revision($loan, $request->user()->id, 'snapshot_deleted', $before);
+        });
+
+        return redirect()->route('company-loans.edit', $loan)
+            ->with('status', '選択した残高実績を削除し、最新の実績を現在残高へ反映しました。');
     }
 
     public function confirmDrafts(Request $request, CompanyAccess $access): RedirectResponse

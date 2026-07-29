@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CompanyLoan;
+use App\Models\CompanyLoanBalanceSnapshot;
 use App\Models\Organization;
 use App\Models\OrganizationUser;
 use App\Models\User;
@@ -13,6 +14,64 @@ use Tests\TestCase;
 class CompanyLoanManagementTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_owner_can_delete_an_incorrect_balance_snapshot_and_latest_remaining_snapshot_becomes_current(): void
+    {
+        [$owner, $organization, $session] = $this->companyUser('owner');
+        $input = $this->loanInput();
+
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.store'), $input)->assertRedirect();
+
+        $loan = CompanyLoan::firstOrFail();
+        $juneSnapshot = CompanyLoanBalanceSnapshot::create([
+            'company_loan_id' => $loan->id,
+            'organization_id' => $organization->id,
+            'balance_as_of' => '2026-06-30',
+            'balance' => 29_000_000,
+            'monthly_principal_payment' => 250_000,
+            'interest_amount' => 30_000,
+            'recorded_by' => $owner->id,
+        ]);
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.edit', $loan))
+            ->assertOk()
+            ->assertSee('基準日時点の残高')
+            ->assertSee('残高実績履歴')
+            ->assertSee('2026/06/30')
+            ->assertSee('29,000,000円');
+
+        $this->actingAs($owner)->withSession($session)
+            ->delete(route('company-loans.balance-snapshots.destroy', [$loan, $juneSnapshot]))
+            ->assertRedirect(route('company-loans.edit', $loan));
+
+        $this->assertDatabaseMissing('company_loan_balance_snapshots', ['id' => $juneSnapshot->id]);
+        $loan->refresh();
+        $this->assertSame(29_250_000, $loan->current_balance);
+        $this->assertSame('2026-05-31', $loan->balance_as_of->toDateString());
+        $this->assertSame(CompanyLoan::RECORD_DRAFT, $loan->record_status);
+        $this->assertDatabaseHas('company_loan_revisions', [
+            'company_loan_id' => $loan->id,
+            'action' => 'snapshot_deleted',
+        ]);
+    }
+
+    public function test_last_balance_snapshot_cannot_be_deleted(): void
+    {
+        [$owner, , $session] = $this->companyUser('owner');
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.store'), $this->loanInput())->assertRedirect();
+
+        $loan = CompanyLoan::firstOrFail();
+        $snapshot = $loan->balanceSnapshots()->firstOrFail();
+
+        $this->actingAs($owner)->withSession($session)
+            ->delete(route('company-loans.balance-snapshots.destroy', [$loan, $snapshot]))
+            ->assertSessionHasErrors('balance_snapshot');
+
+        $this->assertDatabaseHas('company_loan_balance_snapshots', ['id' => $snapshot->id]);
+    }
 
     public function test_owner_can_preview_save_confirm_and_view_loan_dashboard(): void
     {
