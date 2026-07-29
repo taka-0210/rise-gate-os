@@ -90,6 +90,7 @@
         .button.secondary, button.secondary { background: #fff; color: var(--accent-dark); border: 1px solid var(--line); }
         .button.danger, button.danger { background: var(--danger); color: #fff; }
         .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .page-header { margin-bottom: 24px; }
         .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         .card { border: 1px solid var(--line); border-radius: 8px; padding: 18px; background: #fff; }
         .meta { color: var(--muted); font-size: 13px; }

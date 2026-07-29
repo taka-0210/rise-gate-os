@@ -62,6 +62,8 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->get(route('company-finance.repayment-capacity.index'))
             ->assertOk()
             ->assertSee('減価償却・返済余力')
+            ->assertSee('簡易DSCR')
+            ->assertSee('一般的なDSCRでは元利返済額を使う')
             ->assertSee('3,000,000円')
             ->assertSee('4,000,000円')
             ->assertSee('1,200,000円')

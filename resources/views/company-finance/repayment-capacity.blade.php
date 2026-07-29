@@ -6,7 +6,7 @@
         <div>
             <div class="meta"><a href="{{ route('company-finance.index') }}">経営数値</a> / REPAYMENT CAPACITY</div>
             <h1>減価償却・返済余力</h1>
-            <p>利益と減価償却費から返済原資を求め、年間の元本返済後に残る余力を確認します。</p>
+            <p>利益と減価償却費から返済原資を求め、返済余力と簡易DSCR（元本ベース）を確認します。</p>
         </div>
         <div class="actions">
             <a class="button secondary" href="{{ route('company-finance.index') }}">← 経営数値へ戻る</a>
@@ -20,7 +20,7 @@
     <div class="capacity-formula">
         <div><span>返済原資</span><strong>当期純利益 ＋ 減価償却費</strong></div>
         <b>→</b>
-        <div><span>返済後余力</span><strong>返済原資 － 年間元本返済額</strong></div>
+        <div><span>返済後余力・簡易DSCR</span><strong>返済原資 － 年間元本返済額</strong></div>
     </div>
 
     <form method="POST" action="{{ route('company-finance.repayment-capacity.update') }}" class="card capacity-table-wrap">
@@ -35,7 +35,7 @@
         </div>
 
         <table class="capacity-table">
-            <thead><tr><th>年度</th><th>区分</th><th>当期純利益</th><th>減価償却費</th><th>返済原資</th><th>年間元本返済額</th><th>返済後余力</th><th>返済原資倍率</th></tr></thead>
+            <thead><tr><th>年度</th><th>区分</th><th>当期純利益</th><th>減価償却費</th><th>返済原資</th><th>年間元本返済額</th><th>返済後余力</th><th>返済原資倍率<br><small>簡易DSCR</small></th></tr></thead>
             <tbody>
                 @foreach($rows as $row)
                     <tr>
@@ -61,7 +61,7 @@
 
     <div class="card capacity-note">
         <h3>数字の見方</h3>
-        <p>返済原資倍率が1.00倍以上なら、利益と減価償却費でその年度の元本返済を賄える計算です。設備投資、運転資金の増減、税金などによる実際の資金移動は別途確認してください。</p>
+        <p>本画面の簡易DSCRは「返済原資 ÷ 年間元本返済額」です。1.00倍以上なら、利益と減価償却費でその年度の元本返済を賄える計算です。一般的なDSCRでは元利返済額を使うため、本画面では元本ベースと明記しています。設備投資、運転資金の増減、税金などによる実際の資金移動は別途確認してください。</p>
     </div>
 </div>
 
