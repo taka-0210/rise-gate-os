@@ -29,6 +29,7 @@ class CompanyFinanceEntryTest extends TestCase
         $period = CompanyFinancialPeriod::firstOrFail();
         $this->assertSame(40_000_000, $period->gross_profit);
         $this->assertSame(10_000_000, $period->operating_profit);
+        $this->assertSame(500_000, $period->interest_expense);
         $this->assertSame(CompanyFinancialPeriod::RECORD_DRAFT, $period->record_status);
         $this->assertCount(1, $period->revisions);
 
@@ -90,7 +91,7 @@ class CompanyFinanceEntryTest extends TestCase
 
         $this->actingAs($user)->withSession($session)
             ->get(route('company-finance.pl.bulk'))
-            ->assertOk()->assertSee('1</b><span>期', false)->assertSee('10</b><span>法人税等', false);
+            ->assertOk()->assertSee('1</b><span>期', false)->assertSee('11</b><span>法人税等', false);
     }
 
     private function input(): array
@@ -99,6 +100,7 @@ class CompanyFinanceEntryTest extends TestCase
             'period_number' => 21, 'fiscal_year' => 2024, 'net_sales' => 100_000_000,
             'cost_of_sales' => 60_000_000, 'selling_general_admin_expenses' => 30_000_000,
             'non_operating_income' => 2_000_000, 'non_operating_expenses' => 1_000_000,
+            'interest_expense' => 500_000,
             'extraordinary_income' => 0, 'extraordinary_losses' => 0, 'income_taxes' => 3_000_000,
         ];
     }

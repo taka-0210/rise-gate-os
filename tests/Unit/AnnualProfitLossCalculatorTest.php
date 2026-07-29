@@ -14,6 +14,7 @@ class AnnualProfitLossCalculatorTest extends TestCase
             'net_sales' => 1000, 'cost_of_sales' => 600,
             'selling_general_admin_expenses' => 300,
             'non_operating_income' => 20, 'non_operating_expenses' => 10,
+            'interest_expense' => 6,
             'extraordinary_income' => 5, 'extraordinary_losses' => 3, 'income_taxes' => 22,
         ]);
 
@@ -22,6 +23,7 @@ class AnnualProfitLossCalculatorTest extends TestCase
         $this->assertSame(110, $result['ordinary_profit']);
         $this->assertSame(112, $result['profit_before_tax']);
         $this->assertSame(90, $result['net_income']);
+        $this->assertSame(6, $result['interest_expense']);
         $this->assertSame(0.4, $result['gross_profit_ratio']);
     }
 }

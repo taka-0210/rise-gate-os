@@ -212,6 +212,7 @@ class CompanyFinanceController extends Controller
             'selling_general_admin_expenses' => ['required', 'integer', 'min:0'],
             'non_operating_income' => ['nullable', 'integer', 'min:0'],
             'non_operating_expenses' => ['nullable', 'integer', 'min:0'],
+            'interest_expense' => ['nullable', 'integer', 'min:0', 'lte:non_operating_expenses'],
             'extraordinary_income' => ['nullable', 'integer', 'min:0'],
             'extraordinary_losses' => ['nullable', 'integer', 'min:0'],
             'income_taxes' => ['nullable', 'integer', 'min:0'],

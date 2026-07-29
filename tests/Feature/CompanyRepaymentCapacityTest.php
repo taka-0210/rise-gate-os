@@ -26,6 +26,7 @@ class CompanyRepaymentCapacityTest extends TestCase
             'record_status' => CompanyFinancialPeriod::RECORD_CONFIRMED,
             'source_type' => CompanyFinancialPeriod::SOURCE_MANUAL,
             'net_income' => 3_000_000,
+            'interest_expense' => 200_000,
         ]);
         CompanyLoan::create([
             'organization_id' => $organization->id,
@@ -62,13 +63,14 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->get(route('company-finance.repayment-capacity.index'))
             ->assertOk()
             ->assertSee('減価償却・返済余力')
-            ->assertSee('簡易DSCR')
-            ->assertSee('一般的なDSCRでは元利返済額を使う')
+            ->assertSee('DSCR')
             ->assertSee('3,000,000円')
-            ->assertSee('4,000,000円')
+            ->assertSee('200,000円')
+            ->assertSee('4,200,000円')
             ->assertSee('1,200,000円')
+            ->assertSee('1,400,000円')
             ->assertSee('2,800,000円')
-            ->assertSee('3.33倍');
+            ->assertSee('3.00倍');
     }
 
     private function companyOwner(): array

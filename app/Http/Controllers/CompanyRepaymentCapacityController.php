@@ -56,14 +56,19 @@ class CompanyRepaymentCapacityController extends Controller
             $depreciation = $depreciationPeriods->get($year);
             $netIncome = $financialPeriod ? (int) $financialPeriod->net_income : null;
             $depreciationExpense = $depreciation ? (int) $depreciation->depreciation_expense : null;
+            $interestExpense = $financialPeriod?->interest_expense !== null
+                ? (int) $financialPeriod->interest_expense
+                : null;
             $principalRepayment = $capacity->annualPrincipalRepayment(
                 $organization->id,
                 $year,
                 $closingMonth,
             );
+            $usesFullDscr = $interestExpense !== null;
             $repaymentSource = $netIncome !== null && $depreciationExpense !== null
-                ? $netIncome + $depreciationExpense
+                ? $netIncome + $depreciationExpense + ($interestExpense ?? 0)
                 : null;
+            $annualDebtService = $usesFullDscr ? $principalRepayment + $interestExpense : $principalRepayment;
 
             return [
                 'year' => $year,
@@ -71,12 +76,15 @@ class CompanyRepaymentCapacityController extends Controller
                 'type' => $financialPeriod ? '実績' : '計画',
                 'net_income' => $netIncome,
                 'depreciation_expense' => $depreciationExpense,
+                'interest_expense' => $interestExpense,
                 'repayment_source' => $repaymentSource,
                 'principal_repayment' => $principalRepayment,
-                'remaining_capacity' => $repaymentSource !== null ? $repaymentSource - $principalRepayment : null,
-                'coverage_ratio' => $repaymentSource !== null && $principalRepayment > 0
-                    ? $repaymentSource / $principalRepayment
+                'annual_debt_service' => $annualDebtService,
+                'remaining_capacity' => $repaymentSource !== null ? $repaymentSource - $annualDebtService : null,
+                'coverage_ratio' => $repaymentSource !== null && $annualDebtService > 0
+                    ? $repaymentSource / $annualDebtService
                     : null,
+                'dscr_type' => $usesFullDscr ? 'DSCR' : '簡易DSCR',
             ];
         });
 

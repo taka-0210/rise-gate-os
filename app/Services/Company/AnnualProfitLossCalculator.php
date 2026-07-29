@@ -7,7 +7,7 @@ class AnnualProfitLossCalculator
     public const INPUT_FIELDS = [
         'period_number', 'fiscal_year', 'net_sales', 'cost_of_sales',
         'selling_general_admin_expenses', 'non_operating_income',
-        'non_operating_expenses', 'extraordinary_income',
+        'non_operating_expenses', 'interest_expense', 'extraordinary_income',
         'extraordinary_losses', 'income_taxes',
     ];
 
@@ -15,7 +15,9 @@ class AnnualProfitLossCalculator
     {
         $data = [];
         foreach (self::INPUT_FIELDS as $field) {
-            $data[$field] = (int) ($input[$field] ?? 0);
+            $data[$field] = $field === 'interest_expense' && ! isset($input[$field])
+                ? null
+                : (int) ($input[$field] ?? 0);
         }
 
         $sales = $data['net_sales'];

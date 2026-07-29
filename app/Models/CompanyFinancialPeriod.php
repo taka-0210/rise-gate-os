@@ -35,6 +35,7 @@ class CompanyFinancialPeriod extends Model
         'operating_profit_ratio',
         'non_operating_income',
         'non_operating_expenses',
+        'interest_expense',
         'ordinary_profit',
         'extraordinary_income',
         'extraordinary_losses',
