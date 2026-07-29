@@ -118,6 +118,8 @@ class CompanyLoanManagementTest extends TestCase
         $input['current_balance'] = 24_791_000;
         $input['monthly_principal_payment'] = 209_000;
         $input['balance_as_of'] = '2026-07-25';
+        $input['first_payment_on'] = '2026-07-25';
+        $input['scheduled_payment_count'] = 119;
 
         $this->actingAs($owner)->withSession($session)
             ->post(route('company-loans.store'), $input)->assertRedirect();
@@ -126,7 +128,20 @@ class CompanyLoanManagementTest extends TestCase
             ->get(route('company-loans.schedule', ['start' => '2026-07', 'end' => '2026-08']))
             ->assertOk()
             ->assertSee('<td class="total-column"><strong>24,791,000</strong></td>', false)
-            ->assertSee('<td class="repayment-column"><strong>209,000</strong></td>', false);
+            ->assertSee('<td class="repayment-column"><strong>209,000</strong></td>', false)
+            ->assertSee('title="1回目の返済後残高">1回</span>', false)
+            ->assertSee('title="2回目の返済後残高">2回</span>', false);
+    }
+
+    public function test_payment_count_and_first_payment_date_must_be_registered_as_a_pair(): void
+    {
+        [$owner, , $session] = $this->companyUser('owner');
+        $input = $this->loanInput();
+        $input['scheduled_payment_count'] = 119;
+
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.preview'), $input)
+            ->assertSessionHasErrors('first_payment_on');
     }
 
     public function test_owner_can_preview_save_confirm_and_view_loan_dashboard(): void
@@ -134,6 +149,7 @@ class CompanyLoanManagementTest extends TestCase
         [$owner, $organization, $session] = $this->companyUser('owner');
         $input = $this->loanInput();
         $input['scheduled_payment_count'] = 119;
+        $input['first_payment_on'] = '2026-03-25';
 
         $this->actingAs($owner)->withSession($session)
             ->post(route('company-loans.preview'), $input)
@@ -145,6 +161,7 @@ class CompanyLoanManagementTest extends TestCase
         $loan = CompanyLoan::firstOrFail();
         $this->assertSame(CompanyLoan::RECORD_DRAFT, $loan->record_status);
         $this->assertSame(119, $loan->scheduled_payment_count);
+        $this->assertSame('2026-03-25', $loan->first_payment_on->toDateString());
         $this->assertCount(1, $loan->revisions);
         $this->assertDatabaseHas('company_loan_balance_snapshots', [
             'company_loan_id' => $loan->id, 'balance' => 29_250_000,
@@ -382,6 +399,7 @@ class CompanyLoanManagementTest extends TestCase
             'financial_institution' => '姫路信用金庫', 'management_number' => '16',
             'purpose' => '運転資金', 'executed_on' => '2026-03-01', 'term_label' => '10年',
             'scheduled_payment_count' => null,
+            'first_payment_on' => null,
             'original_amount' => 30_000_000, 'current_balance' => 29_250_000,
             'monthly_principal_payment' => 250_000, 'annual_interest_rate' => 1.996,
             'balance_projection_mode' => CompanyLoan::PROJECTION_AMORTIZING,

@@ -6,6 +6,7 @@ $beforeBalanceFields = [
     ['executed_on','借入実行日','date'],
     ['term_label','返済期間','text'],
     ['scheduled_payment_count','返済予定回数','number'],
+    ['first_payment_on','初回返済日','date'],
     ['original_amount','当初借入額','number'],
 ];
 $afterBalanceFields = [

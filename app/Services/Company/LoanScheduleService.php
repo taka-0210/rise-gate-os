@@ -48,6 +48,7 @@ class LoanScheduleService
 
             foreach ($loans as $loan) {
                 $cell = $this->balanceForMonth($loan, $month);
+                $cell['payment_number'] = $this->paymentNumberForMonth($loan, $month);
                 $cells[$loan->id] = $cell;
                 $total += $cell['balance'] ?? 0;
 
@@ -73,6 +74,25 @@ class LoanScheduleService
         }
 
         return $rows;
+    }
+
+    private function paymentNumberForMonth(object $loan, CarbonImmutable $month): ?int
+    {
+        if (! $loan->first_payment_on || ! $loan->scheduled_payment_count) {
+            return null;
+        }
+
+        $firstPaymentMonth = CarbonImmutable::parse($loan->first_payment_on)->startOfMonth();
+        if ($month->lessThan($firstPaymentMonth)) {
+            return null;
+        }
+        if ($loan->completed_on && $month->greaterThan(CarbonImmutable::parse($loan->completed_on)->startOfMonth())) {
+            return null;
+        }
+
+        $number = (int) $firstPaymentMonth->diffInMonths($month) + 1;
+
+        return $number <= (int) $loan->scheduled_payment_count ? $number : null;
     }
 
     private function balanceForMonth(object $loan, CarbonImmutable $month): array

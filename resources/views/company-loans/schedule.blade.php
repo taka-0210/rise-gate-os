@@ -90,6 +90,7 @@
                                 @php($cell = $row['cells'][$loan->id])
                                 <td class="{{ $cell['actual'] ? 'is-actual ' : '' }}{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">
                                     @if($cell['balance'] !== null)
+                                        @if($cell['payment_number'])<span class="payment-number" title="{{ $cell['payment_number'] }}回目の返済後残高">{{ $cell['payment_number'] }}回</span>@endif
                                         @if($cell['actual'])<span class="actual-mark" title="実績">●</span>@endif{{ number_format($cell['balance']) }}
                                     @endif
                                 </td>
@@ -128,6 +129,8 @@
 .schedule-table td.is-actual{background:#eef8f4;color:#135f50;font-weight:700}
 .schedule-table .loan-completed,.schedule-table td.is-actual.loan-completed{background:#e5e8ea;color:#78848a}
 .actual-mark{margin-right:4px;color:#2b9b82;font-size:8px;vertical-align:middle}
+.payment-number{display:inline-block;min-width:30px;margin-right:5px;padding:1px 4px;border-radius:4px;background:#edf2f4;color:#53666e;font-size:10px;text-align:center}
+.schedule-table td.is-actual .payment-number{background:#d9eee6;color:#266454}
 .loan-no{color:var(--accent-dark);font-size:13px}.loan-edit-link{text-decoration:underline;text-decoration-color:#91aaa5;text-underline-offset:3px}.loan-edit-link:hover{color:#0e745f;text-decoration-color:currentColor}.completed-label,.calculated-label{display:block;margin-top:2px;color:#6d787e}.sort-link{display:inline-flex;gap:4px;align-items:center;color:var(--accent-dark);text-decoration:none}.sort-link:hover{text-decoration:underline}.schedule-note{margin-top:16px}.schedule-note p{margin-bottom:0;color:var(--muted)}
 @media(max-width:700px){.loan-schedule-page{width:calc(100vw - 12px)}.schedule-wrap{max-height:calc(100vh - 210px)}}
 </style>
