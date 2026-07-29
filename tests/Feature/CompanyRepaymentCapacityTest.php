@@ -80,19 +80,52 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertSee('3.00倍');
     }
 
+    public function test_november_closing_year_uses_december_through_next_november(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-30 12:00:00 Asia/Tokyo');
+        [$user, $organization, $session] = $this->companyOwner(11);
+
+        CompanyLoan::create([
+            'organization_id' => $organization->id,
+            'financial_institution' => '年度境界銀行',
+            'management_number' => '22',
+            'executed_on' => '2025-12-01',
+            'term_label' => '1年',
+            'original_amount' => 1_200_000,
+            'current_balance' => 0,
+            'monthly_principal_payment' => 100_000,
+            'balance_projection_mode' => CompanyLoan::PROJECTION_AMORTIZING,
+            'maturity_on' => '2026-12-01',
+            'balance_as_of' => '2026-11-30',
+            'loan_status' => CompanyLoan::STATUS_ACTIVE,
+            'record_status' => CompanyLoan::RECORD_CONFIRMED,
+            'source_type' => CompanyLoan::SOURCE_MANUAL,
+        ]);
+
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.repayment-capacity.index'))
+            ->assertOk()
+            ->assertSee('2025年度')
+            ->assertSee('今期')
+            ->assertSee('1,200,000円')
+            ->assertSee('No.22 年度境界銀行')
+            ->assertSee('2027年度')
+            ->assertDontSee('2028年度');
+    }
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
         parent::tearDown();
     }
 
-    private function companyOwner(): array
+    private function companyOwner(int $closingMonth = 12): array
     {
         $user = User::factory()->create();
         $organization = Organization::create([
             'name' => '返済余力テスト株式会社',
             'slug' => 'capacity-'.uniqid(),
-            'fiscal_year_end_month' => 12,
+            'fiscal_year_end_month' => $closingMonth,
         ]);
         $workspace = Workspace::create([
             'organization_id' => $organization->id,

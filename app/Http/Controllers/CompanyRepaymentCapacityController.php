@@ -22,9 +22,10 @@ class CompanyRepaymentCapacityController extends Controller
     ): View {
         [$organization, $canManage] = $this->context($request, $access);
         $closingMonth = $organization->fiscal_year_end_month ?: 12;
-        $currentFiscalYear = CarbonImmutable::now('Asia/Tokyo')->month > $closingMonth
-            ? CarbonImmutable::now('Asia/Tokyo')->year + 1
-            : CarbonImmutable::now('Asia/Tokyo')->year;
+        $now = CarbonImmutable::now('Asia/Tokyo');
+        $currentFiscalYear = $closingMonth === 12 || $now->month > $closingMonth
+            ? $now->year
+            : $now->year - 1;
 
         $financialPeriods = CompanyFinancialPeriod::query()
             ->where('organization_id', $organization->id)
@@ -83,7 +84,7 @@ class CompanyRepaymentCapacityController extends Controller
                 'period_number' => $financialPeriod?->period_number,
                 'type' => $financialPeriod
                     ? '実績'
-                    : ($year < $currentFiscalYear ? '未登録' : '計画'),
+                    : ($year < $currentFiscalYear ? '未登録' : ($year === $currentFiscalYear ? '今期' : '計画')),
                 'net_income' => $netIncome,
                 'depreciation_expense' => $depreciationExpense,
                 'interest_expense' => $interestExpense,
