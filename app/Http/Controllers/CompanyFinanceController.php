@@ -216,6 +216,8 @@ class CompanyFinanceController extends Controller
             'extraordinary_income' => ['nullable', 'integer', 'min:0'],
             'extraordinary_losses' => ['nullable', 'integer', 'min:0'],
             'income_taxes' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'interest_expense.lte' => '支払利息は、営業外費用以下の金額を入力してください。支払利息は営業外費用の内数です。',
         ]);
     }
 

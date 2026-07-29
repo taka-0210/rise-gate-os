@@ -94,6 +94,20 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertOk()->assertSee('1</b><span>期', false)->assertSee('11</b><span>法人税等', false);
     }
 
+    public function test_interest_expense_must_not_exceed_non_operating_expenses(): void
+    {
+        [$user, , $session] = $this->companyOwner();
+        $input = $this->input();
+        $input['non_operating_expenses'] = 585_644;
+        $input['interest_expense'] = 5_792_440;
+
+        $this->actingAs($user)->withSession($session)
+            ->post(route('company-finance.pl.preview'), $input)
+            ->assertSessionHasErrors([
+                'interest_expense' => '支払利息は、営業外費用以下の金額を入力してください。支払利息は営業外費用の内数です。',
+            ]);
+    }
+
     private function input(): array
     {
         return [
