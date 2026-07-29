@@ -81,6 +81,8 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/company/finance/pl/{period}/confirm', [CompanyFinanceController::class, 'confirm'])->name('company-finance.pl.confirm');
         Route::get('/company/finance/repayment-capacity', [CompanyRepaymentCapacityController::class, 'index'])->name('company-finance.repayment-capacity.index');
         Route::put('/company/finance/repayment-capacity', [CompanyRepaymentCapacityController::class, 'update'])->name('company-finance.repayment-capacity.update');
+        Route::post('/company/finance/repayment-capacity/simulate', [CompanyRepaymentCapacityController::class, 'simulate'])->name('company-finance.repayment-capacity.simulate');
+        Route::put('/company/finance/repayment-capacity/scenario', [CompanyRepaymentCapacityController::class, 'saveScenario'])->name('company-finance.repayment-capacity.scenario.save');
         Route::get('/company/finance/{section}', [CompanyFinanceController::class, 'placeholder'])->name('company-finance.section');
         Route::get('/company/loans', [CompanyLoanController::class, 'index'])->name('company-loans.index');
         Route::get('/company/loans/schedule', [CompanyLoanController::class, 'schedule'])->name('company-loans.schedule');

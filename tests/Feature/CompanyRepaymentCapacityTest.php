@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CompanyFinancialPeriod;
 use App\Models\CompanyLoan;
+use App\Models\CompanyRepaymentScenario;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\Workspace;
@@ -77,8 +78,10 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertSee('1,400,000円')
             ->assertSee('2,800,000円')
             ->assertSee('No.1 テスト銀行')
-            ->assertSee('id="repayment-modal-2024"', false)
+            ->assertSee('id="year-detail-2024"', false)
             ->assertDontSee('<details', false)
+            ->assertSee('安全')
+            ->assertSee('今期の改善シミュレーション')
             ->assertSee('3.00倍');
     }
 
@@ -129,16 +132,40 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertDontSee('1,700,000円')
             ->assertSee('1,200,000円')
             ->assertSee('500,000円')
-            ->assertSee('借換えによる一括・完済返済')
+            ->assertSee('借換えによる一括返済')
             ->assertSee('返済方法：借換えで返済')
             ->assertSee('DSCR：算入しない')
-            ->assertSee('extra-repayment-form-2025-', false)
+            ->assertSee('funding-form-2025-', false)
             ->assertSee('No.22 年度境界銀行')
             ->assertSee('No.23 一括返済銀行')
             ->assertSee('2027年度')
             ->assertDontSee('2028年度');
 
         $completedLoan = CompanyLoan::where('management_number', '23')->firstOrFail();
+        $scenarioInput = [
+            'fiscal_year' => 2025,
+            'net_sales' => 50_000_000,
+            'net_income' => 3_000_000,
+            'depreciation_expense' => 1_000_000,
+            'interest_expense' => 100_000,
+            'execute_extra_repayments' => true,
+            'extra_repayment_funding_overrides' => [
+                (string) $completedLoan->id => CompanyLoan::EXTRA_REPAYMENT_REFINANCE,
+            ],
+            'new_loans' => [[
+                'amount' => 0,
+                'executed_on' => null,
+                'term_months' => 60,
+                'annual_interest_rate' => 0,
+                'repayment_mode' => 'amortizing',
+            ]],
+        ];
+        $this->actingAs($user)->withSession($session)
+            ->postJson(route('company-finance.repayment-capacity.simulate'), $scenarioInput)
+            ->assertOk()
+            ->assertJsonPath('principal_repayment', 1_200_000)
+            ->assertJsonPath('refinanced_principal_repayment', 500_000);
+
         $this->actingAs($user)->withSession($session)
             ->put(route('company-finance.repayment-capacity.extra-repayment-funding', $completedLoan), [
                 'extra_repayment_funding' => CompanyLoan::EXTRA_REPAYMENT_SELF_FUNDED,
@@ -150,6 +177,60 @@ class CompanyRepaymentCapacityTest extends TestCase
             CompanyLoan::EXTRA_REPAYMENT_SELF_FUNDED,
             $completedLoan->fresh()->extra_repayment_funding,
         );
+    }
+
+    public function test_owner_can_simulate_and_save_current_year_decisions_without_changing_actuals(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-30 12:00:00 Asia/Tokyo');
+        [$user, $organization, $session] = $this->companyOwner();
+
+        $input = [
+            'fiscal_year' => 2026,
+            'net_sales' => 100_000_000,
+            'net_income' => 1_000_000,
+            'depreciation_expense' => 500_000,
+            'interest_expense' => 100_000,
+            'execute_extra_repayments' => true,
+            'extra_repayment_funding_overrides' => [],
+            'new_loans' => [[
+                'amount' => 12_000_000,
+                'executed_on' => '2026-01-01',
+                'term_months' => 12,
+                'annual_interest_rate' => 12,
+                'repayment_mode' => 'amortizing',
+            ]],
+        ];
+
+        $response = $this->actingAs($user)->withSession($session)
+            ->postJson(route('company-finance.repayment-capacity.simulate'), $input)
+            ->assertOk()
+            ->assertJsonPath('principal_repayment', 11_000_000)
+            ->assertJsonPath('new_loan_interest_expense', 890_000)
+            ->assertJsonPath('annual_debt_service', 11_990_000)
+            ->assertJsonPath('net_income', 110_000)
+            ->assertJsonPath('repayment_source', 1_600_000)
+            ->assertJsonPath('shortfall', 10_390_000)
+            ->assertJsonPath('assessment.label', '要改善');
+        $this->assertLessThan(1, $response->json('coverage_ratio'));
+
+        $this->actingAs($user)->withSession($session)
+            ->putJson(route('company-finance.repayment-capacity.scenario.save'), $input)
+            ->assertOk()
+            ->assertJsonPath('message', '今期の経営判断シナリオを保存しました。');
+
+        $scenario = CompanyRepaymentScenario::firstOrFail();
+        $this->assertSame(2026, $scenario->fiscal_year);
+        $this->assertSame(100_000_000, (int) $scenario->net_sales);
+        $this->assertSame(12_000_000, (int) $scenario->new_loans[0]['amount']);
+        $this->assertDatabaseCount('company_financial_periods', 0);
+        $this->assertDatabaseCount('company_loans', 0);
+
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.repayment-capacity.index'))
+            ->assertOk()
+            ->assertSee('今期計画')
+            ->assertSee('11,000,000円')
+            ->assertSee('要改善');
     }
 
     protected function tearDown(): void
