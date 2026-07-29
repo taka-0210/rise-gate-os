@@ -104,9 +104,9 @@
 
 <style>
 .loan-schedule-page{width:min(1800px,calc(100vw - 24px));position:relative;left:50%;transform:translateX(-50%)}
-.schedule-filter{display:flex;align-items:end;flex-wrap:nowrap;gap:10px;margin-bottom:16px;overflow-x:auto}
-.schedule-filter label{display:grid;gap:5px}.schedule-filter label span{font-size:12px;color:var(--muted);font-weight:700}
-.schedule-filter select{min-width:112px}.schedule-filter .button,.schedule-filter button,.schedule-filter .meta{flex:0 0 auto}
+.schedule-filter{display:flex;align-items:center;flex-wrap:nowrap;gap:14px;margin-bottom:16px;overflow-x:auto}
+.schedule-filter label{display:flex;align-items:center;gap:7px;flex:0 0 auto}.schedule-filter label span{color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap}
+.schedule-filter select{min-width:112px}.schedule-filter .button,.schedule-filter button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;margin:0}.schedule-filter .meta{display:flex;align-items:center;flex:0 0 auto;min-height:42px;margin:0}
 .schedule-wrap{padding:0;overflow:auto;max-height:calc(100vh - 250px)}
 .schedule-table{border-collapse:separate;border-spacing:0;min-width:max-content;font-size:12px;font-variant-numeric:tabular-nums}
 .schedule-table th,.schedule-table td{min-width:118px;padding:7px 9px;border-right:1px solid #dce4e7;border-bottom:1px solid #dce4e7;text-align:right;white-space:nowrap;background:#fff}

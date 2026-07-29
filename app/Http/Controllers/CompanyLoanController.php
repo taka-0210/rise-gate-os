@@ -48,7 +48,7 @@ class CompanyLoanController extends Controller
         $start = isset($validated['start'])
             ? CarbonImmutable::createFromFormat('Y-m', $validated['start'])->startOfMonth()
             : $defaultStart;
-        $durationYears = (int) ($validated['years'] ?? 20);
+        $durationYears = (int) ($validated['years'] ?? 15);
         $end = isset($validated['end']) && ! isset($validated['years'])
             ? CarbonImmutable::createFromFormat('Y-m', $validated['end'])->startOfMonth()
             : $start->addYears($durationYears - 1)->endOfYear()->startOfMonth();
