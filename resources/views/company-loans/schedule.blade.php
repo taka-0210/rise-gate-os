@@ -13,11 +13,17 @@
         </div>
     </div>
 
+    @php
+        $yearOptions = range(now()->year - 20, now()->year + 40);
+    @endphp
     <form class="card schedule-filter" method="GET">
-        <label><span>開始年月</span><input type="month" name="start" value="{{ $start->format('Y-m') }}"></label>
-        <label><span>終了年月</span><input type="month" name="end" value="{{ $end->format('Y-m') }}"></label>
-        <button>表示を更新</button>
-        <span class="meta">最大15年。●は登録済みの実績残高です。</span>
+        <label><span>開始年</span><select name="start">@foreach($yearOptions as $year)<option value="{{ $year }}-01" @selected($start->year === $year)>{{ $year }}年</option>@endforeach</select></label>
+        <span class="range-separator">から</span>
+        <label><span>終了年</span><select name="end">@foreach($yearOptions as $year)<option value="{{ $year }}-12" @selected($end->year === $year)>{{ $year }}年</option>@endforeach</select></label>
+        <span class="range-separator">まで</span>
+        <button>この期間を表示</button>
+        <a class="button secondary" href="{{ route('company-loans.schedule') }}">標準20年に戻す</a>
+        <span class="meta">年だけ選択できます。最大20年。●は登録済みの実績残高です。</span>
     </form>
 
     @if($loans->isEmpty())
@@ -105,7 +111,7 @@
 .loan-schedule-page{width:min(1800px,calc(100vw - 24px));position:relative;left:50%;transform:translateX(-50%)}
 .schedule-filter{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin-bottom:16px}
 .schedule-filter label{display:grid;gap:5px}.schedule-filter label span{font-size:12px;color:var(--muted);font-weight:700}
-.schedule-filter input{min-width:150px}
+.schedule-filter select{min-width:120px}.range-separator{align-self:center;padding-bottom:2px;color:var(--muted);font-size:13px;font-weight:700}
 .schedule-wrap{padding:0;overflow:auto;max-height:calc(100vh - 250px)}
 .schedule-table{border-collapse:separate;border-spacing:0;min-width:max-content;font-size:12px;font-variant-numeric:tabular-nums}
 .schedule-table th,.schedule-table td{min-width:118px;padding:7px 9px;border-right:1px solid #dce4e7;border-bottom:1px solid #dce4e7;text-align:right;white-space:nowrap;background:#fff}

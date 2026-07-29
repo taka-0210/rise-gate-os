@@ -30,14 +30,15 @@ class CompanyLoanController extends Controller
             'sort' => ['nullable', Rule::in(['institution', 'amount', 'monthly', 'term'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
+        $defaultStart = CarbonImmutable::now()->subYears(2)->startOfYear();
         $start = isset($validated['start'])
             ? CarbonImmutable::createFromFormat('Y-m', $validated['start'])->startOfMonth()
-            : CarbonImmutable::now()->subYears(4)->startOfYear();
+            : $defaultStart;
         $end = isset($validated['end'])
             ? CarbonImmutable::createFromFormat('Y-m', $validated['end'])->startOfMonth()
-            : CarbonImmutable::now()->addYears(5)->endOfYear()->startOfMonth();
+            : $defaultStart->addYears(19)->endOfYear()->startOfMonth();
         abort_if($end->lessThan($start), 422, '終了年月は開始年月以降にしてください。');
-        abort_if($start->diffInMonths($end) > 180, 422, '表示期間は15年以内にしてください。');
+        abort_if($start->diffInMonths($end) > 239, 422, '表示期間は20年以内にしてください。');
 
         $loans = CompanyLoan::query()
             ->where('organization_id', $organization->id)

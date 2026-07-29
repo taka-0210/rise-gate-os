@@ -8,12 +8,33 @@ use App\Models\Organization;
 use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class CompanyLoanManagementTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_schedule_defaults_to_twenty_years_starting_two_years_ago_and_uses_year_filters(): void
+    {
+        CarbonImmutable::setTestNow('2026-07-29 12:00:00');
+        [$owner, , $session] = $this->companyUser('owner');
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.schedule'))
+            ->assertOk()
+            ->assertSee('<option value="2024-01" selected>2024年</option>', false)
+            ->assertSee('<option value="2043-12" selected>2043年</option>', false)
+            ->assertSee('標準20年に戻す')
+            ->assertSee('最大20年');
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.schedule', ['start' => '2024-01', 'end' => '2044-01']))
+            ->assertStatus(422);
+
+        CarbonImmutable::setTestNow();
+    }
 
     public function test_owner_can_delete_an_incorrect_balance_snapshot_and_latest_remaining_snapshot_becomes_current(): void
     {
