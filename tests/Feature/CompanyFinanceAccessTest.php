@@ -36,6 +36,7 @@ class CompanyFinanceAccessTest extends TestCase
             ->assertSee('今年度計画と進捗')
             ->assertSee('月次試算表')
             ->assertSee('整合性・差異')
+            ->assertSee('減価償却・返済余力')
             ->assertSee('11月');
 
         $this->actingAs($owner)->withSession($session)
@@ -77,7 +78,13 @@ class CompanyFinanceAccessTest extends TestCase
         $this->actingAs($member)
             ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
             ->get(route('company-finance.index'))
-            ->assertOk();
+            ->assertOk()
+            ->assertDontSee('減価償却・返済余力');
+
+        $this->actingAs($member)
+            ->withSession(['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id])
+            ->get(route('company-finance.repayment-capacity.index'))
+            ->assertForbidden();
     }
 
     public function test_owner_can_assign_company_role_and_finance_permissions(): void

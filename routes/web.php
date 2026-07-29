@@ -10,6 +10,7 @@ use App\Http\Controllers\CompanyMemberAccessController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyHomeController;
 use App\Http\Controllers\CompanyLoanController;
+use App\Http\Controllers\CompanyRepaymentCapacityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EstimateController;
@@ -78,6 +79,8 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::get('/company/finance/pl/{period}/edit', [CompanyFinanceController::class, 'edit'])->name('company-finance.pl.edit');
         Route::put('/company/finance/pl/{period}', [CompanyFinanceController::class, 'update'])->name('company-finance.pl.update');
         Route::post('/company/finance/pl/{period}/confirm', [CompanyFinanceController::class, 'confirm'])->name('company-finance.pl.confirm');
+        Route::get('/company/finance/repayment-capacity', [CompanyRepaymentCapacityController::class, 'index'])->name('company-finance.repayment-capacity.index');
+        Route::put('/company/finance/repayment-capacity', [CompanyRepaymentCapacityController::class, 'update'])->name('company-finance.repayment-capacity.update');
         Route::get('/company/finance/{section}', [CompanyFinanceController::class, 'placeholder'])->name('company-finance.section');
         Route::get('/company/loans', [CompanyLoanController::class, 'index'])->name('company-loans.index');
         Route::get('/company/loans/schedule', [CompanyLoanController::class, 'schedule'])->name('company-loans.schedule');

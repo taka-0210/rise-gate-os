@@ -12,7 +12,7 @@
         </div>
 
         <div class="grid">
-            @if ($canViewCompanyFinance ?? false)
+            @if (($canViewCompanyFinance ?? false) && ($canViewCompanyDebt ?? false))
                 <a class="card" href="{{ route('company-finance.index') }}">
                     <div class="meta">FINANCE</div><h2>経営数値</h2><p>確定実績 {{ $financialPeriodCount }}期分</p>
                 </a>
@@ -31,11 +31,13 @@
                 <h2>保険</h2>
                 <p>契約内容・保険料・更新時期を管理（今後実装）</p>
             </div>
-            <div class="card">
-                <div class="meta">DEPRECIATION</div>
-                <h2>減価償却</h2>
-                <p>固定資産・取得価額・償却予定を管理（今後実装）</p>
-            </div>
+            @if ($canViewCompanyFinance ?? false)
+                <a class="card" href="{{ route('company-finance.repayment-capacity.index') }}">
+                    <div class="meta">REPAYMENT CAPACITY</div>
+                    <h2>減価償却・返済余力</h2>
+                    <p>利益・減価償却費・元本返済額を年度別に確認</p>
+                </a>
+            @endif
         </div>
 
         <div class="panel stack">

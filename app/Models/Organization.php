@@ -51,6 +51,11 @@ class Organization extends Model
         return $this->hasMany(CompanyFinancialPeriod::class);
     }
 
+    public function depreciationPeriods(): HasMany
+    {
+        return $this->hasMany(CompanyDepreciationPeriod::class);
+    }
+
     public function loans(): HasMany
     {
         return $this->hasMany(CompanyLoan::class);
