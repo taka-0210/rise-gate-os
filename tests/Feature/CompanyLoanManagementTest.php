@@ -129,6 +129,7 @@ class CompanyLoanManagementTest extends TestCase
             ->get(route('company-loans.schedule', ['start' => '2026-05', 'end' => '2026-07']))
             ->assertOk()
             ->assertSee('借入残高推移表')
+            ->assertSee(route('company-loans.edit', $loan), false)
             ->assertSee('29,250,000')
             ->assertSee('29,000,000')
             ->assertSee('28,750,000')
@@ -200,7 +201,18 @@ class CompanyLoanManagementTest extends TestCase
         OrganizationUser::where('organization_id', $organization->id)->where('user_id', $member->id)
             ->update(['permissions' => [OrganizationUser::PERMISSION_FINANCE_VIEW_DEBT]]);
 
+        $loan = CompanyLoan::create(array_merge($this->loanInput(), [
+            'organization_id' => $organization->id,
+            'record_status' => CompanyLoan::RECORD_DRAFT,
+            'source_type' => CompanyLoan::SOURCE_MANUAL,
+        ]));
+
         $this->actingAs($member)->withSession($session)->get(route('company-loans.index'))->assertOk();
+        $this->actingAs($member)->withSession($session)
+            ->get(route('company-loans.schedule', ['start' => '2026-05', 'end' => '2026-05']))
+            ->assertOk()
+            ->assertSee('No.16')
+            ->assertDontSee(route('company-loans.edit', $loan), false);
         $this->actingAs($member)->withSession($session)->get(route('company-loans.create'))->assertForbidden();
     }
 

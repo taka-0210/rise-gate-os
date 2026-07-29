@@ -38,7 +38,7 @@
                     <tr>
                         <th class="sticky-year">年度</th>
                         <th class="sticky-month">月</th>
-                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}"><span class="loan-no">No.{{ $loan->management_number }}</span>@if($loan->loan_status === 'completed')<small class="completed-label">完済{{ $loan->completed_on ? ' '.$loan->completed_on->format('Y.m') : '' }}</small>@endif</th>@endforeach
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">@if($canManage)<a class="loan-no loan-edit-link" href="{{ route('company-loans.edit', $loan) }}" title="No.{{ $loan->management_number }}を編集">No.{{ $loan->management_number }}</a>@else<span class="loan-no">No.{{ $loan->management_number }}</span>@endif @if($loan->loan_status === 'completed')<small class="completed-label">完済{{ $loan->completed_on ? ' '.$loan->completed_on->format('Y.m') : '' }}</small>@endif</th>@endforeach
                         <th class="total-column">残高合計</th>
                         <th class="repayment-column">元本返済額</th>
                     </tr>
@@ -121,7 +121,7 @@
 .schedule-table td.is-actual{background:#eef8f4;color:#135f50;font-weight:700}
 .schedule-table .loan-completed,.schedule-table td.is-actual.loan-completed{background:#e5e8ea;color:#78848a}
 .actual-mark{margin-right:4px;color:#2b9b82;font-size:8px;vertical-align:middle}
-.loan-no{color:var(--accent-dark);font-size:13px}.completed-label,.calculated-label{display:block;margin-top:2px;color:#6d787e}.sort-link{display:inline-flex;gap:4px;align-items:center;color:var(--accent-dark);text-decoration:none}.sort-link:hover{text-decoration:underline}.schedule-note{margin-top:16px}.schedule-note p{margin-bottom:0;color:var(--muted)}
+.loan-no{color:var(--accent-dark);font-size:13px}.loan-edit-link{text-decoration:underline;text-decoration-color:#91aaa5;text-underline-offset:3px}.loan-edit-link:hover{color:#0e745f;text-decoration-color:currentColor}.completed-label,.calculated-label{display:block;margin-top:2px;color:#6d787e}.sort-link{display:inline-flex;gap:4px;align-items:center;color:var(--accent-dark);text-decoration:none}.sort-link:hover{text-decoration:underline}.schedule-note{margin-top:16px}.schedule-note p{margin-bottom:0;color:var(--muted)}
 @media(max-width:700px){.loan-schedule-page{width:calc(100vw - 12px)}.schedule-wrap{max-height:calc(100vh - 210px)}}
 </style>
 @endsection

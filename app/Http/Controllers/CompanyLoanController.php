@@ -23,7 +23,7 @@ class CompanyLoanController extends Controller
 {
     public function schedule(Request $request, CompanyAccess $access, LoanScheduleService $schedule): View
     {
-        [$organization] = $this->viewContext($request, $access);
+        [$organization, $canManage] = $this->viewContext($request, $access);
         $validated = $request->validate([
             'start' => ['nullable', 'date_format:Y-m'],
             'end' => ['nullable', 'date_format:Y-m'],
@@ -66,6 +66,7 @@ class CompanyLoanController extends Controller
 
         return view('company-loans.schedule', [
             'organization' => $organization,
+            'canManage' => $canManage,
             'loans' => $loans,
             'rows' => $schedule->build($loans, $start, $end),
             'start' => $start,
