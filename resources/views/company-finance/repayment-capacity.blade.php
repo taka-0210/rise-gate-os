@@ -167,7 +167,7 @@
                 <section id="current-simulation" class="simulation-panel">
                     <div class="simulation-heading">
                         <div><span class="meta">CURRENT YEAR DECISION</span><h2>今期の改善シミュレーション</h2></div>
-                        <p>確定実績は変更しません。経営判断のシナリオとして保存します。</p>
+                        <p>初期値：{{ $simulationSourceType }}。P/Lは変更せず、経営判断のシナリオとして保存します。</p>
                     </div>
 
                     <div class="simulation-inputs">

@@ -30,6 +30,7 @@ class CompanyFinanceEntryTest extends TestCase
         $this->assertSame(40_000_000, $period->gross_profit);
         $this->assertSame(10_000_000, $period->operating_profit);
         $this->assertSame(500_000, $period->interest_expense);
+        $this->assertSame(CompanyFinancialPeriod::STATUS_ACTUAL, $period->status);
         $this->assertSame(CompanyFinancialPeriod::RECORD_DRAFT, $period->record_status);
         $this->assertCount(1, $period->revisions);
 
@@ -108,10 +109,52 @@ class CompanyFinanceEntryTest extends TestCase
             ]);
     }
 
+    public function test_plan_and_forecast_are_stored_separately_from_confirmation_state(): void
+    {
+        [$user, $organization, $session] = $this->companyOwner();
+        $input = $this->input();
+        $input['fiscal_year'] = 2025;
+        $input['period_number'] = 22;
+        $input['status'] = CompanyFinancialPeriod::STATUS_PLAN;
+
+        $this->actingAs($user)->withSession($session)
+            ->post(route('company-finance.pl.store'), $input)
+            ->assertRedirect();
+        $plan = CompanyFinancialPeriod::firstOrFail();
+        $this->actingAs($user)->withSession($session)
+            ->post(route('company-finance.pl.confirm', $plan))
+            ->assertRedirect();
+
+        $input['status'] = CompanyFinancialPeriod::STATUS_FORECAST;
+        $input['net_sales'] = 105_000_000;
+        $this->actingAs($user)->withSession($session)
+            ->post(route('company-finance.pl.store'), $input)
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('company_financial_periods', [
+            'organization_id' => $organization->id,
+            'fiscal_year' => 2025,
+            'status' => CompanyFinancialPeriod::STATUS_PLAN,
+            'record_status' => CompanyFinancialPeriod::RECORD_CONFIRMED,
+        ]);
+        $this->assertDatabaseHas('company_financial_periods', [
+            'organization_id' => $organization->id,
+            'fiscal_year' => 2025,
+            'status' => CompanyFinancialPeriod::STATUS_FORECAST,
+            'record_status' => CompanyFinancialPeriod::RECORD_DRAFT,
+        ]);
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.pl.index'))
+            ->assertOk()
+            ->assertSee('計画')
+            ->assertSee('見込');
+    }
+
     private function input(): array
     {
         return [
-            'period_number' => 21, 'fiscal_year' => 2024, 'net_sales' => 100_000_000,
+            'period_number' => 21, 'fiscal_year' => 2024, 'status' => CompanyFinancialPeriod::STATUS_ACTUAL,
+            'net_sales' => 100_000_000,
             'cost_of_sales' => 60_000_000, 'selling_general_admin_expenses' => 30_000_000,
             'non_operating_income' => 2_000_000, 'non_operating_expenses' => 1_000_000,
             'interest_expense' => 500_000,

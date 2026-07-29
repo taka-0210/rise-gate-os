@@ -22,8 +22,9 @@
             <p>「1期分を入力」または「表を貼り付けて一括入力」から登録できます。</p>
         </div>
     @else
+        @if($latest)
         <div class="stats">
-            <div class="stat"><span>最新実績</span><strong>{{ $latest->period_number }}期</strong><small>{{ $latest->fiscal_year }}年{{ $organization->fiscal_year_end_month ? $organization->fiscal_year_end_month.'月期' : '度' }}</small></div>
+            <div class="stat"><span>最新実績</span><strong>{{ $latest->period_number }}期</strong><small>{{ $latest->fiscal_year }}年度</small></div>
             <div class="stat"><span>売上高</span><strong>{{ number_format($latest->net_sales) }}</strong><small>円</small></div>
             <div class="stat"><span>粗利率</span><strong>{{ number_format((float) $latest->gross_profit_ratio * 100, 1) }}%</strong><small>売上総利益率</small></div>
             <div class="stat"><span>営業利益率</span><strong>{{ number_format((float) $latest->operating_profit_ratio * 100, 1) }}%</strong><small>{{ number_format($latest->operating_profit) }}円</small></div>
@@ -32,7 +33,7 @@
         <div class="insight-grid">
             <div class="card"><span>前期比売上</span><strong class="{{ ($salesGrowthRate ?? 0) < 0 ? 'negative' : '' }}">{{ $salesGrowthRate === null ? '—' : (($salesGrowthRate >= 0 ? '+' : '').number_format($salesGrowthRate, 1).'%') }}</strong><small>{{ $previous ? $previous->period_number.'期との比較' : '比較対象なし' }}</small></div>
             <div class="card"><span>過去最高売上</span><strong>{{ $highestSales?->period_number }}期</strong><small>{{ $highestSales ? number_format($highestSales->net_sales).'円' : '—' }}</small></div>
-            <div class="card"><span>営業黒字</span><strong>{{ $profitablePeriodCount }}期</strong><small>全{{ $periods->count() }}期中</small></div>
+            <div class="card"><span>営業黒字</span><strong>{{ $profitablePeriodCount }}期</strong><small>実績{{ $actualPeriods->count() }}期中</small></div>
             <div class="card"><span>最新の最終利益率</span><strong class="{{ ($latestNetIncomeRatio ?? 0) < 0 ? 'negative' : '' }}">{{ $latestNetIncomeRatio === null ? '—' : number_format($latestNetIncomeRatio, 1).'%' }}</strong><small>当期純利益 ÷ 売上高</small></div>
         </div>
 
@@ -50,13 +51,16 @@
                 @include('company-finance.partials.line-chart', ['title' => '粗利率・営業利益率・最終利益率の推移', 'periods' => $chartPeriods, 'series' => $marginSeries, 'unit' => '%'])
             </section>
         </div>
+        @else
+            <div class="card" style="margin-bottom:18px"><h2>確定実績はまだありません</h2><p>計画・見込は下の一覧で確認できます。実績を登録すると推移グラフを表示します。</p></div>
+        @endif
 
         <form class="card finance-table-wrap" method="POST" action="{{ route('company-finance.pl.confirm-drafts') }}">
             @csrf
             <div class="section-heading">
                 <div>
                     <h2>年度別損益推移</h2>
-                    <p class="meta">確定実績のみ表示。計画・見込・未確定とは区別して保存します。</p>
+                    <p class="meta">実績・計画・見込と、確定・下書きを分けて管理します。</p>
                 </div>
                 <div class="actions">
                     <span class="badge">{{ $periods->count() }}期分</span>
@@ -71,7 +75,8 @@
                     <tr>
                         @if($canManage && $periods->contains('record_status', 'draft'))<th><input type="checkbox" data-check-all aria-label="下書きをすべて選択"></th>@endif
                         <th>期</th>
-                        <th>年度</th>
+                        <th>事業年度</th>
+                        <th>区分</th>
                         <th>売上高</th>
                         <th>売上総利益</th>
                         <th>粗利率</th>
@@ -87,7 +92,17 @@
                         <tr>
                             @if($canManage && $periods->contains('record_status', 'draft'))<td>@if($period->record_status === 'draft')<input type="checkbox" name="ids[]" value="{{ $period->id }}" data-check-item aria-label="{{ $period->period_number }}期を選択">@endif</td>@endif
                             <td>@if($canManage)<a href="{{ route('company-finance.pl.edit',$period) }}">{{ $period->period_number }}期</a>@else{{ $period->period_number }}期@endif<br><small>{{ $period->record_status === 'confirmed' ? '確定' : '下書き' }}</small></td>
-                            <td>{{ $period->fiscal_year }}</td>
+                            <td>
+                                {{ $period->fiscal_year }}年度
+                                @if($organization->fiscal_year_end_month)
+                                    @php
+                                        $startMonth = $organization->fiscal_year_end_month === 12 ? 1 : $organization->fiscal_year_end_month + 1;
+                                        $endYear = $organization->fiscal_year_end_month === 12 ? $period->fiscal_year : $period->fiscal_year + 1;
+                                    @endphp
+                                    <br><small>{{ $period->fiscal_year }}.{{ str_pad($startMonth, 2, '0', STR_PAD_LEFT) }}〜{{ $endYear }}.{{ str_pad($organization->fiscal_year_end_month, 2, '0', STR_PAD_LEFT) }}</small>
+                                @endif
+                            </td>
+                            <td><span class="period-status period-status--{{ $period->status }}">{{ ['actual'=>'実績','plan'=>'計画','forecast'=>'見込'][$period->status] }}</span></td>
                             <td>{{ number_format($period->net_sales) }}</td>
                             <td>{{ number_format($period->gross_profit) }}</td>
                             <td>{{ number_format((float) $period->gross_profit_ratio * 100, 1) }}%</td>
@@ -123,6 +138,7 @@
         .finance-chart__legend { display:flex; flex-wrap:wrap; gap:14px; color:var(--muted); font-size:12px; }
         .finance-chart__legend span { display:inline-flex; align-items:center; gap:6px; }
         .finance-chart__legend i { width:18px; height:3px; border-radius:99px; }
+        .period-status{display:inline-flex;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:800}.period-status--actual{color:#126452;background:#e5f5ef}.period-status--plan{color:#66551c;background:#fbf4d8}.period-status--forecast{color:#174f70;background:#e5f1f8}
         .finance-chart__point { pointer-events:none; transition:r .12s ease; }
         .finance-chart__hit { cursor:crosshair; outline:none; }
         .finance-chart__tooltip { --point-color:#165d6c; position:absolute; z-index:5; display:grid; gap:2px; min-width:126px; padding:9px 11px; border-left:4px solid var(--point-color); border-radius:7px; color:#fff; background:rgba(18,31,39,.94); box-shadow:0 8px 24px rgba(0,0,0,.2); opacity:0; pointer-events:none; transform:translate(-50%,calc(-100% - 10px)); transition:opacity .1s ease; font-size:12px; }

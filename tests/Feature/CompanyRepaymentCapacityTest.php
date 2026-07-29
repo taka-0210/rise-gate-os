@@ -90,6 +90,17 @@ class CompanyRepaymentCapacityTest extends TestCase
         CarbonImmutable::setTestNow('2026-07-30 12:00:00 Asia/Tokyo');
         [$user, $organization, $session] = $this->companyOwner(11);
 
+        CompanyFinancialPeriod::create([
+            'organization_id' => $organization->id,
+            'period_number' => 22,
+            'fiscal_year' => 2025,
+            'status' => CompanyFinancialPeriod::STATUS_PLAN,
+            'record_status' => CompanyFinancialPeriod::RECORD_CONFIRMED,
+            'source_type' => CompanyFinancialPeriod::SOURCE_MANUAL,
+            'net_sales' => 614_000_000,
+            'net_income' => 10_000_000,
+            'interest_expense' => 4_000_000,
+        ]);
         CompanyLoan::create([
             'organization_id' => $organization->id,
             'financial_institution' => '年度境界銀行',
@@ -128,7 +139,9 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->get(route('company-finance.repayment-capacity.index'))
             ->assertOk()
             ->assertSee('2025年度')
-            ->assertSee('今期')
+            ->assertSee('計画')
+            ->assertSee('P/L計画')
+            ->assertSee('614000000')
             ->assertDontSee('1,700,000円')
             ->assertSee('1,200,000円')
             ->assertSee('500,000円')
@@ -140,6 +153,23 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertSee('No.23 一括返済銀行')
             ->assertSee('2027年度')
             ->assertDontSee('2028年度');
+
+        CompanyFinancialPeriod::create([
+            'organization_id' => $organization->id,
+            'period_number' => 22,
+            'fiscal_year' => 2025,
+            'status' => CompanyFinancialPeriod::STATUS_FORECAST,
+            'record_status' => CompanyFinancialPeriod::RECORD_CONFIRMED,
+            'source_type' => CompanyFinancialPeriod::SOURCE_MANUAL,
+            'net_sales' => 620_000_000,
+            'net_income' => 12_000_000,
+            'interest_expense' => 3_500_000,
+        ]);
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.repayment-capacity.index'))
+            ->assertOk()
+            ->assertSee('P/L見込')
+            ->assertSee('620000000');
 
         $completedLoan = CompanyLoan::where('management_number', '23')->firstOrFail();
         $scenarioInput = [
