@@ -26,6 +26,16 @@
             @if ($canViewCompanyDebt ?? false)
                 <a class="card" href="{{ route('company-loans.index') }}"><div class="meta">DEBT / FUNDING</div><h2>借入・資金計画</h2><p>借入残高 {{ number_format($loanBalance) }}円</p></a>
             @endif
+            <div class="card">
+                <div class="meta">INSURANCE</div>
+                <h2>保険</h2>
+                <p>契約内容・保険料・更新時期を管理（今後実装）</p>
+            </div>
+            <div class="card">
+                <div class="meta">DEPRECIATION</div>
+                <h2>減価償却</h2>
+                <p>固定資産・取得価額・償却予定を管理（今後実装）</p>
+            </div>
         </div>
 
         <div class="panel stack">

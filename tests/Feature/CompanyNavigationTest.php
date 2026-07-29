@@ -27,6 +27,10 @@ class CompanyNavigationTest extends TestCase
             ->get(route('company.home'))
             ->assertOk()
             ->assertSee('One Company')
+            ->assertSee('保険')
+            ->assertSee('契約内容・保険料・更新時期を管理（今後実装）')
+            ->assertSee('減価償却')
+            ->assertSee('固定資産・取得価額・償却予定を管理（今後実装）')
             ->assertDontSee('会社切替');
     }
 
