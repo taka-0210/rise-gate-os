@@ -7,7 +7,7 @@
 <div class="finance-entries">
     <a class="card" href="{{ route('company-finance.section', 'bs') }}"><b>01</b><div><h2>B/S</h2><p>資産・負債・純資産と財務体質</p></div></a>
     <a class="card" href="{{ route('company-finance.pl.index') }}"><b>02</b><div><h2>P/L</h2><p>年度別損益と利益率の推移</p></div></a>
-    <a class="card" href="{{ route('company-finance.section', 'plan') }}"><b>03</b><div><h2>今年度計画と進捗</h2><p>売上・粗利・販管費・営業利益の目標</p></div></a>
+    <a class="card" href="{{ route('company-finance.annual-plan.index') }}"><b>03</b><div><h2>今年度計画と進捗</h2><p>売上・粗利・販管費・営業利益の目標</p></div></a>
     <a class="card" href="{{ route('company-finance.section', 'monthly') }}"><b>04</b><div><h2>月次試算表</h2><p>毎月の実績と累計</p></div></a>
     <a class="card" href="{{ route('company-finance.section', 'reconciliation') }}"><b>05</b><div><h2>整合性・差異</h2><p>年度計画と月次実績のズレを確認</p></div></a>
     @if($canViewCompanyDebt ?? false)

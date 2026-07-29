@@ -38,19 +38,17 @@ class CompanyFinanceController extends Controller
         [$organization, $canManage] = $this->context($request, $access);
         $periods = CompanyFinancialPeriod::query()
             ->where('organization_id', $organization->id)
-            ->orderByDesc('fiscal_year')
-            ->orderByRaw("CASE status WHEN 'actual' THEN 0 WHEN 'forecast' THEN 1 ELSE 2 END")
-            ->get();
-        $actualPeriods = $periods->where('status', CompanyFinancialPeriod::STATUS_ACTUAL)->values();
-        $chronological = $actualPeriods->sortBy('fiscal_year')->values();
-        $latest = $actualPeriods->first();
-        $previous = $actualPeriods->get(1);
+            ->where('status', CompanyFinancialPeriod::STATUS_ACTUAL)
+            ->orderByDesc('fiscal_year')->get();
+        $chronological = $periods->sortBy('fiscal_year')->values();
+        $latest = $periods->first();
+        $previous = $periods->get(1);
 
         return view('company-finance.index', [
             'organization' => $organization, 'canManage' => $canManage,
-            'periods' => $periods, 'actualPeriods' => $actualPeriods, 'latest' => $latest, 'previous' => $previous,
-            'highestSales' => $actualPeriods->sortByDesc('net_sales')->first(),
-            'profitablePeriodCount' => $actualPeriods->where('operating_profit', '>', 0)->count(),
+            'periods' => $periods, 'latest' => $latest, 'previous' => $previous,
+            'highestSales' => $periods->sortByDesc('net_sales')->first(),
+            'profitablePeriodCount' => $periods->where('operating_profit', '>', 0)->count(),
             'salesGrowthRate' => $this->growthRate($latest?->net_sales, $previous?->net_sales),
             'latestNetIncomeRatio' => $latest && $latest->net_sales ? ($latest->net_income / $latest->net_sales) * 100 : null,
             'chartPeriods' => $chronological,
@@ -91,7 +89,7 @@ class CompanyFinanceController extends Controller
         $period = $request->filled('period_id') ? CompanyFinancialPeriod::findOrFail($request->integer('period_id')) : null;
         if ($period) $this->owned($period, $organization->id);
         $input = $this->validatedInput($request, $organization->id, $period?->id);
-        $calculated = array_merge($calculator->calculate($input), ['status' => $input['status']]);
+        $calculated = $calculator->calculate($input);
 
         return view('company-finance.preview', compact('organization', 'period', 'input', 'calculated'));
     }
@@ -99,8 +97,7 @@ class CompanyFinanceController extends Controller
     public function store(Request $request, AnnualProfitLossCalculator $calculator, CompanyAccess $access): RedirectResponse
     {
         [$organization] = $this->manageContext($request, $access);
-        $input = $this->validatedInput($request, $organization->id);
-        $data = array_merge($calculator->calculate($input), ['status' => $input['status']]);
+        $data = $calculator->calculate($this->validatedInput($request, $organization->id));
         $period = $this->savePeriod($organization->id, $request->user()->id, null, $data, CompanyFinancialPeriod::SOURCE_MANUAL);
 
         return redirect()->route('company-finance.pl.edit', $period)->with('status', '下書きを保存しました。');
@@ -110,8 +107,7 @@ class CompanyFinanceController extends Controller
     {
         [$organization] = $this->manageContext($request, $access);
         $this->owned($period, $organization->id);
-        $input = $this->validatedInput($request, $organization->id, $period->id);
-        $data = array_merge($calculator->calculate($input), ['status' => $input['status']]);
+        $data = $calculator->calculate($this->validatedInput($request, $organization->id, $period->id));
         $this->savePeriod($organization->id, $request->user()->id, $period, $data, CompanyFinancialPeriod::SOURCE_MANUAL);
 
         return redirect()->route('company-finance.pl.edit', $period)->with('status', '変更を下書き保存しました。再確認後に確定してください。');
@@ -138,6 +134,7 @@ class CompanyFinanceController extends Controller
         ]);
         $query = CompanyFinancialPeriod::query()
             ->where('organization_id', $organization->id)
+            ->where('status', CompanyFinancialPeriod::STATUS_ACTUAL)
             ->where('record_status', CompanyFinancialPeriod::RECORD_DRAFT);
         if ($validated['scope'] === 'selected') {
             $ids = collect($validated['ids'] ?? [])->map(fn ($id) => (int) $id)->unique();
@@ -209,14 +206,7 @@ class CompanyFinanceController extends Controller
     {
         return $request->validate([
             'period_number' => ['required', 'integer', 'between:1,999'],
-            'status' => ['required', Rule::in([
-                CompanyFinancialPeriod::STATUS_ACTUAL,
-                CompanyFinancialPeriod::STATUS_PLAN,
-                CompanyFinancialPeriod::STATUS_FORECAST,
-            ])],
-            'fiscal_year' => ['required', 'integer', 'between:1900,2200', Rule::unique('company_financial_periods')->where(
-                fn ($q) => $q->where('organization_id', $organizationId)->where('status', $request->input('status'))
-            )->ignore($ignoreId)],
+            'fiscal_year' => ['required', 'integer', 'between:1900,2200', Rule::unique('company_financial_periods')->where(fn ($q) => $q->where('organization_id', $organizationId)->where('status', CompanyFinancialPeriod::STATUS_ACTUAL))->ignore($ignoreId)],
             'net_sales' => ['required', 'integer', 'min:0'],
             'cost_of_sales' => ['required', 'integer', 'min:0'],
             'selling_general_admin_expenses' => ['required', 'integer', 'min:0'],
@@ -236,8 +226,7 @@ class CompanyFinanceController extends Controller
         return DB::transaction(function () use ($organizationId, $userId, $period, $data, $source) {
             $before = $period?->toArray();
             $values = array_merge($data, [
-                'organization_id' => $organizationId,
-                'status' => $data['status'] ?? CompanyFinancialPeriod::STATUS_ACTUAL,
+                'organization_id' => $organizationId, 'status' => CompanyFinancialPeriod::STATUS_ACTUAL,
                 'record_status' => CompanyFinancialPeriod::RECORD_DRAFT, 'source_type' => $source,
                 'confirmed_at' => null, 'confirmed_by' => null,
             ]);

@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\CompanyFinancialPeriod;
+use App\Models\CompanyAnnualPlan;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,7 +32,6 @@ class CompanyFinanceEntryTest extends TestCase
         $this->assertSame(40_000_000, $period->gross_profit);
         $this->assertSame(10_000_000, $period->operating_profit);
         $this->assertSame(500_000, $period->interest_expense);
-        $this->assertSame(CompanyFinancialPeriod::STATUS_ACTUAL, $period->status);
         $this->assertSame(CompanyFinancialPeriod::RECORD_DRAFT, $period->record_status);
         $this->assertCount(1, $period->revisions);
 
@@ -109,52 +110,50 @@ class CompanyFinanceEntryTest extends TestCase
             ]);
     }
 
-    public function test_plan_and_forecast_are_stored_separately_from_confirmation_state(): void
+    public function test_owner_can_save_current_annual_plan_and_latest_forecast_separately_from_pl(): void
     {
+        CarbonImmutable::setTestNow('2026-07-30 12:00:00 Asia/Tokyo');
         [$user, $organization, $session] = $this->companyOwner();
-        $input = $this->input();
-        $input['fiscal_year'] = 2025;
-        $input['period_number'] = 22;
-        $input['status'] = CompanyFinancialPeriod::STATUS_PLAN;
+        $organization->update(['fiscal_year_end_month' => 11]);
 
         $this->actingAs($user)->withSession($session)
-            ->post(route('company-finance.pl.store'), $input)
-            ->assertRedirect();
-        $plan = CompanyFinancialPeriod::firstOrFail();
-        $this->actingAs($user)->withSession($session)
-            ->post(route('company-finance.pl.confirm', $plan))
-            ->assertRedirect();
-
-        $input['status'] = CompanyFinancialPeriod::STATUS_FORECAST;
-        $input['net_sales'] = 105_000_000;
-        $this->actingAs($user)->withSession($session)
-            ->post(route('company-finance.pl.store'), $input)
-            ->assertRedirect();
-
-        $this->assertDatabaseHas('company_financial_periods', [
-            'organization_id' => $organization->id,
-            'fiscal_year' => 2025,
-            'status' => CompanyFinancialPeriod::STATUS_PLAN,
-            'record_status' => CompanyFinancialPeriod::RECORD_CONFIRMED,
-        ]);
-        $this->assertDatabaseHas('company_financial_periods', [
-            'organization_id' => $organization->id,
-            'fiscal_year' => 2025,
-            'status' => CompanyFinancialPeriod::STATUS_FORECAST,
-            'record_status' => CompanyFinancialPeriod::RECORD_DRAFT,
-        ]);
-        $this->actingAs($user)->withSession($session)
-            ->get(route('company-finance.pl.index'))
+            ->get(route('company-finance.annual-plan.index'))
             ->assertOk()
-            ->assertSee('計画')
-            ->assertSee('見込');
+            ->assertSee('2025年度')
+            ->assertSee('2025.12〜2026.11');
+
+        $this->actingAs($user)->withSession($session)
+            ->put(route('company-finance.annual-plan.update'), [
+                'period_number' => 22,
+                'plan_net_sales' => 614_000_000,
+                'plan_gross_profit' => 273_230_000,
+                'plan_selling_general_admin_expenses' => 267_230_000,
+                'plan_net_income' => 10_000_000,
+                'plan_interest_expense' => 4_000_000,
+                'plan_depreciation_expense' => 30_000_000,
+                'forecast_net_sales' => 620_000_000,
+                'forecast_net_income' => 12_000_000,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('status', '今年度の計画・最新見込を保存しました。');
+
+        $plan = CompanyAnnualPlan::firstOrFail();
+        $this->assertSame(2025, $plan->fiscal_year);
+        $this->assertSame(614_000_000, (int) $plan->plan_net_sales);
+        $this->assertSame(620_000_000, (int) $plan->forecast_net_sales);
+        $this->assertDatabaseCount('company_financial_periods', 0);
+    }
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+        parent::tearDown();
     }
 
     private function input(): array
     {
         return [
-            'period_number' => 21, 'fiscal_year' => 2024, 'status' => CompanyFinancialPeriod::STATUS_ACTUAL,
-            'net_sales' => 100_000_000,
+            'period_number' => 21, 'fiscal_year' => 2024, 'net_sales' => 100_000_000,
             'cost_of_sales' => 60_000_000, 'selling_general_admin_expenses' => 30_000_000,
             'non_operating_income' => 2_000_000, 'non_operating_expenses' => 1_000_000,
             'interest_expense' => 500_000,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CompanyAnnualPlan;
 use App\Models\CompanyDepreciationPeriod;
 use App\Models\CompanyFinancialPeriod;
 use App\Models\CompanyLoan;
@@ -35,47 +36,35 @@ class CompanyRepaymentCapacityController extends Controller
             ? $now->year
             : $now->year - 1;
 
-        $allFinancialPeriods = CompanyFinancialPeriod::query()
+        $financialPeriods = CompanyFinancialPeriod::query()
             ->where('organization_id', $organization->id)
-            ->where('record_status', CompanyFinancialPeriod::RECORD_CONFIRMED)
-            ->get();
-        $actualFinancialPeriods = $allFinancialPeriods
             ->where('status', CompanyFinancialPeriod::STATUS_ACTUAL)
+            ->where('record_status', CompanyFinancialPeriod::RECORD_CONFIRMED)
+            ->get()
             ->keyBy('fiscal_year');
-        $financialPeriods = $allFinancialPeriods
-            ->groupBy('fiscal_year')
-            ->map(function ($periods, $year) use ($currentFiscalYear) {
-                $priority = (int) $year >= $currentFiscalYear
-                    ? [
-                        CompanyFinancialPeriod::STATUS_FORECAST,
-                        CompanyFinancialPeriod::STATUS_PLAN,
-                        CompanyFinancialPeriod::STATUS_ACTUAL,
-                    ]
-                    : [
-                        CompanyFinancialPeriod::STATUS_ACTUAL,
-                        CompanyFinancialPeriod::STATUS_FORECAST,
-                        CompanyFinancialPeriod::STATUS_PLAN,
-                    ];
-                foreach ($priority as $status) {
-                    if ($period = $periods->firstWhere('status', $status)) {
-                        return $period;
-                    }
-                }
-
-                return $periods->first();
-            });
+        $annualPlan = CompanyAnnualPlan::query()
+            ->where('organization_id', $organization->id)
+            ->where('fiscal_year', $currentFiscalYear)
+            ->first();
+        $hasForecast = $annualPlan && collect([
+            $annualPlan->forecast_net_sales,
+            $annualPlan->forecast_net_income,
+            $annualPlan->forecast_interest_expense,
+            $annualPlan->forecast_depreciation_expense,
+        ])->contains(fn ($value) => $value !== null);
         $depreciationPeriods = CompanyDepreciationPeriod::query()
             ->where('organization_id', $organization->id)
             ->get()
             ->keyBy('fiscal_year');
 
-        $latestActualYear = $actualFinancialPeriods->keys()->map(fn ($year) => (int) $year)->max();
+        $latestActualYear = $financialPeriods->keys()->map(fn ($year) => (int) $year)->max();
         $firstUnreportedYear = $latestActualYear && $latestActualYear < $currentFiscalYear
             ? $latestActualYear + 1
             : $currentFiscalYear;
         $planEndYear = $currentFiscalYear + 2;
 
-        $years = $allFinancialPeriods->pluck('fiscal_year')
+        $years = $financialPeriods->keys()
+            ->when($annualPlan, fn ($years) => $years->push($annualPlan->fiscal_year))
             ->merge($depreciationPeriods->keys()->filter(fn ($year) => (int) $year <= $planEndYear))
             ->merge(range($firstUnreportedYear, $planEndYear))
             ->map(fn ($year) => (int) $year)
@@ -91,14 +80,28 @@ class CompanyRepaymentCapacityController extends Controller
             $capacity,
             $currentFiscalYear,
             $analysis,
+            $annualPlan,
+            $hasForecast,
         ): array {
             $financialPeriod = $financialPeriods->get($year);
             $depreciation = $depreciationPeriods->get($year);
-            $netIncome = $financialPeriod ? (int) $financialPeriod->net_income : null;
-            $depreciationExpense = $depreciation ? (int) $depreciation->depreciation_expense : null;
-            $interestExpense = $financialPeriod?->interest_expense !== null
-                ? (int) $financialPeriod->interest_expense
-                : null;
+            $isCurrentPlan = $year === $currentFiscalYear && $annualPlan;
+            $annualValue = function (string $field) use ($annualPlan, $hasForecast) {
+                $forecast = data_get($annualPlan, 'forecast_'.$field);
+
+                return $hasForecast && $forecast !== null
+                    ? $forecast
+                    : data_get($annualPlan, 'plan_'.$field);
+            };
+            $netIncome = $isCurrentPlan
+                ? $annualValue('net_income')
+                : ($financialPeriod ? (int) $financialPeriod->net_income : null);
+            $depreciationExpense = $isCurrentPlan
+                ? $annualValue('depreciation_expense')
+                : ($depreciation ? (int) $depreciation->depreciation_expense : null);
+            $interestExpense = $isCurrentPlan
+                ? $annualValue('interest_expense')
+                : ($financialPeriod?->interest_expense !== null ? (int) $financialPeriod->interest_expense : null);
             $principalDetails = $capacity->annualPrincipalRepaymentDetails(
                 $organization->id,
                 $year,
@@ -116,14 +119,12 @@ class CompanyRepaymentCapacityController extends Controller
 
             return array_merge($assessment, [
                 'year' => $year,
-                'period_number' => $financialPeriod?->period_number,
-                'type' => $financialPeriod
-                    ? match ($financialPeriod->status) {
-                        CompanyFinancialPeriod::STATUS_PLAN => '計画',
-                        CompanyFinancialPeriod::STATUS_FORECAST => '見込',
-                        default => '実績',
-                    }
-                    : ($year < $currentFiscalYear ? '未登録' : ($year === $currentFiscalYear ? '今期' : '計画')),
+                'period_number' => $isCurrentPlan ? $annualPlan->period_number : $financialPeriod?->period_number,
+                'type' => $isCurrentPlan
+                    ? ($hasForecast ? '最新見込' : '年度計画')
+                    : ($financialPeriod
+                        ? '実績'
+                        : ($year < $currentFiscalYear ? '未登録' : ($year === $currentFiscalYear ? '今期' : '計画'))),
                 'net_income' => $netIncome,
                 'depreciation_expense' => $depreciationExpense,
                 'interest_expense' => $interestExpense,
@@ -136,14 +137,9 @@ class CompanyRepaymentCapacityController extends Controller
         });
 
         $currentRow = $rows->firstWhere('year', $currentFiscalYear);
-        $currentFinancialPeriod = $financialPeriods->get($currentFiscalYear);
-        $simulationSourceType = $currentFinancialPeriod
-            ? match ($currentFinancialPeriod->status) {
-                CompanyFinancialPeriod::STATUS_FORECAST => 'P/L見込',
-                CompanyFinancialPeriod::STATUS_PLAN => 'P/L計画',
-                default => 'P/L実績',
-            }
-            : '未登録';
+        $simulationSourceType = $annualPlan
+            ? ($hasForecast ? '03 今年度計画と進捗「最新見込」' : '03 今年度計画と進捗「年度計画」')
+            : '03 今年度計画と進捗（未登録）';
         $scenario = CompanyRepaymentScenario::query()
             ->where('organization_id', $organization->id)
             ->where('fiscal_year', $currentFiscalYear)
@@ -153,7 +149,11 @@ class CompanyRepaymentCapacityController extends Controller
         }
         $simulationBase = [
             'fiscal_year' => $currentFiscalYear,
-            'net_sales' => $currentFinancialPeriod?->net_sales,
+            'net_sales' => $annualPlan
+                ? ($hasForecast && $annualPlan->forecast_net_sales !== null
+                    ? $annualPlan->forecast_net_sales
+                    : $annualPlan->plan_net_sales)
+                : null,
             'net_income' => data_get($currentRow, 'net_income'),
             'depreciation_expense' => data_get($currentRow, 'depreciation_expense'),
             'interest_expense' => data_get($currentRow, 'interest_expense'),

@@ -96,7 +96,10 @@
                 <div><span>当期純利益</span><strong>{{ $row['net_income'] === null ? '—' : number_format($row['net_income']).'円' }}</strong></div>
                 <div>
                     <span>減価償却費</span>
-                    @if($canManage)
+                    @if($row['year'] === $currentFiscalYear)
+                        <strong>{{ $row['depreciation_expense'] === null ? '—' : number_format($row['depreciation_expense']).'円' }}</strong>
+                        <small>03 今年度計画と進捗から連携</small>
+                    @elseif($canManage)
                         <input type="number" name="depreciation[{{ $row['year'] }}]" form="depreciation-form" value="{{ old('depreciation.'.$row['year'], $row['depreciation_expense']) }}" min="0" max="999999999999" step="1" placeholder="未入力">
                     @else
                         <strong>{{ $row['depreciation_expense'] === null ? '—' : number_format($row['depreciation_expense']).'円' }}</strong>
@@ -221,7 +224,7 @@
 
                     <div class="simulation-actions">
                         <span class="meta" data-simulation-message></span>
-                        <button type="button" class="secondary" data-simulation-reset>実績値に戻す</button>
+                        <button type="button" class="secondary" data-simulation-reset>03の連携値に戻す</button>
                         <button type="button" data-simulation-save>このシナリオを保存</button>
                     </div>
                 </section>
