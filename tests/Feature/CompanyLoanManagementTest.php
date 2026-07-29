@@ -269,8 +269,11 @@ class CompanyLoanManagementTest extends TestCase
             ->get(route('company-loans.schedule', ['start' => '2026-03', 'end' => '2026-06']))
             ->assertOk()
             ->assertSee('200,000')
+            ->assertSee('元本返済額')
             ->assertSee('自動計算')
-            ->assertSeeInOrder(['600,000', '400,000', '200,000', '0']);
+            ->assertSeeInOrder(['600,000', '400,000', '200,000', '0'])
+            ->assertSee('<td class="total-column"><strong>600,000</strong></td>', false)
+            ->assertSee('<td class="repayment-column"><strong>200,000</strong></td>', false);
     }
 
     public function test_completed_loan_subtracts_registered_monthly_payment_until_completion_then_zeros_next_month(): void
@@ -294,9 +297,12 @@ class CompanyLoanManagementTest extends TestCase
             ->get(route('company-loans.schedule', ['start' => '2026-03', 'end' => '2026-07']))
             ->assertOk()
             ->assertSeeInOrder(['800,000', '700,000', '600,000', '500,000', '0'])
-            ->assertSee('<td class="total-column"><strong>0</strong></td>', false);
+            ->assertSee('<td class="total-column"><strong>800,000</strong></td>', false)
+            ->assertSee('<td class="repayment-column"><strong>100,000</strong></td>', false)
+            ->assertSee('<td class="repayment-column"><strong>500,000</strong></td>', false);
 
-        $this->assertSame(2, substr_count($response->getContent(), '<th class="total-column">0</th>'));
+        $this->assertStringContainsString('<th class="total-column">1,000,000</th>', $response->getContent());
+        $this->assertStringContainsString('<th class="total-column">100,000</th>', $response->getContent());
     }
 
     private function loanInput(): array

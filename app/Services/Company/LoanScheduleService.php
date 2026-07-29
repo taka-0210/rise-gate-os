@@ -37,20 +37,33 @@ class LoanScheduleService
     {
         $loans->loadMissing('balanceSnapshots');
         $rows = [];
+        $previousCells = $loans->mapWithKeys(
+            fn ($loan) => [$loan->id => $this->balanceForMonth($loan, $start->subMonth())]
+        )->all();
 
         for ($month = $start->startOfMonth(); $month->lessThanOrEqualTo($end); $month = $month->addMonth()) {
             $cells = [];
             $total = 0;
+            $principalRepaid = 0;
 
             foreach ($loans as $loan) {
                 $cell = $this->balanceForMonth($loan, $month);
                 $cells[$loan->id] = $cell;
-                if ($loan->loan_status !== CompanyLoan::STATUS_COMPLETED) {
-                    $total += $cell['balance'] ?? 0;
+                $total += $cell['balance'] ?? 0;
+
+                $previousBalance = $previousCells[$loan->id]['balance'] ?? null;
+                if ($previousBalance !== null && $cell['balance'] !== null) {
+                    $principalRepaid += max(0, $previousBalance - $cell['balance']);
                 }
+                $previousCells[$loan->id] = $cell;
             }
 
-            $rows[] = ['month' => $month, 'cells' => $cells, 'total' => $total];
+            $rows[] = [
+                'month' => $month,
+                'cells' => $cells,
+                'total' => $total,
+                'principal_repaid' => $principalRepaid,
+            ];
         }
 
         return $rows;

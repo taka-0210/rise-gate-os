@@ -24,7 +24,6 @@
         <div class="card"><h2>借入情報がありません</h2><p>借入を登録すると、ここに月別の残高推移が表示されます。</p></div>
     @else
         @php
-            $outstandingLoans = $loans->reject(fn($loan) => $loan->loan_status === \App\Models\CompanyLoan::STATUS_COMPLETED);
             $sortUrl = fn(string $key) => route('company-loans.schedule', [
                 'start' => $start->format('Y-m'),
                 'end' => $end->format('Y-m'),
@@ -41,31 +40,37 @@
                         <th class="sticky-month">月</th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}"><span class="loan-no">No.{{ $loan->management_number }}</span>@if($loan->loan_status === 'completed')<small class="completed-label">完済{{ $loan->completed_on ? ' '.$loan->completed_on->format('Y.m') : '' }}</small>@endif</th>@endforeach
                         <th class="total-column">残高合計</th>
+                        <th class="repayment-column">元本返済額</th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('institution') }}">金融機関 {{ $sortMark('institution') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ $loan->financial_institution }}</th>@endforeach
                         <th class="total-column"></th>
+                        <th class="repayment-column"></th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('amount') }}">借入額 {{ $sortMark('amount') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($loan->original_amount) }}</th>@endforeach
-                        <th class="total-column">{{ number_format($outstandingLoans->sum('original_amount')) }}</th>
+                        <th class="total-column">{{ number_format($loans->sum('original_amount')) }}</th>
+                        <th class="repayment-column"></th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('monthly') }}">返済／月 {{ $sortMark('monthly') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ number_format($schedulePayments[$loan->id]) }}@if((int)$loan->monthly_principal_payment === 0 && $schedulePayments[$loan->id] > 0)<small class="calculated-label">自動計算</small>@endif</th>@endforeach
-                        <th class="total-column">{{ number_format($outstandingLoans->sum(fn($loan) => $schedulePayments[$loan->id] ?? 0)) }}</th>
+                        <th class="total-column">{{ number_format($loans->sum(fn($loan) => $schedulePayments[$loan->id] ?? 0)) }}</th>
+                        <th class="repayment-column"></th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('term') }}">期間 {{ $sortMark('term') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ $loan->term_label ?: '—' }}</th>@endforeach
                         <th class="total-column"></th>
+                        <th class="repayment-column"></th>
                     </tr>
                     <tr>
                         <th class="sticky-year"></th><th class="sticky-month">計算方式</th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ ['amortizing'=>'元金返済','hold'=>'据置','bullet'=>'期日一括','revolving'=>'当座貸越'][$loan->balance_projection_mode] ?? '元金返済' }}</th>@endforeach
                         <th class="total-column"></th>
+                        <th class="repayment-column"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -83,6 +88,7 @@
                                 </td>
                             @endforeach
                             <td class="total-column"><strong>{{ number_format($row['total']) }}</strong></td>
+                            <td class="repayment-column"><strong>{{ number_format($row['principal_repaid']) }}</strong></td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -108,8 +114,9 @@
 .schedule-table .sticky-year{position:sticky;left:0;z-index:3;min-width:76px;width:76px;text-align:center;background:#f5f7f8}
 .schedule-table .sticky-month{position:sticky;left:76px;z-index:3;min-width:80px;width:80px;text-align:center;background:#f5f7f8;box-shadow:2px 0 0 #cbd7dc}
 .schedule-table thead .sticky-year,.schedule-table thead .sticky-month{z-index:7;background:#e5edef}
-.schedule-table .total-column{position:sticky;right:0;z-index:3;background:#eaf5f2;border-left:2px solid #7ea99f}
-.schedule-table thead .total-column{z-index:7}
+.schedule-table .total-column{position:sticky;right:118px;z-index:3;background:#eaf5f2;border-left:2px solid #7ea99f}
+.schedule-table .repayment-column{position:sticky;right:0;z-index:3;background:#fff5e8;border-left:1px solid #d9b77e}
+.schedule-table thead .total-column,.schedule-table thead .repayment-column{z-index:7}
 .schedule-table tbody tr.year-start th,.schedule-table tbody tr.year-start td{border-top:2px solid #7c929b}
 .schedule-table td.is-actual{background:#eef8f4;color:#135f50;font-weight:700}
 .schedule-table .loan-completed,.schedule-table td.is-actual.loan-completed{background:#e5e8ea;color:#78848a}
