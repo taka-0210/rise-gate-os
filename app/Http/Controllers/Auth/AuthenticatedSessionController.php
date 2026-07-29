@@ -33,13 +33,14 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
         $request->session()->put('access_mode', 'workspace');
+        $request->session()->forget('url.intended');
 
         $companies = $request->user()->organizations()->orderBy('organizations.name')->get();
         if ($companies->count() === 1) {
             $request->session()->put('current_company_id', $companies->first()->id);
             $request->session()->forget('current_workspace_id');
 
-            return redirect()->intended(route('company.home'));
+            return redirect()->route('company.home');
         }
 
         $request->session()->forget(['current_company_id', 'current_workspace_id']);

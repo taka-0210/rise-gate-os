@@ -59,6 +59,25 @@ class CompanyNavigationTest extends TestCase
             ->assertSessionMissing('current_workspace_id');
     }
 
+    public function test_regular_login_ignores_a_stale_forbidden_intended_url(): void
+    {
+        [$user, $company] = $this->companyUser('Safe Login Company');
+
+        $this->withSession(['url.intended' => route('system-admin.members.index')])
+            ->post(route('login'), [
+                'email' => $user->email,
+                'password' => 'password',
+            ])
+            ->assertRedirect(route('company.home'))
+            ->assertSessionHas('access_mode', 'workspace')
+            ->assertSessionHas('current_company_id', $company->id)
+            ->assertSessionMissing('url.intended');
+
+        $this->get(route('company.home'))
+            ->assertOk()
+            ->assertSee('Safe Login Company');
+    }
+
     public function test_personal_workspace_is_created_inside_current_company(): void
     {
         [$user, $company] = $this->companyUser('Personal Company', true);
