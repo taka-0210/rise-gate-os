@@ -73,6 +73,27 @@ class CompanyLoanManagementTest extends TestCase
         $this->assertDatabaseHas('company_loan_balance_snapshots', ['id' => $snapshot->id]);
     }
 
+    public function test_first_principal_payment_in_execution_month_is_included_in_monthly_repayment_total(): void
+    {
+        [$owner, , $session] = $this->companyUser('owner');
+        $input = $this->loanInput();
+        $input['management_number'] = '18';
+        $input['executed_on'] = '2026-07-23';
+        $input['original_amount'] = 25_000_000;
+        $input['current_balance'] = 24_791_000;
+        $input['monthly_principal_payment'] = 209_000;
+        $input['balance_as_of'] = '2026-07-25';
+
+        $this->actingAs($owner)->withSession($session)
+            ->post(route('company-loans.store'), $input)->assertRedirect();
+
+        $this->actingAs($owner)->withSession($session)
+            ->get(route('company-loans.schedule', ['start' => '2026-07', 'end' => '2026-08']))
+            ->assertOk()
+            ->assertSee('<td class="total-column"><strong>24,791,000</strong></td>', false)
+            ->assertSee('<td class="repayment-column"><strong>209,000</strong></td>', false);
+    }
+
     public function test_owner_can_preview_save_confirm_and_view_loan_dashboard(): void
     {
         [$owner, $organization, $session] = $this->companyUser('owner');

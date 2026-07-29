@@ -54,6 +54,12 @@ class LoanScheduleService
                 $previousBalance = $previousCells[$loan->id]['balance'] ?? null;
                 if ($previousBalance !== null && $cell['balance'] !== null) {
                     $principalRepaid += max(0, $previousBalance - $cell['balance']);
+                } elseif (
+                    $cell['balance'] !== null
+                    && $loan->executed_on
+                    && CarbonImmutable::parse($loan->executed_on)->isSameMonth($month)
+                ) {
+                    $principalRepaid += max(0, (int) $loan->original_amount - $cell['balance']);
                 }
                 $previousCells[$loan->id] = $cell;
             }
