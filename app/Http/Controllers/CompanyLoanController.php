@@ -27,18 +27,10 @@ class CompanyLoanController extends Controller
         $validated = $request->validate([
             'start' => ['nullable', 'date_format:Y-m'],
             'end' => ['nullable', 'date_format:Y-m'],
+            'years' => ['nullable', 'integer', Rule::in([5, 10, 15, 20])],
             'sort' => ['nullable', Rule::in(['institution', 'amount', 'monthly', 'term'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
-        $defaultStart = CarbonImmutable::now()->subYears(2)->startOfYear();
-        $start = isset($validated['start'])
-            ? CarbonImmutable::createFromFormat('Y-m', $validated['start'])->startOfMonth()
-            : $defaultStart;
-        $end = isset($validated['end'])
-            ? CarbonImmutable::createFromFormat('Y-m', $validated['end'])->startOfMonth()
-            : $defaultStart->addYears(19)->endOfYear()->startOfMonth();
-        abort_if($end->lessThan($start), 422, '終了年月は開始年月以降にしてください。');
-        abort_if($start->diffInMonths($end) > 239, 422, '表示期間は20年以内にしてください。');
 
         $loans = CompanyLoan::query()
             ->where('organization_id', $organization->id)
@@ -46,6 +38,22 @@ class CompanyLoanController extends Controller
             ->orderBy('financial_institution')
             ->orderBy('management_number')
             ->get();
+        $executionYears = $loans->pluck('executed_on')->filter()->map(
+            fn ($date) => CarbonImmutable::parse($date)->year
+        );
+        $firstLoanYear = (int) ($executionYears->min() ?: CarbonImmutable::now()->year);
+        $lastLoanYear = (int) ($executionYears->max() ?: CarbonImmutable::now()->year);
+        $defaultStartYear = min($lastLoanYear, max($firstLoanYear, CarbonImmutable::now()->year - 2));
+        $defaultStart = CarbonImmutable::create($defaultStartYear, 1, 1)->startOfYear();
+        $start = isset($validated['start'])
+            ? CarbonImmutable::createFromFormat('Y-m', $validated['start'])->startOfMonth()
+            : $defaultStart;
+        $durationYears = (int) ($validated['years'] ?? 20);
+        $end = isset($validated['end']) && ! isset($validated['years'])
+            ? CarbonImmutable::createFromFormat('Y-m', $validated['end'])->startOfMonth()
+            : $start->addYears($durationYears - 1)->endOfYear()->startOfMonth();
+        abort_if($end->lessThan($start), 422, '終了年月は開始年月以降にしてください。');
+        abort_if($start->diffInMonths($end) > 239, 422, '表示期間は20年以内にしてください。');
         $sort = $validated['sort'] ?? null;
         $direction = $validated['direction'] ?? 'asc';
         if ($sort) {
@@ -72,6 +80,8 @@ class CompanyLoanController extends Controller
             'rows' => $schedule->build($loans, $start, $end),
             'start' => $start,
             'end' => $end,
+            'durationYears' => $durationYears,
+            'startYearOptions' => range($firstLoanYear, $lastLoanYear),
             'sort' => $sort,
             'direction' => $direction,
             'schedulePayments' => $schedulePayments,

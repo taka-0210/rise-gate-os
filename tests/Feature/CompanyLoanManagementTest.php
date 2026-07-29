@@ -19,19 +19,33 @@ class CompanyLoanManagementTest extends TestCase
     public function test_schedule_defaults_to_twenty_years_starting_two_years_ago_and_uses_year_filters(): void
     {
         CarbonImmutable::setTestNow('2026-07-29 12:00:00');
-        [$owner, , $session] = $this->companyUser('owner');
+        [$owner, $organization, $session] = $this->companyUser('owner');
+        foreach ([['1', '2017-04-01'], ['2', '2026-07-01']] as [$number, $executedOn]) {
+            $input = $this->loanInput();
+            $input['management_number'] = $number;
+            $input['executed_on'] = $executedOn;
+            CompanyLoan::create(array_merge($input, [
+                'organization_id' => $organization->id,
+                'record_status' => CompanyLoan::RECORD_DRAFT,
+                'source_type' => CompanyLoan::SOURCE_MANUAL,
+            ]));
+        }
 
         $this->actingAs($owner)->withSession($session)
             ->get(route('company-loans.schedule'))
             ->assertOk()
-            ->assertSee('<option value="2024-01" selected>2024年</option>', false)
-            ->assertSee('<option value="2043-12" selected>2043年</option>', false)
-            ->assertSee('標準20年に戻す')
-            ->assertSee('最大20年');
+            ->assertSee('value="2017-01"', false)
+            ->assertSee('value="2024-01" selected', false)
+            ->assertSee('value="2026-01"', false)
+            ->assertDontSee('<option value="2027-01">2027年</option>', false)
+            ->assertSee('value="20" selected', false)
+            ->assertSee('標準に戻す');
 
         $this->actingAs($owner)->withSession($session)
-            ->get(route('company-loans.schedule', ['start' => '2024-01', 'end' => '2044-01']))
-            ->assertStatus(422);
+            ->get(route('company-loans.schedule', ['start' => '2017-01', 'years' => 5]))
+            ->assertOk()
+            ->assertSee('value="2017-01" selected', false)
+            ->assertSee('value="5" selected', false);
 
         CarbonImmutable::setTestNow();
     }
