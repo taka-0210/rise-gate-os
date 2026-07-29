@@ -133,6 +133,7 @@ class CompanyLoanManagementTest extends TestCase
     {
         [$owner, $organization, $session] = $this->companyUser('owner');
         $input = $this->loanInput();
+        $input['scheduled_payment_count'] = 119;
 
         $this->actingAs($owner)->withSession($session)
             ->post(route('company-loans.preview'), $input)
@@ -143,6 +144,7 @@ class CompanyLoanManagementTest extends TestCase
 
         $loan = CompanyLoan::firstOrFail();
         $this->assertSame(CompanyLoan::RECORD_DRAFT, $loan->record_status);
+        $this->assertSame(119, $loan->scheduled_payment_count);
         $this->assertCount(1, $loan->revisions);
         $this->assertDatabaseHas('company_loan_balance_snapshots', [
             'company_loan_id' => $loan->id, 'balance' => 29_250_000,
@@ -165,6 +167,7 @@ class CompanyLoanManagementTest extends TestCase
             ->assertOk()
             ->assertSee('借入残高推移表')
             ->assertSee(route('company-loans.edit', $loan), false)
+            ->assertSee('119回')
             ->assertSee('29,250,000')
             ->assertSee('29,000,000')
             ->assertSee('28,750,000')
@@ -378,6 +381,7 @@ class CompanyLoanManagementTest extends TestCase
         return [
             'financial_institution' => '姫路信用金庫', 'management_number' => '16',
             'purpose' => '運転資金', 'executed_on' => '2026-03-01', 'term_label' => '10年',
+            'scheduled_payment_count' => null,
             'original_amount' => 30_000_000, 'current_balance' => 29_250_000,
             'monthly_principal_payment' => 250_000, 'annual_interest_rate' => 1.996,
             'balance_projection_mode' => CompanyLoan::PROJECTION_AMORTIZING,

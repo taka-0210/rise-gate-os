@@ -287,6 +287,7 @@ class CompanyLoanController extends Controller
             'management_number' => ['required', 'string', 'max:50', Rule::unique('company_loans')->where(fn ($query) => $query->where('organization_id', $organizationId)->where('financial_institution', $request->input('financial_institution')))->ignore($ignoreId)],
             'purpose' => ['nullable', 'string', 'max:255'], 'executed_on' => ['nullable', 'date'],
             'term_label' => ['nullable', 'string', 'max:50'], 'original_amount' => ['required', 'integer', 'min:0'],
+            'scheduled_payment_count' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'current_balance' => ['required', 'integer', 'min:0'], 'monthly_principal_payment' => ['required', 'integer', 'min:0'],
             'balance_projection_mode' => ['required', Rule::in([
                 CompanyLoan::PROJECTION_AMORTIZING, CompanyLoan::PROJECTION_HOLD,

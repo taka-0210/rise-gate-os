@@ -5,6 +5,7 @@ $beforeBalanceFields = [
     ['purpose','資金用途','text'],
     ['executed_on','借入実行日','date'],
     ['term_label','返済期間','text'],
+    ['scheduled_payment_count','返済予定回数','number'],
     ['original_amount','当初借入額','number'],
 ];
 $afterBalanceFields = [
@@ -28,7 +29,7 @@ $fieldValue = function (string $name) use ($values) {
 @if($errors->any())<div class="alert error">{{ $errors->first() }}</div>@endif
 <div class="loan-form-grid">
 @foreach($beforeBalanceFields as [$name,$label,$type])
-<label><span>{{ $label }}</span><input type="{{ $type }}" name="{{ $name }}" @if($type==='number') min="0" step="1" @endif value="{{ $fieldValue($name) }}" @required(in_array($name,['financial_institution','management_number','original_amount']))></label>
+<label><span>{{ $label }}</span><input type="{{ $type }}" name="{{ $name }}" @if($type==='number') min="{{ $name==='scheduled_payment_count'?1:0 }}" step="1" @endif value="{{ $fieldValue($name) }}" @required(in_array($name,['financial_institution','management_number','original_amount']))></label>
 @endforeach
 
 <fieldset class="balance-pair">

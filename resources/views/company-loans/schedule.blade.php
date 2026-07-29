@@ -62,6 +62,12 @@
                         <th class="repayment-column"></th>
                     </tr>
                     <tr>
+                        <th class="sticky-year"></th><th class="sticky-month">返済回数</th>
+                        @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ $loan->scheduled_payment_count ? number_format($loan->scheduled_payment_count).'回' : '—' }}</th>@endforeach
+                        <th class="total-column"></th>
+                        <th class="repayment-column"></th>
+                    </tr>
+                    <tr>
                         <th class="sticky-year"></th><th class="sticky-month"><a class="sort-link" href="{{ $sortUrl('term') }}">期間 {{ $sortMark('term') }}</a></th>
                         @foreach($loans as $loan)<th class="{{ $loan->loan_status === 'completed' ? 'loan-completed' : '' }}">{{ $loan->term_label ?: '—' }}</th>@endforeach
                         <th class="total-column"></th>
