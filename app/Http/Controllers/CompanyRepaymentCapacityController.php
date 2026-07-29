@@ -37,9 +37,15 @@ class CompanyRepaymentCapacityController extends Controller
             ->get()
             ->keyBy('fiscal_year');
 
+        $latestActualYear = $financialPeriods->keys()->map(fn ($year) => (int) $year)->max();
+        $firstUnreportedYear = $latestActualYear && $latestActualYear < $currentFiscalYear
+            ? $latestActualYear + 1
+            : $currentFiscalYear;
+        $planEndYear = $currentFiscalYear + 2;
+
         $years = $financialPeriods->keys()
-            ->merge($depreciationPeriods->keys())
-            ->merge(range($currentFiscalYear, $currentFiscalYear + 9))
+            ->merge($depreciationPeriods->keys()->filter(fn ($year) => (int) $year <= $planEndYear))
+            ->merge(range($firstUnreportedYear, $planEndYear))
             ->map(fn ($year) => (int) $year)
             ->unique()
             ->sortDesc()
@@ -51,6 +57,7 @@ class CompanyRepaymentCapacityController extends Controller
             $financialPeriods,
             $depreciationPeriods,
             $capacity,
+            $currentFiscalYear,
         ): array {
             $financialPeriod = $financialPeriods->get($year);
             $depreciation = $depreciationPeriods->get($year);
@@ -59,11 +66,12 @@ class CompanyRepaymentCapacityController extends Controller
             $interestExpense = $financialPeriod?->interest_expense !== null
                 ? (int) $financialPeriod->interest_expense
                 : null;
-            $principalRepayment = $capacity->annualPrincipalRepayment(
+            $principalDetails = $capacity->annualPrincipalRepaymentDetails(
                 $organization->id,
                 $year,
                 $closingMonth,
             );
+            $principalRepayment = $principalDetails['total'];
             $usesFullDscr = $interestExpense !== null;
             $repaymentSource = $netIncome !== null && $depreciationExpense !== null
                 ? $netIncome + $depreciationExpense + ($interestExpense ?? 0)
@@ -73,12 +81,15 @@ class CompanyRepaymentCapacityController extends Controller
             return [
                 'year' => $year,
                 'period_number' => $financialPeriod?->period_number,
-                'type' => $financialPeriod ? '実績' : '計画',
+                'type' => $financialPeriod
+                    ? '実績'
+                    : ($year < $currentFiscalYear ? '未登録' : '計画'),
                 'net_income' => $netIncome,
                 'depreciation_expense' => $depreciationExpense,
                 'interest_expense' => $interestExpense,
                 'repayment_source' => $repaymentSource,
                 'principal_repayment' => $principalRepayment,
+                'principal_repayment_loans' => $principalDetails['loans'],
                 'annual_debt_service' => $annualDebtService,
                 'remaining_capacity' => $repaymentSource !== null ? $repaymentSource - $annualDebtService : null,
                 'coverage_ratio' => $repaymentSource !== null && $annualDebtService > 0

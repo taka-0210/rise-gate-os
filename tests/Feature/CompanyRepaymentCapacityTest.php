@@ -7,6 +7,7 @@ use App\Models\CompanyLoan;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,6 +17,7 @@ class CompanyRepaymentCapacityTest extends TestCase
 
     public function test_owner_can_save_depreciation_and_view_annual_repayment_capacity(): void
     {
+        CarbonImmutable::setTestNow('2026-07-30 12:00:00 Asia/Tokyo');
         [$user, $organization, $session] = $this->companyOwner();
 
         CompanyFinancialPeriod::create([
@@ -63,6 +65,10 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->get(route('company-finance.repayment-capacity.index'))
             ->assertOk()
             ->assertSee('減価償却・返済余力')
+            ->assertSee('2025年度')
+            ->assertSee('未登録')
+            ->assertSee('2028年度')
+            ->assertDontSee('2029年度')
             ->assertSee('DSCR')
             ->assertSee('3,000,000円')
             ->assertSee('200,000円')
@@ -70,7 +76,14 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertSee('1,200,000円')
             ->assertSee('1,400,000円')
             ->assertSee('2,800,000円')
+            ->assertSee('No.1 テスト銀行')
             ->assertSee('3.00倍');
+    }
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+        parent::tearDown();
     }
 
     private function companyOwner(): array
