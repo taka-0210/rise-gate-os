@@ -15,16 +15,9 @@ class AnnualPlanForecastService
         $actualCost = (int) $actualMonths->sum('actual_cost_of_sales');
         $actualSga = (int) $actualMonths->sum('actual_selling_general_admin_expenses');
         $elapsedPlanSales = (int) $actualMonths->sum('plan_net_sales');
-        $remainingPlanSales = (int) $remainingMonths->sum(
-            fn ($month) => $month->forecast_net_sales ?? $month->plan_net_sales,
-        );
-        $remainingPlanCost = (int) $remainingMonths->sum(
-            fn ($month) => $month->forecast_cost_of_sales ?? $month->plan_cost_of_sales,
-        );
-        $remainingPlanSga = (int) $remainingMonths->sum(
-            fn ($month) => $month->forecast_selling_general_admin_expenses
-                ?? $month->plan_selling_general_admin_expenses,
-        );
+        $remainingPlanSales = (int) $remainingMonths->sum('forecast_net_sales');
+        $remainingPlanCost = (int) $remainingMonths->sum('forecast_cost_of_sales');
+        $remainingPlanSga = (int) $remainingMonths->sum('forecast_selling_general_admin_expenses');
 
         $planSales = (int) ($plan->plan_net_sales ?? 0);
         if ($remainingMonths->isNotEmpty() && $remainingMonths->every(fn ($month) => data_get($month, 'plan_cost_of_sales') === null)) {

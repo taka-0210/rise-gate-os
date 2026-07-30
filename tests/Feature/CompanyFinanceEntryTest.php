@@ -183,6 +183,8 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('利益は、最後に残った結果ではなく、最初に決める目標です。')
             ->assertSee('②</span>目標粗利率', false)
             ->assertSee('単月へセット')
+            ->assertSee('選択期間の平均')
+            ->assertSee('id="average-period-from"', false)
             ->assertSee('class="company-finance-screen"', false)
             ->assertSee('::-webkit-inner-spin-button', false)
             ->assertDontSee('厨房君');

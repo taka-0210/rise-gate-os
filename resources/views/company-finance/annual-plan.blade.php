@@ -14,6 +14,10 @@
     $money = fn ($number) => $number === null ? '—' : number_format((int) round($number));
     $inputMoney = fn ($number) => $number === null || $number === '' ? '' : number_format((int) $number);
     $actualMonths = $months->filter(fn ($month) => data_get($month, 'actual_net_sales') !== null);
+    $actualMonthIndexes = $months
+        ->filter(fn ($month) => data_get($month, 'actual_net_sales') !== null)
+        ->keys()
+        ->values();
     $monthlyActualAverages = [
         'sales' => (int) round($actualMonths->avg('actual_net_sales') ?: 0),
         'cost' => (int) round($actualMonths->avg('actual_cost_of_sales') ?: 0),
@@ -120,9 +124,18 @@
             </div>
             <div class="monthly-plan-bulk">
                 <div class="bulk-heading">
-                    <div><strong>実績平均から残り月を計画</strong><span>入力済み実績の平均額を、実績が未入力の月だけに反映します。</span></div>
+                    <div><strong>選択期間の実績平均から残り月を計画</strong><span>選択した期間の平均額を、実績が未入力の月だけに反映します。</span></div>
                     <div class="plan-average-summary">
-                        <span>入力済み実績の平均</span>
+                        <span>選択期間の平均</span>
+                        <div class="average-period">
+                            <select id="average-period-from" aria-label="平均の開始月">
+                                @foreach($actualMonthIndexes as $index)<option value="{{ $index }}">{{ $months[$index]->month->format('n月') }}</option>@endforeach
+                            </select>
+                            <span>〜</span>
+                            <select id="average-period-to" aria-label="平均の終了月">
+                                @foreach($actualMonthIndexes as $index)<option value="{{ $index }}" @selected($loop->last)>{{ $months[$index]->month->format('n月') }}</option>@endforeach
+                            </select>
+                        </div>
                         <b>売上 <i id="average-plan-sales">{{ $money($monthlyActualAverages['sales']) }}</i></b>
                         <b>原価 <i id="average-plan-cost">{{ $money($monthlyActualAverages['cost']) }}</i></b>
                         <b>粗利 <i id="average-plan-gross">{{ $money($monthlyActualAverages['gross']) }}</i></b>
@@ -339,6 +352,7 @@
 .plan-swatch{background:#edf2fb}.progress-sheet .plan-value-row input{font-weight:700}.projected-value{background:#edf2fb!important;color:#355f99!important;font-weight:700}.progress-sheet td.input-cell:has(.forecast-entry:not([hidden])){background:#edf2fb}.forecast-entry{color:#355f99;font-weight:700}
 .heading-with-help{display:flex;align-items:center;gap:10px}.heading-with-help h2{margin:3px 0 0}.reverse-plan-help{padding:4px 9px;border:1px solid #9dbbc2;border-radius:999px;background:#fff;color:var(--accent-dark);font-size:12px;font-weight:700}.reverse-plan-dialog{width:min(680px,calc(100vw - 28px));padding:0;border:0;border-radius:16px;box-shadow:0 24px 80px rgba(13,35,45,.3)}.reverse-plan-dialog::backdrop{background:rgba(13,30,39,.52)}.reverse-plan-dialog__header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--line)}.reverse-plan-dialog__header h2{margin:3px 0 0}.reverse-plan-dialog__close{width:42px;height:42px;padding:0;font-size:24px}.reverse-plan-dialog__body{padding:22px 24px}.reverse-plan-dialog__body>p:first-child{margin-top:0}.reverse-plan-dialog__grid{display:grid;grid-template-columns:1fr 1.35fr;gap:12px;margin:20px 0}.reverse-plan-dialog__grid section{padding:15px;border:1px solid var(--line);border-radius:10px;background:#f8fbfb}.reverse-plan-dialog__grid h3{margin:0 0 8px}.reverse-plan-dialog__grid p,.reverse-plan-dialog__grid ul{margin:0}.reverse-plan-dialog__grid li{margin:6px 0}.reverse-plan-dialog blockquote{margin:20px 0 0;padding:17px 18px;border-left:4px solid var(--accent-dark);background:#f2faf7;color:var(--accent-dark);font-size:17px;font-weight:800}.reverse-plan-dialog__footer{display:flex;justify-content:flex-end;padding:14px 24px;border-top:1px solid var(--line)}@media(max-width:600px){.reverse-plan-dialog__grid{grid-template-columns:1fr}}
 .rate-input{display:flex;align-items:center;justify-content:flex-end;gap:5px}.plan-sheet .rate-input input{width:calc(100% - 22px);min-width:70px}.bulk-fields .rate-input input{width:100%;text-align:right}.rate-suffix{flex:0 0 auto}.bulk-fields{grid-template-columns:repeat(6,minmax(120px,1fr)) minmax(270px,auto)}.bulk-calculated{display:flex;min-height:44px;flex-direction:column;justify-content:center;padding:6px 10px;border:1px solid #b5c5c7;border-radius:7px;background:#f0f2f3;text-align:right}.bulk-calculated span{font-size:12px;color:var(--muted);text-align:left}.bulk-calculated strong{margin-top:3px}.bulk-target{display:grid;grid-template-columns:minmax(155px,1fr) auto;align-items:end;gap:8px}.bulk-target label{min-width:0}.bulk-target select{width:100%}.bulk-target button{white-space:nowrap}.reverse-plan-input-order{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}.reverse-plan-input-order li{display:flex;align-items:center;gap:8px;margin:0}.reverse-plan-input-order li span{color:var(--accent-dark);font-weight:800}@media(max-width:1250px){.bulk-fields{grid-template-columns:repeat(3,1fr)}.bulk-target{grid-column:1/-1}}@media(max-width:700px){.bulk-fields{grid-template-columns:1fr}.bulk-target{grid-template-columns:1fr}}
+.average-period{display:flex;align-items:center;gap:4px}.average-period span{margin:0}.average-period select{min-width:66px;padding:5px 7px}.rate-input{display:flex;align-items:center;justify-content:flex-end;gap:5px}.plan-sheet .rate-input input{width:calc(100% - 22px);min-width:70px}.bulk-fields .rate-input input{width:100%;text-align:right}.rate-suffix{flex:0 0 auto}.bulk-fields{grid-template-columns:repeat(6,minmax(120px,1fr)) minmax(270px,auto)}.bulk-calculated{display:flex;min-height:44px;flex-direction:column;justify-content:center;padding:6px 10px;border:1px solid #b5c5c7;border-radius:7px;background:#f0f2f3;text-align:right}.bulk-calculated span{font-size:12px;color:var(--muted);text-align:left}.bulk-calculated strong{margin-top:3px}.bulk-target{display:grid;grid-template-columns:minmax(155px,1fr) auto;align-items:end;gap:8px}.bulk-target label{min-width:0}.bulk-target select{width:100%}.bulk-target button{white-space:nowrap}.reverse-plan-input-order{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}.reverse-plan-input-order li{display:flex;align-items:center;gap:8px;margin:0}.reverse-plan-input-order li span{color:var(--accent-dark);font-weight:800}@media(max-width:1250px){.bulk-fields{grid-template-columns:repeat(3,1fr)}.bulk-target{grid-column:1/-1}}@media(max-width:700px){.bulk-fields{grid-template-columns:1fr}.bulk-target{grid-template-columns:1fr}}
 </style>
 
 <script>
@@ -347,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!form) return;
     const count = 12;
     let taxMode = 'exclusive';
+    let selectedAverageValues = null;
     const taxFactor = () => taxMode === 'inclusive' ? 1.1 : 1;
     const num = value => value === '' || value === null || value === undefined
         ? null
@@ -421,7 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const plannedCostRate = annualSales ? (annualSales - annualGross) / annualSales : 0;
         let cumPlan = 0, cumSales = 0, cumCost = 0, cumSga = 0;
         let actualSalesTotal = 0, actualCostTotal = 0, actualSgaTotal = 0;
-        let actualCount = 0, actualCostCount = 0, actualSgaCount = 0;
+        let actualCount = 0, averageActualCount = 0, actualCostCount = 0, actualSgaCount = 0;
+        const selectedFrom = Number(document.getElementById('average-period-from')?.value ?? 0);
+        const selectedTo = Number(document.getElementById('average-period-to')?.value ?? count - 1);
+        const averageStart = Math.min(selectedFrom, selectedTo);
+        const averageEnd = Math.max(selectedFrom, selectedTo);
         const cumulativeSelectors = [
             '.cumulative-sales', '.cumulative-variance', '.cumulative-cost',
             '.cumulative-gross', '.cumulative-sga', '.cumulative-operating',
@@ -437,9 +456,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const forecastSalesInput = field(`months[${i}][forecast_net_sales]`);
             const forecastCostInput = field(`months[${i}][forecast_cost_of_sales]`);
             const forecastSgaInput = field(`months[${i}][forecast_selling_general_admin_expenses]`);
-            const forecastSales = canonical(forecastSalesInput) ?? plan;
-            const forecastCost = canonical(forecastCostInput) ?? planCost;
-            const forecastSga = canonical(forecastSgaInput) ?? planSga;
+            const forecastSales = canonical(forecastSalesInput);
+            const forecastCost = canonical(forecastCostInput);
+            const forecastSga = canonical(forecastSgaInput);
             const sales = canonical(salesInput);
             const costRaw = canonical(costInput);
             const cost = costRaw || 0;
@@ -450,8 +469,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const displayedSales = hasActual ? sales : forecastSales;
             const displayedCost = hasActual ? cost : forecastCost;
             const displayedSga = hasActual ? sgaRaw : forecastSga;
-            const displayedGross = displayedSales - displayedCost;
-            const displayedOperating = displayedGross - (displayedSga || 0);
+            const displayedGross = displayedSales !== null && displayedCost !== null
+                ? displayedSales - displayedCost
+                : null;
+            const displayedOperating = displayedGross !== null && displayedSga !== null
+                ? displayedGross - displayedSga
+                : null;
 
             [salesInput, costInput, sgaInput].forEach(input => {
                 if (input) input.hidden = !hasActual;
@@ -459,12 +482,9 @@ document.addEventListener('DOMContentLoaded', () => {
             [[forecastSalesInput, forecastSales], [forecastCostInput, forecastCost], [forecastSgaInput, forecastSga]].forEach(([input, forecastValue]) => {
                 if (!input) return;
                 input.hidden = hasActual;
-                if (!hasActual && canonical(input) === null) {
-                    input.value = formatInput(forecastValue * taxFactor());
-                }
             });
 
-            set('.sales-variance', i, displayedSales - plan);
+            set('.sales-variance', i, displayedSales !== null ? displayedSales - plan : null);
             set('.actual-gross', i, displayedGross);
             set('.actual-operating', i, displayedOperating);
             const monthlyAchievement = plan ? displayedSales / plan : null;
@@ -485,22 +505,25 @@ document.addEventListener('DOMContentLoaded', () => {
             set('.cumulative-plan', i, cumPlan);
             if (hasActual) {
                 actualCount++;
-                actualSalesTotal += sales;
-                if (costRaw !== null) {
-                    actualCostTotal += costRaw;
-                    actualCostCount++;
-                }
-                if (sgaRaw !== null) {
-                    actualSgaTotal += sgaRaw;
-                    actualSgaCount++;
+                if (i >= averageStart && i <= averageEnd) {
+                    actualSalesTotal += sales;
+                    averageActualCount++;
+                    if (costRaw !== null) {
+                        actualCostTotal += costRaw;
+                        actualCostCount++;
+                    }
+                    if (sgaRaw !== null) {
+                        actualSgaTotal += sgaRaw;
+                        actualSgaCount++;
+                    }
                 }
                 cumSales += sales;
                 cumCost += cost;
                 cumSga += sgaRaw || 0;
             } else {
-                cumSales += forecastSales;
-                cumCost += forecastCost;
-                cumSga += forecastSga;
+                cumSales += forecastSales ?? 0;
+                cumCost += forecastCost ?? 0;
+                cumSga += forecastSga ?? 0;
             }
 
             const cumGross = cumSales - cumCost;
@@ -525,14 +548,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        document.getElementById('average-plan-sales').textContent = money(actualCount ? actualSalesTotal / actualCount : null);
+        document.getElementById('average-plan-sales').textContent = money(averageActualCount ? actualSalesTotal / averageActualCount : null);
         document.getElementById('average-plan-cost').textContent = money(actualCostCount ? actualCostTotal / actualCostCount : null);
         document.getElementById('average-plan-sga').textContent = money(actualSgaCount ? actualSgaTotal / actualSgaCount : null);
-        const averageSales = actualCount ? actualSalesTotal / actualCount : null;
+        const averageSales = averageActualCount ? actualSalesTotal / averageActualCount : null;
         const averageCost = actualCostCount ? actualCostTotal / actualCostCount : null;
         const averageSga = actualSgaCount ? actualSgaTotal / actualSgaCount : null;
         const averageGross = averageSales !== null && averageCost !== null ? averageSales - averageCost : null;
         const averageOperating = averageGross !== null && averageSga !== null ? averageGross - averageSga : null;
+        selectedAverageValues = {
+            sales: averageSales,
+            grossMargin: averageSales ? averageGross / averageSales * 100 : null,
+            sga: averageSga,
+        };
         document.getElementById('average-plan-gross').textContent = money(averageGross);
         document.getElementById('average-plan-operating').textContent = money(averageOperating);
         const bulkSales = canonical(document.getElementById('bulk-plan-sales'));
@@ -588,6 +616,27 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById(id)?.addEventListener('input', () => {
             updatePlan();
             distributeAnnualPlan();
+        });
+    });
+    function loadSelectedAverageIntoSetter() {
+        if (!selectedAverageValues) return;
+        [
+            ['bulk-plan-sales', selectedAverageValues.sales],
+            ['bulk-plan-sga', selectedAverageValues.sga],
+        ].forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            input.dataset.taxExclusive = value === null ? '' : String(Math.round(value));
+            input.value = formatInput(value === null ? null : value * taxFactor());
+        });
+        document.getElementById('bulk-plan-gross-margin').value = selectedAverageValues.grossMargin === null
+            ? ''
+            : selectedAverageValues.grossMargin.toFixed(1);
+    }
+    ['average-period-from', 'average-period-to'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', () => {
+            recalculate();
+            loadSelectedAverageIntoSetter();
+            recalculate();
         });
     });
     form.addEventListener('input', recalculate);
