@@ -131,17 +131,38 @@ class CompanyFinanceEntryTest extends TestCase
                 'plan_net_income' => 10_000_000,
                 'plan_interest_expense' => 4_000_000,
                 'plan_depreciation_expense' => 30_000_000,
-                'forecast_net_sales' => 620_000_000,
                 'forecast_net_income' => 12_000_000,
+                'forecast_interest_expense' => 3_500_000,
+                'forecast_depreciation_expense' => 31_000_000,
+                'months' => collect(range(0, 11))->map(function (int $index) {
+                    $month = CarbonImmutable::create(2025, 12, 1, 0, 0, 0, 'Asia/Tokyo')->addMonths($index);
+
+                    return [
+                        'month' => $month->format('Y-m-d'),
+                        'plan_net_sales' => 50_000_000,
+                        'actual_net_sales' => $index < 7 ? 45_000_000 : null,
+                        'actual_cost_of_sales' => $index < 7 ? 25_000_000 : null,
+                        'actual_selling_general_admin_expenses' => $index < 7 ? 20_000_000 : null,
+                    ];
+                })->all(),
             ])
             ->assertRedirect()
-            ->assertSessionHas('status', '今年度の計画・最新見込を保存しました。');
+            ->assertSessionHas('status', '今年度の計画・月次進捗・最新見込を保存しました。');
 
         $plan = CompanyAnnualPlan::firstOrFail();
         $this->assertSame(2025, $plan->fiscal_year);
         $this->assertSame(614_000_000, (int) $plan->plan_net_sales);
-        $this->assertSame(620_000_000, (int) $plan->forecast_net_sales);
+        $this->assertSame(565_000_000, (int) $plan->forecast_net_sales);
+        $this->assertSame(12_000_000, (int) $plan->forecast_net_income);
+        $this->assertCount(12, $plan->months);
         $this->assertDatabaseCount('company_financial_periods', 0);
+
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.annual-plan.index'))
+            ->assertOk()
+            ->assertSee('月別計画と実績')
+            ->assertSee('最新の着地見込み')
+            ->assertSee('税抜き');
     }
 
     protected function tearDown(): void

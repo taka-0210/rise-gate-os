@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompanyAnnualPlan extends Model
 {
@@ -24,4 +25,9 @@ class CompanyAnnualPlan extends Model
         'forecast_depreciation_expense',
         'updated_by',
     ];
+
+    public function months(): HasMany
+    {
+        return $this->hasMany(CompanyAnnualPlanMonth::class)->orderBy('month');
+    }
 }
