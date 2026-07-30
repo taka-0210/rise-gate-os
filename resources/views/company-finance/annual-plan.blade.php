@@ -21,6 +21,9 @@
     ];
     $monthlyActualAverages['gross'] = $monthlyActualAverages['sales'] - $monthlyActualAverages['cost'];
     $monthlyActualAverages['operating'] = $monthlyActualAverages['gross'] - $monthlyActualAverages['sga'];
+    $monthlyActualGrossMargin = $monthlyActualAverages['sales'] > 0
+        ? $monthlyActualAverages['gross'] / $monthlyActualAverages['sales'] * 100
+        : 0;
 @endphp
 
 <div class="annual-plan-page">
@@ -128,12 +131,25 @@
                     </div>
                 </div>
                 <div class="bulk-fields">
-                    <label><span>平均売上</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sales" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['sales']) }}" data-tax-exclusive="{{ $monthlyActualAverages['sales'] }}" @disabled(!$canManage)></label>
-                    <label><span>平均売上原価</span><input class="formatted-money-input tax-convertible" id="bulk-plan-cost" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['cost']) }}" data-tax-exclusive="{{ $monthlyActualAverages['cost'] }}" @disabled(!$canManage)></label>
-                    <div class="bulk-calculated"><span>平均粗利</span><strong id="bulk-plan-gross">{{ $money($monthlyActualAverages['gross']) }}</strong></div>
-                    <label><span>平均販管費</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sga" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['sga']) }}" data-tax-exclusive="{{ $monthlyActualAverages['sga'] }}" @disabled(!$canManage)></label>
-                    <div class="bulk-calculated"><span>平均営業利益</span><strong id="bulk-plan-operating">{{ $money($monthlyActualAverages['operating']) }}</strong></div>
-                    @if($canManage)<button type="button" id="apply-plan-averages">未入力月へ一括反映</button>@endif
+                    <label><span>売上</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sales" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['sales']) }}" data-tax-exclusive="{{ $monthlyActualAverages['sales'] }}" @disabled(!$canManage)></label>
+                    <label><span>粗利率</span><div class="rate-input"><input id="bulk-plan-gross-margin" type="text" inputmode="decimal" value="{{ number_format($monthlyActualGrossMargin, 1) }}" @disabled(!$canManage)><span>%</span></div></label>
+                    <label><span>販管費</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sga" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['sga']) }}" data-tax-exclusive="{{ $monthlyActualAverages['sga'] }}" @disabled(!$canManage)></label>
+                    <div class="bulk-calculated"><span>売上原価</span><strong id="bulk-plan-cost">{{ $money($monthlyActualAverages['cost']) }}</strong></div>
+                    <div class="bulk-calculated"><span>粗利</span><strong id="bulk-plan-gross">{{ $money($monthlyActualAverages['gross']) }}</strong></div>
+                    <div class="bulk-calculated"><span>営業利益</span><strong id="bulk-plan-operating">{{ $money($monthlyActualAverages['operating']) }}</strong></div>
+                    @if($canManage)
+                        <div class="bulk-target">
+                            <label><span>反映先</span><select id="bulk-target-month">
+                                <option value="all">未入力月へ一括反映</option>
+                                @foreach($months as $index => $month)
+                                    @if(data_get($month, 'actual_net_sales') === null)
+                                        <option value="{{ $index }}">{{ $month->month->format('n月') }}</option>
+                                    @endif
+                                @endforeach
+                            </select></label>
+                            <button type="button" id="apply-plan-averages">単月へセット</button>
+                        </div>
+                    @endif
                 </div>
             </div>
         </section>
@@ -322,7 +338,7 @@
 .annual-plan-page{width:min(1540px,calc(100vw - 28px));position:relative;left:50%;transform:translateX(-50%)}.period-toolbar{display:flex;align-items:end;gap:22px;margin-bottom:18px;padding:16px 18px;border:1px solid #b7d5ce;border-radius:11px;background:#f2faf7}.period-toolbar>div:first-child{margin-right:auto}.period-toolbar span,.plan-supplement span,.forecast-grid span,.repayment-fields span{display:block;color:var(--muted);font-size:12px}.period-toolbar strong{display:block;margin-top:5px;color:var(--accent-dark)}.period-toolbar label{width:100px}.cell-legend{display:flex;gap:12px;padding-bottom:8px}.cell-legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}.cell-legend i{width:14px;height:14px;border:1px solid #b5c5c7;border-radius:3px}.editable-swatch{background:#edf9f4}.calculated-swatch{background:#f0f2f3}.tax-switch>div{display:flex;margin-top:5px}.tax-button{padding:8px 16px;border:1px solid #aac5cb;background:#fff;color:#315b64}.tax-button:first-child{border-radius:7px 0 0 7px}.tax-button:last-child{border-radius:0 7px 7px 0}.tax-button.active{background:var(--accent-dark);color:#fff}.sheet-card,.forecast-card{padding:18px;margin-bottom:16px}.sheet-heading{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:12px}.sheet-heading h2{margin:3px 0 0}.sheet-heading p{margin:0;color:var(--muted);font-size:13px}.sheet-scroll{overflow-x:auto;border:1px solid #aebdc0}.plan-sheet,.progress-sheet{width:100%;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums}.plan-sheet{min-width:1040px}.progress-sheet{min-width:1500px}.plan-sheet th,.plan-sheet td,.progress-sheet th,.progress-sheet td{border:1px solid #b5bec0;text-align:center}.plan-sheet th,.plan-sheet td{height:50px;padding:6px}.plan-sheet thead th,.progress-sheet thead th{background:#dfe6e8;color:#183e48}.plan-sheet tbody th{width:90px;background:#f8edc7}.plan-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:10px}.plan-sheet td.input-cell{background:#edf9f4;padding:4px}.plan-sheet input{width:100%;min-width:120px;padding:9px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.plan-sheet input:focus{border-color:#4c91a0;background:#fff}.plan-sheet td{font-weight:700}.plan-supplement{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:12px;margin-top:14px}.plan-supplement label,.repayment-fields label{display:flex;flex-direction:column;gap:5px}.compact{padding:10px 13px;white-space:nowrap}.monthly-plan-bulk{margin-top:16px;padding:16px;border:1px solid #b8c9df;border-radius:10px;background:#f5f8fd}.bulk-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.bulk-heading span{display:block;margin-top:3px;color:var(--muted);font-size:12px}.plan-average-summary{display:flex;align-items:center;gap:13px}.plan-average-summary span{margin:0}.plan-average-summary b{color:#355f99;font-size:13px}.plan-average-summary i{font-style:normal}.bulk-fields{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:10px;margin-top:12px}.bulk-fields label{margin:0}.progress-sheet th,.progress-sheet td{height:42px;padding:4px}.progress-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:9px}.progress-sheet td.input-cell{background:#edf9f4;padding:3px}.progress-sheet .row-title,.progress-sheet tbody th{position:sticky;left:0;z-index:2;width:150px;background:#e5eaeb}.progress-sheet thead th{height:52px}.progress-sheet thead th:not(.row-title){width:112px}.progress-sheet .plan-row th{background:#e2eaf7;color:#355f99;z-index:3}.progress-sheet .plan-row td.input-cell{background:#edf2fb}.progress-sheet .plan-value-row input{color:#355f99;font-weight:800}.sheet-input{width:100%;min-width:90px;padding:7px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.sheet-input:focus{border-color:#4c91a0;background:#fff}.calculated,.progress-sheet tbody td>span{display:block;width:100%;text-align:right;padding-right:0}.emphasis-row{border-bottom:3px solid #59747a}.ratio-separator{border-top:4px solid #59747a}.ratio-cell{padding:0!important;background:#f0f2f3!important}.ratio-cell span{padding:10px 8px!important}.rate-good{background:#aec3e6;color:#173f68;font-weight:700}.rate-watch{background:#efb788;color:#613819;font-weight:700}.negative{color:#d13b32!important;font-weight:700}.forecast-card{border-color:#9ec7d6}.forecast-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.forecast-grid>div{padding:13px;border:1px solid var(--line);border-radius:8px;background:#f8fbfb}.forecast-grid strong{display:block;margin-top:7px;color:var(--accent-dark);font-size:16px}.repayment-fields{display:grid;grid-template-columns:1.4fr repeat(3,1fr);align-items:end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}.repayment-fields h3,.repayment-fields p{margin:0}.repayment-fields p{color:var(--muted);font-size:12px}.save-actions{justify-content:flex-end;margin:18px 0}@media(max-width:900px){.period-toolbar,.sheet-heading,.bulk-heading{align-items:stretch;flex-direction:column}.period-toolbar>div:first-child{margin-right:0}.cell-legend{padding-bottom:0}.plan-average-summary{flex-wrap:wrap}.plan-supplement,.bulk-fields,.forecast-grid,.repayment-fields{grid-template-columns:1fr 1fr}}@media(max-width:600px){.plan-supplement,.bulk-fields,.forecast-grid,.repayment-fields{grid-template-columns:1fr}}
 .plan-swatch{background:#edf2fb}.progress-sheet .plan-value-row input{font-weight:700}.projected-value{background:#edf2fb!important;color:#355f99!important;font-weight:700}.progress-sheet td.input-cell:has(.forecast-entry:not([hidden])){background:#edf2fb}.forecast-entry{color:#355f99;font-weight:700}
 .heading-with-help{display:flex;align-items:center;gap:10px}.heading-with-help h2{margin:3px 0 0}.reverse-plan-help{padding:4px 9px;border:1px solid #9dbbc2;border-radius:999px;background:#fff;color:var(--accent-dark);font-size:12px;font-weight:700}.reverse-plan-dialog{width:min(680px,calc(100vw - 28px));padding:0;border:0;border-radius:16px;box-shadow:0 24px 80px rgba(13,35,45,.3)}.reverse-plan-dialog::backdrop{background:rgba(13,30,39,.52)}.reverse-plan-dialog__header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--line)}.reverse-plan-dialog__header h2{margin:3px 0 0}.reverse-plan-dialog__close{width:42px;height:42px;padding:0;font-size:24px}.reverse-plan-dialog__body{padding:22px 24px}.reverse-plan-dialog__body>p:first-child{margin-top:0}.reverse-plan-dialog__grid{display:grid;grid-template-columns:1fr 1.35fr;gap:12px;margin:20px 0}.reverse-plan-dialog__grid section{padding:15px;border:1px solid var(--line);border-radius:10px;background:#f8fbfb}.reverse-plan-dialog__grid h3{margin:0 0 8px}.reverse-plan-dialog__grid p,.reverse-plan-dialog__grid ul{margin:0}.reverse-plan-dialog__grid li{margin:6px 0}.reverse-plan-dialog blockquote{margin:20px 0 0;padding:17px 18px;border-left:4px solid var(--accent-dark);background:#f2faf7;color:var(--accent-dark);font-size:17px;font-weight:800}.reverse-plan-dialog__footer{display:flex;justify-content:flex-end;padding:14px 24px;border-top:1px solid var(--line)}@media(max-width:600px){.reverse-plan-dialog__grid{grid-template-columns:1fr}}
-.rate-input{display:flex;align-items:center;justify-content:flex-end;gap:5px}.plan-sheet .rate-input input{width:calc(100% - 22px);min-width:70px}.rate-suffix{flex:0 0 auto}.bulk-fields{grid-template-columns:repeat(5,minmax(150px,1fr)) auto}.bulk-calculated{display:flex;min-height:44px;flex-direction:column;justify-content:center;padding:6px 10px;border:1px solid #b5c5c7;border-radius:7px;background:#f0f2f3;text-align:right}.bulk-calculated span{font-size:12px;color:var(--muted);text-align:left}.bulk-calculated strong{margin-top:3px}.reverse-plan-input-order{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}.reverse-plan-input-order li{display:flex;align-items:center;gap:8px;margin:0}.reverse-plan-input-order li span{color:var(--accent-dark);font-weight:800}@media(max-width:1150px){.bulk-fields{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.bulk-fields{grid-template-columns:1fr}}
+.rate-input{display:flex;align-items:center;justify-content:flex-end;gap:5px}.plan-sheet .rate-input input{width:calc(100% - 22px);min-width:70px}.bulk-fields .rate-input input{width:100%;text-align:right}.rate-suffix{flex:0 0 auto}.bulk-fields{grid-template-columns:repeat(6,minmax(120px,1fr)) minmax(270px,auto)}.bulk-calculated{display:flex;min-height:44px;flex-direction:column;justify-content:center;padding:6px 10px;border:1px solid #b5c5c7;border-radius:7px;background:#f0f2f3;text-align:right}.bulk-calculated span{font-size:12px;color:var(--muted);text-align:left}.bulk-calculated strong{margin-top:3px}.bulk-target{display:grid;grid-template-columns:minmax(155px,1fr) auto;align-items:end;gap:8px}.bulk-target label{min-width:0}.bulk-target select{width:100%}.bulk-target button{white-space:nowrap}.reverse-plan-input-order{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}.reverse-plan-input-order li{display:flex;align-items:center;gap:8px;margin:0}.reverse-plan-input-order li span{color:var(--accent-dark);font-weight:800}@media(max-width:1250px){.bulk-fields{grid-template-columns:repeat(3,1fr)}.bulk-target{grid-column:1/-1}}@media(max-width:700px){.bulk-fields{grid-template-columns:1fr}.bulk-target{grid-template-columns:1fr}}
 </style>
 
 <script>
@@ -520,10 +536,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('average-plan-gross').textContent = money(averageGross);
         document.getElementById('average-plan-operating').textContent = money(averageOperating);
         const bulkSales = canonical(document.getElementById('bulk-plan-sales'));
-        const bulkCost = canonical(document.getElementById('bulk-plan-cost'));
+        const bulkGrossMargin = (num(document.getElementById('bulk-plan-gross-margin')?.value) || 0) / 100;
         const bulkSga = canonical(document.getElementById('bulk-plan-sga'));
-        const bulkGross = bulkSales !== null && bulkCost !== null ? bulkSales - bulkCost : null;
+        const bulkGross = bulkSales !== null ? Math.round(bulkSales * bulkGrossMargin) : null;
+        const bulkCost = bulkSales !== null && bulkGross !== null ? bulkSales - bulkGross : null;
         const bulkOperating = bulkGross !== null && bulkSga !== null ? bulkGross - bulkSga : null;
+        document.getElementById('bulk-plan-cost').textContent = money(bulkCost);
         document.getElementById('bulk-plan-gross').textContent = money(bulkGross);
         document.getElementById('bulk-plan-operating').textContent = money(bulkOperating);
         const forecastSales = cumSales;
@@ -588,13 +606,18 @@ document.addEventListener('DOMContentLoaded', () => {
         recalculate();
     });
     document.getElementById('apply-plan-averages')?.addEventListener('click', () => {
+        const sales = canonical(document.getElementById('bulk-plan-sales')) || 0;
+        const grossMargin = (num(document.getElementById('bulk-plan-gross-margin')?.value) || 0) / 100;
+        const gross = Math.round(sales * grossMargin);
         const values = {
-            forecast_net_sales: canonical(document.getElementById('bulk-plan-sales')) || 0,
-            forecast_cost_of_sales: canonical(document.getElementById('bulk-plan-cost')) || 0,
+            forecast_net_sales: sales,
+            forecast_cost_of_sales: sales - gross,
             forecast_selling_general_admin_expenses: canonical(document.getElementById('bulk-plan-sga')) || 0,
         };
+        const target = document.getElementById('bulk-target-month')?.value || 'all';
         for (let i = 0; i < count; i++) {
             if (canonical(field(`months[${i}][actual_net_sales]`)) !== null) continue;
+            if (target !== 'all' && Number(target) !== i) continue;
             Object.entries(values).forEach(([name, value]) => {
                 const input = field(`months[${i}][${name}]`);
                 input.dataset.taxExclusive = String(value);
