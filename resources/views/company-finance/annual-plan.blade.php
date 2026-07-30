@@ -13,10 +13,11 @@
     $planOperating = $planGross - $planSga;
     $money = fn ($number) => $number === null ? '—' : number_format((int) round($number));
     $inputMoney = fn ($number) => $number === null || $number === '' ? '' : number_format((int) $number);
-    $monthlyPlanAverages = [
-        'sales' => (int) round($months->avg('plan_net_sales') ?: 0),
-        'cost' => (int) round($months->avg('plan_cost_of_sales') ?: 0),
-        'sga' => (int) round($months->avg('plan_selling_general_admin_expenses') ?: 0),
+    $actualMonths = $months->filter(fn ($month) => data_get($month, 'actual_net_sales') !== null);
+    $monthlyActualAverages = [
+        'sales' => (int) round($actualMonths->avg('actual_net_sales') ?: 0),
+        'cost' => (int) round($actualMonths->avg('actual_cost_of_sales') ?: 0),
+        'sga' => (int) round($actualMonths->avg('actual_selling_general_admin_expenses') ?: 0),
     ];
 @endphp
 
@@ -46,6 +47,7 @@
             <div class="cell-legend">
                 <span><i class="editable-swatch"></i>入力できます</span>
                 <span><i class="calculated-swatch"></i>自動計算</span>
+                <span><i class="plan-swatch"></i>計画・見込</span>
             </div>
             <div class="tax-switch" aria-label="月次表の表示金額">
                 <span>表示金額</span>
@@ -105,19 +107,19 @@
             </div>
             <div class="monthly-plan-bulk">
                 <div class="bulk-heading">
-                    <div><strong>月次計画の平均・一括入力</strong><span>入力した平均額を12か月の計画欄へまとめて反映します。</span></div>
+                    <div><strong>実績平均から残り月を計画</strong><span>入力済み実績の平均額を、実績が未入力の月だけに反映します。</span></div>
                     <div class="plan-average-summary">
-                        <span>現在の平均</span>
-                        <b>売上 <i id="average-plan-sales">{{ $money($monthlyPlanAverages['sales']) }}</i></b>
-                        <b>原価 <i id="average-plan-cost">{{ $money($monthlyPlanAverages['cost']) }}</i></b>
-                        <b>販管費 <i id="average-plan-sga">{{ $money($monthlyPlanAverages['sga']) }}</i></b>
+                        <span>入力済み実績の平均</span>
+                        <b>売上 <i id="average-plan-sales">{{ $money($monthlyActualAverages['sales']) }}</i></b>
+                        <b>原価 <i id="average-plan-cost">{{ $money($monthlyActualAverages['cost']) }}</i></b>
+                        <b>販管費 <i id="average-plan-sga">{{ $money($monthlyActualAverages['sga']) }}</i></b>
                     </div>
                 </div>
                 <div class="bulk-fields">
-                    <label><span>平均売上</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sales" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyPlanAverages['sales']) }}" data-tax-exclusive="{{ $monthlyPlanAverages['sales'] }}" @disabled(!$canManage)></label>
-                    <label><span>平均売上原価</span><input class="formatted-money-input tax-convertible" id="bulk-plan-cost" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyPlanAverages['cost']) }}" data-tax-exclusive="{{ $monthlyPlanAverages['cost'] }}" @disabled(!$canManage)></label>
-                    <label><span>平均販管費</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sga" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyPlanAverages['sga']) }}" data-tax-exclusive="{{ $monthlyPlanAverages['sga'] }}" @disabled(!$canManage)></label>
-                    @if($canManage)<button type="button" id="apply-plan-averages">12か月へ一括反映</button>@endif
+                    <label><span>平均売上</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sales" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['sales']) }}" data-tax-exclusive="{{ $monthlyActualAverages['sales'] }}" @disabled(!$canManage)></label>
+                    <label><span>平均売上原価</span><input class="formatted-money-input tax-convertible" id="bulk-plan-cost" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['cost']) }}" data-tax-exclusive="{{ $monthlyActualAverages['cost'] }}" @disabled(!$canManage)></label>
+                    <label><span>平均販管費</span><input class="formatted-money-input tax-convertible" id="bulk-plan-sga" type="text" inputmode="numeric" value="{{ $inputMoney($monthlyActualAverages['sga']) }}" data-tax-exclusive="{{ $monthlyActualAverages['sga'] }}" @disabled(!$canManage)></label>
+                    @if($canManage)<button type="button" id="apply-plan-averages">未入力月へ一括反映</button>@endif
                 </div>
             </div>
         </section>
@@ -262,6 +264,7 @@
 
 <style>
 .annual-plan-page{width:min(1540px,calc(100vw - 28px));position:relative;left:50%;transform:translateX(-50%)}.period-toolbar{display:flex;align-items:end;gap:22px;margin-bottom:18px;padding:16px 18px;border:1px solid #b7d5ce;border-radius:11px;background:#f2faf7}.period-toolbar>div:first-child{margin-right:auto}.period-toolbar span,.plan-supplement span,.forecast-grid span,.repayment-fields span{display:block;color:var(--muted);font-size:12px}.period-toolbar strong{display:block;margin-top:5px;color:var(--accent-dark)}.period-toolbar label{width:100px}.cell-legend{display:flex;gap:12px;padding-bottom:8px}.cell-legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}.cell-legend i{width:14px;height:14px;border:1px solid #b5c5c7;border-radius:3px}.editable-swatch{background:#edf9f4}.calculated-swatch{background:#f0f2f3}.tax-switch>div{display:flex;margin-top:5px}.tax-button{padding:8px 16px;border:1px solid #aac5cb;background:#fff;color:#315b64}.tax-button:first-child{border-radius:7px 0 0 7px}.tax-button:last-child{border-radius:0 7px 7px 0}.tax-button.active{background:var(--accent-dark);color:#fff}.sheet-card,.forecast-card{padding:18px;margin-bottom:16px}.sheet-heading{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:12px}.sheet-heading h2{margin:3px 0 0}.sheet-heading p{margin:0;color:var(--muted);font-size:13px}.sheet-scroll{overflow-x:auto;border:1px solid #aebdc0}.plan-sheet,.progress-sheet{width:100%;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums}.plan-sheet{min-width:1040px}.progress-sheet{min-width:1500px}.plan-sheet th,.plan-sheet td,.progress-sheet th,.progress-sheet td{border:1px solid #b5bec0;text-align:center}.plan-sheet th,.plan-sheet td{height:50px;padding:6px}.plan-sheet thead th,.progress-sheet thead th{background:#dfe6e8;color:#183e48}.plan-sheet tbody th{width:90px;background:#f8edc7}.plan-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:10px}.plan-sheet td.input-cell{background:#edf9f4;padding:4px}.plan-sheet input{width:100%;min-width:120px;padding:9px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.plan-sheet input:focus{border-color:#4c91a0;background:#fff}.plan-sheet td{font-weight:700}.plan-supplement{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:12px;margin-top:14px}.plan-supplement label,.repayment-fields label{display:flex;flex-direction:column;gap:5px}.compact{padding:10px 13px;white-space:nowrap}.monthly-plan-bulk{margin-top:16px;padding:16px;border:1px solid #b8c9df;border-radius:10px;background:#f5f8fd}.bulk-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.bulk-heading span{display:block;margin-top:3px;color:var(--muted);font-size:12px}.plan-average-summary{display:flex;align-items:center;gap:13px}.plan-average-summary span{margin:0}.plan-average-summary b{color:#355f99;font-size:13px}.plan-average-summary i{font-style:normal}.bulk-fields{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:10px;margin-top:12px}.bulk-fields label{margin:0}.progress-sheet th,.progress-sheet td{height:42px;padding:4px}.progress-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:9px}.progress-sheet td.input-cell{background:#edf9f4;padding:3px}.progress-sheet .row-title,.progress-sheet tbody th{position:sticky;left:0;z-index:2;width:150px;background:#e5eaeb}.progress-sheet thead th{height:52px}.progress-sheet thead th:not(.row-title){width:112px}.progress-sheet .plan-row th{background:#e2eaf7;color:#355f99;z-index:3}.progress-sheet .plan-row td.input-cell{background:#edf2fb}.progress-sheet .plan-value-row input{color:#355f99;font-weight:800}.sheet-input{width:100%;min-width:90px;padding:7px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.sheet-input:focus{border-color:#4c91a0;background:#fff}.calculated,.progress-sheet tbody td>span{display:block;width:100%;text-align:right;padding-right:0}.emphasis-row{border-bottom:3px solid #59747a}.ratio-separator{border-top:4px solid #59747a}.ratio-cell{padding:0!important;background:#f0f2f3!important}.ratio-cell span{padding:10px 8px!important}.rate-good{background:#aec3e6;color:#173f68;font-weight:700}.rate-watch{background:#efb788;color:#613819;font-weight:700}.negative{color:#d13b32!important;font-weight:700}.forecast-card{border-color:#9ec7d6}.forecast-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.forecast-grid>div{padding:13px;border:1px solid var(--line);border-radius:8px;background:#f8fbfb}.forecast-grid strong{display:block;margin-top:7px;color:var(--accent-dark);font-size:16px}.repayment-fields{display:grid;grid-template-columns:1.4fr repeat(3,1fr);align-items:end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}.repayment-fields h3,.repayment-fields p{margin:0}.repayment-fields p{color:var(--muted);font-size:12px}.save-actions{justify-content:flex-end;margin:18px 0}@media(max-width:900px){.period-toolbar,.sheet-heading,.bulk-heading{align-items:stretch;flex-direction:column}.period-toolbar>div:first-child{margin-right:0}.cell-legend{padding-bottom:0}.plan-average-summary{flex-wrap:wrap}.plan-supplement,.bulk-fields,.forecast-grid,.repayment-fields{grid-template-columns:1fr 1fr}}@media(max-width:600px){.plan-supplement,.bulk-fields,.forecast-grid,.repayment-fields{grid-template-columns:1fr}}
+.plan-swatch{background:#edf2fb}.projected-value{background:#edf2fb!important;color:#355f99!important;font-weight:800}
 </style>
 
 <script>
@@ -322,23 +325,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const plannedGrossMargin = annualSales ? annualGross / annualSales : 0;
         const plannedCostRate = annualSales ? (annualSales - annualGross) / annualSales : 0;
         let cumPlan = 0, cumSales = 0, cumCost = 0, cumSga = 0;
-        let planSalesTotal = 0, planCostTotal = 0, planSgaTotal = 0;
-        let actualCount = 0, remainingPlan = 0, remainingPlanCost = 0, remainingPlanSga = 0;
+        let actualSalesTotal = 0, actualCostTotal = 0, actualSgaTotal = 0;
+        let actualCount = 0, actualCostCount = 0, actualSgaCount = 0;
+        const cumulativeSelectors = [
+            '.cumulative-sales', '.cumulative-variance', '.cumulative-cost',
+            '.cumulative-gross', '.cumulative-sga', '.cumulative-operating',
+        ];
 
         for (let i = 0; i < count; i++) {
             const plan = canonical(field(`months[${i}][plan_net_sales]`)) || 0;
             const planCost = canonical(field(`months[${i}][plan_cost_of_sales]`)) || 0;
             const planSga = canonical(field(`months[${i}][plan_selling_general_admin_expenses]`)) || 0;
             const sales = canonical(field(`months[${i}][actual_net_sales]`));
-            const cost = canonical(field(`months[${i}][actual_cost_of_sales]`)) || 0;
+            const costRaw = canonical(field(`months[${i}][actual_cost_of_sales]`));
+            const cost = costRaw || 0;
             const sgaRaw = canonical(field(`months[${i}][actual_selling_general_admin_expenses]`));
             const hasActual = sales !== null;
             const gross = hasActual ? sales - cost : null;
             const operating = hasActual && sgaRaw !== null ? gross - sgaRaw : null;
-            planSalesTotal += plan;
-            planCostTotal += planCost;
-            planSgaTotal += planSga;
-
             set('.actual-sales', i, sales);
             set('.sales-variance', i, hasActual ? sales - plan : null);
             set('.actual-cost', i, hasActual ? cost : null);
@@ -359,42 +363,52 @@ document.addEventListener('DOMContentLoaded', () => {
             set('.cumulative-plan', i, cumPlan);
             if (hasActual) {
                 actualCount++;
+                actualSalesTotal += sales;
+                if (costRaw !== null) {
+                    actualCostTotal += costRaw;
+                    actualCostCount++;
+                }
+                if (sgaRaw !== null) {
+                    actualSgaTotal += sgaRaw;
+                    actualSgaCount++;
+                }
                 cumSales += sales;
                 cumCost += cost;
                 cumSga += sgaRaw || 0;
-                const cumGross = cumSales - cumCost;
-                set('.cumulative-sales', i, cumSales);
-                set('.cumulative-variance', i, cumSales - cumPlan);
-                set('.cumulative-cost', i, cumCost);
-                set('.cumulative-gross', i, cumGross);
-                set('.cumulative-sga', i, cumSga);
-                set('.cumulative-operating', i, cumGross - cumSga);
-                set('.cumulative-achievement', i, cumPlan ? cumSales / cumPlan : null, 'rate');
-                set('.cumulative-cost-rate', i, cumSales ? cumCost / cumSales : null, 'rate');
-                set('.cumulative-gross-rate', i, cumSales ? cumGross / cumSales : null, 'rate');
-                const cumulativeAchievement = cumPlan ? cumSales / cumPlan : null;
-                const cumulativeCostRate = cumSales ? cumCost / cumSales : null;
-                const cumulativeGrossRate = cumSales ? cumGross / cumSales : null;
-                assessRate('.cumulative-achievement', i, cumulativeAchievement, cumulativeAchievement >= 1);
-                assessRate('.cumulative-cost-rate', i, cumulativeCostRate, cumulativeCostRate <= plannedCostRate);
-                assessRate('.cumulative-gross-rate', i, cumulativeGrossRate, cumulativeGrossRate >= plannedGrossMargin);
             } else {
-                remainingPlan += plan;
-                remainingPlanCost += planCost;
-                remainingPlanSga += planSga;
-                ['.cumulative-sales','.cumulative-variance','.cumulative-cost','.cumulative-gross','.cumulative-sga','.cumulative-operating'].forEach(selector => set(selector, i, null));
-                ['.cumulative-achievement','.cumulative-cost-rate','.cumulative-gross-rate'].forEach(selector => set(selector, i, null, 'rate'));
-                ['.cumulative-achievement','.cumulative-cost-rate','.cumulative-gross-rate'].forEach(selector => assessRate(selector, i, null, false));
+                cumSales += plan;
+                cumCost += planCost;
+                cumSga += planSga;
             }
+
+            const cumGross = cumSales - cumCost;
+            set('.cumulative-sales', i, cumSales);
+            set('.cumulative-variance', i, cumSales - cumPlan);
+            set('.cumulative-cost', i, cumCost);
+            set('.cumulative-gross', i, cumGross);
+            set('.cumulative-sga', i, cumSga);
+            set('.cumulative-operating', i, cumGross - cumSga);
+            set('.cumulative-achievement', i, cumPlan ? cumSales / cumPlan : null, 'rate');
+            set('.cumulative-cost-rate', i, cumSales ? cumCost / cumSales : null, 'rate');
+            set('.cumulative-gross-rate', i, cumSales ? cumGross / cumSales : null, 'rate');
+            const cumulativeAchievement = cumPlan ? cumSales / cumPlan : null;
+            const cumulativeCostRate = cumSales ? cumCost / cumSales : null;
+            const cumulativeGrossRate = cumSales ? cumGross / cumSales : null;
+            assessRate('.cumulative-achievement', i, cumulativeAchievement, cumulativeAchievement >= 1);
+            assessRate('.cumulative-cost-rate', i, cumulativeCostRate, cumulativeCostRate <= plannedCostRate);
+            assessRate('.cumulative-gross-rate', i, cumulativeGrossRate, cumulativeGrossRate >= plannedGrossMargin);
+            cumulativeSelectors.forEach(selector => {
+                const element = form.querySelector(`${selector}[data-index="${i}"]`);
+                element?.classList.toggle('projected-value', !hasActual);
+            });
         }
 
-        document.getElementById('average-plan-sales').textContent = money(planSalesTotal / count);
-        document.getElementById('average-plan-cost').textContent = money(planCostTotal / count);
-        document.getElementById('average-plan-sga').textContent = money(planSgaTotal / count);
-        const actualGross = cumSales - cumCost;
-        const forecastSales = cumSales + remainingPlan;
-        const forecastGross = actualGross + (remainingPlan - remainingPlanCost);
-        const forecastSga = cumSga + remainingPlanSga;
+        document.getElementById('average-plan-sales').textContent = money(actualCount ? actualSalesTotal / actualCount : null);
+        document.getElementById('average-plan-cost').textContent = money(actualCostCount ? actualCostTotal / actualCostCount : null);
+        document.getElementById('average-plan-sga').textContent = money(actualSgaCount ? actualSgaTotal / actualSgaCount : null);
+        const forecastSales = cumSales;
+        const forecastGross = cumSales - cumCost;
+        const forecastSga = cumSga;
         const forecast = {
             'actual-month-count': `${actualCount}か月`,
             'forecast-sales': money(forecastSales),
@@ -456,6 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             plan_selling_general_admin_expenses: canonical(document.getElementById('bulk-plan-sga')) || 0,
         };
         for (let i = 0; i < count; i++) {
+            if (canonical(field(`months[${i}][actual_net_sales]`)) !== null) continue;
             Object.entries(values).forEach(([name, value]) => {
                 const input = field(`months[${i}][${name}]`);
                 input.dataset.taxExclusive = String(value);
