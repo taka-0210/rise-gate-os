@@ -142,6 +142,9 @@ class CompanyFinanceEntryTest extends TestCase
                         'plan_net_sales' => 50_000_000,
                         'plan_cost_of_sales' => 30_000_000,
                         'plan_selling_general_admin_expenses' => 20_000_000,
+                        'forecast_net_sales' => $index < 7 ? null : 50_000_000,
+                        'forecast_cost_of_sales' => $index < 7 ? null : 30_000_000,
+                        'forecast_selling_general_admin_expenses' => $index < 7 ? null : 20_000_000,
                         'actual_net_sales' => $index < 7 ? 45_000_000 : null,
                         'actual_cost_of_sales' => $index < 7 ? 25_000_000 : null,
                         'actual_selling_general_admin_expenses' => $index < 7 ? 20_000_000 : null,
@@ -159,6 +162,8 @@ class CompanyFinanceEntryTest extends TestCase
         $this->assertSame(240_000_000, (int) $plan->forecast_selling_general_admin_expenses);
         $this->assertSame(12_000_000, (int) $plan->forecast_net_income);
         $this->assertCount(12, $plan->months);
+        $this->assertSame(51_166_666, (int) $plan->months->first()->plan_net_sales);
+        $this->assertSame(50_000_000, (int) $plan->months->last()->forecast_net_sales);
         $this->assertDatabaseCount('company_financial_periods', 0);
 
         $this->actingAs($user)->withSession($session)

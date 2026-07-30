@@ -85,6 +85,9 @@ class CompanyAnnualPlanController extends Controller
             'plan_net_sales',
             'plan_cost_of_sales',
             'plan_selling_general_admin_expenses',
+            'forecast_net_sales',
+            'forecast_cost_of_sales',
+            'forecast_selling_general_admin_expenses',
             'actual_net_sales',
             'actual_cost_of_sales',
             'actual_selling_general_admin_expenses',
@@ -115,10 +118,31 @@ class CompanyAnnualPlanController extends Controller
                 ),
             );
 
+            $annualSales = (int) ($validated['plan_net_sales'] ?? 0);
+            $annualCost = $annualSales - (int) ($validated['plan_gross_profit'] ?? 0);
+            $annualSga = (int) ($validated['plan_selling_general_admin_expenses'] ?? 0);
+            $monthPlans = collect($this->fiscalMonths(
+                $fiscalYear,
+                $organization->fiscal_year_end_month ?: 12,
+            ))->values()->mapWithKeys(function (CarbonImmutable $month, int $index) use (
+                $annualSales,
+                $annualCost,
+                $annualSga,
+            ): array {
+                return [$month->format('Y-m-d') => [
+                    'plan_net_sales' => $this->monthlyShare($annualSales, $index),
+                    'plan_cost_of_sales' => $this->monthlyShare($annualCost, $index),
+                    'plan_selling_general_admin_expenses' => $this->monthlyShare($annualSga, $index),
+                ]];
+            });
+
             foreach ($validated['months'] as $month) {
                 $plan->months()->updateOrCreate(
                     ['month' => $month['month']],
-                    collect($month)->except('month')->all(),
+                    array_merge(
+                        collect($month)->except('month')->all(),
+                        $monthPlans->get($month['month']),
+                    ),
                 );
             }
 
@@ -159,7 +183,18 @@ class CompanyAnnualPlanController extends Controller
             ) {
                 $key = $month->format('Y-m-d');
                 if ($saved->has($key)) {
-                    return $saved->get($key);
+                    $row = $saved->get($key);
+                    $row->setAttribute('plan_net_sales', $index === 11
+                        ? $annualSales - ($monthlySalesBase * 11)
+                        : $monthlySalesBase);
+                    $row->setAttribute('plan_cost_of_sales', $index === 11
+                        ? $annualCost - ($monthlyCostBase * 11)
+                        : $monthlyCostBase);
+                    $row->setAttribute('plan_selling_general_admin_expenses', $index === 11
+                        ? $annualSga - ($monthlySgaBase * 11)
+                        : $monthlySgaBase);
+
+                    return $row;
                 }
 
                 return (object) [
@@ -173,11 +208,21 @@ class CompanyAnnualPlanController extends Controller
                     'plan_selling_general_admin_expenses' => $index === 11
                         ? $annualSga - ($monthlySgaBase * 11)
                         : $monthlySgaBase,
+                    'forecast_net_sales' => null,
+                    'forecast_cost_of_sales' => null,
+                    'forecast_selling_general_admin_expenses' => null,
                     'actual_net_sales' => null,
                     'actual_cost_of_sales' => null,
                     'actual_selling_general_admin_expenses' => null,
                 ];
             });
+    }
+
+    private function monthlyShare(int $annualTotal, int $index): int
+    {
+        $base = intdiv($annualTotal, 12);
+
+        return $index === 11 ? $annualTotal - ($base * 11) : $base;
     }
 
     private function fiscalMonths(int $fiscalYear, int $closingMonth): Collection

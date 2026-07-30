@@ -185,6 +185,17 @@
                                     @endphp
                                     <td class="{{ $field ? 'input-cell' : 'calculated-cell' }}">
                                         @if($field)
+                                            @php
+                                                $forecastField = match ($field) {
+                                                    'actual_net_sales' => 'forecast_net_sales',
+                                                    'actual_cost_of_sales' => 'forecast_cost_of_sales',
+                                                    'actual_selling_general_admin_expenses' => 'forecast_selling_general_admin_expenses',
+                                                };
+                                                $forecastValue = array_key_exists($forecastField, $oldMonth)
+                                                    ? $oldMonth[$forecastField]
+                                                    : data_get($month, $forecastField);
+                                            @endphp
+                                            <input type="hidden" name="months[{{ $index }}][{{ $forecastField }}]" value="{{ $forecastValue }}" data-tax-exclusive="{{ $forecastValue }}">
                                             <input class="sheet-input formatted-money-input tax-convertible" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $field }}]" value="{{ $inputMoney($fieldValue) }}" data-tax-exclusive="{{ $fieldValue }}" @disabled(!$canManage)>
                                         @else
                                             <span class="calculated {{ $class }}" data-index="{{ $index }}">—</span>
@@ -357,6 +368,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const salesInput = field(`months[${i}][actual_net_sales]`);
             const costInput = field(`months[${i}][actual_cost_of_sales]`);
             const sgaInput = field(`months[${i}][actual_selling_general_admin_expenses]`);
+            const forecastSales = canonical(field(`months[${i}][forecast_net_sales]`)) ?? plan;
+            const forecastCost = canonical(field(`months[${i}][forecast_cost_of_sales]`)) ?? planCost;
+            const forecastSga = canonical(field(`months[${i}][forecast_selling_general_admin_expenses]`)) ?? planSga;
             const sales = canonical(salesInput);
             const costRaw = canonical(costInput);
             const cost = costRaw || 0;
@@ -364,13 +378,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const hasActual = sales !== null;
             const gross = hasActual ? sales - cost : null;
             const operating = hasActual && sgaRaw !== null ? gross - sgaRaw : null;
-            const displayedSales = hasActual ? sales : plan;
-            const displayedCost = hasActual ? cost : planCost;
-            const displayedSga = hasActual ? sgaRaw : planSga;
+            const displayedSales = hasActual ? sales : forecastSales;
+            const displayedCost = hasActual ? cost : forecastCost;
+            const displayedSga = hasActual ? sgaRaw : forecastSga;
             const displayedGross = displayedSales - displayedCost;
             const displayedOperating = displayedGross - (displayedSga || 0);
 
-            [[salesInput, plan], [costInput, planCost], [sgaInput, planSga]].forEach(([input, forecastValue]) => {
+            [[salesInput, forecastSales], [costInput, forecastCost], [sgaInput, forecastSga]].forEach(([input, forecastValue]) => {
                 if (!input) return;
                 input.classList.toggle('forecast-field', !hasActual);
                 input.placeholder = hasActual ? '' : formatInput(forecastValue * taxFactor());
@@ -410,9 +424,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 cumCost += cost;
                 cumSga += sgaRaw || 0;
             } else {
-                cumSales += plan;
-                cumCost += planCost;
-                cumSga += planSga;
+                cumSales += forecastSales;
+                cumCost += forecastCost;
+                cumSga += forecastSga;
             }
 
             const cumGross = cumSales - cumCost;
@@ -496,16 +510,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('apply-plan-averages')?.addEventListener('click', () => {
         const values = {
-            plan_net_sales: canonical(document.getElementById('bulk-plan-sales')) || 0,
-            plan_cost_of_sales: canonical(document.getElementById('bulk-plan-cost')) || 0,
-            plan_selling_general_admin_expenses: canonical(document.getElementById('bulk-plan-sga')) || 0,
+            forecast_net_sales: canonical(document.getElementById('bulk-plan-sales')) || 0,
+            forecast_cost_of_sales: canonical(document.getElementById('bulk-plan-cost')) || 0,
+            forecast_selling_general_admin_expenses: canonical(document.getElementById('bulk-plan-sga')) || 0,
         };
         for (let i = 0; i < count; i++) {
             if (canonical(field(`months[${i}][actual_net_sales]`)) !== null) continue;
             Object.entries(values).forEach(([name, value]) => {
                 const input = field(`months[${i}][${name}]`);
                 input.dataset.taxExclusive = String(value);
-                input.value = formatInput(value * taxFactor());
+                input.value = String(value);
             });
         }
         recalculate();
