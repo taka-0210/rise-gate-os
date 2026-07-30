@@ -103,7 +103,7 @@
                 <label><span>当期純利益計画</span><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_net_income" value="{{ $inputMoney($value('plan_net_income')) }}" @disabled(!$canManage)></label>
                 <label><span>支払利息計画</span><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_interest_expense" value="{{ $inputMoney($value('plan_interest_expense')) }}" @disabled(!$canManage)></label>
                 <label><span>減価償却費計画</span><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_depreciation_expense" value="{{ $inputMoney($value('plan_depreciation_expense')) }}" @disabled(!$canManage)></label>
-                @if($canManage)<button class="button secondary compact" type="button" id="distribute-sales">売上目標を12か月に配分</button>@endif
+                @if($canManage)<button class="button secondary compact" type="button" id="distribute-sales">年間計画を12か月に反映</button>@endif
             </div>
             <div class="monthly-plan-bulk">
                 <div class="bulk-heading">
@@ -317,6 +317,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('plan-cost-ratio').textContent = sales ? rate(cost / sales) : '—';
     }
 
+    function distributeAnnualPlan() {
+        const totals = {
+            plan_net_sales: planValue('plan_net_sales'),
+            plan_cost_of_sales: planValue('plan_net_sales') - planValue('plan_gross_profit'),
+            plan_selling_general_admin_expenses: planValue('plan_selling_general_admin_expenses'),
+        };
+
+        Object.entries(totals).forEach(([name, total]) => {
+            const base = Math.floor(total / count);
+            for (let i = 0; i < count; i++) {
+                const input = field(`months[${i}][${name}]`);
+                const value = i === count - 1 ? total - base * (count - 1) : base;
+                input.dataset.taxExclusive = String(value);
+                input.value = formatInput(value * taxFactor());
+            }
+        });
+    }
+
     function recalculate() {
         updatePlan();
         const annualSales = planValue('plan_net_sales');
@@ -458,6 +476,9 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = formatInput(value);
         });
     });
+    ['plan_net_sales', 'plan_gross_profit', 'plan_selling_general_admin_expenses'].forEach(name => {
+        field(name)?.addEventListener('input', distributeAnnualPlan);
+    });
     form.addEventListener('input', recalculate);
     document.querySelectorAll('.tax-button').forEach(button => button.addEventListener('click', () => {
         taxMode = button.dataset.taxMode;
@@ -470,13 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
         recalculate();
     }));
     document.getElementById('distribute-sales')?.addEventListener('click', () => {
-        const total = planValue('plan_net_sales');
-        const base = Math.floor(total / 12);
-        for (let i = 0; i < count; i++) {
-            const input = field(`months[${i}][plan_net_sales]`);
-            input.dataset.taxExclusive = String(i === 11 ? total - base * 11 : base);
-            input.value = formatInput(Number(input.dataset.taxExclusive) * taxFactor());
-        }
+        distributeAnnualPlan();
         recalculate();
     });
     document.getElementById('apply-plan-averages')?.addEventListener('click', () => {
