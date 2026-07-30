@@ -72,6 +72,15 @@
             font: inherit;
             background: #fff;
         }
+        .company-finance-screen input[type="number"] {
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+        .company-finance-screen input[type="number"]::-webkit-inner-spin-button,
+        .company-finance-screen input[type="number"]::-webkit-outer-spin-button {
+            margin: 0;
+            -webkit-appearance: none;
+        }
         .field { display: grid; gap: 6px; }
         .error { color: var(--danger); font-size: 13px; }
         .button, button {
@@ -275,7 +284,7 @@
         }
     </style>
 </head>
-<body>
+<body @class(['company-finance-screen' => request()->routeIs('company-finance.*')])>
 <div class="shell">
     <header class="topbar">
         <a class="brand" href="{{ route('welcome') }}" aria-label="RISE GATE OS トップへ">

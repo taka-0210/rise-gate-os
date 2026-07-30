@@ -164,6 +164,8 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('累計')
             ->assertSee('最新の着地見込み')
             ->assertSee('data-tax-mode="inclusive"', false)
+            ->assertSee('class="company-finance-screen"', false)
+            ->assertSee('::-webkit-inner-spin-button', false)
             ->assertDontSee('厨房君');
     }
 
