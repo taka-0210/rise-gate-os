@@ -63,6 +63,8 @@
                 <div><span class="meta">ANNUAL PLAN</span><h2>年間計画</h2></div>
                 <p>入力・保存の基準は税抜です。税込は消費税10%で自動表示します。</p>
             </div>
+            <input type="hidden" name="plan_gross_profit" value="{{ $planGross }}">
+            <input type="hidden" name="plan_selling_general_admin_expenses" value="{{ $planSga }}">
             <div class="sheet-scroll">
                 <table class="plan-sheet">
                     <thead>
@@ -82,10 +84,10 @@
                             <th>税抜</th>
                             <td class="input-cell"><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_net_sales" value="{{ $inputMoney($value('plan_net_sales')) }}" @disabled(!$canManage)></td>
                             <td id="plan-cost-exclusive">{{ $money($planCost) }}</td>
-                            <td class="input-cell"><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_gross_profit" value="{{ $inputMoney($value('plan_gross_profit')) }}" @disabled(!$canManage)></td>
-                            <td class="input-cell"><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_selling_general_admin_expenses" value="{{ $inputMoney($value('plan_selling_general_admin_expenses')) }}" @disabled(!$canManage)></td>
-                            <td id="plan-operating-exclusive">{{ $money($planOperating) }}</td>
-                            <td id="plan-gross-margin" rowspan="2">{{ $planSales ? number_format($planGross / $planSales * 100, 1).'%' : '—' }}</td>
+                            <td id="plan-gross-exclusive">{{ $money($planGross) }}</td>
+                            <td id="plan-sga-exclusive">{{ $money($planSga) }}</td>
+                            <td class="input-cell"><input class="formatted-money-input" id="plan-operating-target" type="text" inputmode="numeric" value="{{ $inputMoney($planOperating) }}" @disabled(!$canManage)></td>
+                            <td class="input-cell" rowspan="2"><input id="plan-gross-margin-target" type="text" inputmode="decimal" value="{{ $planSales ? number_format($planGross / $planSales * 100, 1) : '' }}" @disabled(!$canManage)><span class="rate-suffix">%</span></td>
                             <td id="plan-cost-ratio" rowspan="2">{{ $planSales ? number_format($planCost / $planSales * 100, 1).'%' : '—' }}</td>
                         </tr>
                         <tr>
@@ -310,13 +312,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updatePlan() {
         const sales = planValue('plan_net_sales');
-        const gross = planValue('plan_gross_profit');
-        const sga = planValue('plan_selling_general_admin_expenses');
+        const operating = num(document.getElementById('plan-operating-target')?.value) || 0;
+        const grossMargin = (num(document.getElementById('plan-gross-margin-target')?.value) || 0) / 100;
+        const gross = Math.round(sales * grossMargin);
         const cost = sales - gross;
-        const operating = gross - sga;
+        const sga = gross - operating;
+        field('plan_gross_profit').value = String(gross);
+        field('plan_selling_general_admin_expenses').value = String(sga);
         const values = {
             'plan-cost-exclusive': cost,
-            'plan-operating-exclusive': operating,
+            'plan-gross-exclusive': gross,
+            'plan-sga-exclusive': sga,
             'plan-sales-inclusive': sales * 1.1,
             'plan-cost-inclusive': cost * 1.1,
             'plan-gross-inclusive': gross * 1.1,
@@ -324,7 +330,6 @@ document.addEventListener('DOMContentLoaded', () => {
             'plan-operating-inclusive': operating * 1.1,
         };
         Object.entries(values).forEach(([id, value]) => document.getElementById(id).textContent = rawMoney(value));
-        document.getElementById('plan-gross-margin').textContent = sales ? rate(gross / sales) : '—';
         document.getElementById('plan-cost-ratio').textContent = sales ? rate(cost / sales) : '—';
     }
 
@@ -498,8 +503,15 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = formatInput(value);
         });
     });
-    ['plan_net_sales', 'plan_gross_profit', 'plan_selling_general_admin_expenses'].forEach(name => {
-        field(name)?.addEventListener('input', distributeAnnualPlan);
+    field('plan_net_sales')?.addEventListener('input', () => {
+        updatePlan();
+        distributeAnnualPlan();
+    });
+    ['plan-operating-target', 'plan-gross-margin-target'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', () => {
+            updatePlan();
+            distributeAnnualPlan();
+        });
     });
     form.addEventListener('input', recalculate);
     document.querySelectorAll('.tax-button').forEach(button => button.addEventListener('click', () => {
