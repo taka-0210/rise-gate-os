@@ -160,9 +160,10 @@ class CompanyFinanceEntryTest extends TestCase
         $this->actingAs($user)->withSession($session)
             ->get(route('company-finance.annual-plan.index'))
             ->assertOk()
-            ->assertSee('月別計画と実績')
+            ->assertSee('単月')
+            ->assertSee('累計')
             ->assertSee('最新の着地見込み')
-            ->assertSee('税抜き')
+            ->assertSee('data-tax-mode="inclusive"', false)
             ->assertDontSee('厨房君');
     }
 

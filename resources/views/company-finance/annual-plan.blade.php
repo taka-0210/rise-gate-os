@@ -6,18 +6,20 @@
     $startMonth = $closingMonth === 12 ? 1 : $closingMonth + 1;
     $endYear = $closingMonth === 12 ? $fiscalYear : $fiscalYear + 1;
     $value = fn (string $name) => old($name, data_get($plan, $name));
-    $amount = fn ($number) => $number === null ? '—' : number_format((int) $number).'円';
-    $rate = fn ($number) => $number === null ? '—' : number_format($number * 100, 1).'%';
-    $planOperatingProfit = $plan?->plan_gross_profit !== null && $plan?->plan_selling_general_admin_expenses !== null
-        ? (int) $plan->plan_gross_profit - (int) $plan->plan_selling_general_admin_expenses
-        : null;
+    $planSales = (int) ($value('plan_net_sales') ?: 0);
+    $planGross = (int) ($value('plan_gross_profit') ?: 0);
+    $planSga = (int) ($value('plan_selling_general_admin_expenses') ?: 0);
+    $planCost = $planSales - $planGross;
+    $planOperating = $planGross - $planSga;
+    $money = fn ($number) => $number === null ? '—' : number_format((int) round($number));
 @endphp
+
 <div class="annual-plan-page">
     <div class="page-header">
         <div>
             <div class="meta"><a href="{{ route('company-finance.index') }}">経営数値</a> / ANNUAL PLAN & PROGRESS</div>
             <h1>今年度計画と進捗</h1>
-            <p>年度目標と月次実績を税抜きで管理し、残り期間を計画どおり進めた場合の着地見込みを確認します。</p>
+            <p>年間計画、単月、累計を同じ並びで確認し、年度の着地を判断します。</p>
         </div>
         <div class="actions">
             <a class="button secondary" href="{{ route('company-finance.index') }}">← 経営数値へ戻る</a>
@@ -32,239 +34,334 @@
         @csrf
         @method('PUT')
 
-        <div class="period-banner">
-            <div><span>対象事業年度</span><strong>{{ $fiscalYear }}年度</strong></div>
-            <div><span>対象期間（JST）</span><strong>{{ $fiscalYear }}.{{ str_pad($startMonth, 2, '0', STR_PAD_LEFT) }}〜{{ $endYear }}.{{ str_pad($closingMonth, 2, '0', STR_PAD_LEFT) }}</strong></div>
-            <label><span>期</span><input type="number" name="period_number" min="1" max="999" value="{{ $value('period_number') }}" placeholder="例：22" @disabled(!$canManage)></label>
-            <div class="tax-badge"><span>計算基準</span><strong>税抜き</strong></div>
-        </div>
-
-        <section class="card plan-section">
-            <div class="section-heading">
-                <div><span class="meta">01 ANNUAL PLAN</span><h2>年間計画</h2></div>
-                <p>期首に決めた目標です。月次の見込み計算と06の返済余力の基準になります。</p>
-            </div>
-            <div class="annual-fields">
-                @foreach([
-                    'plan_net_sales' => '売上高',
-                    'plan_gross_profit' => '売上総利益',
-                    'plan_selling_general_admin_expenses' => '販売費及び一般管理費',
-                    'plan_net_income' => '当期純利益',
-                    'plan_interest_expense' => '支払利息',
-                    'plan_depreciation_expense' => '減価償却費',
-                ] as $name => $label)
-                    <label>
-                        <span>{{ $label }}</span>
-                        <input type="number" name="{{ $name }}" value="{{ $value($name) }}" step="1" @if($name !== 'plan_net_income') min="0" @endif @disabled(!$canManage)>
-                    </label>
-                @endforeach
-            </div>
-            <div class="calculated-row">
-                <div><span>目標粗利率</span><strong id="plan-gross-margin">{{ $plan?->plan_net_sales ? number_format($plan->plan_gross_profit / $plan->plan_net_sales * 100, 1).'%' : '—' }}</strong></div>
-                <div><span>目標営業利益</span><strong id="plan-operating-profit">{{ $amount($planOperatingProfit) }}</strong></div>
-            </div>
-        </section>
-
-        <section class="card plan-section">
-            <div class="section-heading">
-                <div><span class="meta">02 MONTHLY PROGRESS</span><h2>月別計画と実績</h2></div>
-                <div class="section-tools">
-                    <p>売上・売上原価・販管費の数値を税抜きで入力します。売上実績を入力した月までを実績期間として扱います。</p>
-                    @if($canManage)<button class="button secondary compact" type="button" id="distribute-sales">年間売上を12か月に配分</button>@endif
+        <div class="period-toolbar">
+            <div><span>対象年度</span><strong>{{ $fiscalYear }}年度（{{ $fiscalYear }}.{{ str_pad($startMonth, 2, '0', STR_PAD_LEFT) }}〜{{ $endYear }}.{{ str_pad($closingMonth, 2, '0', STR_PAD_LEFT) }}）</strong></div>
+            <label><span>期</span><input type="number" name="period_number" min="1" max="999" value="{{ $value('period_number') }}" @disabled(!$canManage)></label>
+            <div class="tax-switch" aria-label="月次表の表示金額">
+                <span>表示金額</span>
+                <div>
+                    <button type="button" class="tax-button active" data-tax-mode="exclusive">税抜</button>
+                    <button type="button" class="tax-button" data-tax-mode="inclusive">税込</button>
                 </div>
             </div>
-            <div class="monthly-table-wrap">
-                <table class="monthly-table">
+        </div>
+
+        <section class="card sheet-card">
+            <div class="sheet-heading">
+                <div><span class="meta">ANNUAL PLAN</span><h2>年間計画</h2></div>
+                <p>入力・保存の基準は税抜です。税込は消費税10%で自動表示します。</p>
+            </div>
+            <div class="sheet-scroll">
+                <table class="plan-sheet">
                     <thead>
                         <tr>
-                            <th>月</th>
-                            <th>目標売上</th>
-                            <th>売上実績</th>
-                            <th>売上原価実績</th>
-                            <th>粗利実績</th>
-                            <th>販管費実績<br><small>freee</small></th>
-                            <th>営業利益実績</th>
-                            <th>売上達成率</th>
+                            <th></th>
+                            <th>売上目標</th>
+                            <th>売上原価</th>
+                            <th>粗利</th>
+                            <th>販管費</th>
+                            <th>営業利益</th>
+                            <th>目標粗利率</th>
+                            <th>売上原価率</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($months as $index => $month)
-                            @php
-                                $oldMonth = old("months.$index", []);
-                                $monthValue = fn ($field) => array_key_exists($field, $oldMonth)
-                                    ? $oldMonth[$field]
-                                    : data_get($month, $field);
-                                $hasActual = $monthValue('actual_net_sales') !== null && $monthValue('actual_net_sales') !== '';
-                                $actualGross = $hasActual
-                                    ? (int) $monthValue('actual_net_sales') - (int) ($monthValue('actual_cost_of_sales') ?: 0)
-                                    : null;
-                                $actualOperating = $hasActual && $monthValue('actual_selling_general_admin_expenses') !== null
-                                    ? $actualGross - (int) $monthValue('actual_selling_general_admin_expenses')
-                                    : null;
-                                $achievement = $hasActual && (int) $monthValue('plan_net_sales') > 0
-                                    ? (int) $monthValue('actual_net_sales') / (int) $monthValue('plan_net_sales')
-                                    : null;
-                            @endphp
-                            <tr class="month-row {{ $hasActual ? 'has-actual' : '' }}">
-                                <td class="month-label">
-                                    <strong>{{ $month->month->format('Y年n月') }}</strong>
-                                    <span class="actual-label">{{ $hasActual ? '実績' : '計画' }}</span>
+                        <tr>
+                            <th>税抜</th>
+                            <td><input type="number" name="plan_net_sales" value="{{ $value('plan_net_sales') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td id="plan-cost-exclusive">{{ $money($planCost) }}</td>
+                            <td><input type="number" name="plan_gross_profit" value="{{ $value('plan_gross_profit') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td><input type="number" name="plan_selling_general_admin_expenses" value="{{ $value('plan_selling_general_admin_expenses') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td id="plan-operating-exclusive">{{ $money($planOperating) }}</td>
+                            <td id="plan-gross-margin" rowspan="2">{{ $planSales ? number_format($planGross / $planSales * 100, 1).'%' : '—' }}</td>
+                            <td id="plan-cost-ratio" rowspan="2">{{ $planSales ? number_format($planCost / $planSales * 100, 1).'%' : '—' }}</td>
+                        </tr>
+                        <tr>
+                            <th>税込</th>
+                            <td id="plan-sales-inclusive">{{ $money($planSales * 1.1) }}</td>
+                            <td id="plan-cost-inclusive">{{ $money($planCost * 1.1) }}</td>
+                            <td id="plan-gross-inclusive">{{ $money($planGross * 1.1) }}</td>
+                            <td id="plan-sga-inclusive">{{ $money($planSga * 1.1) }}</td>
+                            <td id="plan-operating-inclusive">{{ $money($planOperating * 1.1) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="plan-supplement">
+                <label><span>当期純利益計画</span><input type="number" name="plan_net_income" value="{{ $value('plan_net_income') }}" step="1" @disabled(!$canManage)></label>
+                <label><span>支払利息計画</span><input type="number" name="plan_interest_expense" value="{{ $value('plan_interest_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
+                <label><span>減価償却費計画</span><input type="number" name="plan_depreciation_expense" value="{{ $value('plan_depreciation_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
+                @if($canManage)<button class="button secondary compact" type="button" id="distribute-sales">売上目標を12か月に配分</button>@endif
+            </div>
+        </section>
+
+        <section class="card sheet-card">
+            <div class="sheet-heading">
+                <div><span class="meta">MONTHLY</span><h2>単月</h2></div>
+                <p><span class="tax-mode-label">税抜</span>表示。月ごとの計画と実績を縦に確認できます。</p>
+            </div>
+            <div class="sheet-scroll">
+                <table class="progress-sheet" id="monthly-sheet">
+                    <thead>
+                        <tr>
+                            <th class="row-title">単月</th>
+                            @foreach($months as $month)<th>{{ $month->month->format('Y年') }}<br><strong>{{ $month->month->format('n月') }}</strong></th>@endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="plan-row">
+                            <th>目標売上</th>
+                            @foreach($months as $index => $month)
+                                @php
+                                    $oldMonth = old("months.$index", []);
+                                    $monthValue = fn ($field) => array_key_exists($field, $oldMonth) ? $oldMonth[$field] : data_get($month, $field);
+                                @endphp
+                                <td>
                                     <input type="hidden" name="months[{{ $index }}][month]" value="{{ $month->month->format('Y-m-d') }}">
+                                    <input class="sheet-input" type="number" name="months[{{ $index }}][plan_net_sales]" value="{{ $monthValue('plan_net_sales') }}" data-tax-exclusive="{{ $monthValue('plan_net_sales') }}" min="0" step="1" @disabled(!$canManage)>
                                 </td>
-                                @foreach([
-                                    'plan_net_sales',
-                                    'actual_net_sales',
-                                    'actual_cost_of_sales',
-                                ] as $field)
-                                    <td><input type="number" name="months[{{ $index }}][{{ $field }}]" value="{{ $monthValue($field) }}" min="0" step="1" @disabled(!$canManage)></td>
+                            @endforeach
+                        </tr>
+                        @foreach([
+                            ['actual_net_sales', '売上', 'actual-sales'],
+                            [null, '差異', 'sales-variance'],
+                            ['actual_cost_of_sales', '売上原価', 'actual-cost'],
+                            [null, '粗利', 'actual-gross'],
+                            ['actual_selling_general_admin_expenses', '販管費', 'actual-sga'],
+                            [null, '営業利益', 'actual-operating'],
+                        ] as [$field, $label, $class])
+                            <tr class="{{ in_array($class, ['sales-variance','actual-operating']) ? 'emphasis-row' : '' }}">
+                                <th>{{ $label }}</th>
+                                @foreach($months as $index => $month)
+                                    @php
+                                        $oldMonth = old("months.$index", []);
+                                        $fieldValue = $field ? (array_key_exists($field, $oldMonth) ? $oldMonth[$field] : data_get($month, $field)) : null;
+                                    @endphp
+                                    <td>
+                                        @if($field)
+                                            <input class="sheet-input" type="number" name="months[{{ $index }}][{{ $field }}]" value="{{ $fieldValue }}" data-tax-exclusive="{{ $fieldValue }}" min="0" step="1" @disabled(!$canManage)>
+                                        @else
+                                            <span class="calculated {{ $class }}" data-index="{{ $index }}">—</span>
+                                        @endif
+                                    </td>
                                 @endforeach
-                                <td class="calculated-cell actual-gross">{{ $amount($actualGross) }}</td>
-                                <td><input type="number" name="months[{{ $index }}][actual_selling_general_admin_expenses]" value="{{ $monthValue('actual_selling_general_admin_expenses') }}" min="0" step="1" @disabled(!$canManage)></td>
-                                <td class="calculated-cell actual-operating">{{ $amount($actualOperating) }}</td>
-                                <td class="calculated-cell achievement">{{ $rate($achievement) }}</td>
                             </tr>
                         @endforeach
+                        <tr class="ratio-separator"><th>売上達成率</th>@foreach($months as $index => $month)<td><span class="monthly-achievement" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>原価率</th>@foreach($months as $index => $month)<td><span class="monthly-cost-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>粗利率</th>@foreach($months as $index => $month)<td><span class="monthly-gross-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
                     </tbody>
                 </table>
             </div>
         </section>
 
-        <section class="card plan-section forecast-section">
-            <div class="section-heading">
-                <div><span class="meta">03 LATEST FORECAST</span><h2>最新の着地見込み</h2></div>
-                <p>実績入力済み月は実績、残りの月は目標売上と年間計画の利益率を使って自動計算します。</p>
+        <section class="card sheet-card">
+            <div class="sheet-heading">
+                <div><span class="meta">CUMULATIVE</span><h2>累計</h2></div>
+                <p>各月までの計画・実績・差異を累積表示します。</p>
             </div>
-            <div class="forecast-grid">
-                <div><span>実績入力</span><strong id="actual-month-count">{{ $forecast['actual_month_count'] ?? 0 }}か月</strong></div>
-                <div><span>売上実績累計</span><strong id="actual-sales">{{ $amount($forecast['actual_sales'] ?? 0) }}</strong></div>
-                <div><span>目標との差異</span><strong id="sales-variance" class="{{ ($forecast['sales_variance'] ?? 0) < 0 ? 'negative' : '' }}">{{ $amount($forecast['sales_variance'] ?? 0) }}</strong></div>
-                <div><span>売上達成率</span><strong id="sales-achievement">{{ $rate($forecast['sales_achievement_rate'] ?? null) }}</strong></div>
-                <div><span>粗利実績累計</span><strong id="actual-gross-profit">{{ $amount($forecast['actual_gross_profit'] ?? 0) }}</strong></div>
-                <div><span>実績粗利率</span><strong id="actual-gross-margin">{{ $rate($forecast['gross_margin'] ?? null) }}</strong></div>
-            </div>
-            <div class="landing-forecast">
-                <h3>このまま計画どおり進めた場合</h3>
-                <div class="forecast-grid forecast-grid--landing">
-                    <div><span>売上高見込み</span><strong id="forecast-sales">{{ $amount($forecast['forecast_sales'] ?? null) }}</strong></div>
-                    <div><span>売上総利益見込み</span><strong id="forecast-gross-profit">{{ $amount($forecast['forecast_gross_profit'] ?? null) }}</strong></div>
-                    <div><span>販管費見込み</span><strong id="forecast-sga">{{ $amount($forecast['forecast_sga'] ?? null) }}</strong></div>
-                    <div><span>営業利益見込み</span><strong id="forecast-operating-profit">{{ $amount($forecast['forecast_operating_profit'] ?? null) }}</strong></div>
-                    <div><span>年間売上目標との差</span><strong id="forecast-sales-variance" class="{{ ($forecast['forecast_sales_variance'] ?? 0) < 0 ? 'negative' : '' }}">{{ $amount($forecast['forecast_sales_variance'] ?? null) }}</strong></div>
-                </div>
-            </div>
-            <div class="repayment-fields">
-                <div>
-                    <h3>返済余力に使う最新見込</h3>
-                    <p>月次表だけでは算出できない項目です。現時点の見込みを入力すると06へ連携します。</p>
-                </div>
-                @foreach([
-                    'forecast_net_income' => '当期純利益見込み',
-                    'forecast_interest_expense' => '支払利息見込み',
-                    'forecast_depreciation_expense' => '減価償却費見込み',
-                ] as $name => $label)
-                    <label><span>{{ $label }}</span><input type="number" name="{{ $name }}" value="{{ $value($name) }}" step="1" @if($name !== 'forecast_net_income') min="0" @endif @disabled(!$canManage)></label>
-                @endforeach
+            <div class="sheet-scroll">
+                <table class="progress-sheet" id="cumulative-sheet">
+                    <thead>
+                        <tr>
+                            <th class="row-title">累計</th>
+                            @foreach($months as $month)<th>{{ $month->month->format('Y年') }}<br><strong>{{ $month->month->format('n月') }}</strong></th>@endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach([
+                            ['目標売上', 'cumulative-plan', true],
+                            ['売上', 'cumulative-sales', false],
+                            ['差異', 'cumulative-variance', false],
+                            ['売上原価', 'cumulative-cost', false],
+                            ['粗利', 'cumulative-gross', false],
+                            ['販管費', 'cumulative-sga', false],
+                            ['営業利益', 'cumulative-operating', false],
+                        ] as [$label, $class, $isPlan])
+                            <tr class="{{ $isPlan ? 'plan-row' : ($class === 'cumulative-variance' || $class === 'cumulative-operating' ? 'emphasis-row' : '') }}">
+                                <th>{{ $label }}</th>
+                                @foreach($months as $index => $month)<td><span class="{{ $class }}" data-index="{{ $index }}">—</span></td>@endforeach
+                            </tr>
+                        @endforeach
+                        <tr class="ratio-separator"><th>売上達成率</th>@foreach($months as $index => $month)<td><span class="cumulative-achievement" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>原価率</th>@foreach($months as $index => $month)<td><span class="cumulative-cost-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>粗利率</th>@foreach($months as $index => $month)<td><span class="cumulative-gross-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
-        @if($canManage)
-            <div class="actions plan-actions"><button type="submit">計画・進捗・見込みを保存</button></div>
-        @endif
-    </form>
+        <section class="card forecast-card">
+            <div class="sheet-heading">
+                <div><span class="meta">LATEST FORECAST</span><h2>最新の着地見込み</h2></div>
+                <p>実績入力済み月＋残り月の計画から自動計算します。</p>
+            </div>
+            <div class="forecast-grid">
+                <div><span>実績入力</span><strong id="actual-month-count">0か月</strong></div>
+                <div><span>売上見込み</span><strong id="forecast-sales">—</strong></div>
+                <div><span>粗利見込み</span><strong id="forecast-gross-profit">—</strong></div>
+                <div><span>販管費見込み</span><strong id="forecast-sga">—</strong></div>
+                <div><span>営業利益見込み</span><strong id="forecast-operating-profit">—</strong></div>
+                <div><span>年間目標との差</span><strong id="forecast-sales-variance">—</strong></div>
+            </div>
+            <div class="repayment-fields">
+                <div><h3>06へ連携する最新見込</h3><p>月次表から算出できない項目を入力します。</p></div>
+                <label><span>当期純利益見込み</span><input type="number" name="forecast_net_income" value="{{ $value('forecast_net_income') }}" step="1" @disabled(!$canManage)></label>
+                <label><span>支払利息見込み</span><input type="number" name="forecast_interest_expense" value="{{ $value('forecast_interest_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
+                <label><span>減価償却費見込み</span><input type="number" name="forecast_depreciation_expense" value="{{ $value('forecast_depreciation_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
+            </div>
+        </section>
 
-    <div class="card connection-note">
-        <h3>06 減価償却・返済余力との連携</h3>
-        <p>自動計算した売上・粗利・販管費の着地見込みと、上で入力した当期純利益・支払利息・減価償却費の見込みを保存します。06では最新見込を優先してDSCRを計算します。</p>
-    </div>
+        @if($canManage)<div class="actions save-actions"><button type="submit">計画・進捗・見込みを保存</button></div>@endif
+    </form>
 </div>
 
 <style>
-.annual-plan-page{width:min(1460px,calc(100vw - 32px));position:relative;left:50%;transform:translateX(-50%)}.period-banner{display:grid;grid-template-columns:1fr 1.4fr 140px 140px;gap:14px;margin-bottom:18px;padding:18px;border:1px solid #b7d5ce;border-radius:12px;background:#f2faf7}.period-banner>div,.period-banner label{display:flex;flex-direction:column;gap:5px}.period-banner span,.annual-fields span,.calculated-row span,.forecast-grid span,.repayment-fields span{color:var(--muted);font-size:12px}.period-banner strong{font-size:18px;color:var(--accent-dark)}.tax-badge{padding-left:16px;border-left:1px solid #b7d5ce}.plan-section{padding:22px;margin-bottom:18px}.section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:18px}.section-heading h2{margin:4px 0 0}.section-heading p{max-width:570px;margin:0;color:var(--muted);font-size:13px}.section-tools{display:flex;align-items:center;gap:12px}.button.compact{padding:9px 12px;white-space:nowrap}.annual-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.annual-fields label,.repayment-fields label{display:flex;flex-direction:column;gap:6px}.calculated-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.calculated-row>div{display:flex;justify-content:space-between;padding:14px;border-radius:9px;background:#f4f8f8}.calculated-row strong{color:var(--accent-dark)}.monthly-table-wrap{overflow-x:auto}.monthly-table{width:100%;min-width:1240px;border-collapse:collapse}.monthly-table th,.monthly-table td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.monthly-table th{background:#f1f6f7;color:#315b64;font-size:12px}.monthly-table th:first-child,.monthly-table td:first-child{text-align:left}.monthly-table input{min-width:132px;width:100%;padding:9px}.month-label strong{display:block}.actual-label{display:inline-block;margin-top:3px;padding:2px 7px;border-radius:10px;background:#eef2f3;color:var(--muted);font-size:11px}.has-actual .actual-label{background:#dff3ec;color:#176c57}.has-actual{background:#fbfefd}.calculated-cell{font-size:13px}.forecast-section{border-color:#9ec7d6}.forecast-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.forecast-grid>div{min-height:78px;padding:14px;border:1px solid var(--line);border-radius:9px;background:#fff}.forecast-grid strong{display:block;margin-top:8px;color:var(--accent-dark);font-size:17px}.negative{color:#b23a3a!important}.landing-forecast{margin-top:18px;padding:18px;border-radius:11px;background:#f2faf7}.landing-forecast h3{margin-top:0}.forecast-grid--landing{grid-template-columns:repeat(5,1fr)}.repayment-fields{display:grid;grid-template-columns:1.5fr repeat(3,1fr);align-items:end;gap:13px;margin-top:18px}.repayment-fields h3{margin:0 0 5px}.repayment-fields p{margin:0;color:var(--muted);font-size:12px}.plan-actions{justify-content:flex-end;margin:16px 0 22px}.connection-note h3{margin-top:0}.connection-note p{margin-bottom:0}@media(max-width:950px){.period-banner,.annual-fields,.forecast-grid,.forecast-grid--landing,.repayment-fields{grid-template-columns:1fr 1fr}.section-heading,.section-tools{flex-direction:column}.tax-badge{padding-left:0;border-left:0}}@media(max-width:600px){.period-banner,.annual-fields,.forecast-grid,.forecast-grid--landing,.repayment-fields,.calculated-row{grid-template-columns:1fr}}
+.annual-plan-page{width:min(1540px,calc(100vw - 28px));position:relative;left:50%;transform:translateX(-50%)}.period-toolbar{display:flex;align-items:end;gap:22px;margin-bottom:18px;padding:16px 18px;border:1px solid #b7d5ce;border-radius:11px;background:#f2faf7}.period-toolbar>div:first-child{margin-right:auto}.period-toolbar span,.plan-supplement span,.forecast-grid span,.repayment-fields span{display:block;color:var(--muted);font-size:12px}.period-toolbar strong{display:block;margin-top:5px;color:var(--accent-dark)}.period-toolbar label{width:100px}.tax-switch>div{display:flex;margin-top:5px}.tax-button{padding:8px 16px;border:1px solid #aac5cb;background:#fff;color:#315b64}.tax-button:first-child{border-radius:7px 0 0 7px}.tax-button:last-child{border-radius:0 7px 7px 0}.tax-button.active{background:var(--accent-dark);color:#fff}.sheet-card,.forecast-card{padding:18px;margin-bottom:16px}.sheet-heading{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:12px}.sheet-heading h2{margin:3px 0 0}.sheet-heading p{margin:0;color:var(--muted);font-size:13px}.sheet-scroll{overflow-x:auto;border:1px solid #aebdc0}.plan-sheet,.progress-sheet{width:100%;border-collapse:collapse;table-layout:fixed}.plan-sheet{min-width:1040px}.progress-sheet{min-width:1500px}.plan-sheet th,.plan-sheet td,.progress-sheet th,.progress-sheet td{border:1px solid #b5bec0;text-align:center}.plan-sheet th,.plan-sheet td{height:50px;padding:6px}.plan-sheet thead th,.progress-sheet thead th{background:#dfe6e8;color:#183e48}.plan-sheet tbody th{width:90px;background:#f8edc7}.plan-sheet input{width:100%;min-width:120px;padding:9px;text-align:right;border-color:transparent;background:#fff}.plan-sheet td{font-weight:700}.plan-supplement{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:12px;margin-top:14px}.plan-supplement label,.repayment-fields label{display:flex;flex-direction:column;gap:5px}.compact{padding:10px 13px;white-space:nowrap}.progress-sheet th,.progress-sheet td{height:42px;padding:4px}.progress-sheet .row-title,.progress-sheet tbody th{position:sticky;left:0;z-index:2;width:150px;background:#e5eaeb}.progress-sheet thead th{height:52px}.progress-sheet thead th:not(.row-title){width:112px}.progress-sheet .plan-row th,.progress-sheet .plan-row td{background:#fff5cf}.progress-sheet .plan-row th{z-index:3}.sheet-input{width:100%;min-width:90px;padding:7px 4px;text-align:right;border:1px solid transparent;background:transparent}.sheet-input:focus{border-color:#4c91a0;background:#fff}.calculated{display:block;text-align:right;padding-right:5px}.emphasis-row{border-bottom:3px solid #59747a}.ratio-separator{border-top:4px solid #59747a}.negative{color:#d13b32!important;font-weight:700}.forecast-card{border-color:#9ec7d6}.forecast-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.forecast-grid>div{padding:13px;border:1px solid var(--line);border-radius:8px;background:#f8fbfb}.forecast-grid strong{display:block;margin-top:7px;color:var(--accent-dark);font-size:16px}.repayment-fields{display:grid;grid-template-columns:1.4fr repeat(3,1fr);align-items:end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}.repayment-fields h3,.repayment-fields p{margin:0}.repayment-fields p{color:var(--muted);font-size:12px}.save-actions{justify-content:flex-end;margin:18px 0}@media(max-width:900px){.period-toolbar,.sheet-heading{align-items:stretch;flex-direction:column}.period-toolbar>div:first-child{margin-right:0}.plan-supplement,.forecast-grid,.repayment-fields{grid-template-columns:1fr 1fr}}@media(max-width:600px){.plan-supplement,.forecast-grid,.repayment-fields{grid-template-columns:1fr}}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('annual-plan-form');
     if (!form) return;
-    const rows = [...form.querySelectorAll('.month-row')];
-    const number = value => value === '' || value === null ? null : Number(value);
-    const input = name => form.querySelector(`[name="${name}"]`);
-    const yen = value => value === null || !Number.isFinite(value) ? '—' : `${Math.round(value).toLocaleString('ja-JP')}円`;
-    const percent = value => value === null || !Number.isFinite(value) ? '—' : `${(value * 100).toFixed(1)}%`;
-    const set = (id, text, negative = false) => {
-        const element = document.getElementById(id);
+    const count = 12;
+    let taxMode = 'exclusive';
+    const taxFactor = () => taxMode === 'inclusive' ? 1.1 : 1;
+    const num = value => value === '' || value === null || value === undefined ? null : Number(value);
+    const field = name => form.querySelector(`[name="${name}"]`);
+    const canonical = element => num(element?.dataset.taxExclusive);
+    const money = value => value === null || !Number.isFinite(value) ? '—' : Math.round(value * taxFactor()).toLocaleString('ja-JP');
+    const rawMoney = value => value === null || !Number.isFinite(value) ? '—' : Math.round(value).toLocaleString('ja-JP');
+    const rate = value => value === null || !Number.isFinite(value) ? '—' : `${(value * 100).toFixed(1)}%`;
+    const set = (selector, index, value, kind = 'money') => {
+        const element = form.querySelector(`${selector}[data-index="${index}"]`);
         if (!element) return;
-        element.textContent = text;
-        element.classList.toggle('negative', negative);
+        element.textContent = kind === 'rate' ? rate(value) : money(value);
+        element.classList.toggle('negative', kind === 'money' && value !== null && value < 0);
     };
+    const planValue = name => num(field(name)?.value) || 0;
 
-    function recalculate() {
-        const planSales = number(input('plan_net_sales')?.value) || 0;
-        const planGross = number(input('plan_gross_profit')?.value) || 0;
-        const planSga = number(input('plan_selling_general_admin_expenses')?.value) || 0;
-        const grossMargin = planSales > 0 ? planGross / planSales : 0;
-        let actualCount = 0, actualSales = 0, actualCost = 0, actualSga = 0;
-        let elapsedPlan = 0, remainingPlan = 0;
-
-        rows.forEach((row, index) => {
-            const plan = number(input(`months[${index}][plan_net_sales]`)?.value) || 0;
-            const salesValue = input(`months[${index}][actual_net_sales]`)?.value ?? '';
-            const sales = number(salesValue);
-            const cost = number(input(`months[${index}][actual_cost_of_sales]`)?.value) || 0;
-            const sgaValue = input(`months[${index}][actual_selling_general_admin_expenses]`)?.value ?? '';
-            const sga = number(sgaValue);
-            const hasActual = sales !== null;
-
-            row.classList.toggle('has-actual', hasActual);
-            row.querySelector('.actual-label').textContent = hasActual ? '実績' : '計画';
-            if (hasActual) {
-                actualCount++;
-                actualSales += sales;
-                actualCost += cost;
-                actualSga += sga || 0;
-                elapsedPlan += plan;
-                const gross = sales - cost;
-                row.querySelector('.actual-gross').textContent = yen(gross);
-                row.querySelector('.actual-operating').textContent = sga === null ? '—' : yen(gross - sga);
-                row.querySelector('.achievement').textContent = plan > 0 ? percent(sales / plan) : '—';
-            } else {
-                remainingPlan += plan;
-                row.querySelector('.actual-gross').textContent = '—';
-                row.querySelector('.actual-operating').textContent = '—';
-                row.querySelector('.achievement').textContent = '—';
-            }
-        });
-
-        const actualGross = actualSales - actualCost;
-        const variance = actualSales - elapsedPlan;
-        const forecastSales = actualSales + remainingPlan;
-        const forecastGross = actualGross + remainingPlan * grossMargin;
-        const forecastSga = actualSga + (planSga / 12 * (12 - actualCount));
-        const operating = planGross - planSga;
-
-        set('plan-gross-margin', planSales > 0 ? percent(grossMargin) : '—');
-        set('plan-operating-profit', yen(operating));
-        set('actual-month-count', `${actualCount}か月`);
-        set('actual-sales', yen(actualSales));
-        set('sales-variance', yen(variance), variance < 0);
-        set('sales-achievement', elapsedPlan > 0 ? percent(actualSales / elapsedPlan) : '—');
-        set('actual-gross-profit', yen(actualGross));
-        set('actual-gross-margin', actualSales > 0 ? percent(actualGross / actualSales) : '—');
-        set('forecast-sales', yen(forecastSales));
-        set('forecast-gross-profit', yen(forecastGross));
-        set('forecast-sga', yen(forecastSga));
-        set('forecast-operating-profit', yen(forecastGross - forecastSga), forecastGross - forecastSga < 0);
-        set('forecast-sales-variance', yen(forecastSales - planSales), forecastSales - planSales < 0);
+    function updatePlan() {
+        const sales = planValue('plan_net_sales');
+        const gross = planValue('plan_gross_profit');
+        const sga = planValue('plan_selling_general_admin_expenses');
+        const cost = sales - gross;
+        const operating = gross - sga;
+        const values = {
+            'plan-cost-exclusive': cost,
+            'plan-operating-exclusive': operating,
+            'plan-sales-inclusive': sales * 1.1,
+            'plan-cost-inclusive': cost * 1.1,
+            'plan-gross-inclusive': gross * 1.1,
+            'plan-sga-inclusive': sga * 1.1,
+            'plan-operating-inclusive': operating * 1.1,
+        };
+        Object.entries(values).forEach(([id, value]) => document.getElementById(id).textContent = rawMoney(value));
+        document.getElementById('plan-gross-margin').textContent = sales ? rate(gross / sales) : '—';
+        document.getElementById('plan-cost-ratio').textContent = sales ? rate(cost / sales) : '—';
     }
 
+    function recalculate() {
+        updatePlan();
+        const annualSales = planValue('plan_net_sales');
+        const annualGross = planValue('plan_gross_profit');
+        const annualSga = planValue('plan_selling_general_admin_expenses');
+        const plannedGrossMargin = annualSales ? annualGross / annualSales : 0;
+        let cumPlan = 0, cumSales = 0, cumCost = 0, cumSga = 0;
+        let actualCount = 0, remainingPlan = 0;
+
+        for (let i = 0; i < count; i++) {
+            const plan = canonical(field(`months[${i}][plan_net_sales]`)) || 0;
+            const sales = canonical(field(`months[${i}][actual_net_sales]`));
+            const cost = canonical(field(`months[${i}][actual_cost_of_sales]`)) || 0;
+            const sgaRaw = canonical(field(`months[${i}][actual_selling_general_admin_expenses]`));
+            const hasActual = sales !== null;
+            const gross = hasActual ? sales - cost : null;
+            const operating = hasActual && sgaRaw !== null ? gross - sgaRaw : null;
+
+            set('.actual-sales', i, sales);
+            set('.sales-variance', i, hasActual ? sales - plan : null);
+            set('.actual-cost', i, hasActual ? cost : null);
+            set('.actual-gross', i, gross);
+            set('.actual-sga', i, sgaRaw);
+            set('.actual-operating', i, operating);
+            set('.monthly-achievement', i, hasActual && plan ? sales / plan : null, 'rate');
+            set('.monthly-cost-rate', i, hasActual && sales ? cost / sales : null, 'rate');
+            set('.monthly-gross-rate', i, hasActual && sales ? gross / sales : null, 'rate');
+
+            cumPlan += plan;
+            set('.cumulative-plan', i, cumPlan);
+            if (hasActual) {
+                actualCount++;
+                cumSales += sales;
+                cumCost += cost;
+                cumSga += sgaRaw || 0;
+                const cumGross = cumSales - cumCost;
+                set('.cumulative-sales', i, cumSales);
+                set('.cumulative-variance', i, cumSales - cumPlan);
+                set('.cumulative-cost', i, cumCost);
+                set('.cumulative-gross', i, cumGross);
+                set('.cumulative-sga', i, cumSga);
+                set('.cumulative-operating', i, cumGross - cumSga);
+                set('.cumulative-achievement', i, cumPlan ? cumSales / cumPlan : null, 'rate');
+                set('.cumulative-cost-rate', i, cumSales ? cumCost / cumSales : null, 'rate');
+                set('.cumulative-gross-rate', i, cumSales ? cumGross / cumSales : null, 'rate');
+            } else {
+                remainingPlan += plan;
+                ['.cumulative-sales','.cumulative-variance','.cumulative-cost','.cumulative-gross','.cumulative-sga','.cumulative-operating'].forEach(selector => set(selector, i, null));
+                ['.cumulative-achievement','.cumulative-cost-rate','.cumulative-gross-rate'].forEach(selector => set(selector, i, null, 'rate'));
+            }
+        }
+
+        const actualGross = cumSales - cumCost;
+        const forecastSales = cumSales + remainingPlan;
+        const forecastGross = actualGross + remainingPlan * plannedGrossMargin;
+        const forecastSga = cumSga + annualSga / 12 * (12 - actualCount);
+        const forecast = {
+            'actual-month-count': `${actualCount}か月`,
+            'forecast-sales': money(forecastSales),
+            'forecast-gross-profit': money(forecastGross),
+            'forecast-sga': money(forecastSga),
+            'forecast-operating-profit': money(forecastGross - forecastSga),
+            'forecast-sales-variance': money(forecastSales - annualSales),
+        };
+        Object.entries(forecast).forEach(([id, text]) => {
+            const element = document.getElementById(id);
+            element.textContent = text;
+            element.classList.toggle('negative', id !== 'actual-month-count' && (id === 'forecast-operating-profit' ? forecastGross - forecastSga : id === 'forecast-sales-variance' ? forecastSales - annualSales : 0) < 0);
+        });
+    }
+
+    form.querySelectorAll('.sheet-input').forEach(input => {
+        input.addEventListener('input', () => {
+            input.dataset.taxExclusive = input.value === ''
+                ? ''
+                : String(taxMode === 'inclusive' ? Math.round(Number(input.value) / 1.1) : Number(input.value));
+        });
+    });
     form.addEventListener('input', recalculate);
-    document.getElementById('distribute-sales')?.addEventListener('click', () => {
-        const total = number(input('plan_net_sales')?.value) || 0;
-        const base = Math.floor(total / 12);
-        rows.forEach((row, index) => {
-            input(`months[${index}][plan_net_sales]`).value = index === 11 ? total - base * 11 : base;
+    document.querySelectorAll('.tax-button').forEach(button => button.addEventListener('click', () => {
+        taxMode = button.dataset.taxMode;
+        document.querySelectorAll('.tax-button').forEach(item => item.classList.toggle('active', item === button));
+        document.querySelectorAll('.tax-mode-label').forEach(item => item.textContent = taxMode === 'inclusive' ? '税込' : '税抜');
+        form.querySelectorAll('.sheet-input').forEach(input => {
+            const value = canonical(input);
+            input.value = value === null ? '' : Math.round(value * taxFactor());
         });
         recalculate();
+    }));
+    document.getElementById('distribute-sales')?.addEventListener('click', () => {
+        const total = planValue('plan_net_sales');
+        const base = Math.floor(total / 12);
+        for (let i = 0; i < count; i++) {
+            const input = field(`months[${i}][plan_net_sales]`);
+            input.dataset.taxExclusive = String(i === 11 ? total - base * 11 : base);
+            input.value = Math.round(Number(input.dataset.taxExclusive) * taxFactor());
+        }
+        recalculate();
+    });
+    form.addEventListener('submit', () => {
+        form.querySelectorAll('.sheet-input').forEach(input => input.value = input.dataset.taxExclusive);
     });
     recalculate();
 });
