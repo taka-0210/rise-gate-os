@@ -162,7 +162,42 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertOk()
             ->assertSee('月別計画と実績')
             ->assertSee('最新の着地見込み')
-            ->assertSee('税抜き');
+            ->assertSee('税抜き')
+            ->assertDontSee('厨房君');
+    }
+
+    public function test_22nd_plan_progress_is_seeded_from_the_source_workbook_as_tax_excluded_amounts(): void
+    {
+        [$user, $organization] = $this->companyOwner();
+        $plan = CompanyAnnualPlan::create([
+            'organization_id' => $organization->id,
+            'fiscal_year' => 2025,
+            'period_number' => 22,
+            'plan_net_sales' => 614_000_000,
+            'plan_gross_profit' => 273_230_000,
+            'plan_selling_general_admin_expenses' => 267_230_000,
+            'updated_by' => $user->id,
+        ]);
+
+        $migration = require database_path('migrations/2026_07_30_000007_seed_22nd_annual_plan_progress.php');
+        $migration->up();
+
+        $this->assertCount(12, $plan->fresh()->months);
+        $this->assertDatabaseHas('company_annual_plan_months', [
+            'company_annual_plan_id' => $plan->id,
+            'month' => '2025-12-01',
+            'plan_net_sales' => 51_166_666,
+            'actual_net_sales' => 43_711_274,
+            'actual_cost_of_sales' => 25_238_002,
+            'actual_selling_general_admin_expenses' => 22_269_166,
+        ]);
+        $this->assertDatabaseHas('company_annual_plan_months', [
+            'company_annual_plan_id' => $plan->id,
+            'month' => '2026-11-01',
+            'plan_net_sales' => 51_166_674,
+            'actual_net_sales' => null,
+        ]);
+        $this->assertSame(568_049_516, (int) $plan->fresh()->forecast_net_sales);
     }
 
     protected function tearDown(): void

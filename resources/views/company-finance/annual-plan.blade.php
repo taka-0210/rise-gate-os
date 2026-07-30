@@ -69,7 +69,7 @@
             <div class="section-heading">
                 <div><span class="meta">02 MONTHLY PROGRESS</span><h2>月別計画と実績</h2></div>
                 <div class="section-tools">
-                    <p>厨房君・freeeの数値を税抜きで入力します。売上実績を入力した月までを実績期間として扱います。</p>
+                    <p>売上・売上原価・販管費の数値を税抜きで入力します。売上実績を入力した月までを実績期間として扱います。</p>
                     @if($canManage)<button class="button secondary compact" type="button" id="distribute-sales">年間売上を12か月に配分</button>@endif
                 </div>
             </div>
@@ -79,8 +79,8 @@
                         <tr>
                             <th>月</th>
                             <th>目標売上</th>
-                            <th>売上実績<br><small>厨房君</small></th>
-                            <th>売上原価実績<br><small>厨房君</small></th>
+                            <th>売上実績</th>
+                            <th>売上原価実績</th>
                             <th>粗利実績</th>
                             <th>販管費実績<br><small>freee</small></th>
                             <th>営業利益実績</th>
