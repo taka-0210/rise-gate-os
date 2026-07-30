@@ -12,6 +12,7 @@
     $planCost = $planSales - $planGross;
     $planOperating = $planGross - $planSga;
     $money = fn ($number) => $number === null ? '—' : number_format((int) round($number));
+    $inputMoney = fn ($number) => $number === null || $number === '' ? '' : number_format((int) $number);
 @endphp
 
 <div class="annual-plan-page">
@@ -72,10 +73,10 @@
                     <tbody>
                         <tr>
                             <th>税抜</th>
-                            <td class="input-cell"><input type="number" name="plan_net_sales" value="{{ $value('plan_net_sales') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td class="input-cell"><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_net_sales" value="{{ $inputMoney($value('plan_net_sales')) }}" @disabled(!$canManage)></td>
                             <td id="plan-cost-exclusive">{{ $money($planCost) }}</td>
-                            <td class="input-cell"><input type="number" name="plan_gross_profit" value="{{ $value('plan_gross_profit') }}" min="0" step="1" @disabled(!$canManage)></td>
-                            <td class="input-cell"><input type="number" name="plan_selling_general_admin_expenses" value="{{ $value('plan_selling_general_admin_expenses') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td class="input-cell"><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_gross_profit" value="{{ $inputMoney($value('plan_gross_profit')) }}" @disabled(!$canManage)></td>
+                            <td class="input-cell"><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_selling_general_admin_expenses" value="{{ $inputMoney($value('plan_selling_general_admin_expenses')) }}" @disabled(!$canManage)></td>
                             <td id="plan-operating-exclusive">{{ $money($planOperating) }}</td>
                             <td id="plan-gross-margin" rowspan="2">{{ $planSales ? number_format($planGross / $planSales * 100, 1).'%' : '—' }}</td>
                             <td id="plan-cost-ratio" rowspan="2">{{ $planSales ? number_format($planCost / $planSales * 100, 1).'%' : '—' }}</td>
@@ -92,9 +93,9 @@
                 </table>
             </div>
             <div class="plan-supplement">
-                <label><span>当期純利益計画</span><input type="number" name="plan_net_income" value="{{ $value('plan_net_income') }}" step="1" @disabled(!$canManage)></label>
-                <label><span>支払利息計画</span><input type="number" name="plan_interest_expense" value="{{ $value('plan_interest_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
-                <label><span>減価償却費計画</span><input type="number" name="plan_depreciation_expense" value="{{ $value('plan_depreciation_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
+                <label><span>当期純利益計画</span><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_net_income" value="{{ $inputMoney($value('plan_net_income')) }}" @disabled(!$canManage)></label>
+                <label><span>支払利息計画</span><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_interest_expense" value="{{ $inputMoney($value('plan_interest_expense')) }}" @disabled(!$canManage)></label>
+                <label><span>減価償却費計画</span><input class="formatted-money-input" type="text" inputmode="numeric" name="plan_depreciation_expense" value="{{ $inputMoney($value('plan_depreciation_expense')) }}" @disabled(!$canManage)></label>
                 @if($canManage)<button class="button secondary compact" type="button" id="distribute-sales">売上目標を12か月に配分</button>@endif
             </div>
         </section>
@@ -122,7 +123,7 @@
                                 @endphp
                                 <td class="input-cell">
                                     <input type="hidden" name="months[{{ $index }}][month]" value="{{ $month->month->format('Y-m-d') }}">
-                                    <input class="sheet-input" type="number" name="months[{{ $index }}][plan_net_sales]" value="{{ $monthValue('plan_net_sales') }}" data-tax-exclusive="{{ $monthValue('plan_net_sales') }}" min="0" step="1" @disabled(!$canManage)>
+                                    <input class="sheet-input formatted-money-input" type="text" inputmode="numeric" name="months[{{ $index }}][plan_net_sales]" value="{{ $inputMoney($monthValue('plan_net_sales')) }}" data-tax-exclusive="{{ $monthValue('plan_net_sales') }}" @disabled(!$canManage)>
                                 </td>
                             @endforeach
                         </tr>
@@ -143,7 +144,7 @@
                                     @endphp
                                     <td class="{{ $field ? 'input-cell' : 'calculated-cell' }}">
                                         @if($field)
-                                            <input class="sheet-input" type="number" name="months[{{ $index }}][{{ $field }}]" value="{{ $fieldValue }}" data-tax-exclusive="{{ $fieldValue }}" min="0" step="1" @disabled(!$canManage)>
+                                            <input class="sheet-input formatted-money-input" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $field }}]" value="{{ $inputMoney($fieldValue) }}" data-tax-exclusive="{{ $fieldValue }}" @disabled(!$canManage)>
                                         @else
                                             <span class="calculated {{ $class }}" data-index="{{ $index }}">—</span>
                                         @endif
@@ -210,9 +211,9 @@
             </div>
             <div class="repayment-fields">
                 <div><h3>06へ連携する最新見込</h3><p>月次表から算出できない項目を入力します。</p></div>
-                <label><span>当期純利益見込み</span><input type="number" name="forecast_net_income" value="{{ $value('forecast_net_income') }}" step="1" @disabled(!$canManage)></label>
-                <label><span>支払利息見込み</span><input type="number" name="forecast_interest_expense" value="{{ $value('forecast_interest_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
-                <label><span>減価償却費見込み</span><input type="number" name="forecast_depreciation_expense" value="{{ $value('forecast_depreciation_expense') }}" min="0" step="1" @disabled(!$canManage)></label>
+                <label><span>当期純利益見込み</span><input class="formatted-money-input" type="text" inputmode="numeric" name="forecast_net_income" value="{{ $inputMoney($value('forecast_net_income')) }}" @disabled(!$canManage)></label>
+                <label><span>支払利息見込み</span><input class="formatted-money-input" type="text" inputmode="numeric" name="forecast_interest_expense" value="{{ $inputMoney($value('forecast_interest_expense')) }}" @disabled(!$canManage)></label>
+                <label><span>減価償却費見込み</span><input class="formatted-money-input" type="text" inputmode="numeric" name="forecast_depreciation_expense" value="{{ $inputMoney($value('forecast_depreciation_expense')) }}" @disabled(!$canManage)></label>
             </div>
         </section>
 
@@ -231,11 +232,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const count = 12;
     let taxMode = 'exclusive';
     const taxFactor = () => taxMode === 'inclusive' ? 1.1 : 1;
-    const num = value => value === '' || value === null || value === undefined ? null : Number(value);
+    const num = value => value === '' || value === null || value === undefined
+        ? null
+        : Number(String(value).replaceAll(',', '').trim());
     const field = name => form.querySelector(`[name="${name}"]`);
     const canonical = element => num(element?.dataset.taxExclusive);
     const money = value => value === null || !Number.isFinite(value) ? '—' : Math.round(value * taxFactor()).toLocaleString('ja-JP');
     const rawMoney = value => value === null || !Number.isFinite(value) ? '—' : Math.round(value).toLocaleString('ja-JP');
+    const formatInput = value => value === null || !Number.isFinite(value) ? '' : Math.round(value).toLocaleString('ja-JP');
     const rate = value => value === null || !Number.isFinite(value) ? '—' : `${(value * 100).toFixed(1)}%`;
     const set = (selector, index, value, kind = 'money') => {
         const element = form.querySelector(`${selector}[data-index="${index}"]`);
@@ -358,9 +362,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     form.querySelectorAll('.sheet-input').forEach(input => {
         input.addEventListener('input', () => {
+            const entered = num(input.value);
             input.dataset.taxExclusive = input.value === ''
                 ? ''
-                : String(taxMode === 'inclusive' ? Math.round(Number(input.value) / 1.1) : Number(input.value));
+                : String(taxMode === 'inclusive' ? Math.round(entered / 1.1) : entered);
+        });
+    });
+    form.querySelectorAll('.formatted-money-input').forEach(input => {
+        input.addEventListener('focus', () => {
+            const value = num(input.value);
+            input.value = value === null ? '' : String(value);
+        });
+        input.addEventListener('blur', () => {
+            const value = num(input.value);
+            input.value = formatInput(value);
         });
     });
     form.addEventListener('input', recalculate);
@@ -370,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.tax-mode-label').forEach(item => item.textContent = taxMode === 'inclusive' ? '税込' : '税抜');
         form.querySelectorAll('.sheet-input').forEach(input => {
             const value = canonical(input);
-            input.value = value === null ? '' : Math.round(value * taxFactor());
+            input.value = formatInput(value === null ? null : value * taxFactor());
         });
         recalculate();
     }));
@@ -380,11 +395,15 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < count; i++) {
             const input = field(`months[${i}][plan_net_sales]`);
             input.dataset.taxExclusive = String(i === 11 ? total - base * 11 : base);
-            input.value = Math.round(Number(input.dataset.taxExclusive) * taxFactor());
+            input.value = formatInput(Number(input.dataset.taxExclusive) * taxFactor());
         }
         recalculate();
     });
     form.addEventListener('submit', () => {
+        form.querySelectorAll('.formatted-money-input').forEach(input => {
+            const value = num(input.value);
+            input.value = value === null ? '' : String(value);
+        });
         form.querySelectorAll('.sheet-input').forEach(input => input.value = input.dataset.taxExclusive);
     });
     recalculate();
