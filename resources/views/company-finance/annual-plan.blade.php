@@ -60,7 +60,13 @@
 
         <section class="card sheet-card">
             <div class="sheet-heading">
-                <div><span class="meta">ANNUAL PLAN</span><h2>年間計画</h2></div>
+                <div>
+                    <span class="meta">ANNUAL PLAN</span>
+                    <div class="heading-with-help">
+                        <h2>年間計画</h2>
+                        <button type="button" class="reverse-plan-help" onclick="document.getElementById('reverse-plan-dialog').showModal()">逆算入力</button>
+                    </div>
+                </div>
                 <p>入力・保存の基準は税抜です。税込は消費税10%で自動表示します。</p>
             </div>
             <input type="hidden" name="plan_gross_profit" value="{{ $planGross }}">
@@ -125,6 +131,33 @@
                 </div>
             </div>
         </section>
+
+        <dialog id="reverse-plan-dialog" class="reverse-plan-dialog">
+            <div class="reverse-plan-dialog__header">
+                <div><span class="meta">REVERSE PLANNING</span><h2>逆算入力とは</h2></div>
+                <button type="button" class="secondary reverse-plan-dialog__close" onclick="this.closest('dialog').close()" aria-label="閉じる">×</button>
+            </div>
+            <div class="reverse-plan-dialog__body">
+                <p>経営計画は、費用を積み上げて利益を予想するだけのものではありません。</p>
+                <p>まず「いくら売るか」と「いくら利益を残すか」を決める。次に、必要な粗利と、使える販管費を逆算する。これが、目標から会社の動きを設計する「逆算経営」です。</p>
+                <div class="reverse-plan-dialog__grid">
+                    <section>
+                        <h3>入力する数字</h3>
+                        <p>売上目標・目標営業利益・目標粗利率</p>
+                    </section>
+                    <section>
+                        <h3>自動で求める数字</h3>
+                        <ul>
+                            <li>粗利 ＝ 売上目標 × 目標粗利率</li>
+                            <li>売上原価 ＝ 売上目標 − 粗利</li>
+                            <li>販管費 ＝ 粗利 − 目標営業利益</li>
+                        </ul>
+                    </section>
+                </div>
+                <blockquote>利益は、最後に残った結果ではなく、最初に決める目標です。</blockquote>
+            </div>
+            <div class="reverse-plan-dialog__footer"><button type="button" onclick="this.closest('dialog').close()">閉じる</button></div>
+        </dialog>
 
         <section class="card sheet-card">
             <div class="sheet-heading">
@@ -278,6 +311,7 @@
 <style>
 .annual-plan-page{width:min(1540px,calc(100vw - 28px));position:relative;left:50%;transform:translateX(-50%)}.period-toolbar{display:flex;align-items:end;gap:22px;margin-bottom:18px;padding:16px 18px;border:1px solid #b7d5ce;border-radius:11px;background:#f2faf7}.period-toolbar>div:first-child{margin-right:auto}.period-toolbar span,.plan-supplement span,.forecast-grid span,.repayment-fields span{display:block;color:var(--muted);font-size:12px}.period-toolbar strong{display:block;margin-top:5px;color:var(--accent-dark)}.period-toolbar label{width:100px}.cell-legend{display:flex;gap:12px;padding-bottom:8px}.cell-legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}.cell-legend i{width:14px;height:14px;border:1px solid #b5c5c7;border-radius:3px}.editable-swatch{background:#edf9f4}.calculated-swatch{background:#f0f2f3}.tax-switch>div{display:flex;margin-top:5px}.tax-button{padding:8px 16px;border:1px solid #aac5cb;background:#fff;color:#315b64}.tax-button:first-child{border-radius:7px 0 0 7px}.tax-button:last-child{border-radius:0 7px 7px 0}.tax-button.active{background:var(--accent-dark);color:#fff}.sheet-card,.forecast-card{padding:18px;margin-bottom:16px}.sheet-heading{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:12px}.sheet-heading h2{margin:3px 0 0}.sheet-heading p{margin:0;color:var(--muted);font-size:13px}.sheet-scroll{overflow-x:auto;border:1px solid #aebdc0}.plan-sheet,.progress-sheet{width:100%;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums}.plan-sheet{min-width:1040px}.progress-sheet{min-width:1500px}.plan-sheet th,.plan-sheet td,.progress-sheet th,.progress-sheet td{border:1px solid #b5bec0;text-align:center}.plan-sheet th,.plan-sheet td{height:50px;padding:6px}.plan-sheet thead th,.progress-sheet thead th{background:#dfe6e8;color:#183e48}.plan-sheet tbody th{width:90px;background:#f8edc7}.plan-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:10px}.plan-sheet td.input-cell{background:#edf9f4;padding:4px}.plan-sheet input{width:100%;min-width:120px;padding:9px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.plan-sheet input:focus{border-color:#4c91a0;background:#fff}.plan-sheet td{font-weight:700}.plan-supplement{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:12px;margin-top:14px}.plan-supplement label,.repayment-fields label{display:flex;flex-direction:column;gap:5px}.compact{padding:10px 13px;white-space:nowrap}.monthly-plan-bulk{margin-top:16px;padding:16px;border:1px solid #b8c9df;border-radius:10px;background:#f5f8fd}.bulk-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.bulk-heading span{display:block;margin-top:3px;color:var(--muted);font-size:12px}.plan-average-summary{display:flex;align-items:center;gap:13px}.plan-average-summary span{margin:0}.plan-average-summary b{color:#355f99;font-size:13px}.plan-average-summary i{font-style:normal}.bulk-fields{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:10px;margin-top:12px}.bulk-fields label{margin:0}.progress-sheet th,.progress-sheet td{height:42px;padding:4px}.progress-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:9px}.progress-sheet td.input-cell{background:#edf9f4;padding:3px}.progress-sheet .row-title,.progress-sheet tbody th{position:sticky;left:0;z-index:2;width:150px;background:#e5eaeb}.progress-sheet thead th{height:52px}.progress-sheet thead th:not(.row-title){width:112px}.progress-sheet .plan-row th{background:#e2eaf7;color:#355f99;z-index:3}.progress-sheet .plan-row td.input-cell{background:#edf2fb}.progress-sheet .plan-value-row input{color:#355f99;font-weight:800}.sheet-input{width:100%;min-width:90px;padding:7px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.sheet-input:focus{border-color:#4c91a0;background:#fff}.calculated,.progress-sheet tbody td>span{display:block;width:100%;text-align:right;padding-right:0}.emphasis-row{border-bottom:3px solid #59747a}.ratio-separator{border-top:4px solid #59747a}.ratio-cell{padding:0!important;background:#f0f2f3!important}.ratio-cell span{padding:10px 8px!important}.rate-good{background:#aec3e6;color:#173f68;font-weight:700}.rate-watch{background:#efb788;color:#613819;font-weight:700}.negative{color:#d13b32!important;font-weight:700}.forecast-card{border-color:#9ec7d6}.forecast-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.forecast-grid>div{padding:13px;border:1px solid var(--line);border-radius:8px;background:#f8fbfb}.forecast-grid strong{display:block;margin-top:7px;color:var(--accent-dark);font-size:16px}.repayment-fields{display:grid;grid-template-columns:1.4fr repeat(3,1fr);align-items:end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}.repayment-fields h3,.repayment-fields p{margin:0}.repayment-fields p{color:var(--muted);font-size:12px}.save-actions{justify-content:flex-end;margin:18px 0}@media(max-width:900px){.period-toolbar,.sheet-heading,.bulk-heading{align-items:stretch;flex-direction:column}.period-toolbar>div:first-child{margin-right:0}.cell-legend{padding-bottom:0}.plan-average-summary{flex-wrap:wrap}.plan-supplement,.bulk-fields,.forecast-grid,.repayment-fields{grid-template-columns:1fr 1fr}}@media(max-width:600px){.plan-supplement,.bulk-fields,.forecast-grid,.repayment-fields{grid-template-columns:1fr}}
 .plan-swatch{background:#edf2fb}.progress-sheet .plan-value-row input{font-weight:700}.projected-value{background:#edf2fb!important;color:#355f99!important;font-weight:700}.progress-sheet td.input-cell:has(.forecast-entry:not([hidden])){background:#edf2fb}.forecast-entry{color:#355f99;font-weight:700}
+.heading-with-help{display:flex;align-items:center;gap:10px}.heading-with-help h2{margin:3px 0 0}.reverse-plan-help{padding:4px 9px;border:1px solid #9dbbc2;border-radius:999px;background:#fff;color:var(--accent-dark);font-size:12px;font-weight:700}.reverse-plan-dialog{width:min(680px,calc(100vw - 28px));padding:0;border:0;border-radius:16px;box-shadow:0 24px 80px rgba(13,35,45,.3)}.reverse-plan-dialog::backdrop{background:rgba(13,30,39,.52)}.reverse-plan-dialog__header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--line)}.reverse-plan-dialog__header h2{margin:3px 0 0}.reverse-plan-dialog__close{width:42px;height:42px;padding:0;font-size:24px}.reverse-plan-dialog__body{padding:22px 24px}.reverse-plan-dialog__body>p:first-child{margin-top:0}.reverse-plan-dialog__grid{display:grid;grid-template-columns:1fr 1.35fr;gap:12px;margin:20px 0}.reverse-plan-dialog__grid section{padding:15px;border:1px solid var(--line);border-radius:10px;background:#f8fbfb}.reverse-plan-dialog__grid h3{margin:0 0 8px}.reverse-plan-dialog__grid p,.reverse-plan-dialog__grid ul{margin:0}.reverse-plan-dialog__grid li{margin:6px 0}.reverse-plan-dialog blockquote{margin:20px 0 0;padding:17px 18px;border-left:4px solid var(--accent-dark);background:#f2faf7;color:var(--accent-dark);font-size:17px;font-weight:800}.reverse-plan-dialog__footer{display:flex;justify-content:flex-end;padding:14px 24px;border-top:1px solid var(--line)}@media(max-width:600px){.reverse-plan-dialog__grid{grid-template-columns:1fr}}
 </style>
 
 <script>

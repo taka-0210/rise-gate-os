@@ -179,6 +179,8 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('data-tax-mode="inclusive"', false)
             ->assertSee('value="614,000,000"', false)
             ->assertSee('class="formatted-money-input"', false)
+            ->assertSee('逆算入力')
+            ->assertSee('利益は、最後に残った結果ではなく、最初に決める目標です。')
             ->assertSee('class="company-finance-screen"', false)
             ->assertSee('::-webkit-inner-spin-button', false)
             ->assertDontSee('厨房君');
