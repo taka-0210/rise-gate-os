@@ -140,6 +140,8 @@ class CompanyFinanceEntryTest extends TestCase
                     return [
                         'month' => $month->format('Y-m-d'),
                         'plan_net_sales' => 50_000_000,
+                        'plan_cost_of_sales' => 30_000_000,
+                        'plan_selling_general_admin_expenses' => 20_000_000,
                         'actual_net_sales' => $index < 7 ? 45_000_000 : null,
                         'actual_cost_of_sales' => $index < 7 ? 25_000_000 : null,
                         'actual_selling_general_admin_expenses' => $index < 7 ? 20_000_000 : null,
@@ -153,6 +155,8 @@ class CompanyFinanceEntryTest extends TestCase
         $this->assertSame(2025, $plan->fiscal_year);
         $this->assertSame(614_000_000, (int) $plan->plan_net_sales);
         $this->assertSame(565_000_000, (int) $plan->forecast_net_sales);
+        $this->assertSame(240_000_000, (int) $plan->forecast_gross_profit);
+        $this->assertSame(240_000_000, (int) $plan->forecast_selling_general_admin_expenses);
         $this->assertSame(12_000_000, (int) $plan->forecast_net_income);
         $this->assertCount(12, $plan->months);
         $this->assertDatabaseCount('company_financial_periods', 0);
@@ -163,6 +167,9 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('単月')
             ->assertSee('累計')
             ->assertSee('最新の着地見込み')
+            ->assertSee('月次計画の平均・一括入力')
+            ->assertSee('計画売上原価')
+            ->assertSee('計画販管費')
             ->assertSee('data-tax-mode="inclusive"', false)
             ->assertSee('value="614,000,000"', false)
             ->assertSee('class="formatted-money-input"', false)

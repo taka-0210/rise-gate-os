@@ -11,6 +11,8 @@ class CompanyAnnualPlanMonth extends Model
         'company_annual_plan_id',
         'month',
         'plan_net_sales',
+        'plan_cost_of_sales',
+        'plan_selling_general_admin_expenses',
         'actual_net_sales',
         'actual_cost_of_sales',
         'actual_selling_general_admin_expenses',

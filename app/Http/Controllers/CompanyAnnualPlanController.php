@@ -83,6 +83,8 @@ class CompanyAnnualPlanController extends Controller
         $rules['months.*.month'] = ['required', 'date_format:Y-m-d'];
         foreach ([
             'plan_net_sales',
+            'plan_cost_of_sales',
+            'plan_selling_general_admin_expenses',
             'actual_net_sales',
             'actual_cost_of_sales',
             'actual_selling_general_admin_expenses',
@@ -138,11 +140,23 @@ class CompanyAnnualPlanController extends Controller
     ): Collection {
         $saved = $plan?->months?->keyBy(fn ($month) => $month->month->format('Y-m-d')) ?? collect();
         $annualSales = (int) ($plan?->plan_net_sales ?? 0);
-        $monthlyBase = intdiv($annualSales, 12);
+        $annualCost = $annualSales - (int) ($plan?->plan_gross_profit ?? 0);
+        $annualSga = (int) ($plan?->plan_selling_general_admin_expenses ?? 0);
+        $monthlySalesBase = intdiv($annualSales, 12);
+        $monthlyCostBase = intdiv($annualCost, 12);
+        $monthlySgaBase = intdiv($annualSga, 12);
 
         return $this->fiscalMonths($fiscalYear, $closingMonth)
             ->values()
-            ->map(function (CarbonImmutable $month, int $index) use ($saved, $monthlyBase, $annualSales) {
+            ->map(function (CarbonImmutable $month, int $index) use (
+                $saved,
+                $monthlySalesBase,
+                $monthlyCostBase,
+                $monthlySgaBase,
+                $annualSales,
+                $annualCost,
+                $annualSga,
+            ) {
                 $key = $month->format('Y-m-d');
                 if ($saved->has($key)) {
                     return $saved->get($key);
@@ -151,8 +165,14 @@ class CompanyAnnualPlanController extends Controller
                 return (object) [
                     'month' => $month,
                     'plan_net_sales' => $index === 11
-                        ? $annualSales - ($monthlyBase * 11)
-                        : $monthlyBase,
+                        ? $annualSales - ($monthlySalesBase * 11)
+                        : $monthlySalesBase,
+                    'plan_cost_of_sales' => $index === 11
+                        ? $annualCost - ($monthlyCostBase * 11)
+                        : $monthlyCostBase,
+                    'plan_selling_general_admin_expenses' => $index === 11
+                        ? $annualSga - ($monthlySgaBase * 11)
+                        : $monthlySgaBase,
                     'actual_net_sales' => null,
                     'actual_cost_of_sales' => null,
                     'actual_selling_general_admin_expenses' => null,

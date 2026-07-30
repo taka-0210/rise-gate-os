@@ -16,17 +16,25 @@ class AnnualPlanForecastService
         $actualSga = (int) $actualMonths->sum('actual_selling_general_admin_expenses');
         $elapsedPlanSales = (int) $actualMonths->sum('plan_net_sales');
         $remainingPlanSales = (int) $remainingMonths->sum('plan_net_sales');
+        $remainingPlanCost = (int) $remainingMonths->sum('plan_cost_of_sales');
+        $remainingPlanSga = (int) $remainingMonths->sum('plan_selling_general_admin_expenses');
 
         $planSales = (int) ($plan->plan_net_sales ?? 0);
-        $planGrossProfit = (int) ($plan->plan_gross_profit ?? 0);
-        $grossMargin = $planSales > 0 ? $planGrossProfit / $planSales : 0.0;
-        $remainingSga = $months->isNotEmpty()
-            ? (int) round(((int) ($plan->plan_selling_general_admin_expenses ?? 0) / $months->count()) * $remainingMonths->count())
-            : 0;
+        if ($remainingMonths->isNotEmpty() && $remainingMonths->every(fn ($month) => data_get($month, 'plan_cost_of_sales') === null)) {
+            $planCost = $planSales - (int) ($plan->plan_gross_profit ?? 0);
+            $remainingPlanCost = $planSales > 0
+                ? (int) round($remainingPlanSales * ($planCost / $planSales))
+                : 0;
+        }
+        if ($remainingMonths->isNotEmpty() && $remainingMonths->every(fn ($month) => data_get($month, 'plan_selling_general_admin_expenses') === null)) {
+            $remainingPlanSga = $months->isNotEmpty()
+                ? (int) round(((int) ($plan->plan_selling_general_admin_expenses ?? 0) / $months->count()) * $remainingMonths->count())
+                : 0;
+        }
 
         $forecastSales = $actualSales + $remainingPlanSales;
-        $forecastGrossProfit = ($actualSales - $actualCost) + (int) round($remainingPlanSales * $grossMargin);
-        $forecastSga = $actualSga + $remainingSga;
+        $forecastGrossProfit = ($actualSales - $actualCost) + ($remainingPlanSales - $remainingPlanCost);
+        $forecastSga = $actualSga + $remainingPlanSga;
 
         return [
             'actual_month_count' => $actualMonths->count(),
