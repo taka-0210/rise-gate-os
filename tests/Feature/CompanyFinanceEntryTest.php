@@ -181,6 +181,9 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('class="formatted-money-input"', false)
             ->assertSee('逆算入力')
             ->assertSee('利益は、最後に残った結果ではなく、最初に決める目標です。')
+            ->assertSee('平均粗利')
+            ->assertSee('平均営業利益')
+            ->assertSee('②</span>目標粗利率', false)
             ->assertSee('class="company-finance-screen"', false)
             ->assertSee('::-webkit-inner-spin-button', false)
             ->assertDontSee('厨房君');
