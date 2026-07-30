@@ -37,6 +37,10 @@
         <div class="period-toolbar">
             <div><span>対象年度</span><strong>{{ $fiscalYear }}年度（{{ $fiscalYear }}.{{ str_pad($startMonth, 2, '0', STR_PAD_LEFT) }}〜{{ $endYear }}.{{ str_pad($closingMonth, 2, '0', STR_PAD_LEFT) }}）</strong></div>
             <label><span>期</span><input type="number" name="period_number" min="1" max="999" value="{{ $value('period_number') }}" @disabled(!$canManage)></label>
+            <div class="cell-legend">
+                <span><i class="editable-swatch"></i>入力できます</span>
+                <span><i class="calculated-swatch"></i>自動計算</span>
+            </div>
             <div class="tax-switch" aria-label="月次表の表示金額">
                 <span>表示金額</span>
                 <div>
@@ -68,10 +72,10 @@
                     <tbody>
                         <tr>
                             <th>税抜</th>
-                            <td><input type="number" name="plan_net_sales" value="{{ $value('plan_net_sales') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td class="input-cell"><input type="number" name="plan_net_sales" value="{{ $value('plan_net_sales') }}" min="0" step="1" @disabled(!$canManage)></td>
                             <td id="plan-cost-exclusive">{{ $money($planCost) }}</td>
-                            <td><input type="number" name="plan_gross_profit" value="{{ $value('plan_gross_profit') }}" min="0" step="1" @disabled(!$canManage)></td>
-                            <td><input type="number" name="plan_selling_general_admin_expenses" value="{{ $value('plan_selling_general_admin_expenses') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td class="input-cell"><input type="number" name="plan_gross_profit" value="{{ $value('plan_gross_profit') }}" min="0" step="1" @disabled(!$canManage)></td>
+                            <td class="input-cell"><input type="number" name="plan_selling_general_admin_expenses" value="{{ $value('plan_selling_general_admin_expenses') }}" min="0" step="1" @disabled(!$canManage)></td>
                             <td id="plan-operating-exclusive">{{ $money($planOperating) }}</td>
                             <td id="plan-gross-margin" rowspan="2">{{ $planSales ? number_format($planGross / $planSales * 100, 1).'%' : '—' }}</td>
                             <td id="plan-cost-ratio" rowspan="2">{{ $planSales ? number_format($planCost / $planSales * 100, 1).'%' : '—' }}</td>
@@ -116,7 +120,7 @@
                                     $oldMonth = old("months.$index", []);
                                     $monthValue = fn ($field) => array_key_exists($field, $oldMonth) ? $oldMonth[$field] : data_get($month, $field);
                                 @endphp
-                                <td>
+                                <td class="input-cell">
                                     <input type="hidden" name="months[{{ $index }}][month]" value="{{ $month->month->format('Y-m-d') }}">
                                     <input class="sheet-input" type="number" name="months[{{ $index }}][plan_net_sales]" value="{{ $monthValue('plan_net_sales') }}" data-tax-exclusive="{{ $monthValue('plan_net_sales') }}" min="0" step="1" @disabled(!$canManage)>
                                 </td>
@@ -137,7 +141,7 @@
                                         $oldMonth = old("months.$index", []);
                                         $fieldValue = $field ? (array_key_exists($field, $oldMonth) ? $oldMonth[$field] : data_get($month, $field)) : null;
                                     @endphp
-                                    <td>
+                                    <td class="{{ $field ? 'input-cell' : 'calculated-cell' }}">
                                         @if($field)
                                             <input class="sheet-input" type="number" name="months[{{ $index }}][{{ $field }}]" value="{{ $fieldValue }}" data-tax-exclusive="{{ $fieldValue }}" min="0" step="1" @disabled(!$canManage)>
                                         @else
@@ -147,9 +151,9 @@
                                 @endforeach
                             </tr>
                         @endforeach
-                        <tr class="ratio-separator"><th>売上達成率</th>@foreach($months as $index => $month)<td><span class="monthly-achievement" data-index="{{ $index }}">—</span></td>@endforeach</tr>
-                        <tr><th>原価率</th>@foreach($months as $index => $month)<td><span class="monthly-cost-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
-                        <tr><th>粗利率</th>@foreach($months as $index => $month)<td><span class="monthly-gross-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr class="ratio-separator"><th>売上達成率</th>@foreach($months as $index => $month)<td class="ratio-cell"><span class="monthly-achievement" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>原価率</th>@foreach($months as $index => $month)<td class="ratio-cell"><span class="monthly-cost-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>粗利率</th>@foreach($months as $index => $month)<td class="ratio-cell"><span class="monthly-gross-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
                     </tbody>
                 </table>
             </div>
@@ -180,12 +184,12 @@
                         ] as [$label, $class, $isPlan])
                             <tr class="{{ $isPlan ? 'plan-row' : ($class === 'cumulative-variance' || $class === 'cumulative-operating' ? 'emphasis-row' : '') }}">
                                 <th>{{ $label }}</th>
-                                @foreach($months as $index => $month)<td><span class="{{ $class }}" data-index="{{ $index }}">—</span></td>@endforeach
+                                @foreach($months as $index => $month)<td class="calculated-cell"><span class="{{ $class }}" data-index="{{ $index }}">—</span></td>@endforeach
                             </tr>
                         @endforeach
-                        <tr class="ratio-separator"><th>売上達成率</th>@foreach($months as $index => $month)<td><span class="cumulative-achievement" data-index="{{ $index }}">—</span></td>@endforeach</tr>
-                        <tr><th>原価率</th>@foreach($months as $index => $month)<td><span class="cumulative-cost-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
-                        <tr><th>粗利率</th>@foreach($months as $index => $month)<td><span class="cumulative-gross-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr class="ratio-separator"><th>売上達成率</th>@foreach($months as $index => $month)<td class="ratio-cell"><span class="cumulative-achievement" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>原価率</th>@foreach($months as $index => $month)<td class="ratio-cell"><span class="cumulative-cost-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
+                        <tr><th>粗利率</th>@foreach($months as $index => $month)<td class="ratio-cell"><span class="cumulative-gross-rate" data-index="{{ $index }}">—</span></td>@endforeach</tr>
                     </tbody>
                 </table>
             </div>
@@ -217,7 +221,7 @@
 </div>
 
 <style>
-.annual-plan-page{width:min(1540px,calc(100vw - 28px));position:relative;left:50%;transform:translateX(-50%)}.period-toolbar{display:flex;align-items:end;gap:22px;margin-bottom:18px;padding:16px 18px;border:1px solid #b7d5ce;border-radius:11px;background:#f2faf7}.period-toolbar>div:first-child{margin-right:auto}.period-toolbar span,.plan-supplement span,.forecast-grid span,.repayment-fields span{display:block;color:var(--muted);font-size:12px}.period-toolbar strong{display:block;margin-top:5px;color:var(--accent-dark)}.period-toolbar label{width:100px}.tax-switch>div{display:flex;margin-top:5px}.tax-button{padding:8px 16px;border:1px solid #aac5cb;background:#fff;color:#315b64}.tax-button:first-child{border-radius:7px 0 0 7px}.tax-button:last-child{border-radius:0 7px 7px 0}.tax-button.active{background:var(--accent-dark);color:#fff}.sheet-card,.forecast-card{padding:18px;margin-bottom:16px}.sheet-heading{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:12px}.sheet-heading h2{margin:3px 0 0}.sheet-heading p{margin:0;color:var(--muted);font-size:13px}.sheet-scroll{overflow-x:auto;border:1px solid #aebdc0}.plan-sheet,.progress-sheet{width:100%;border-collapse:collapse;table-layout:fixed}.plan-sheet{min-width:1040px}.progress-sheet{min-width:1500px}.plan-sheet th,.plan-sheet td,.progress-sheet th,.progress-sheet td{border:1px solid #b5bec0;text-align:center}.plan-sheet th,.plan-sheet td{height:50px;padding:6px}.plan-sheet thead th,.progress-sheet thead th{background:#dfe6e8;color:#183e48}.plan-sheet tbody th{width:90px;background:#f8edc7}.plan-sheet input{width:100%;min-width:120px;padding:9px;text-align:right;border-color:transparent;background:#fff}.plan-sheet td{font-weight:700}.plan-supplement{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:12px;margin-top:14px}.plan-supplement label,.repayment-fields label{display:flex;flex-direction:column;gap:5px}.compact{padding:10px 13px;white-space:nowrap}.progress-sheet th,.progress-sheet td{height:42px;padding:4px}.progress-sheet .row-title,.progress-sheet tbody th{position:sticky;left:0;z-index:2;width:150px;background:#e5eaeb}.progress-sheet thead th{height:52px}.progress-sheet thead th:not(.row-title){width:112px}.progress-sheet .plan-row th,.progress-sheet .plan-row td{background:#fff5cf}.progress-sheet .plan-row th{z-index:3}.sheet-input{width:100%;min-width:90px;padding:7px 4px;text-align:right;border:1px solid transparent;background:transparent}.sheet-input:focus{border-color:#4c91a0;background:#fff}.calculated{display:block;text-align:right;padding-right:5px}.emphasis-row{border-bottom:3px solid #59747a}.ratio-separator{border-top:4px solid #59747a}.negative{color:#d13b32!important;font-weight:700}.forecast-card{border-color:#9ec7d6}.forecast-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.forecast-grid>div{padding:13px;border:1px solid var(--line);border-radius:8px;background:#f8fbfb}.forecast-grid strong{display:block;margin-top:7px;color:var(--accent-dark);font-size:16px}.repayment-fields{display:grid;grid-template-columns:1.4fr repeat(3,1fr);align-items:end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}.repayment-fields h3,.repayment-fields p{margin:0}.repayment-fields p{color:var(--muted);font-size:12px}.save-actions{justify-content:flex-end;margin:18px 0}@media(max-width:900px){.period-toolbar,.sheet-heading{align-items:stretch;flex-direction:column}.period-toolbar>div:first-child{margin-right:0}.plan-supplement,.forecast-grid,.repayment-fields{grid-template-columns:1fr 1fr}}@media(max-width:600px){.plan-supplement,.forecast-grid,.repayment-fields{grid-template-columns:1fr}}
+.annual-plan-page{width:min(1540px,calc(100vw - 28px));position:relative;left:50%;transform:translateX(-50%)}.period-toolbar{display:flex;align-items:end;gap:22px;margin-bottom:18px;padding:16px 18px;border:1px solid #b7d5ce;border-radius:11px;background:#f2faf7}.period-toolbar>div:first-child{margin-right:auto}.period-toolbar span,.plan-supplement span,.forecast-grid span,.repayment-fields span{display:block;color:var(--muted);font-size:12px}.period-toolbar strong{display:block;margin-top:5px;color:var(--accent-dark)}.period-toolbar label{width:100px}.cell-legend{display:flex;gap:12px;padding-bottom:8px}.cell-legend span{display:flex;align-items:center;gap:5px;white-space:nowrap}.cell-legend i{width:14px;height:14px;border:1px solid #b5c5c7;border-radius:3px}.editable-swatch{background:#edf9f4}.calculated-swatch{background:#f0f2f3}.tax-switch>div{display:flex;margin-top:5px}.tax-button{padding:8px 16px;border:1px solid #aac5cb;background:#fff;color:#315b64}.tax-button:first-child{border-radius:7px 0 0 7px}.tax-button:last-child{border-radius:0 7px 7px 0}.tax-button.active{background:var(--accent-dark);color:#fff}.sheet-card,.forecast-card{padding:18px;margin-bottom:16px}.sheet-heading{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:12px}.sheet-heading h2{margin:3px 0 0}.sheet-heading p{margin:0;color:var(--muted);font-size:13px}.sheet-scroll{overflow-x:auto;border:1px solid #aebdc0}.plan-sheet,.progress-sheet{width:100%;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums}.plan-sheet{min-width:1040px}.progress-sheet{min-width:1500px}.plan-sheet th,.plan-sheet td,.progress-sheet th,.progress-sheet td{border:1px solid #b5bec0;text-align:center}.plan-sheet th,.plan-sheet td{height:50px;padding:6px}.plan-sheet thead th,.progress-sheet thead th{background:#dfe6e8;color:#183e48}.plan-sheet tbody th{width:90px;background:#f8edc7}.plan-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:10px}.plan-sheet td.input-cell{background:#edf9f4;padding:4px}.plan-sheet input{width:100%;min-width:120px;padding:9px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.plan-sheet input:focus{border-color:#4c91a0;background:#fff}.plan-sheet td{font-weight:700}.plan-supplement{display:grid;grid-template-columns:repeat(3,1fr) auto;align-items:end;gap:12px;margin-top:14px}.plan-supplement label,.repayment-fields label{display:flex;flex-direction:column;gap:5px}.compact{padding:10px 13px;white-space:nowrap}.progress-sheet th,.progress-sheet td{height:42px;padding:4px}.progress-sheet tbody td{background:#f0f2f3;text-align:right;padding-right:9px}.progress-sheet td.input-cell{background:#edf9f4;padding:3px}.progress-sheet .row-title,.progress-sheet tbody th{position:sticky;left:0;z-index:2;width:150px;background:#e5eaeb}.progress-sheet thead th{height:52px}.progress-sheet thead th:not(.row-title){width:112px}.progress-sheet .plan-row th{background:#fff5cf;z-index:3}.progress-sheet .plan-row td.input-cell{background:#fff8dc}.sheet-input{width:100%;min-width:90px;padding:7px 6px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid transparent;background:transparent}.sheet-input:focus{border-color:#4c91a0;background:#fff}.calculated,.progress-sheet tbody td>span{display:block;width:100%;text-align:right;padding-right:0}.emphasis-row{border-bottom:3px solid #59747a}.ratio-separator{border-top:4px solid #59747a}.ratio-cell{padding:0!important;background:#f0f2f3!important}.ratio-cell span{padding:10px 8px!important}.rate-good{background:#aec3e6;color:#173f68;font-weight:700}.rate-watch{background:#efb788;color:#613819;font-weight:700}.negative{color:#d13b32!important;font-weight:700}.forecast-card{border-color:#9ec7d6}.forecast-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.forecast-grid>div{padding:13px;border:1px solid var(--line);border-radius:8px;background:#f8fbfb}.forecast-grid strong{display:block;margin-top:7px;color:var(--accent-dark);font-size:16px}.repayment-fields{display:grid;grid-template-columns:1.4fr repeat(3,1fr);align-items:end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}.repayment-fields h3,.repayment-fields p{margin:0}.repayment-fields p{color:var(--muted);font-size:12px}.save-actions{justify-content:flex-end;margin:18px 0}@media(max-width:900px){.period-toolbar,.sheet-heading{align-items:stretch;flex-direction:column}.period-toolbar>div:first-child{margin-right:0}.cell-legend{padding-bottom:0}.plan-supplement,.forecast-grid,.repayment-fields{grid-template-columns:1fr 1fr}}@media(max-width:600px){.plan-supplement,.forecast-grid,.repayment-fields{grid-template-columns:1fr}}
 </style>
 
 <script>
@@ -238,6 +242,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!element) return;
         element.textContent = kind === 'rate' ? rate(value) : money(value);
         element.classList.toggle('negative', kind === 'money' && value !== null && value < 0);
+    };
+    const assessRate = (selector, index, value, isGood) => {
+        const element = form.querySelector(`${selector}[data-index="${index}"]`);
+        if (!element) return;
+        element.classList.toggle('rate-good', value !== null && isGood);
+        element.classList.toggle('rate-watch', value !== null && !isGood);
     };
     const planValue = name => num(field(name)?.value) || 0;
 
@@ -267,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const annualGross = planValue('plan_gross_profit');
         const annualSga = planValue('plan_selling_general_admin_expenses');
         const plannedGrossMargin = annualSales ? annualGross / annualSales : 0;
+        const plannedCostRate = annualSales ? (annualSales - annualGross) / annualSales : 0;
         let cumPlan = 0, cumSales = 0, cumCost = 0, cumSga = 0;
         let actualCount = 0, remainingPlan = 0;
 
@@ -288,6 +299,12 @@ document.addEventListener('DOMContentLoaded', () => {
             set('.monthly-achievement', i, hasActual && plan ? sales / plan : null, 'rate');
             set('.monthly-cost-rate', i, hasActual && sales ? cost / sales : null, 'rate');
             set('.monthly-gross-rate', i, hasActual && sales ? gross / sales : null, 'rate');
+            const monthlyAchievement = hasActual && plan ? sales / plan : null;
+            const monthlyCostRate = hasActual && sales ? cost / sales : null;
+            const monthlyGrossRate = hasActual && sales ? gross / sales : null;
+            assessRate('.monthly-achievement', i, monthlyAchievement, monthlyAchievement >= 1);
+            assessRate('.monthly-cost-rate', i, monthlyCostRate, monthlyCostRate <= plannedCostRate);
+            assessRate('.monthly-gross-rate', i, monthlyGrossRate, monthlyGrossRate >= plannedGrossMargin);
 
             cumPlan += plan;
             set('.cumulative-plan', i, cumPlan);
@@ -306,10 +323,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 set('.cumulative-achievement', i, cumPlan ? cumSales / cumPlan : null, 'rate');
                 set('.cumulative-cost-rate', i, cumSales ? cumCost / cumSales : null, 'rate');
                 set('.cumulative-gross-rate', i, cumSales ? cumGross / cumSales : null, 'rate');
+                const cumulativeAchievement = cumPlan ? cumSales / cumPlan : null;
+                const cumulativeCostRate = cumSales ? cumCost / cumSales : null;
+                const cumulativeGrossRate = cumSales ? cumGross / cumSales : null;
+                assessRate('.cumulative-achievement', i, cumulativeAchievement, cumulativeAchievement >= 1);
+                assessRate('.cumulative-cost-rate', i, cumulativeCostRate, cumulativeCostRate <= plannedCostRate);
+                assessRate('.cumulative-gross-rate', i, cumulativeGrossRate, cumulativeGrossRate >= plannedGrossMargin);
             } else {
                 remainingPlan += plan;
                 ['.cumulative-sales','.cumulative-variance','.cumulative-cost','.cumulative-gross','.cumulative-sga','.cumulative-operating'].forEach(selector => set(selector, i, null));
                 ['.cumulative-achievement','.cumulative-cost-rate','.cumulative-gross-rate'].forEach(selector => set(selector, i, null, 'rate'));
+                ['.cumulative-achievement','.cumulative-cost-rate','.cumulative-gross-rate'].forEach(selector => assessRate(selector, i, null, false));
             }
         }
 
