@@ -3,6 +3,7 @@
 @section('content')
 @php
     $closingMonth = $organization->fiscal_year_end_month ?: 12;
+    $currentCalendarMonth = \Carbon\CarbonImmutable::now('Asia/Tokyo')->startOfMonth();
     $startMonth = $closingMonth === 12 ? 1 : $closingMonth + 1;
     $endYear = $closingMonth === 12 ? $fiscalYear : $fiscalYear + 1;
     $value = fn (string $name) => old($name, data_get($plan, $name));
@@ -16,6 +17,11 @@
     $actualMonths = $months->filter(fn ($month) => data_get($month, 'actual_net_sales') !== null);
     $actualMonthIndexes = $months
         ->filter(fn ($month) => data_get($month, 'actual_net_sales') !== null)
+        ->keys()
+        ->values();
+    $actualPeriodIndexes = $months
+        ->filter(fn ($month) => $month->month->startOfMonth()->lessThan($currentCalendarMonth)
+            || data_get($month, 'actual_net_sales') !== null)
         ->keys()
         ->values();
     $monthlyActualAverages = [
@@ -155,7 +161,7 @@
                             <label><span>反映先</span><select id="bulk-target-month">
                                 <option value="all">未入力月へ一括反映</option>
                                 @foreach($months as $index => $month)
-                                    @if(data_get($month, 'actual_net_sales') === null)
+                                    @if($month->month->startOfMonth()->greaterThanOrEqualTo($currentCalendarMonth) && data_get($month, 'actual_net_sales') === null)
                                         <option value="{{ $index }}">{{ $month->month->format('n月') }}</option>
                                     @endif
                                 @endforeach
@@ -360,6 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('annual-plan-form');
     if (!form) return;
     const count = 12;
+    const actualPeriodIndexes = @json($actualPeriodIndexes);
     let taxMode = 'exclusive';
     let selectedAverageValues = null;
     const taxFactor = () => taxMode === 'inclusive' ? 1.1 : 1;
@@ -464,11 +471,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const cost = costRaw || 0;
             const sgaRaw = canonical(sgaInput);
             const hasActual = sales !== null;
+            const isActualPeriod = actualPeriodIndexes.includes(i) || hasActual;
             const gross = hasActual ? sales - cost : null;
             const operating = hasActual && sgaRaw !== null ? gross - sgaRaw : null;
-            const displayedSales = hasActual ? sales : forecastSales;
-            const displayedCost = hasActual ? cost : forecastCost;
-            const displayedSga = hasActual ? sgaRaw : forecastSga;
+            const displayedSales = isActualPeriod ? sales : forecastSales;
+            const displayedCost = isActualPeriod ? costRaw : forecastCost;
+            const displayedSga = isActualPeriod ? sgaRaw : forecastSga;
             const displayedGross = displayedSales !== null && displayedCost !== null
                 ? displayedSales - displayedCost
                 : null;
@@ -477,17 +485,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 : null;
 
             [salesInput, costInput, sgaInput].forEach(input => {
-                if (input) input.hidden = !hasActual;
+                if (input) input.hidden = !isActualPeriod;
             });
             [[forecastSalesInput, forecastSales], [forecastCostInput, forecastCost], [forecastSgaInput, forecastSga]].forEach(([input, forecastValue]) => {
                 if (!input) return;
-                input.hidden = hasActual;
+                input.hidden = isActualPeriod;
             });
 
             set('.sales-variance', i, displayedSales !== null ? displayedSales - plan : null);
             set('.actual-gross', i, displayedGross);
             set('.actual-operating', i, displayedOperating);
-            const monthlyAchievement = plan ? displayedSales / plan : null;
+            const monthlyAchievement = plan && displayedSales !== null ? displayedSales / plan : null;
             const monthlyCostRate = displayedSales ? displayedCost / displayedSales : null;
             const monthlyGrossRate = displayedSales ? displayedGross / displayedSales : null;
             set('.monthly-achievement', i, monthlyAchievement, 'rate');
@@ -498,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
             assessRate('.monthly-gross-rate', i, monthlyGrossRate, monthlyGrossRate >= plannedGrossMargin);
             ['.sales-variance', '.actual-gross', '.actual-operating'].forEach(selector => {
                 const element = form.querySelector(`${selector}[data-index="${i}"]`);
-                element?.classList.toggle('projected-value', !hasActual);
+                element?.classList.toggle('projected-value', !isActualPeriod);
             });
 
             cumPlan += plan;
@@ -517,9 +525,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         actualSgaCount++;
                     }
                 }
-                cumSales += sales;
-                cumCost += cost;
-                cumSga += sgaRaw || 0;
+            }
+            if (isActualPeriod) {
+                cumSales += sales ?? 0;
+                cumCost += costRaw ?? 0;
+                cumSga += sgaRaw ?? 0;
             } else {
                 cumSales += forecastSales ?? 0;
                 cumCost += forecastCost ?? 0;
@@ -544,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
             assessRate('.cumulative-gross-rate', i, cumulativeGrossRate, cumulativeGrossRate >= plannedGrossMargin);
             cumulativeSelectors.forEach(selector => {
                 const element = form.querySelector(`${selector}[data-index="${i}"]`);
-                element?.classList.toggle('projected-value', !hasActual);
+                element?.classList.toggle('projected-value', !isActualPeriod);
             });
         }
 
@@ -655,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         const target = document.getElementById('bulk-target-month')?.value || 'all';
         for (let i = 0; i < count; i++) {
-            if (canonical(field(`months[${i}][actual_net_sales]`)) !== null) continue;
+            if (actualPeriodIndexes.includes(i) || canonical(field(`months[${i}][actual_net_sales]`)) !== null) continue;
             if (target !== 'all' && Number(target) !== i) continue;
             Object.entries(values).forEach(([name, value]) => {
                 const input = field(`months[${i}][${name}]`);

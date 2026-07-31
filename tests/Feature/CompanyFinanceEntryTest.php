@@ -225,6 +225,19 @@ class CompanyFinanceEntryTest extends TestCase
         $this->assertSame(568_049_516, (int) $plan->fresh()->forecast_net_sales);
     }
 
+    public function test_months_before_the_current_jst_month_are_actual_periods(): void
+    {
+        CarbonImmutable::setTestNow('2026-08-01 00:05:00 Asia/Tokyo');
+        [$user, $organization, $session] = $this->companyOwner();
+        $organization->update(['fiscal_year_end_month' => 11]);
+
+        $this->actingAs($user)->withSession($session)
+            ->get(route('company-finance.annual-plan.index'))
+            ->assertOk()
+            ->assertDontSee('<option value="7">7月</option>', false)
+            ->assertSee('<option value="8">8月</option>', false);
+    }
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();

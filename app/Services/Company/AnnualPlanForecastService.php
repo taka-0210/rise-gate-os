@@ -2,6 +2,7 @@
 
 namespace App\Services\Company;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 class AnnualPlanForecastService
@@ -9,7 +10,15 @@ class AnnualPlanForecastService
     public function calculate(object $plan, Collection $months): array
     {
         $actualMonths = $months->filter(fn ($month) => $month->actual_net_sales !== null);
-        $remainingMonths = $months->reject(fn ($month) => $month->actual_net_sales !== null);
+        $currentMonth = CarbonImmutable::now('Asia/Tokyo')->startOfMonth();
+        $remainingMonths = $months
+            ->reject(fn ($month) => $month->actual_net_sales !== null)
+            ->filter(function ($month) use ($currentMonth): bool {
+                $monthDate = data_get($month, 'month');
+
+                return $monthDate === null
+                    || CarbonImmutable::parse($monthDate, 'Asia/Tokyo')->startOfMonth()->greaterThanOrEqualTo($currentMonth);
+            });
 
         $actualSales = (int) $actualMonths->sum('actual_net_sales');
         $actualCost = (int) $actualMonths->sum('actual_cost_of_sales');
