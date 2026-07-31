@@ -80,6 +80,7 @@ class CompanyRepaymentCapacityTest extends TestCase
             ->assertSee('2,800,000円')
             ->assertSee('No.1 テスト銀行')
             ->assertSee('id="year-detail-2024"', false)
+            ->assertSee('data-money-input', false)
             ->assertDontSee('<details', false)
             ->assertSee('安全')
             ->assertSee('今期の改善シミュレーション')

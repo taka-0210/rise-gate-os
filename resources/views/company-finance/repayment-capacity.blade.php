@@ -100,7 +100,7 @@
                         <strong>{{ $row['depreciation_expense'] === null ? '—' : number_format($row['depreciation_expense']).'円' }}</strong>
                         <small>03 今年度計画と進捗から連携</small>
                     @elseif($canManage)
-                        <input type="number" name="depreciation[{{ $row['year'] }}]" form="depreciation-form" value="{{ old('depreciation.'.$row['year'], $row['depreciation_expense']) }}" min="0" max="999999999999" step="1" placeholder="未入力">
+                        <input type="text" inputmode="numeric" data-money-input name="depreciation[{{ $row['year'] }}]" form="depreciation-form" value="{{ old('depreciation.'.$row['year'], $row['depreciation_expense']) }}" min="0" max="999999999999" step="1" placeholder="未入力">
                     @else
                         <strong>{{ $row['depreciation_expense'] === null ? '—' : number_format($row['depreciation_expense']).'円' }}</strong>
                     @endif
@@ -174,10 +174,10 @@
                     </div>
 
                     <div class="simulation-inputs">
-                        <label><span>売上計画（計画前提）</span><input type="number" data-sim="net_sales" step="1"></label>
-                        <label><span>新規借入前の当期純利益計画</span><input type="number" data-sim="net_income" step="1"></label>
-                        <label><span>減価償却費</span><input type="number" data-sim="depreciation_expense" min="0" step="1"></label>
-                        <label><span>既存借入の支払利息計画</span><input type="number" data-sim="interest_expense" min="0" step="1"></label>
+                        <label><span>売上計画（計画前提）</span><input type="text" inputmode="numeric" data-money-input data-sim="net_sales"></label>
+                        <label><span>新規借入前の当期純利益計画</span><input type="text" inputmode="numeric" data-money-input data-sim="net_income"></label>
+                        <label><span>減価償却費</span><input type="text" inputmode="numeric" data-money-input data-sim="depreciation_expense"></label>
+                        <label><span>既存借入の支払利息計画</span><input type="text" inputmode="numeric" data-money-input data-sim="interest_expense"></label>
                         <label><span>一括返済</span><select data-sim="execute_extra_repayments"><option value="1">実施する</option><option value="0">実施しない</option></select></label>
                     </div>
 
@@ -200,7 +200,7 @@
                         <h3>新規借入の判断</h3>
                         <p class="meta">新規借入の利息と今期中の元本返済を自動計算し、当期純利益計画・返済額へ反映します。</p>
                         <div class="simulation-inputs">
-                            <label><span>新規借入額</span><input type="number" data-new-loan="amount" min="0" step="1"></label>
+                            <label><span>新規借入額</span><input type="text" inputmode="numeric" data-money-input data-new-loan="amount"></label>
                             <label><span>実行日</span><input type="date" data-new-loan="executed_on"></label>
                             <label><span>返済期間（月）</span><input type="number" data-new-loan="term_months" min="1" max="600"></label>
                             <label><span>年利（%）</span><input type="number" data-new-loan="annual_interest_rate" min="0" max="100" step="0.0001"></label>
@@ -267,7 +267,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
     let timer;
 
-    const nullableNumber = value => value === '' || value === null ? null : Number(value);
+    const nullableNumber = value => value === '' || value === null
+        ? null
+        : Number(String(value).replaceAll(',', ''));
     const collectInput = () => {
         const values = {fiscal_year: Number(savedDefaults.fiscal_year)};
         root.querySelectorAll('[data-sim]').forEach(input => {
@@ -301,6 +303,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const newLoan = defaults.new_loans?.[0] ?? {};
         root.querySelectorAll('[data-new-loan]').forEach(input => {
             input.value = newLoan[input.dataset.newLoan] ?? '';
+        });
+        root.querySelectorAll('[data-money-input]').forEach(input => {
+            const value = nullableNumber(input.value);
+            input.value = value === null ? '' : value.toLocaleString('ja-JP');
         });
     };
     const money = value => value === null ? '—' : `${Number(value).toLocaleString('ja-JP')}円`;

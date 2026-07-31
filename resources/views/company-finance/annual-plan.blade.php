@@ -598,16 +598,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 : String(taxMode === 'inclusive' ? Math.round(entered / 1.1) : entered);
         });
     });
-    form.querySelectorAll('.formatted-money-input').forEach(input => {
-        input.addEventListener('focus', () => {
-            const value = num(input.value);
-            input.value = value === null ? '' : String(value);
-        });
-        input.addEventListener('blur', () => {
-            const value = num(input.value);
-            input.value = formatInput(value);
-        });
-    });
     field('plan_net_sales')?.addEventListener('input', () => {
         updatePlan();
         distributeAnnualPlan();

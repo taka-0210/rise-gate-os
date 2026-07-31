@@ -185,6 +185,7 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('単月へセット')
             ->assertSee('選択期間の平均')
             ->assertSee('id="average-period-from"', false)
+            ->assertSee("digits.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')", false)
             ->assertSee('class="company-finance-screen"', false)
             ->assertSee('::-webkit-inner-spin-button', false)
             ->assertDontSee('厨房君');

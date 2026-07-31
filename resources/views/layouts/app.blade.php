@@ -350,6 +350,47 @@
         @yield('content')
     </main>
 </div>
+@if(request()->routeIs('company-finance.*'))
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const selector = '[data-money-input], .formatted-money-input';
+    const formatMoney = input => {
+        const original = input.value;
+        if (original === '') return;
+        const cursor = input.selectionStart;
+        const beforeCursorDigits = cursor === null
+            ? null
+            : (original.slice(0, cursor).match(/\d/g) || []).length;
+        const negative = original.trim().startsWith('-');
+        let digits = original.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+        if (digits === '') {
+            input.value = negative ? '-' : '';
+            return;
+        }
+        input.value = `${negative ? '-' : ''}${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+        if (beforeCursorDigits === null) return;
+        let seen = 0;
+        let nextCursor = negative ? 1 : 0;
+        while (nextCursor < input.value.length && seen < beforeCursorDigits) {
+            if (/\d/.test(input.value[nextCursor])) seen++;
+            nextCursor++;
+        }
+        input.setSelectionRange(nextCursor, nextCursor);
+    };
+
+    document.querySelectorAll(selector).forEach(formatMoney);
+    document.addEventListener('input', event => {
+        if (event.target.matches(selector)) formatMoney(event.target);
+    });
+    document.addEventListener('submit', event => {
+        document.querySelectorAll(selector).forEach(input => {
+            if (input.form !== event.target) return;
+            input.value = input.value.replaceAll(',', '');
+        });
+    }, true);
+});
+</script>
+@endif
 </body>
 </html>
 
