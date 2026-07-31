@@ -34,6 +34,10 @@
     $monthlyActualGrossMargin = $monthlyActualAverages['sales'] > 0
         ? $monthlyActualAverages['gross'] / $monthlyActualAverages['sales'] * 100
         : 0;
+    $checkCountsByMonth = $checks
+        ->where('status', 'needs_review')
+        ->groupBy(fn ($check) => $check->month->format('Y-m-d'))
+        ->map->count();
 @endphp
 
 <div class="annual-plan-page">
@@ -173,6 +177,27 @@
             </div>
         </section>
 
+        <dialog id="month-check-dialog" class="month-check-dialog">
+            <div class="reverse-plan-dialog__header">
+                <div><span class="meta">MANAGEMENT CHECK</span><h2 id="month-check-title">数値の確認メモ</h2></div>
+                <button type="button" class="secondary reverse-plan-dialog__close" onclick="this.closest('dialog').close()" aria-label="閉じる">×</button>
+            </div>
+            <div class="month-check-dialog__body">
+                <div class="check-amounts">
+                    <div><span>管理会計</span><strong id="check-management-amount">—</strong></div>
+                    <label><span>財務会計の金額（任意）</span><input class="formatted-money-input tax-convertible" id="check-accounting-amount" type="text" inputmode="numeric" data-money-input data-tax-exclusive=""></label>
+                    <div><span>差額</span><strong id="check-difference">—</strong></div>
+                </div>
+                <label><span>状態</span><select id="check-status"><option value="none">メモなし</option><option value="needs_review">要確認</option><option value="resolved">確認済み</option></select></label>
+                <label><span>確認メモ</span><textarea id="check-note" rows="5" maxlength="2000" placeholder="財務会計との相違や、確認する内容を記録します"></textarea></label>
+                <p id="check-updated" class="check-updated"></p>
+            </div>
+            <div class="reverse-plan-dialog__footer">
+                <button type="button" class="secondary" onclick="this.closest('dialog').close()">閉じる</button>
+                @if($canManage)<button type="button" id="apply-check-memo">メモを反映</button>@endif
+            </div>
+        </dialog>
+
         <dialog id="reverse-plan-dialog" class="reverse-plan-dialog">
             <div class="reverse-plan-dialog__header">
                 <div><span class="meta">REVERSE PLANNING</span><h2>逆算入力とは</h2></div>
@@ -206,7 +231,7 @@
 
         <section class="card sheet-card">
             <div class="sheet-heading">
-                <div><span class="meta">MONTHLY</span><h2>単月</h2></div>
+                <div><span class="meta">MONTHLY</span><h2>単月</h2><small class="annual-allocation-note">上3段は年間計画から月割りした自動配分です</small></div>
                 <p><span class="tax-mode-label">税抜</span>表示。月ごとの計画と実績を縦に確認できます。</p>
             </div>
             <div class="sheet-scroll">
@@ -214,7 +239,12 @@
                     <thead>
                         <tr>
                             <th class="row-title">単月</th>
-                            @foreach($months as $month)<th>{{ $month->month->format('Y年') }}<br><strong>{{ $month->month->format('n月') }}</strong></th>@endforeach
+                            @foreach($months as $index => $month)
+                                @php
+                                    $monthCheckCount = $checkCountsByMonth->get($month->month->format('Y-m-d'), 0);
+                                @endphp
+                                <th data-month-header="{{ $index }}">{{ $month->month->format('Y年') }}<br><strong>{{ $month->month->format('n月') }}</strong><span class="month-check-count" @if(!$monthCheckCount) hidden @endif>要確認 {{ $monthCheckCount }}</span></th>
+                            @endforeach
                         </tr>
                     </thead>
                     <tbody>
@@ -222,12 +252,11 @@
                             <th>計画売上</th>
                             @foreach($months as $index => $month)
                                 @php
-                                    $oldMonth = old("months.$index", []);
-                                    $monthValue = fn ($field) => array_key_exists($field, $oldMonth) ? $oldMonth[$field] : data_get($month, $field);
+                                    $planSalesValue = old("months.$index.plan_net_sales", data_get($month, 'plan_net_sales'));
                                 @endphp
                                 <td class="input-cell">
                                     <input type="hidden" name="months[{{ $index }}][month]" value="{{ $month->month->format('Y-m-d') }}">
-                                    <input class="sheet-input formatted-money-input tax-convertible" type="text" inputmode="numeric" name="months[{{ $index }}][plan_net_sales]" value="{{ $inputMoney($monthValue('plan_net_sales')) }}" data-tax-exclusive="{{ $monthValue('plan_net_sales') }}" @disabled(!$canManage)>
+                                    <input class="sheet-input formatted-money-input tax-convertible" type="text" inputmode="numeric" name="months[{{ $index }}][plan_net_sales]" value="{{ $inputMoney($planSalesValue) }}" data-tax-exclusive="{{ $planSalesValue }}" readonly>
                                 </td>
                             @endforeach
                         </tr>
@@ -243,7 +272,7 @@
                                         $planFieldValue = array_key_exists($planField, $oldMonth) ? $oldMonth[$planField] : data_get($month, $planField);
                                     @endphp
                                     <td class="input-cell">
-                                        <input class="sheet-input formatted-money-input tax-convertible" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $planField }}]" value="{{ $inputMoney($planFieldValue) }}" data-tax-exclusive="{{ $planFieldValue }}" @disabled(!$canManage)>
+                                        <input class="sheet-input formatted-money-input tax-convertible" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $planField }}]" value="{{ $inputMoney($planFieldValue) }}" data-tax-exclusive="{{ $planFieldValue }}" readonly>
                                     </td>
                                 @endforeach
                             </tr>
@@ -263,7 +292,17 @@
                                         $oldMonth = old("months.$index", []);
                                         $fieldValue = $field ? (array_key_exists($field, $oldMonth) ? $oldMonth[$field] : data_get($month, $field)) : null;
                                     @endphp
-                                    <td class="{{ $field ? 'input-cell' : 'calculated-cell' }}">
+                                    @php
+                                        $isActualPeriod = $month->month->startOfMonth()->lessThan($currentCalendarMonth) || $fieldValue !== null;
+                                        $check = $field ? $checks->get($month->month->format('Y-m-d').'|'.$field) : null;
+                                        $checkStatus = $field ? old("months.$index.checks.$field.status", $check?->status ?? 'none') : 'none';
+                                        $checkAccounting = $field ? old("months.$index.checks.$field.accounting_amount", $check?->accounting_amount) : null;
+                                        $checkNote = $field ? old("months.$index.checks.$field.note", $check?->note) : null;
+                                        $checkUpdated = $check?->updated_at
+                                            ? $check->updated_at->timezone('Asia/Tokyo')->format('Y/m/d H:i').' '.$check->updatedBy?->name
+                                            : '';
+                                    @endphp
+                                    <td class="{{ $field ? 'input-cell checkable-cell '.($checkStatus === 'needs_review' ? 'check-needed' : ($checkStatus === 'resolved' ? 'check-resolved' : '')) : 'calculated-cell' }}" @if($field) data-check-cell data-index="{{ $index }}" data-metric="{{ $field }}" @endif>
                                         @if($field)
                                             @php
                                                 $forecastField = match ($field) {
@@ -275,8 +314,14 @@
                                                     ? $oldMonth[$forecastField]
                                                     : data_get($month, $forecastField);
                                             @endphp
-                                            <input class="sheet-input formatted-money-input tax-convertible forecast-entry" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $forecastField }}]" value="{{ $inputMoney($forecastValue) }}" data-tax-exclusive="{{ $forecastValue }}" {{ $fieldValue !== null ? 'hidden' : '' }} @disabled(!$canManage)>
-                                            <input class="sheet-input formatted-money-input tax-convertible actual-entry" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $field }}]" value="{{ $inputMoney($fieldValue) }}" data-tax-exclusive="{{ $fieldValue }}" {{ $fieldValue === null ? 'hidden' : '' }} @disabled(!$canManage)>
+                                            <div class="month-entry-wrap">
+                                                <input class="sheet-input formatted-money-input tax-convertible forecast-entry" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $forecastField }}]" value="{{ $inputMoney($forecastValue) }}" data-tax-exclusive="{{ $forecastValue }}" {{ $isActualPeriod ? 'hidden' : '' }} @disabled(!$canManage)>
+                                                <input class="sheet-input formatted-money-input tax-convertible actual-entry" type="text" inputmode="numeric" name="months[{{ $index }}][{{ $field }}]" value="{{ $inputMoney($fieldValue) }}" data-tax-exclusive="{{ $fieldValue }}" {{ !$isActualPeriod ? 'hidden' : '' }} @disabled(!$canManage)>
+                                                <input type="hidden" class="check-status-input" name="months[{{ $index }}][checks][{{ $field }}][status]" value="{{ $checkStatus }}">
+                                                <input type="hidden" class="check-accounting-input" name="months[{{ $index }}][checks][{{ $field }}][accounting_amount]" value="{{ $checkAccounting }}">
+                                                <input type="hidden" class="check-note-input" name="months[{{ $index }}][checks][{{ $field }}][note]" value="{{ $checkNote }}">
+                                                <button type="button" class="cell-check-trigger" data-month-index="{{ $index }}" data-metric="{{ $field }}" data-label="{{ $label }}" data-month-label="{{ $month->month->format('Y年n月') }}" data-updated="{{ $checkUpdated }}" @if(!$isActualPeriod) hidden @endif>{{ $checkStatus === 'needs_review' ? '● 要確認' : ($checkStatus === 'resolved' ? '✓ 確認済み' : 'メモ') }}</button>
+                                            </div>
                                         @else
                                             <span class="calculated {{ $class }}" data-index="{{ $index }}">—</span>
                                         @endif
@@ -359,6 +404,7 @@
 .heading-with-help{display:flex;align-items:center;gap:10px}.heading-with-help h2{margin:3px 0 0}.reverse-plan-help{padding:4px 9px;border:1px solid #9dbbc2;border-radius:999px;background:#fff;color:var(--accent-dark);font-size:12px;font-weight:700}.reverse-plan-dialog{width:min(680px,calc(100vw - 28px));padding:0;border:0;border-radius:16px;box-shadow:0 24px 80px rgba(13,35,45,.3)}.reverse-plan-dialog::backdrop{background:rgba(13,30,39,.52)}.reverse-plan-dialog__header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--line)}.reverse-plan-dialog__header h2{margin:3px 0 0}.reverse-plan-dialog__close{width:42px;height:42px;padding:0;font-size:24px}.reverse-plan-dialog__body{padding:22px 24px}.reverse-plan-dialog__body>p:first-child{margin-top:0}.reverse-plan-dialog__grid{display:grid;grid-template-columns:1fr 1.35fr;gap:12px;margin:20px 0}.reverse-plan-dialog__grid section{padding:15px;border:1px solid var(--line);border-radius:10px;background:#f8fbfb}.reverse-plan-dialog__grid h3{margin:0 0 8px}.reverse-plan-dialog__grid p,.reverse-plan-dialog__grid ul{margin:0}.reverse-plan-dialog__grid li{margin:6px 0}.reverse-plan-dialog blockquote{margin:20px 0 0;padding:17px 18px;border-left:4px solid var(--accent-dark);background:#f2faf7;color:var(--accent-dark);font-size:17px;font-weight:800}.reverse-plan-dialog__footer{display:flex;justify-content:flex-end;padding:14px 24px;border-top:1px solid var(--line)}@media(max-width:600px){.reverse-plan-dialog__grid{grid-template-columns:1fr}}
 .rate-input{display:flex;align-items:center;justify-content:flex-end;gap:5px}.plan-sheet .rate-input input{width:calc(100% - 22px);min-width:70px}.bulk-fields .rate-input input{width:100%;text-align:right}.rate-suffix{flex:0 0 auto}.bulk-fields{grid-template-columns:repeat(6,minmax(120px,1fr)) minmax(270px,auto)}.bulk-calculated{display:flex;min-height:44px;flex-direction:column;justify-content:center;padding:6px 10px;border:1px solid #b5c5c7;border-radius:7px;background:#f0f2f3;text-align:right}.bulk-calculated span{font-size:12px;color:var(--muted);text-align:left}.bulk-calculated strong{margin-top:3px}.bulk-target{display:grid;grid-template-columns:minmax(155px,1fr) auto;align-items:end;gap:8px}.bulk-target label{min-width:0}.bulk-target select{width:100%}.bulk-target button{white-space:nowrap}.reverse-plan-input-order{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}.reverse-plan-input-order li{display:flex;align-items:center;gap:8px;margin:0}.reverse-plan-input-order li span{color:var(--accent-dark);font-weight:800}@media(max-width:1250px){.bulk-fields{grid-template-columns:repeat(3,1fr)}.bulk-target{grid-column:1/-1}}@media(max-width:700px){.bulk-fields{grid-template-columns:1fr}.bulk-target{grid-template-columns:1fr}}
 .average-period{display:flex;align-items:center;gap:4px}.average-period span{margin:0}.average-period select{min-width:66px;padding:5px 7px}.rate-input{display:flex;align-items:center;justify-content:flex-end;gap:5px}.plan-sheet .rate-input input{width:calc(100% - 22px);min-width:70px}.bulk-fields .rate-input input{width:100%;text-align:right}.rate-suffix{flex:0 0 auto}.bulk-fields{grid-template-columns:repeat(6,minmax(120px,1fr)) minmax(270px,auto)}.bulk-calculated{display:flex;min-height:44px;flex-direction:column;justify-content:center;padding:6px 10px;border:1px solid #b5c5c7;border-radius:7px;background:#f0f2f3;text-align:right}.bulk-calculated span{font-size:12px;color:var(--muted);text-align:left}.bulk-calculated strong{margin-top:3px}.bulk-target{display:grid;grid-template-columns:minmax(155px,1fr) auto;align-items:end;gap:8px}.bulk-target label{min-width:0}.bulk-target select{width:100%}.bulk-target button{white-space:nowrap}.reverse-plan-input-order{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}.reverse-plan-input-order li{display:flex;align-items:center;gap:8px;margin:0}.reverse-plan-input-order li span{color:var(--accent-dark);font-weight:800}@media(max-width:1250px){.bulk-fields{grid-template-columns:repeat(3,1fr)}.bulk-target{grid-column:1/-1}}@media(max-width:700px){.bulk-fields{grid-template-columns:1fr}.bulk-target{grid-template-columns:1fr}}
+.annual-allocation-note{display:block;margin-top:4px;color:#59686d}.progress-sheet .plan-row th{background:#536269;color:#fff}.progress-sheet .plan-row td.input-cell{background:#edf0f1}.progress-sheet .plan-value-row input{color:#435258;font-weight:700;cursor:default}.month-check-count{display:block;width:max-content;margin:4px auto 0;padding:2px 5px;border-radius:999px;background:#fff0b8;color:#785a00;font-size:9px;font-weight:800}.month-entry-wrap{display:flex;min-height:42px;flex-direction:column;justify-content:center;align-items:stretch}.cell-check-trigger{align-self:flex-end;padding:1px 3px;background:transparent;color:#718086;font-size:9px;font-weight:700}.checkable-cell.check-needed{background:#fff4c9!important;box-shadow:inset 0 0 0 2px #d6a72d}.checkable-cell.check-needed .cell-check-trigger{color:#8a5c00}.checkable-cell.check-resolved .cell-check-trigger{color:#24715f}.month-check-dialog{width:min(720px,calc(100vw - 28px));padding:0;border:0;border-radius:16px;box-shadow:0 24px 80px rgba(13,35,45,.3)}.month-check-dialog::backdrop{background:rgba(13,30,39,.52)}.month-check-dialog__body{display:grid;gap:16px;padding:22px 24px}.month-check-dialog__body label{display:flex;flex-direction:column;gap:6px}.check-amounts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.check-amounts>div,.check-amounts>label{display:flex;min-height:76px;flex-direction:column;justify-content:center;padding:11px;border:1px solid var(--line);border-radius:9px;background:#f8fbfb}.check-amounts span{color:var(--muted);font-size:12px}.check-amounts strong{margin-top:7px;font-size:17px}.check-updated{min-height:18px;margin:0;color:var(--muted);font-size:12px}@media(max-width:650px){.check-amounts{grid-template-columns:1fr}}
 </style>
 
 <script>
@@ -369,6 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const actualPeriodIndexes = @json($actualPeriodIndexes);
     let taxMode = 'exclusive';
     let selectedAverageValues = null;
+    let activeCheckCell = null;
     const taxFactor = () => taxMode === 'inclusive' ? 1.1 : 1;
     const num = value => value === '' || value === null || value === undefined
         ? null
@@ -486,6 +533,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             [salesInput, costInput, sgaInput].forEach(input => {
                 if (input) input.hidden = !isActualPeriod;
+            });
+            form.querySelectorAll(`.cell-check-trigger[data-month-index="${i}"]`).forEach(button => {
+                button.hidden = !isActualPeriod;
             });
             [[forecastSalesInput, forecastSales], [forecastCostInput, forecastCost], [forecastSgaInput, forecastSga]].forEach(([input, forecastValue]) => {
                 if (!input) return;
@@ -675,6 +725,70 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         recalculate();
     });
+    const checkDialog = document.getElementById('month-check-dialog');
+    const checkAccountingInput = document.getElementById('check-accounting-amount');
+    const checkStatusInput = document.getElementById('check-status');
+    const checkNoteInput = document.getElementById('check-note');
+    const checkManagementAmount = () => {
+        if (!activeCheckCell) return null;
+        return canonical(activeCheckCell.querySelector('.actual-entry'));
+    };
+    const renderCheckDifference = () => {
+        const management = checkManagementAmount();
+        const accounting = canonical(checkAccountingInput);
+        document.getElementById('check-management-amount').textContent = money(management);
+        document.getElementById('check-difference').textContent = management !== null && accounting !== null
+            ? money(management - accounting)
+            : '—';
+    };
+    const refreshCheckIndicators = () => {
+        const counts = new Map();
+        form.querySelectorAll('.cell-check-trigger').forEach(button => {
+            const cell = button.closest('[data-check-cell]');
+            const status = cell.querySelector('.check-status-input').value || 'none';
+            cell.classList.toggle('check-needed', status === 'needs_review');
+            cell.classList.toggle('check-resolved', status === 'resolved');
+            button.textContent = status === 'needs_review' ? '● 要確認' : status === 'resolved' ? '✓ 確認済み' : 'メモ';
+            if (status === 'needs_review') {
+                const index = button.dataset.monthIndex;
+                counts.set(index, (counts.get(index) || 0) + 1);
+            }
+        });
+        form.querySelectorAll('.month-check-count').forEach(badge => {
+            const index = badge.closest('[data-month-header]').dataset.monthHeader;
+            const count = counts.get(index) || 0;
+            badge.hidden = count === 0;
+            badge.textContent = `要確認 ${count}`;
+        });
+    };
+    form.querySelectorAll('.cell-check-trigger').forEach(button => button.addEventListener('click', () => {
+        activeCheckCell = button.closest('[data-check-cell]');
+        const accounting = num(activeCheckCell.querySelector('.check-accounting-input').value);
+        checkAccountingInput.dataset.taxExclusive = accounting === null ? '' : String(accounting);
+        checkAccountingInput.value = formatInput(accounting === null ? null : accounting * taxFactor());
+        checkStatusInput.value = activeCheckCell.querySelector('.check-status-input').value || 'none';
+        checkNoteInput.value = activeCheckCell.querySelector('.check-note-input').value || '';
+        document.getElementById('month-check-title').textContent = `${button.dataset.monthLabel} ${button.dataset.label}`;
+        document.getElementById('check-updated').textContent = button.dataset.updated
+            ? `最終更新：${button.dataset.updated}`
+            : 'まだメモは保存されていません。';
+        renderCheckDifference();
+        checkDialog.showModal();
+    }));
+    checkAccountingInput?.addEventListener('input', renderCheckDifference);
+    document.getElementById('apply-check-memo')?.addEventListener('click', () => {
+        if (!activeCheckCell) return;
+        const status = checkStatusInput.value;
+        const accounting = status === 'none' ? null : canonical(checkAccountingInput);
+        const note = status === 'none' ? '' : checkNoteInput.value.trim();
+        activeCheckCell.querySelector('.check-status-input').value = status;
+        activeCheckCell.querySelector('.check-accounting-input').value = accounting === null ? '' : String(accounting);
+        activeCheckCell.querySelector('.check-note-input').value = note;
+        activeCheckCell.querySelector('.cell-check-trigger').dataset.updated = 'この画面を保存すると記録されます';
+        refreshCheckIndicators();
+        checkDialog.close();
+    });
+    refreshCheckIndicators();
     form.addEventListener('submit', () => {
         form.querySelectorAll('.formatted-money-input').forEach(input => {
             const value = num(input.value);

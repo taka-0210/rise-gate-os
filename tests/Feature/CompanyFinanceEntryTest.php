@@ -148,6 +148,13 @@ class CompanyFinanceEntryTest extends TestCase
                         'actual_net_sales' => $index < 7 ? 45_000_000 : null,
                         'actual_cost_of_sales' => $index < 7 ? 25_000_000 : null,
                         'actual_selling_general_admin_expenses' => $index < 7 ? 20_000_000 : null,
+                        'checks' => $index === 0 ? [
+                            'actual_net_sales' => [
+                                'status' => 'needs_review',
+                                'accounting_amount' => 44_500_000,
+                                'note' => '財務会計の締め後に再確認',
+                            ],
+                        ] : [],
                     ];
                 })->all(),
             ])
@@ -165,6 +172,14 @@ class CompanyFinanceEntryTest extends TestCase
         $this->assertSame(51_166_666, (int) $plan->months->first()->plan_net_sales);
         $this->assertSame(50_000_000, (int) $plan->months->last()->forecast_net_sales);
         $this->assertDatabaseCount('company_financial_periods', 0);
+        $this->assertDatabaseHas('company_annual_plan_month_checks', [
+            'company_annual_plan_id' => $plan->id,
+            'month' => '2025-12-01 00:00:00',
+            'metric' => 'actual_net_sales',
+            'status' => 'needs_review',
+            'accounting_amount' => 44_500_000,
+            'note' => '財務会計の締め後に再確認',
+        ]);
 
         $this->actingAs($user)->withSession($session)
             ->get(route('company-finance.annual-plan.index'))
@@ -185,6 +200,8 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('単月へセット')
             ->assertSee('選択期間の平均')
             ->assertSee('id="average-period-from"', false)
+            ->assertSee('要確認 1')
+            ->assertSee('財務会計の締め後に再確認')
             ->assertSee("digits.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')", false)
             ->assertSee('class="company-finance-screen"', false)
             ->assertSee('::-webkit-inner-spin-button', false)

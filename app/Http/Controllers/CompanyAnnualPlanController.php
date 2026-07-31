@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CompanyAnnualPlan;
+use App\Models\CompanyAnnualPlanMonthCheck;
 use App\Models\OrganizationUser;
 use App\Services\Company\AnnualPlanForecastService;
 use App\Services\Company\CompanyAccess;
@@ -25,7 +26,7 @@ class CompanyAnnualPlanController extends Controller
         $plan = CompanyAnnualPlan::query()
             ->where('organization_id', $organization->id)
             ->where('fiscal_year', $fiscalYear)
-            ->with('months')
+            ->with(['months', 'checks.updatedBy'])
             ->first();
         $months = $this->monthRows(
             $fiscalYear,
@@ -33,6 +34,9 @@ class CompanyAnnualPlanController extends Controller
             $plan,
         );
         $forecast = $plan ? $forecastService->calculate($plan, $months) : null;
+        $checks = $plan?->checks?->keyBy(
+            fn (CompanyAnnualPlanMonthCheck $check) => $check->month->format('Y-m-d').'|'.$check->metric,
+        ) ?? collect();
 
         return view('company-finance.annual-plan', compact(
             'organization',
@@ -41,6 +45,7 @@ class CompanyAnnualPlanController extends Controller
             'plan',
             'months',
             'forecast',
+            'checks',
         ));
     }
 
@@ -69,6 +74,22 @@ class CompanyAnnualPlanController extends Controller
                     ? 'between:-999999999999,999999999999'
                     : 'between:0,999999999999',
             ];
+        }
+        foreach ([
+            'actual_net_sales',
+            'actual_cost_of_sales',
+            'actual_selling_general_admin_expenses',
+        ] as $metric) {
+            $rules['months.*.checks.'.$metric.'.status'] = [
+                'nullable',
+                'in:none,'.CompanyAnnualPlanMonthCheck::STATUS_NEEDS_REVIEW.','.CompanyAnnualPlanMonthCheck::STATUS_RESOLVED,
+            ];
+            $rules['months.*.checks.'.$metric.'.accounting_amount'] = [
+                'nullable',
+                'integer',
+                'between:0,999999999999',
+            ];
+            $rules['months.*.checks.'.$metric.'.note'] = ['nullable', 'string', 'max:2000'];
         }
         foreach (['net_income', 'interest_expense', 'depreciation_expense'] as $field) {
             $rules['forecast_'.$field] = [
@@ -144,6 +165,39 @@ class CompanyAnnualPlanController extends Controller
                         $monthPlans->get($month['month']),
                     ),
                 );
+
+                foreach ([
+                    'actual_net_sales',
+                    'actual_cost_of_sales',
+                    'actual_selling_general_admin_expenses',
+                ] as $metric) {
+                    $checkData = data_get($month, 'checks.'.$metric, []);
+                    $status = data_get($checkData, 'status', 'none');
+                    $query = $plan->checks()
+                        ->where('month', $month['month'])
+                        ->where('metric', $metric);
+
+                    if ($status === 'none') {
+                        $query->delete();
+                        continue;
+                    }
+
+                    $existing = $query->first();
+                    $resolved = $status === CompanyAnnualPlanMonthCheck::STATUS_RESOLVED;
+                    $plan->checks()->updateOrCreate(
+                        ['month' => $month['month'], 'metric' => $metric],
+                        [
+                            'status' => $status,
+                            'accounting_amount' => data_get($checkData, 'accounting_amount'),
+                            'note' => data_get($checkData, 'note'),
+                            'resolved_at' => $resolved
+                                ? ($existing?->resolved_at ?? CarbonImmutable::now('Asia/Tokyo'))
+                                : null,
+                            'resolved_by' => $resolved ? $request->user()->id : null,
+                            'updated_by' => $request->user()->id,
+                        ],
+                    );
+                }
             }
 
             $forecast = $forecastService->calculate($plan, $plan->months()->get());

@@ -30,4 +30,9 @@ class CompanyAnnualPlan extends Model
     {
         return $this->hasMany(CompanyAnnualPlanMonth::class)->orderBy('month');
     }
+
+    public function checks(): HasMany
+    {
+        return $this->hasMany(CompanyAnnualPlanMonthCheck::class)->orderBy('month');
+    }
 }
