@@ -187,7 +187,7 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('単月')
             ->assertSee('累計')
             ->assertSee('最新の着地見込み')
-            ->assertSee('実績平均から残り月を計画')
+            ->assertSee('実績・計画平均から残り月を計画')
             ->assertSee('未入力月へ一括反映')
             ->assertSee('計画売上原価')
             ->assertSee('計画販管費')
@@ -198,7 +198,7 @@ class CompanyFinanceEntryTest extends TestCase
             ->assertSee('利益は、最後に残った結果ではなく、最初に決める目標です。')
             ->assertSee('②</span>目標粗利率', false)
             ->assertSee('単月へセット')
-            ->assertSee('選択期間の平均')
+            ->assertSee('選択期間の実績・計画平均')
             ->assertSee('id="average-period-from"', false)
             ->assertSee('要確認 1')
             ->assertSee('財務会計の締め後に再確認')
@@ -248,11 +248,15 @@ class CompanyFinanceEntryTest extends TestCase
         [$user, $organization, $session] = $this->companyOwner();
         $organization->update(['fiscal_year_end_month' => 11]);
 
-        $this->actingAs($user)->withSession($session)
+        $response = $this->actingAs($user)->withSession($session)
             ->get(route('company-finance.annual-plan.index'))
-            ->assertOk()
-            ->assertDontSee('<option value="7">7月</option>', false)
-            ->assertSee('<option value="8">8月</option>', false);
+            ->assertOk();
+
+        preg_match('/<select id="bulk-target-month">(.*?)<\/select>/s', $response->getContent(), $matches);
+        $bulkTargets = $matches[1] ?? '';
+
+        $this->assertStringNotContainsString('<option value="7">7月</option>', $bulkTargets);
+        $this->assertStringContainsString('<option value="8">8月</option>', $bulkTargets);
     }
 
     protected function tearDown(): void

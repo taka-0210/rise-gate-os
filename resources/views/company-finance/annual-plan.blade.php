@@ -134,16 +134,16 @@
             </div>
             <div class="monthly-plan-bulk">
                 <div class="bulk-heading">
-                    <div><strong>選択期間の実績平均から残り月を計画</strong><span>選択した期間の平均額を、実績が未入力の月だけに反映します。</span></div>
+                    <div><strong>選択期間の実績・計画平均から残り月を計画</strong><span>実績月は実績値、将来月は見込み値（未入力なら年間計画の月割り）で平均します。</span></div>
                     <div class="plan-average-summary">
-                        <span>選択期間の平均</span>
+                        <span>選択期間の実績・計画平均</span>
                         <div class="average-period">
                             <select id="average-period-from" aria-label="平均の開始月">
-                                @foreach($actualMonthIndexes as $index)<option value="{{ $index }}">{{ $months[$index]->month->format('n月') }}</option>@endforeach
+                                @foreach($months as $index => $month)<option value="{{ $index }}">{{ $month->month->format('n月') }}</option>@endforeach
                             </select>
                             <span>〜</span>
                             <select id="average-period-to" aria-label="平均の終了月">
-                                @foreach($actualMonthIndexes as $index)<option value="{{ $index }}" @selected($loop->last)>{{ $months[$index]->month->format('n月') }}</option>@endforeach
+                                @foreach($months as $index => $month)<option value="{{ $index }}" @selected($loop->last)>{{ $month->month->format('n月') }}</option>@endforeach
                             </select>
                         </div>
                         <b>売上 <i id="average-plan-sales">{{ $money($monthlyActualAverages['sales']) }}</i></b>
@@ -521,9 +521,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const isActualPeriod = actualPeriodIndexes.includes(i) || hasActual;
             const gross = hasActual ? sales - cost : null;
             const operating = hasActual && sgaRaw !== null ? gross - sgaRaw : null;
-            const displayedSales = isActualPeriod ? sales : forecastSales;
-            const displayedCost = isActualPeriod ? costRaw : forecastCost;
-            const displayedSga = isActualPeriod ? sgaRaw : forecastSga;
+            const displayedSales = isActualPeriod ? sales : (forecastSales ?? plan);
+            const displayedCost = isActualPeriod ? costRaw : (forecastCost ?? planCost);
+            const displayedSga = isActualPeriod ? sgaRaw : (forecastSga ?? planSga);
             const displayedGross = displayedSales !== null && displayedCost !== null
                 ? displayedSales - displayedCost
                 : null;
@@ -563,17 +563,19 @@ document.addEventListener('DOMContentLoaded', () => {
             set('.cumulative-plan', i, cumPlan);
             if (hasActual) {
                 actualCount++;
-                if (i >= averageStart && i <= averageEnd) {
-                    actualSalesTotal += sales;
+            }
+            if (i >= averageStart && i <= averageEnd) {
+                if (displayedSales !== null) {
+                    actualSalesTotal += displayedSales;
                     averageActualCount++;
-                    if (costRaw !== null) {
-                        actualCostTotal += costRaw;
-                        actualCostCount++;
-                    }
-                    if (sgaRaw !== null) {
-                        actualSgaTotal += sgaRaw;
-                        actualSgaCount++;
-                    }
+                }
+                if (displayedCost !== null) {
+                    actualCostTotal += displayedCost;
+                    actualCostCount++;
+                }
+                if (displayedSga !== null) {
+                    actualSgaTotal += displayedSga;
+                    actualSgaCount++;
                 }
             }
             if (isActualPeriod) {
