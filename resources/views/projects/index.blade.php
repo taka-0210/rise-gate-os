@@ -90,7 +90,8 @@
                 </label>
                 <label>進行状況
                     <select name="status" onchange="this.form.submit()">
-                        <option value="">すべて</option>
+                        <option value="active_group" @selected($selectedStatus === 'active_group')>アクティブ</option>
+                        <option value="all" @selected($selectedStatus === 'all')>すべて</option>
                         @foreach ($statuses as $value => $label)<option value="{{ $value }}" @selected($selectedStatus === $value)>{{ $label }}</option>@endforeach
                     </select>
                 </label>
@@ -108,7 +109,7 @@
                         <option value="client_desc" @selected($sort === 'client_desc')>クライアント名 降順</option>
                     </select>
                 </label>
-                @if ($selectedClientId || $selectedStatus || $selectedPriority || $sort !== 'latest')
+                @if ($selectedClientId || $selectedStatus !== 'active_group' || $selectedPriority || $sort !== 'latest')
                     <div class="project-filter-clear"><a href="{{ route('projects.index') }}">絞り込みを解除</a></div>
                 @endif
             </form>

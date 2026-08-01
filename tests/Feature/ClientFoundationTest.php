@@ -226,6 +226,46 @@ class ClientFoundationTest extends TestCase
             ->assertDontSee('Wrong Priority Project');
     }
 
+    public function test_project_list_defaults_to_active_group_and_can_show_all(): void
+    {
+        [$user, $workspace] = $this->createWorkspaceOwner();
+        $client = Client::create(['organization_id' => $workspace->organization_id, 'workspace_id' => $workspace->id, 'name' => 'Active Group Client']);
+
+        foreach ([
+            ['Draft Project', Project::STATUS_DRAFT],
+            ['Proposed Project', Project::STATUS_PROPOSED],
+            ['Active Project', Project::STATUS_ACTIVE],
+            ['On Hold Project', Project::STATUS_ON_HOLD],
+            ['Completed Project', Project::STATUS_COMPLETED],
+        ] as [$name, $status]) {
+            $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])->post('/projects', [
+                'client_id' => $client->id,
+                'name' => $name,
+                'status' => $status,
+                'priority' => Project::PRIORITY_NORMAL,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.index'))
+            ->assertOk()
+            ->assertSeeInOrder(['value="active_group" selected', 'アクティブ', 'value="all"', 'すべて'], false)
+            ->assertSee('Draft Project')
+            ->assertSee('Proposed Project')
+            ->assertSee('Active Project')
+            ->assertDontSee('On Hold Project')
+            ->assertDontSee('Completed Project');
+
+        $this->get(route('projects.index', ['status' => 'all']))
+            ->assertOk()
+            ->assertSee('Draft Project')
+            ->assertSee('Proposed Project')
+            ->assertSee('Active Project')
+            ->assertSee('On Hold Project')
+            ->assertSee('Completed Project');
+    }
+
     public function test_project_can_be_marked_as_proposed_and_list_card_shows_its_status(): void
     {
         [$user, $workspace] = $this->createWorkspaceOwner();

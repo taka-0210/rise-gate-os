@@ -95,9 +95,9 @@ class ProjectController extends Controller
         if (! in_array($sort, ['latest', 'oldest', 'client_asc', 'client_desc'], true)) {
             $sort = 'latest';
         }
-        $status = $request->input('status');
-        if (! array_key_exists((string) $status, Project::statuses())) {
-            $status = null;
+        $status = $request->input('status', 'active_group');
+        if (! in_array($status, ['active_group', 'all', ...array_keys(Project::statuses())], true)) {
+            $status = 'active_group';
         }
         $priority = $request->input('priority');
         if (! array_key_exists((string) $priority, Project::priorities())) {
@@ -116,7 +116,12 @@ class ProjectController extends Controller
                     ->where('status', ProjectMember::STATUS_ACTIVE);
             })
             ->when($clientId, fn ($query) => $query->where('client_id', $clientId))
-            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($status === 'active_group', fn ($query) => $query->whereIn('status', [
+                Project::STATUS_DRAFT,
+                Project::STATUS_PROPOSED,
+                Project::STATUS_ACTIVE,
+            ]))
+            ->when(! in_array($status, ['active_group', 'all'], true), fn ($query) => $query->where('status', $status))
             ->when($priority, fn ($query) => $query->where('priority', $priority))
             ->withCount(['roadmaps', 'improvements', 'tasks'])
             ->with(['owner', 'client', 'roadmaps.improvements.tasks', 'improvements.tasks', 'sourceImprovementOutput.improvement.project', 'members' => fn ($query) => $query->where('user_id', $request->user()->id)])
