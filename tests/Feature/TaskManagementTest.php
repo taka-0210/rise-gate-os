@@ -329,6 +329,33 @@ class TaskManagementTest extends TestCase
             ->assertSee('1日目');
     }
 
+    public function test_unscheduled_project_period_can_be_anchored_to_real_dates(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $project->update(['duration_days' => 29]);
+        $task = $this->createTask($project, $owner);
+        $roadmap = $task->improvement->roadmap;
+
+        $roadmap->update(['planned_start_day' => 1, 'target_day' => 29]);
+        $task->improvement->update(['planned_start_day' => 3, 'target_day' => 20]);
+        $task->update(['planned_start_day' => 5, 'due_day' => 10]);
+
+        $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->patchJson(route('projects.timeline.update', [$project, 'project', $project->id]), [
+                'start_date' => '2026-08-03',
+                'end_date' => '2026-08-31',
+                'reset_descendants' => false,
+            ])->assertOk();
+
+        $this->assertSame('2026-08-03', $project->fresh()->start_date?->toDateString());
+        $this->assertSame('2026-08-31', $project->fresh()->due_date?->toDateString());
+        $this->assertSame('2026-08-03', $roadmap->fresh()->planned_start_date?->toDateString());
+        $this->assertSame('2026-08-05', $task->improvement->fresh()->planned_start_date?->toDateString());
+        $this->assertSame('2026-08-07', $task->fresh()->planned_start_date?->toDateString());
+        $this->assertSame('2026-08-12', $task->fresh()->due_date?->toDateString());
+    }
+
     public function test_project_editor_can_view_edit_and_update_task(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();

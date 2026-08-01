@@ -31,7 +31,12 @@ class TimelineScheduleController extends Controller
         };
         Gate::authorize('update', $model);
 
-        if (! $project->start_date && $project->duration_days) {
+        $isAnchoringProject = $type === 'project'
+            && ! $project->start_date
+            && $project->duration_days
+            && $request->filled(['start_date', 'end_date']);
+
+        if (! $project->start_date && $project->duration_days && ! $isAnchoringProject) {
             return $this->updateRelative($request, $project, $type, $model);
         }
 
@@ -51,7 +56,7 @@ class TimelineScheduleController extends Controller
             ]),
         };
 
-        $integrity = DB::transaction(function () use ($project, $type, $model, $attributes): array {
+        $integrity = DB::transaction(function () use ($project, $type, $model, $attributes, $isAnchoringProject): array {
             $before = app(ScheduleIntegrityService::class)->inspect($project->fresh())['invalid'];
             $projectBoundaryBefore = $this->projectBoundaryViolations($project->fresh());
 
@@ -101,6 +106,10 @@ class TimelineScheduleController extends Controller
                     'due_date' => $attributes['end_date'],
                 ],
             });
+
+            if ($isAnchoringProject) {
+                app(RelativeScheduleService::class)->anchor($project->fresh());
+            }
 
             $projectBoundaryAfter = $this->projectBoundaryViolations($project->fresh());
             $newBoundaryViolation = $projectBoundaryAfter->diffKeys($projectBoundaryBefore)->first();
