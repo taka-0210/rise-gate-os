@@ -16,6 +16,8 @@
         .project-filters { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:18px; padding:14px; border:1px solid var(--line); border-radius:9px; background:#f8fafb; }
         .project-filters label { margin:0; font-size:12px; color:var(--muted); }
         .project-filters select { margin-top:5px; }
+        .project-filters optgroup { color:#8a969f; font-weight:700; }
+        .project-filters optgroup option { color:var(--ink); font-weight:400; }
         .project-filter-clear { grid-column:1/-1; font-size:13px; }
         .project-focus-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
         .project-focus-card { --status-color:#7b8790; min-width:0; padding:16px; border:2px solid #66717a; border-left:7px solid var(--status-color); border-radius:10px; background:#fafbfc; transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
@@ -92,7 +94,16 @@
                     <select name="status" onchange="this.form.submit()">
                         <option value="active_group" @selected($selectedStatus === 'active_group')>アクティブ</option>
                         <option value="all" @selected($selectedStatus === 'all')>すべて</option>
-                        @foreach ($statuses as $value => $label)<option value="{{ $value }}" @selected($selectedStatus === $value)>{{ $label }}</option>@endforeach
+                        <optgroup label="アクティブに含まれる状態">
+                            @foreach ([\App\Models\Project::STATUS_DRAFT, \App\Models\Project::STATUS_PROPOSED, \App\Models\Project::STATUS_ACTIVE] as $value)
+                                <option value="{{ $value }}" @selected($selectedStatus === $value)>{{ $statuses[$value] }}</option>
+                            @endforeach
+                        </optgroup>
+                        <optgroup label="その他の状態">
+                            @foreach ([\App\Models\Project::STATUS_ON_HOLD, \App\Models\Project::STATUS_COMPLETED, \App\Models\Project::STATUS_ARCHIVED] as $value)
+                                <option value="{{ $value }}" @selected($selectedStatus === $value)>{{ $statuses[$value] }}</option>
+                            @endforeach
+                        </optgroup>
                     </select>
                 </label>
                 <label>優先度

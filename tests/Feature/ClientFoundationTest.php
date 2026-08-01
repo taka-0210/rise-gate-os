@@ -250,7 +250,20 @@ class ClientFoundationTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.index'))
             ->assertOk()
-            ->assertSeeInOrder(['value="active_group" selected', 'アクティブ', 'value="all"', 'すべて'], false)
+            ->assertSeeInOrder([
+                'value="active_group" selected',
+                'アクティブ',
+                'value="all"',
+                'すべて',
+                '<optgroup label="アクティブに含まれる状態">',
+                '準備中',
+                '提案済み',
+                '進行中',
+                '<optgroup label="その他の状態">',
+                '保留',
+                'ひと区切り',
+                '継続フォロー',
+            ], false)
             ->assertSee('Draft Project')
             ->assertSee('Proposed Project')
             ->assertSee('Active Project')
