@@ -124,6 +124,7 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 ## Documents
 
 - `blueprint/README.md`: Company OSを人が理解する順番に再編集するBlueprintの構成と参照元
+- `design-book/README.md`: 高見さんがCompany OSを自分の言葉で理解するためのDesign Book構成
 - `blueprint/chapter-01-why-company-os.md`: Blueprint Chapter 1「Company OSはなぜ必要か」
 - `blueprint/chapter-02-continuous-evolution.md`: Blueprint Chapter 2「会社の進化は、止まらない。」
 - `blueprint/chapter-03-company-os-dictionary.md`: Blueprint Chapter 3「会社の進化を構成する言葉」
