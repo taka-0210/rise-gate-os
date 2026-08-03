@@ -55,8 +55,8 @@ Chapter 8  現在の実装とこれから
 | Chapter 1 | Company OSはなぜ必要か | 日本を支える中小企業が、自ら進化し続けるために何が必要か | 5ページ | レビュー完了 |
 | Chapter 2 | 会社の進化は、止まらない。 | 「改善に終わりはない」とは何を意味するか | 5ページ | レビュー反映済み |
 | Chapter 3 | 会社の進化を構成する言葉 | 観察、意味付け、改善、判断、結果、学びに、どのような名前と役割を与えるか | 7ページ | レビュー反映済み |
-| Chapter 4 | 会社の出来事は、つながった瞬間に意味を持つ。 | 概念同士のつながり、問い、根拠、説明責任がなぜ必要か | 5ページ | 初版作成済み |
-| Chapter 5 | Company OSのプロダクト構造 | 標準機能、実行モジュール、AIはどう位置付くか | 5ページ | 未作成 |
+| Chapter 4 | 会社の出来事は、つながった瞬間に意味を持つ。 | 概念同士のつながり、問い、根拠、説明責任がなぜ必要か | 5ページ | レビュー完了 |
+| Chapter 5 | 会社の土台・思考・実行を、一つにつなぐ | Company OSを支える3層と、その役割の違い | 6ページ | 初版作成済み |
 | Chapter 6 | 会社・人・パートナー | 誰が、どの会社・拠点・役割でCompany OSを使うか | 4ページ | 未作成・一部要定義 |
 | Chapter 7 | Company OSを会社へ導入する | 会社の観察設計と対話をどう始めるか | 3ページ | 未作成 |
 | Chapter 8 | 現在地とこれから | 現在何が動き、どのようにCompany OS全体へ育てるか | 2ページ | 未作成・一部要定義 |
@@ -143,7 +143,9 @@ Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行
 - Evidence、反証、不確実性、説明責任
 - 「現時点では判断できない」と言えるCompany Intelligence
 
-### Chapter 5: Company OSのプロダクト構造
+### Chapter 5: 会社の土台・思考・実行を、一つにつなぐ
+
+内部整理名: Company OS Product Architecture
 
 主要参照:
 
@@ -151,19 +153,23 @@ Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行
 - [`../architecture.md`](../architecture.md)
 - [`../product/company-os-core-model.md`](../product/company-os-core-model.md)
 - [`../product/company-os-value.md`](../product/company-os-value.md)
+- [`../common-staff-platform-foundation.md`](../common-staff-platform-foundation.md)
 - [`../roadmap.md`](../roadmap.md)
 
 扱う内容:
 
-- Company OSを上位サービスとするブランド構造
-- 会社・経営指針・経営数値・改善・Knowledgeなどの標準領域
-- RISE GATE OSをProject Management Engineとして位置付ける考え方
-- 会社や拠点が選択して利用する追加モジュール
-- 全体を横断して支援するAI
+- Company OSは一つのシステムではなく、会社が進化し続けるための基盤であること
+- Foundation、Company Core、Business Modulesの3層
+- 経営理念、経営指針、経営数値、借入、組織・メンバーを支えるFoundation
+- Direction、Observation、Sense、Improvement、Decision、Knowledge、Company Dialogue、Company AIを担うCompany Core
+- Project Management、CRM、Meetingなど、会社ごとに選択できるBusiness Modules
+- 現在のRISE GATE OSと、将来のCompany Execution Engineという役割名の検討
+- HIT-HUBは将来統合を検討するBusiness Moduleであり、正式機能ではないこと
+- Company OSの思想をそのまま形にした全体鳥瞰図
 
 編集上の注意:
 
-標準機能と追加モジュールの正式な境界は、既存ドキュメントだけでは未確定の部分があります。Chapter 5を作成する前に、経営指針、経営数値、組織・メンバー基盤、Branch、HIT-HUB機能統合の判断を別途記録します。
+FoundationとCompany CoreはCompany OSを成立させる共通基盤、Business Modulesは会社ごとに選択・追加できる実務領域として区別します。RISE GATE OSの正式な将来名称、個々のBusiness Moduleの提供範囲、HIT-HUB統合は未確定事項として明示し、完成済みの機能として表現しません。
 
 ### Chapter 6: 会社・人・パートナー
 
@@ -232,7 +238,8 @@ HIT-HUB統合、Branch機能、代理店向け機能は構想段階です。正�
 - [`chapter-02-continuous-evolution.md`](chapter-02-continuous-evolution.md): Chapter 2「会社の進化は、止まらない。」
 - [`chapter-03-company-os-dictionary.md`](chapter-03-company-os-dictionary.md): Chapter 3「会社の進化を構成する言葉」
 - [`chapter-04-meaningful-relationships.md`](chapter-04-meaningful-relationships.md): Chapter 4「会社の出来事は、つながった瞬間に意味を持つ。」
+- [`chapter-05-company-os-product-architecture.md`](chapter-05-company-os-product-architecture.md): Chapter 5「会社の土台・思考・実行を、一つにつなぐ」
 
 ## 次に行うこと
 
-Chapter 4のメッセージ、世界観、順序を確認してからChapter 5へ進みます。現時点ではChapter 5以降の本文を作成しません。
+Chapter 5の3層構造、全体鳥瞰図、実行領域の名称候補を確認してからChapter 6へ進みます。現時点ではChapter 6以降の本文を作成しません。
