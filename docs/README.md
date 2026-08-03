@@ -1,8 +1,8 @@
-# Rise Gate OS
+# Company OS
 
 改善を、文化に。
 
-Rise Gate OS は、単なる案件管理システムではありません。
+Company OSは、単なる案件管理システムではありません。
 
 会社の改善を育て、知識へ変え、AIが活用できる Company Operating System を目指すプロジェクトです。
 
@@ -22,7 +22,7 @@ Project で生まれた Improvement が、Task になり、新しい Project に
 
 Rise Gate OS は、この改善の連鎖を会社の成長として記録します。
 
-Company OS は思想・概念であり、Rise Gate OS はそれを実際の業務で動かす実装・プロダクトです。
+Company OSは正式なサービス名です。RISE GATE OSは、その中でProject改善を実行するProject Management Engineです。
 
 Improvement は会社の資産です。
 
@@ -120,6 +120,8 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 
 ## Documents
 
+- `product/company-os-core-model.md`: Company OSの憲法となるPhase2-1 Core Model
+- `product/company-os-domain-model.md`: Phase2-2 Concept / Domain Model
 - `philosophy.md`: 思想・目的・価値観
 - `product/company-os-value.md`: COMPANY OSの価値、ChatGPTとの違い、現在地と目指す姿
 - `architecture.md`: システム全体構成と責務分離

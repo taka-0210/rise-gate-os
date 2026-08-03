@@ -11,6 +11,24 @@
 - 変更理由と判断の背景を残す。
 - ドキュメントはコードと同じく育てる資産として扱う。
 
+## Phase2-1 - Company OS Core Model v1.0
+
+Status: Fixed as the constitutional model before Company OS feature design.
+
+Summary:
+
+- Company OSを、会社に起きる変化を観察し、意味を見いだし、改善へ育て、実行と学習を次の観察へつなぐOperating Systemと定義した。
+- Company OSの入口をObservation、中心概念をImprovementとした。
+- Direction、Observation、Sense、Improvement、Decision、Task、Project、Result、Knowledge、AI ProposalをCore Conceptとした。
+- Observationの事実とSenseの解釈を分離した。
+- ProjectをImprovementを実現するProject Management Engine、Taskを具体的な実行手段と位置付けた。
+- Taskには完了、Projectには終了があるが、Company OS全体には完了がないと定義した。
+- Resultを終点ではなく、必ず新しいObservationへ戻る起点とした。
+- 始点も終点もない循環を`Continuous Evolution`と命名した。
+- AI Proposalと人による正式なDecisionを分離した。
+- Event StormingとDomain Eventを設計へ採用し、Event Sourcingは前提にしない方針とした。
+- Phase2-2の論理データモデルを作成し、物理実装前の不変条件と未決事項を整理した。
+
 ## v1.0 - Design Fixed
 
 Status: Fixed before Laravel implementation.
