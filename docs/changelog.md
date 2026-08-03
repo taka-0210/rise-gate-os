@@ -70,6 +70,24 @@ Summary:
 - Company Intelligenceを、根拠をたどり、説明し、必要なら判断不能と言える能力と定義した。
 - 次フェーズの価値名を`Semantic Navigator`とし、Company Evolution Graphをその内部表現候補と位置付けた。
 
+## Product Phase3 - Observation-first MVP Direction v1.0
+
+Status: Fixed before Phase3 application implementation.
+
+Summary:
+
+- MVPの目的を「毎日開きたくなる」から「会社に変化があれば自然に開きたくなる」へ変更した。
+- Company Dialogueは時刻ではなくObservationを起点に開始するイベント駆動体験とした。
+- 変化がない日に不要な問いや通知を生成せず、静かな状態を正当な状態として扱う方針とした。
+- Observation Sourceとして、人、システム、AI、CSV、会議、定期イベント、外部情報を整理した。
+- Source成熟段階をHuman Observation、AI-assisted Observation、Connected Observationの3段階とした。
+- MVPは人によるObservation登録だけで成立させ、API連携を導入条件にしない方針とした。
+- Observation Designを、会社ごとの変化の発生源、Signal、Evidence、Observer、Timing、Dialogue Policyを整理する導入支援活動と定義した。
+- 代理店・導入支援会社はシステム接続より先に、会社の観察設計を支援する方針とした。
+- Manual ObservationからResultによる次のObservationまで、一本のVertical SliceをMVPとした。
+- 日次利用率ではなく、変化を意味・判断・改善へつなげられたかをMVPの成功基準とした。
+- Semantic NavigatorはMVPに必要なQueryから段階的に実装し、完全なGraphと自動連携はMVP後とした。
+
 ## v1.0 - Design Fixed
 
 Status: Fixed before Laravel implementation.

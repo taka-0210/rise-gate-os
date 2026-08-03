@@ -1048,30 +1048,30 @@ Company OSのQuery Modelが成立している状態は、次のとおりです�
 - 「会社は進化したか」を単純な完了率や単一スコアで答えない。
 - Query Modelから、次に必要なGraph、Read Model、権限、データが逆算できる。
 
-## Next Phase: Semantic Navigator
+## Next Product Phase: Observation-first MVP
 
-次は、このQuery Modelに答えるための`Semantic Navigator`を設計します。
+思想・概念・関係・問いの設計を一度区切り、次はObservationを人が記録するところから始まるPhase3 MVPを実装可能な単位へ分解します。
 
-Semantic Navigatorは利用者が得る価値の名称です。Company Evolution Graphは、その内部でRelationshipを探索するための実装・表現候補です。
+Semantic NavigatorはMVPを支える内部能力として、必要なQueryから段階的に実装します。Company Evolution Graphは、その内部表現候補として後から検討します。
 
 順序は次のとおりです。
 
 ```text
-Question
+Observation
     ↓
-Query Contract
+Company Dialogue
     ↓
-Required Relationship Traversal
+Human Sense / Decision
     ↓
-Semantic Navigator
+Improvement / Execution
     ↓
-Company Evolution Graph / Search Index
+Result
     ↓
-Read Model / AI Context
+Observation
     ↓
-UI
+Minimal Semantic Navigator / Accountability
 ```
 
 利用者はGraphを見ること自体を目的にしません。会社を知り、意味をたどり、根拠を理解するためにNavigatorを使います。
 
-> Semantic Navigatorは、Company OSが会社の進化について答え、その理由とEvidence Pathを説明するための意味探索エンジンです。
+MVPの方向性は`company-os-phase3-mvp.md`を正本とします。

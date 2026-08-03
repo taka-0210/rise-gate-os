@@ -52,7 +52,8 @@ AI は蓄積された知識を活用するパートナーです。
 - Relationship Model: Phase2-3 v1.0 fixed
 - Laravel implementation: Existing Project Management and Company foundation implemented
 - Query Model: Phase2-4 v1.0 fixed
-- Next design phase: Semantic Navigator based on the Query Model
+- Product Phase3: Observation-first MVP direction fixed
+- Next implementation: Manual Observationから始まる最小のContinuous Evolution
 
 ## Implemented Foundation
 
@@ -126,6 +127,7 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 - `product/company-os-domain-model.md`: Phase2-2 Concept / Domain Model
 - `product/company-os-relationship-model.md`: Phase2-3 意味のネットワークとRelationship Model
 - `product/company-os-query-model.md`: Phase2-4 Company OSが答える問いと説明責任
+- `product/company-os-phase3-mvp.md`: Observation First、Company Dialogue、Observation DesignによるPhase3 MVP
 - `philosophy.md`: 思想・目的・価値観
 - `product/company-os-value.md`: COMPANY OSの価値、ChatGPTとの違い、現在地と目指す姿
 - `architecture.md`: システム全体構成と責務分離
