@@ -34,8 +34,8 @@ Company OSの思想、構造、価値、体験、プロダクト全体を、人�
 | 区分 | 章 | 中心となる問い | 目安 | 状態 |
 |---|---|---|---:|---|
 | Front | 表紙・Blueprintの読み方 | この資料は何で、どう読めばよいか | 2ページ | 構成確定 |
-| Chapter 1 | Company OSはなぜ必要か | 日本を支える中小企業が、自ら進化し続けるために何が必要か | 5ページ | 初版作成済み |
-| Chapter 2 | Company OSの憲法 | 「改善に終わりはない」とは何を意味するか | 5ページ | 未作成 |
+| Chapter 1 | Company OSはなぜ必要か | 日本を支える中小企業が、自ら進化し続けるために何が必要か | 5ページ | レビュー完了 |
+| Chapter 2 | 会社の進化は、止まらない。 | 「改善に終わりはない」とは何を意味するか | 5ページ | 初版作成済み |
 | Chapter 3 | 会社の進化を構成する概念 | ObservationからKnowledgeまで、何がどうつながるか | 6ページ | 未作成 |
 | Chapter 4 | 会社の意味と知能 | Relationship、問い、根拠、説明責任がなぜ必要か | 5ページ | 未作成 |
 | Chapter 5 | Company OSのプロダクト構造 | 標準機能、実行モジュール、AIはどう位置付くか | 5ページ | 未作成 |
@@ -63,7 +63,9 @@ Company OSの思想、構造、価値、体験、プロダクト全体を、人�
 - Company OSの短い定義
 - Company OSがProject管理やAIツールだけではない理由
 
-### Chapter 2: Company OSの憲法
+### Chapter 2: 会社の進化は、止まらない。
+
+内部整理名: Company OSの憲法
 
 主要参照:
 
@@ -76,8 +78,9 @@ Company OSの思想、構造、価値、体験、プロダクト全体を、人�
 - Continuous Evolution
 - Company OSには完了がない
 - Resultは次のObservationの始まり
-- Awareness、Culture、Observationの境界
-- 人とAIの責任分担
+- ObservationからKnowledge、そしてObservationへ戻る円環
+- Directionが循環全体を照らすこと
+- 循環するたびに会社の経験とKnowledgeが育つこと
 
 ### Chapter 3: 会社の進化を構成する概念
 
@@ -197,7 +200,8 @@ HIT-HUB統合、Branch機能、代理店向け機能は構想段階です。正�
 ## 作成済みChapter
 
 - [`chapter-01-why-company-os.md`](chapter-01-why-company-os.md): Chapter 1「Company OSはなぜ必要か」
+- [`chapter-02-continuous-evolution.md`](chapter-02-continuous-evolution.md): Chapter 2「会社の進化は、止まらない。」
 
 ## 次に行うこと
 
-Chapter 1のメッセージ、用語、順序を確認してからChapter 2へ進みます。現時点ではChapter 2以降の本文を作成しません。
+Chapter 2のメッセージ、用語、順序を確認してからChapter 3へ進みます。現時点ではChapter 3以降の本文を作成しません。

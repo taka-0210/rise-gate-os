@@ -125,6 +125,7 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 
 - `blueprint/README.md`: Company OSを人が理解する順番に再編集するBlueprintの構成と参照元
 - `blueprint/chapter-01-why-company-os.md`: Blueprint Chapter 1「Company OSはなぜ必要か」
+- `blueprint/chapter-02-continuous-evolution.md`: Blueprint Chapter 2「会社の進化は、止まらない。」
 - `product/company-os-core-model.md`: Company OSの憲法となるPhase2-1 Core Model
 - `product/company-os-domain-model.md`: Phase2-2 Concept / Domain Model
 - `product/company-os-relationship-model.md`: Phase2-3 意味のネットワークとRelationship Model
