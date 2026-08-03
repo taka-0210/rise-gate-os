@@ -31,6 +31,79 @@ Company OSは、毎日のデータ更新、API、自動分析を導入条件に�
 
 Company OSの入口はObservationです。
 
+### Awareness is outside Company OS
+
+Observationの前には、人や組織が現実世界で「あれ？」と気付く`Awareness`があります。
+
+```text
+現実世界
+    ↓
+Awareness
+  人が変化や違和感に気付く
+    ↓
+Observation
+  気付きを会社の正式な文脈へ記録する
+    ↓
+Company OS
+```
+
+AwarenessはCore Conceptや保存対象にしません。人間と組織文化の領域です。
+
+> ObservationはCompany OSの入口であり、Awarenessは人間の入口です。
+
+### Awareness Culture
+
+Observation Designより前に、どのような違和感や変化を「気付いてよいもの」とするかという文化があります。
+
+```text
+Direction
+    ↓
+Awareness Culture
+    ↓
+Observation Design
+    ↓
+Observation
+    ↓
+Company Dialogue
+```
+
+社員が小さな違和感を口にできない会社では、入力フォームを用意してもObservationは生まれません。
+
+Company OSはAwarenessをシステム化しません。しかし、次の文化を壊さない体験を目指します。
+
+- 小さな気付きを歓迎する。
+- 問題と決める前に事実を共有できる。
+- 間違いや勘違いを責めない。
+- 「まだ判断できない」と言える。
+- 良い変化も悪い変化も観察する。
+- 気付きがどう改善や学びにつながったかを返す。
+
+Company OSの世界観は、管理の円ではなく会社の呼吸として捉えられます。
+
+```text
+Culture
+    ↓
+Awareness
+    ↓
+Observation
+    ↓
+Sense
+    ↓
+Improvement
+    ↓
+Decision
+    ↓
+Execution
+    ↓
+Result
+    ↓
+Knowledge
+    ↓
+Awareness
+```
+
+この思想は実装概念を増やすためではなく、人の気付きをCompany OSが奪わないための境界として残します。
+
 ```text
 会社に変化が起きる
     ↓
@@ -559,4 +632,3 @@ Phase3の設計・実装判断では、次を確認します。
 - 代理店がObservation Designとして説明・支援できるか。
 
 > Company OSのMVPは、毎日使わせることではなく、会社の変化を見失わず、意味と改善へつなぐ最小の循環を成立させることです。
-

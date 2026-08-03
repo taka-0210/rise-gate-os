@@ -322,6 +322,7 @@
                     @endisset
                     @isset($currentCompany)
                         <a href="{{ route('company.home') }}">ホーム</a>
+                        <a href="{{ route('company-observations.index') }}">気付き・観察</a>
                         @if ($canViewCompanyFinance ?? false)
                             <a href="{{ route('company-finance.index') }}">経営数値</a>
                         @endif
@@ -366,6 +367,7 @@
                     request()->routeIs('company-finance.*') => ['経営数値', route('company-finance.index')],
                     request()->routeIs('company-loans.*') => ['借入管理', route('company-loans.index')],
                     request()->routeIs('company-members.*') => ['会社設定', route('company-members.index')],
+                    request()->routeIs('company-observations.*') => ['気付き・観察', route('company-observations.index')],
                     request()->routeIs('clients.*') => ['顧客企業', route('clients.index')],
                     request()->routeIs('projects.*') || request()->routeIs('estimates.*') => ['Project Management', route('projects.index')],
                     request()->routeIs('dashboard') => ['ダッシュボード', route('dashboard')],

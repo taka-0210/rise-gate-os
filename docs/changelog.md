@@ -87,6 +87,9 @@ Summary:
 - Manual ObservationからResultによる次のObservationまで、一本のVertical SliceをMVPとした。
 - 日次利用率ではなく、変化を意味・判断・改善へつなげられたかをMVPの成功基準とした。
 - Semantic NavigatorはMVPに必要なQueryから段階的に実装し、完全なGraphと自動連携はMVP後とした。
+- Awarenessを、人が現実世界で変化に気付く入口としてObservationの前に置いた。
+- AwarenessはCore Conceptや保存対象にせず、Awareness CultureとしてCompany OSの外側に残す方針とした。
+- ObservationをCompany OSの入口、Awarenessを人間の入口と定義した。
 
 ## v1.0 - Design Fixed
 

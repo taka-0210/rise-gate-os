@@ -60,4 +60,19 @@ class Organization extends Model
     {
         return $this->hasMany(CompanyLoan::class);
     }
+
+    public function observations(): HasMany
+    {
+        return $this->hasMany(CompanyObservation::class);
+    }
+
+    public function senses(): HasMany
+    {
+        return $this->hasMany(CompanySense::class);
+    }
+
+    public function companyImprovements(): HasMany
+    {
+        return $this->hasMany(CompanyImprovement::class);
+    }
 }

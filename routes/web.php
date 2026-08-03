@@ -8,6 +8,7 @@ use App\Http\Controllers\Client\ClientCompanyAccountController;
 use App\Http\Controllers\CompanyAnnualPlanController;
 use App\Http\Controllers\CompanyFinanceController;
 use App\Http\Controllers\CompanyMemberAccessController;
+use App\Http\Controllers\CompanyObservationController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyHomeController;
 use App\Http\Controllers\CompanyLoanController;
@@ -67,6 +68,11 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
 
     Route::middleware(['workspace-mode', 'company'])->group(function (): void {
         Route::get('/company', CompanyHomeController::class)->name('company.home');
+        Route::get('/company/observations', [CompanyObservationController::class, 'index'])->name('company-observations.index');
+        Route::post('/company/observations', [CompanyObservationController::class, 'store'])->name('company-observations.store');
+        Route::get('/company/observations/{companyObservation}', [CompanyObservationController::class, 'show'])->name('company-observations.show');
+        Route::post('/company/observations/{companyObservation}/dialogue', [CompanyObservationController::class, 'respond'])->name('company-observations.respond');
+        Route::post('/company/observations/{companyObservation}/senses/{companySense}/improvements', [CompanyObservationController::class, 'storeImprovement'])->name('company-observations.improvements.store');
         Route::get('/company/finance', [CompanyFinanceController::class, 'index'])->name('company-finance.index');
         Route::put('/company/finance/settings', [CompanyFinanceController::class, 'updateSettings'])->name('company-finance.settings.update');
         Route::get('/company/finance/pl', [CompanyFinanceController::class, 'profitLoss'])->name('company-finance.pl.index');

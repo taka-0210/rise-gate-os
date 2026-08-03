@@ -12,6 +12,11 @@
         </div>
 
         <div class="grid">
+            <a class="card" href="{{ route('company-observations.index') }}">
+                <div class="meta">OBSERVATION FIRST</div>
+                <h2>気付き・観察</h2>
+                <p>Observation {{ $observationCount }}件 / 確認待ち {{ $unreviewedObservationCount }}件</p>
+            </a>
             @if (($canViewCompanyFinance ?? false) && ($canViewCompanyDebt ?? false))
                 <a class="card" href="{{ route('company-finance.index') }}">
                     <div class="meta">FINANCE</div><h2>経営数値</h2><p>確定実績 {{ $financialPeriodCount }}期分</p>

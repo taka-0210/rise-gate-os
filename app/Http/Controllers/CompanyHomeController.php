@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CompanyFinancialPeriod;
 use App\Models\CompanyLoan;
+use App\Models\CompanyObservation;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -33,6 +34,13 @@ class CompanyHomeController extends Controller
                 ->where('organization_id', $company->id)
                 ->where('loan_status', CompanyLoan::STATUS_ACTIVE)
                 ->sum('current_balance'),
+            'observationCount' => CompanyObservation::query()
+                ->where('organization_id', $company->id)
+                ->count(),
+            'unreviewedObservationCount' => CompanyObservation::query()
+                ->where('organization_id', $company->id)
+                ->where('importance', CompanyObservation::IMPORTANCE_UNREVIEWED)
+                ->count(),
         ]);
     }
 }
