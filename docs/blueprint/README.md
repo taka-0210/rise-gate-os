@@ -47,7 +47,7 @@ Chapter 8  現在の実装とこれから
 
 ## 全体構成
 
-表紙と読み方を含め、完成時は全38ページ前後を想定します。ページ数は内容を削るための上限ではなく、一つのメッセージを一枚で理解できる密度を保つための目安です。
+表紙と読み方を含め、完成時は全40ページ前後を想定します。ページ数は内容を削るための上限ではなく、一つのメッセージを一枚で理解できる密度を保つための目安です。
 
 | 区分 | 章 | 中心となる問い | 目安 | 状態 |
 |---|---|---|---:|---|
@@ -56,7 +56,7 @@ Chapter 8  現在の実装とこれから
 | Chapter 2 | 会社の進化は、止まらない。 | 「改善に終わりはない」とは何を意味するか | 5ページ | レビュー反映済み |
 | Chapter 3 | 会社の進化を構成する言葉 | 観察、意味付け、改善、判断、結果、学びに、どのような名前と役割を与えるか | 7ページ | レビュー反映済み |
 | Chapter 4 | 会社の出来事は、つながった瞬間に意味を持つ。 | 概念同士のつながり、問い、根拠、説明責任がなぜ必要か | 5ページ | レビュー完了 |
-| Chapter 5 | 会社の土台・思考・実行を、一つにつなぐ | Company OSを支える3層と、その役割の違い | 6ページ | 責任設計レビュー中 |
+| Chapter 5 | 会社の土台・思考・実行を、一つにつなぐ | Company OSを支える責任と、そのつながり | 7ページ | 責任設計承認・本文改訂済み |
 | Chapter 6 | 会社・人・パートナー | 誰が、どの会社・拠点・役割でCompany OSを使うか | 4ページ | 未作成・一部要定義 |
 | Chapter 7 | Company OSを会社へ導入する | 会社の観察設計と対話をどう始めるか | 3ページ | 未作成 |
 | Chapter 8 | 現在地とこれから | 現在何が動き、どのようにCompany OS全体へ育てるか | 2ページ | 未作成・一部要定義 |
@@ -162,20 +162,20 @@ Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行
 - 会社の正式な土台、進化を担う中心、会社ごとの実務という責任領域
 - Decisionを行動へ渡し、Resultを戻す実行境界
 - 経営理念、経営指針、経営数値、借入、組織・メンバーを支えるFoundation
-- Direction、Observation、Sense、Improvement、Decision、Knowledge、Company Dialogue、Company AIを担うCompany Core
+- Direction、Observation、Sense、Improvement、Decision、Result、Knowledge、Relationship、Company Dialogue、Company AIを担うCompany Core
 - Projectを業務領域ではなく実行方式として位置付ける考え方
 - 会社ごとに接続する業務能力と、製品として提供するModuleの区別
-- 現在のRISE GATE OSと、将来のCompany Execution Engineという役割名の検討
-- HIT-HUBは将来統合を検討するBusiness Moduleであり、正式機能ではないこと
+- 現在のRISE GATE OSと、実行をつなぐ責任領域の将来名称の検討
+- HIT-HUBは将来接続・統合を検討する実務領域であり、正式機能ではないこと
 - Company OSの思想をそのまま形にした全体鳥瞰図
 
 編集上の注意:
 
-責任上の構造と、販売・契約・画面上のModule構成を混在させません。Foundation、Company Core、Business Modulesなどの呼称も責任確定前の仮称として扱います。RISE GATE OSの正式な将来名称、個々の提供範囲、HIT-HUB統合は未確定事項として明示し、完成済みの機能として表現しません。
+責任上の構造と、販売・契約・画面上のModule構成を混在させません。Foundation、Company Core、Execution Boundary、Operational Capabilitiesなどの呼称は正式命名前の仮称として扱います。RISE GATE OSの正式な将来名称、個々の提供範囲、HIT-HUB統合は未確定事項として明示し、完成済みの機能として表現しません。
 
-Project ManagementをBusiness Modulesと同列に置く初版構造は再検討中です。先に[`chapter-05-responsibility-review.md`](chapter-05-responsibility-review.md)で各領域の責任と実行方式の境界を確定し、その後にChapter 5本文と全体鳥瞰図を改訂します。
+Project ManagementをBusiness Modulesと同列に置く初版構造は採用しません。Projectは複雑なImprovementを実現する実行方式の一つとし、判断を現実へ渡してResultを戻す責任の中へ位置付けます。
 
-比較レビューを踏まえた1案の最終推奨構造は、[`chapter-05-final-structure-proposal.md`](chapter-05-final-structure-proposal.md)にまとめています。この提案が承認されるまでは、Chapter 5本文へ反映しません。
+比較レビューを踏まえた1案の最終推奨構造は、[`chapter-05-final-structure-proposal.md`](chapter-05-final-structure-proposal.md)にまとめています。責任設計は承認済みで、Chapter 5本文へ反映しました。正式名称は引き続き保留します。
 
 ### Chapter 6: 会社・人・パートナー
 
@@ -246,8 +246,8 @@ HIT-HUB統合、Branch機能、代理店向け機能は構想段階です。正�
 - [`chapter-04-meaningful-relationships.md`](chapter-04-meaningful-relationships.md): Chapter 4「会社の出来事は、つながった瞬間に意味を持つ。」
 - [`chapter-05-company-os-product-architecture.md`](chapter-05-company-os-product-architecture.md): Chapter 5「会社の土台・思考・実行を、一つにつなぐ」
 - [`chapter-05-responsibility-review.md`](chapter-05-responsibility-review.md): Chapter 5責任設計レビュー（本文改訂前の比較資料）
-- [`chapter-05-final-structure-proposal.md`](chapter-05-final-structure-proposal.md): Chapter 5最終推奨構造案（承認前）
+- [`chapter-05-final-structure-proposal.md`](chapter-05-final-structure-proposal.md): Chapter 5最終推奨構造案（責任設計承認済み・正式名称保留）
 
 ## 次に行うこと
 
-Chapter 5最終推奨構造案をレビューし、承認後にChapter 5本文と全体鳥瞰図を改訂してからChapter 6へ進みます。現時点ではChapter 6以降の本文を作成しません。
+改訂したChapter 5本文と全体鳥瞰図のレビューを完了してからChapter 6へ進みます。Execution BoundaryとOperational Capabilitiesの正式名称は、承認済みの責任構造とは分けて後のブランド設計で検討します。現時点ではChapter 6以降の本文を作成しません。
