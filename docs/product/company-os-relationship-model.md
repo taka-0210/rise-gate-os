@@ -658,9 +658,9 @@ relationship_type_registry
 
 これはPhase2-4以降の検証対象であり、この文書だけでMigration作成を承認するものではありません。
 
-## Next Phase: Company Evolution Graph
+## Next Phase Input: Company OS Query Model and Semantic Navigator
 
-Relationship Modelの次に、Company Evolution Graphを設計します。
+Relationship Modelの次に、Company OSが答えるべき問いをQuery Modelとして設計します。Semantic Navigatorは、そのQuery Modelに必要な意味探索と説明責任を実現するために設計します。Company Evolution GraphはNavigatorの内部表現候補です。
 
 ```text
 Concept Node = 星
@@ -669,7 +669,7 @@ Relationship = 重力
 会社全体の進化 = 星雲
 ```
 
-次フェーズでは見た目から設計せず、次を決めます。
+Navigator設計では見た目から始めず、Query Modelを入力として次を決めます。
 
 - どのNodeをCompany Evolution Graphへ含めるか。
 - どのRelationshipを探索可能にするか。
@@ -679,7 +679,6 @@ Relationship = 重力
 - Company、Project、個人、顧客の可視性をどう守るか。
 - AIがRelationship Pathをどのように説明するか。
 
-Company Evolution Graphは飾りの可視化ではありません。
+Company Evolution Graphは飾りの可視化ではなく、Semantic Navigatorが利用する探索構造です。
 
 > 会社の中にある意味のつながりを、人とAIが理解し、育て、次の進化へ使うためのCompany OSの意味モデルです。
-

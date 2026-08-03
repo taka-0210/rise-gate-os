@@ -644,7 +644,7 @@ Knowledgeが作られないResultはあり得ます。しかし、評価され�
 
 ## Decisions Handed to Later Phases
 
-Phase2-3でRelationshipの意味モデルを確定しました。次の内容は物理モデル、Company Evolution Graph、権限設計で確定します。
+Phase2-3でRelationshipの意味モデルを確定しました。次の内容は物理モデル、Semantic Navigator、権限設計で確定します。
 
 1. 各専用RelationとSemantic Relationshipを同期するDomain Eventの範囲。
 2. 既存Project ImprovementとCompany Improvementを同一Aggregateへ統合するか。
@@ -657,4 +657,4 @@ Phase2-3でRelationshipの意味モデルを確定しました。次の内容は
 9. AI Proposalの既存Project向け実装とCompany向け提案の境界。
 10. Company、Workspace、Projectをまたぐ権限と可視性。
 
-この論理モデルとRelationship Modelを、Company Evolution Graphと物理設計の入力とします。
+この論理モデルとRelationship Modelを、Query Model、Semantic Navigator、物理設計の入力とします。

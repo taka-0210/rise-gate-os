@@ -45,7 +45,30 @@ Summary:
 - 矛盾するRelationshipを削除せず、同時に保持して判断履歴を残す方針とした。
 - 所有・認可・参照整合性の正本を専用FK／Relationとし、Semantic Graphだけに依存しない方針とした。
 - `Result generates Observation`をContinuous Evolutionの必須Relationshipとした。
-- Graph Database、Event Sourcing、画面実装は前提にせず、次フェーズでCompany Evolution Graphを設計することとした。
+- Graph Database、Event Sourcing、画面実装は前提にせず、Company Evolution Graphの前にQuery Modelを設計することとした。
+
+## Phase2-4 - Company OS Query Model v1.0
+
+Status: Fixed before Semantic Navigator, read model, and UI design.
+
+Summary:
+
+- Company OSを、会社の進化について問い、その答えに至った意味の経路と根拠を説明できるOperating Systemと定義した。
+- Question、Authorized Query Plan、Relationship Traversal、Evidence Set、Answerの順序を確定した。
+- 経営者、管理者、Project担当者、一般社員、顧客、AIごとの問いと権限原則を整理した。
+- Observation、Sense、Improvement、Decision、Project、Result、Knowledge、Company EvolutionのCanonical Query Set v1を定義した。
+- 回答に結論、期間、Evidence Path、支持、反証、確信度、鮮度、不足情報、次のObservationを含める契約を定義した。
+- Observation、Sense、Decision、AI Proposalを回答内で明確に分離する原則を定義した。
+- Evidence不足を推測で埋めず、`insufficient_evidence`として回答できる設計とした。
+- 「会社は進化したか」を単一スコアで表さず、Directionごとに前進、停滞、後退、未評価を説明する方針とした。
+- AIは質問者の権限を継承し、権限適用後のConceptとRelationshipだけを探索する方針とした。
+- Graphを表現から先に作らず、Query Modelに必要な探索からCompany Evolution Graphを逆算する方針とした。
+- Company OSを、回答だけでなく「なぜその答えになったか」を示す説明責任を持つOperating Systemと定義した。
+- Answer Contractへ支持数、反証数、未確認数、Confidenceの根拠、AI推論、人の最終判断点を追加した。
+- Evidence不足時に、判断不能の理由と次に必要なObservationを示すことを必須とした。
+- 因果Queryでは相関から原因を断定せず、代替仮説と反証を探索する方針とした。
+- Company Intelligenceを、根拠をたどり、説明し、必要なら判断不能と言える能力と定義した。
+- 次フェーズの価値名を`Semantic Navigator`とし、Company Evolution Graphをその内部表現候補と位置付けた。
 
 ## v1.0 - Design Fixed
 
