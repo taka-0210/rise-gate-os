@@ -1,13 +1,13 @@
-@extends('layouts.app', ['title' => 'Clients - Rise Gate OS'])
+@extends('layouts.app', ['title' => '顧客企業 - Company OS'])
 
 @section('content')
     <section class="stack">
         <div class="actions" style="justify-content: space-between; align-items: flex-start;">
             <div>
-                <h1>Clients</h1>
+                <h1>顧客企業</h1>
                 <p>Clients are Companies. Projectは会社から生まれます。社内Projectの場合はClientなしでも扱えます。</p>
             </div>
-            <a class="button" href="{{ route('clients.create') }}">Create Client</a>
+            <a class="button" href="{{ route('clients.create') }}">顧客企業を登録</a>
         </div>
 
         @if ($clients->isEmpty())

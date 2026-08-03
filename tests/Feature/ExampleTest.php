@@ -16,7 +16,7 @@ class ExampleTest extends TestCase
 
         $response
             ->assertStatus(200)
-            ->assertSee('AI-DRIVEN PROJECT OPERATING SYSTEM')
+            ->assertSee('COMPANY OPERATING SYSTEM')
             ->assertSee('会社の前進を、')
             ->assertSee('AIが理解する')
             ->assertSee('AIが提案する')

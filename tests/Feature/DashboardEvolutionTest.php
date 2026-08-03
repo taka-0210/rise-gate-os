@@ -62,7 +62,7 @@ class DashboardEvolutionTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('今週、会社は');
-        $response->assertSee('Rise Gate OSからの一言');
+        $response->assertSee('Company OSからの一言');
         $response->assertSee('会社の現在地');
         $response->assertSee('次に育てる改善');
         $response->assertSee('Evolution Dashboard改善');

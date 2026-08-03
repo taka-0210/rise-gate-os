@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => ($loan?'借入契約を編集':'借入を登録').' - COMPANY OS'])
+@extends('layouts.app', ['title' => ($loan?'借入契約を編集':'借入を登録').' - Company OS'])
 @section('content')
 <div class="page-header"><div><div class="meta"><a href="{{ route('company-loans.index') }}">借入・資金計画</a> / INPUT</div><h1>{{ $loan ? $loan->financial_institution.' No.'.$loan->management_number : '借入を登録' }}</h1><p>残高には必ず基準日を付け、いつ時点の数字かを明確にします。</p></div></div>
 @if(session('status'))<div class="alert success">{{ session('status') }}</div>@endif

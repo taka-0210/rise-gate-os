@@ -1,9 +1,9 @@
-﻿@extends('layouts.app', ['title' => 'Create Client - Rise Gate OS'])
+@extends('layouts.app', ['title' => '顧客企業を登録 - Company OS'])
 
 @section('content')
     <section class="panel stack">
         <div>
-            <h1>Create Client</h1>
+            <h1>顧客企業を登録</h1>
             <p>Clientは担当者ではなく会社そのものです。ContactsやUsersとの紐付けは今後のPhaseで扱います。</p>
         </div>
 
@@ -60,7 +60,7 @@
             </div>
 
             <div class="actions">
-                <button type="submit">Create Client</button>
+                <button type="submit">顧客企業を登録</button>
                 <a href="{{ route('clients.index') }}">Cancel</a>
             </div>
         </form>

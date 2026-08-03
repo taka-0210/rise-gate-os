@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => '経営数値 - COMPANY OS'])
+@extends('layouts.app', ['title' => '経営数値 - Company OS'])
 
 @section('content')
 <div class="finance-page">

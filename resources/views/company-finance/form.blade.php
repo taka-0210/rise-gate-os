@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => ($period ? '年度P/Lを編集' : '年度P/Lを入力').' - COMPANY OS'])
+@extends('layouts.app', ['title' => ($period ? '年度P/Lを編集' : '年度P/Lを入力').' - Company OS'])
 @section('content')
 <div class="page-header"><div><div class="meta"><a href="{{ route('company-finance.pl.index') }}">P/L</a> / ACTUAL INPUT</div><h1>{{ $period ? $period->period_number.'期を編集' : '年度P/L実績を入力' }}</h1><p>P/Lは終了した事業年度の実績専用です。計画・最新見込は「03 今年度計画と進捗」で入力します。</p></div></div>
 @if(session('status'))<div class="alert success">{{ session('status') }}</div>@endif

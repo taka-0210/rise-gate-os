@@ -1,10 +1,10 @@
-@extends('layouts.app', ['title' => 'System Admin - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'System Admin - Company OS'])
 
 @section('content')
     <section class="stack">
         <div>
             <h1>システム管理</h1>
-            <p>Rise Gate OSのメンバーを登録し、専用Workspaceの作成または既存Workspaceへの所属を行います。</p>
+            <p>Company OSのメンバーを登録し、専用Workspaceの作成または既存Workspaceへの所属を行います。</p>
         </div>
 
         @if (session('status'))

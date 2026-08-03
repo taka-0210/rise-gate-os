@@ -12,6 +12,15 @@ class CompanyNavigationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_public_entry_uses_company_os_as_the_service_brand(): void
+    {
+        $this->get(route('welcome'))
+            ->assertOk()
+            ->assertSee('Company OS')
+            ->assertSee('by RISE GATE')
+            ->assertDontSee('RISE GATE OS');
+    }
+
     public function test_single_company_user_enters_company_home_without_company_selector(): void
     {
         [$user, $company] = $this->companyUser('One Company');
@@ -26,6 +35,8 @@ class CompanyNavigationTest extends TestCase
             ->withSession(['access_mode' => 'workspace', 'current_company_id' => $company->id])
             ->get(route('company.home'))
             ->assertOk()
+            ->assertSee('Company OS')
+            ->assertSee('by RISE GATE')
             ->assertSee('One Company')
             ->assertSee('保険')
             ->assertSee('契約内容・保険料・更新時期を管理（今後実装）')

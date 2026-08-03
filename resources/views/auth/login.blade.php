@@ -1,10 +1,10 @@
-﻿@extends('layouts.app', ['title' => 'Login - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Login - Company OS'])
 
 @section('content')
     <section class="panel stack">
         <div>
-            <h1>Login</h1>
-            <p>Workspaceを持つRise Gate OSへログインします。</p>
+            <h1>Company OSへログイン</h1>
+            <p>登録済みのアカウントでCompany OSを利用します。</p>
         </div>
 
         <form class="stack" method="POST" action="{{ route('login') }}">

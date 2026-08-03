@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Evolution Dashboard - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Evolution Dashboard - Company OS'])
 
 @section('content')
     <section class="stack evolution-dashboard">
@@ -19,7 +19,7 @@
         <aside class="os-message">
             <div class="message-mark">AI</div>
             <div>
-                <div class="meta">Rise Gate OSからの一言</div>
+                <div class="meta">Company OSからの一言</div>
                 @if ($weekImprovementCount > $previousWeekImprovementCount)
                     <p>今週は改善の動きが先週より増えています。この流れを、次の結果記録へ育てていきましょう。</p>
                 @elseif ($resultWaitingCount > 0)

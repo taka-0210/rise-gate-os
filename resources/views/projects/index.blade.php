@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'PROJECT一覧 - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Project Management - Company OS'])
 
 @section('content')
     <style>

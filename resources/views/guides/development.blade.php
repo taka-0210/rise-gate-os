@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => '開発の進め方 - Rise Gate OS'])
+@extends('layouts.app', ['title' => '開発の進め方 - Company OS'])
 
 @section('content')
     <section class="stack development-guide">
@@ -111,7 +111,7 @@
                 </div>
                 <span class="rule-pill">Asia/Tokyo（JST）</span>
             </div>
-            <p>RISE GATE OSの画面表示、入力初期値、履歴、保存日時、通知、帳票・提出資料は、すべて日本時間を基準にします。新しい機能を追加するときは、UTCのまま画面へ表示されていないことを実装時と検証時の両方で確認します。</p>
+            <p>Company OSの画面表示、入力初期値、履歴、保存日時、通知、帳票・提出資料は、すべて日本時間を基準にします。新しい機能を追加するときは、UTCのまま画面へ表示されていないことを実装時と検証時の両方で確認します。</p>
             <dl class="status-list">
                 <div><dt>表示と入力</dt><dd>日付・時刻の表示、および「現在時刻」を使う初期値はAsia/Tokyoで生成します。</dd></div>
                 <div><dt>履歴と提出資料</dt><dd>保存履歴、承認時刻、タイムライン、帳票に記載する時刻も日本時間で統一します。</dd></div>

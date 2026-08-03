@@ -221,12 +221,12 @@
                     <a class="button secondary" href="{{ route('projects.workspace', $project) }}">計画と進捗を確認する</a>
                 </div>
             </div>
-            @php($continuationText = "RISE GATE OSのプロジェクト「{$project->name}」でAI提案「{$proposal->title}」を承認・反映しました。現在のプロジェクト計画を確認し、承認内容に基づく次の作業を開始してください。")
+            @php($continuationText = "Company OSのプロジェクト「{$project->name}」でAI提案「{$proposal->title}」を承認・反映しました。現在のプロジェクト計画を確認し、承認内容に基づく次の作業を開始してください。")
             <div class="card stack proposal-next-action">
                 <div>
                     <div class="eyebrow">現在の状態・{{ $proposal->handed_off_at ? 'Codexへ伝達済み' : '反映済み／Codexは待機中' }}</div>
                     <h2>{{ $proposal->handed_off_at ? 'Codexへ伝えました' : 'Codexへ作業開始を伝える' }}</h2>
-                    <p>承認内容はRISE GATE OSへ反映済みです。次の作業を始めるには、下の文章をCodexへ送ってください。</p>
+                    <p>承認内容はCompany OSへ反映済みです。次の作業を始めるには、下の文章をCodexへ送ってください。</p>
                 </div>
                 <textarea id="proposal-continuation-copy-text" rows="4" readonly>{{ $continuationText }}</textarea>
                 <div class="actions">

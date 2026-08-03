@@ -1,10 +1,10 @@
-@extends('layouts.app', ['title' => $company->name.' - COMPANY OS'])
+@extends('layouts.app', ['title' => $company->name.' - Company OS'])
 
 @section('content')
     <section class="stack">
         <div class="page-header">
             <div>
-                <div class="meta">COMPANY OS / COMPANY HOME</div>
+                <div class="meta">Company OS / COMPANY HOME</div>
                 <h1>{{ $company->name }}</h1>
                 <p>会社の方向、数字、Workspaceをつなぐ入口です。</p>
             </div>

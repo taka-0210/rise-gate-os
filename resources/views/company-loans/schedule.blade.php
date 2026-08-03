@@ -1,10 +1,10 @@
-@extends('layouts.app', ['title' => '借入残高推移表 - COMPANY OS'])
+@extends('layouts.app', ['title' => '借入残高推移表 - Company OS'])
 
 @section('content')
 <div class="loan-schedule-page">
     <div class="page-header">
         <div>
-            <div class="meta">COMPANY OS / DEBT &amp; FUNDING</div>
+            <div class="meta">Company OS / DEBT &amp; FUNDING</div>
             <h1>借入残高推移表</h1>
             <p>登録済みの借入条件から月末予定残高を自動計算し、実績残高がある月はその値を表示します。</p>
         </div>

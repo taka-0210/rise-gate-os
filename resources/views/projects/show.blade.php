@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => $project->name.' - Rise Gate OS'])
+@extends('layouts.app', ['title' => $project->name.' - Company OS'])
 
 @section('content')
     <style>

@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => '全体スケジュール - Rise Gate OS'])
+@extends('layouts.app', ['title' => '全体スケジュール - Company OS'])
 
 @section('content')
     <style>

@@ -1,9 +1,9 @@
-@extends('layouts.app', ['title' => '会社ユーザー・権限 - COMPANY OS'])
+@extends('layouts.app', ['title' => '会社ユーザー・権限 - Company OS'])
 
 @section('content')
     <div class="page-header">
         <div>
-            <div class="meta">COMPANY OS / COMPANY ACCOUNT</div>
+            <div class="meta">Company OS / COMPANY ACCOUNT</div>
             <h1>会社ユーザー・権限</h1>
             <p>{{ $organization->name }}に所属するユーザーごとに、経営情報へのアクセス範囲を設定します。</p>
         </div>

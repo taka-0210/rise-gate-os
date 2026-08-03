@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'RISE GATE OS | AI駆動のプロジェクトOS'])
+@extends('layouts.app', ['title' => 'Company OS | 会社を改善し続けるためのOperating System'])
 
 @section('content')
     <section class="os-hero">
@@ -9,12 +9,12 @@
         <div class="os-hero__content">
             <div class="os-hero__eyebrow">
                 <span class="os-hero__pulse"></span>
-                AI-DRIVEN PROJECT OPERATING SYSTEM
+                COMPANY OPERATING SYSTEM
             </div>
             <h1>会社の前進を、<br><span>AIと人で動かす。</span></h1>
             <p class="os-hero__lead">
-                RISE GATE OSは、プロジェクト、ロードマップ、改善、タスク、社内知識をひとつにつなぐAI駆動の経営・業務OSです。
-                AIが状況を読み取り、次の計画や改善を提案。人が判断・承認し、実行可能な仕事としてOSへ反映します。
+                Company OSは、経営、改善、AI、Knowledge、Projectをひとつにつなぎ、会社全体を改善し続けるためのOperating Systemです。
+                会社の方針と現在地を共有し、人とAIの判断・実行・改善を次の成長へつなげます。
             </p>
 
             <div class="actions os-hero__actions">
@@ -26,7 +26,7 @@
                     <a class="button os-hero__secondary" href="{{ route('projects.index') }}">プロジェクトを見る</a>
                 @else
                     <a class="button os-hero__primary" href="{{ route('register') }}">
-                        RISE GATE OSを始める
+                        Company OSを始める
                         <span aria-hidden="true">→</span>
                     </a>
                     <a class="button os-hero__secondary" href="{{ route('login') }}">ログイン</a>
@@ -43,36 +43,36 @@
             <div class="os-cosmos__planet" aria-hidden="true">
                 <div class="os-cosmos__planet-light"></div>
                 <div class="os-cosmos__planet-copy">
-                    <strong>RISE GATE</strong>
-                    <span>AI OS</span>
+                    <strong>Company</strong>
+                    <span>OS</span>
                 </div>
             </div>
 
             <div class="os-cosmos__projects" aria-hidden="true">
-                <div class="os-cosmos__satellite os-cosmos__satellite--one"><span>PROJECT</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--one"><span>MANAGEMENT</span></div>
                 <div class="os-cosmos__satellite os-cosmos__satellite--two"><span>KNOWLEDGE</span></div>
-                <div class="os-cosmos__satellite os-cosmos__satellite--three"><span>ROADMAP</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--three"><span>PROJECT</span></div>
                 <div class="os-cosmos__satellite os-cosmos__satellite--four"><span>IMPROVE</span></div>
-                <div class="os-cosmos__satellite os-cosmos__satellite--five"><span>CLIENT</span></div>
-                <div class="os-cosmos__satellite os-cosmos__satellite--six"><span>APPROVAL</span></div>
-                <div class="os-cosmos__satellite os-cosmos__satellite--seven"><span>TASK</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--five"><span>FINANCE</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--six"><span>STRATEGY</span></div>
+                <div class="os-cosmos__satellite os-cosmos__satellite--seven"><span>AI</span></div>
             </div>
         </div>
     </section>
 
-    <section class="os-pillars" aria-label="RISE GATE OSのAI駆動サイクル">
+    <section class="os-pillars" aria-label="Company OSのAI駆動サイクル">
         <article class="os-pillar">
             <span class="os-pillar__number">01</span>
             <div>
                 <h2>AIが理解する</h2>
-                <p>プロジェクトの目的、現状、履歴、社内知識をつなぎ、AIが仕事の背景まで把握します。</p>
+                <p>会社の方針、経営情報、プロジェクト、改善履歴、社内知識をつなぎ、AIが仕事の背景まで把握します。</p>
             </div>
         </article>
         <article class="os-pillar">
             <span class="os-pillar__number">02</span>
             <div>
                 <h2>AIが提案する</h2>
-                <p>次に必要なロードマップ、改善、タスクを構造化し、根拠とともに実行案を提示します。</p>
+                <p>会社の現在地をもとに、次に必要な改善やプロジェクトを構造化し、根拠とともに実行案を提示します。</p>
             </div>
         </article>
         <article class="os-pillar">

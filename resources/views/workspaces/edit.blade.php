@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Workspace設定 - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Workspace設定 - Company OS'])
 
 @section('content')
     <section class="stack">

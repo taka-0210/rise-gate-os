@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title ?? 'Rise Gate OS' }}</title>
+    <title>{{ $title ?? 'Company OS' }}</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('favicon.png') }}">
     <style>
@@ -39,8 +39,10 @@
             border-bottom: 1px solid var(--line);
             background: #fff;
         }
-        .brand { display:inline-flex; align-items:center; flex:0 0 auto; }
-        .brand-logo { display:block; width:194px; max-width:100%; height:auto; }
+        .brand { display:inline-flex; align-items:center; gap:12px; flex:0 0 auto; color:var(--ink); }
+        .brand-mark { display:grid; gap:1px; line-height:1; }
+        .brand-name { font-size:24px; font-weight:900; letter-spacing:-.04em; }
+        .brand-operator { color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; }
         .workspace-pill {
             display: inline-flex;
             align-items: center;
@@ -51,7 +53,11 @@
             color: var(--muted);
             font-size: 13px;
         }
-        .nav { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 14px; }
+        .nav { display: flex; align-items: center; justify-content:flex-end; flex-wrap:wrap; gap: 14px; color: var(--muted); font-size: 14px; }
+        .nav-separator { width:1px; height:20px; background:var(--line); }
+        .breadcrumbs { display:flex; align-items:center; gap:8px; width:min(1040px, calc(100% - 40px)); margin:18px auto -18px; color:var(--muted); font-size:13px; }
+        .breadcrumbs a { color:var(--muted); }
+        .breadcrumbs [aria-current="page"] { color:var(--ink); font-weight:700; }
         .main { width: min(1040px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0; }
         .panel {
             background: #fff;
@@ -273,7 +279,8 @@
         }
         @media (max-width: 760px) {
             .topbar { align-items: flex-start; flex-direction: column; }
-            .brand-logo { width:174px; }
+            .nav-separator { display:none; }
+            .breadcrumbs { width:min(100% - 28px, 1040px); margin-top:14px; }
             .main { width: min(100% - 28px, 1040px); padding-top: 28px; }
             .grid { grid-template-columns: 1fr; }
             .pagination { align-items: flex-start; flex-direction: column; }
@@ -287,8 +294,11 @@
 <body @class(['company-finance-screen' => request()->routeIs('company-finance.*')])>
 <div class="shell">
     <header class="topbar">
-        <a class="brand" href="{{ route('welcome') }}" aria-label="RISE GATE OS トップへ">
-            <img class="brand-logo" src="{{ asset('images/rise-gate-os-logo.png') }}" alt="RISE GATE OS">
+        <a class="brand" href="{{ auth()->check() && session('access_mode') !== 'system_admin' ? route('company.home') : route('welcome') }}" aria-label="Company OS トップへ">
+            <span class="brand-mark">
+                <span class="brand-name">Company OS</span>
+                <span class="brand-operator">by RISE GATE</span>
+            </span>
         </a>
         <nav class="nav">
             @auth
@@ -311,6 +321,7 @@
                         <span class="workspace-pill">› {{ $currentWorkspace->name }} / {{ $currentWorkspaceRole }}</span>
                     @endisset
                     @isset($currentCompany)
+                        <a href="{{ route('company.home') }}">ホーム</a>
                         @if ($canViewCompanyFinance ?? false)
                             <a href="{{ route('company-finance.index') }}">経営数値</a>
                         @endif
@@ -323,8 +334,10 @@
                         <a href="{{ route('workspaces.index') }}">Workspaces</a>
                     @endisset
                     @isset($currentWorkspace)
-                        <a href="{{ route('clients.index') }}">Clients</a>
-                        <a href="{{ route('projects.index') }}">Projects</a>
+                        <span class="nav-separator" aria-hidden="true"></span>
+                        <a href="{{ route('dashboard') }}">ダッシュボード</a>
+                        <a href="{{ route('clients.index') }}">顧客企業</a>
+                        <a href="{{ route('projects.index') }}">Project Management</a>
                         <a href="{{ route('development-guide') }}">開発の進め方</a>
                         <a href="{{ route('documents.index') }}">帳票管理</a>
                         <a href="{{ route('ai-connections.index') }}">AI接続</a>
@@ -346,6 +359,35 @@
             @endauth
         </nav>
     </header>
+    @auth
+        @if (session('access_mode') !== 'system_admin' && isset($currentCompany))
+            @php
+                $module = match (true) {
+                    request()->routeIs('company-finance.*') => ['経営数値', route('company-finance.index')],
+                    request()->routeIs('company-loans.*') => ['借入管理', route('company-loans.index')],
+                    request()->routeIs('company-members.*') => ['会社設定', route('company-members.index')],
+                    request()->routeIs('clients.*') => ['顧客企業', route('clients.index')],
+                    request()->routeIs('projects.*') || request()->routeIs('estimates.*') => ['Project Management', route('projects.index')],
+                    request()->routeIs('dashboard') => ['ダッシュボード', route('dashboard')],
+                    request()->routeIs('documents.*') => ['帳票管理', route('documents.index')],
+                    request()->routeIs('ai-connections.*') || request()->routeIs('ai-settings.*') => ['AI', route('ai-settings.edit')],
+                    request()->routeIs('workspaces.*') => ['Workspaces', route('workspaces.index')],
+                    default => null,
+                };
+            @endphp
+            <nav class="breadcrumbs" aria-label="パンくず">
+                <a href="{{ route('company.home') }}">Company OS</a>
+                @if($module)
+                    <span aria-hidden="true">›</span>
+                    <a href="{{ $module[1] }}" @if(!isset($project)) aria-current="page" @endif>{{ $module[0] }}</a>
+                @endif
+                @isset($project)
+                    <span aria-hidden="true">›</span>
+                    <a href="{{ route('projects.show', $project) }}" aria-current="page">{{ $project->name }}</a>
+                @endisset
+            </nav>
+        @endif
+    @endauth
     <main class="main">
         @yield('content')
     </main>

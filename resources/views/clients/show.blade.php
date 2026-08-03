@@ -1,4 +1,4 @@
-﻿@extends('layouts.app', ['title' => $client->name.' - Rise Gate OS'])
+@extends('layouts.app', ['title' => $client->name.' - Company OS'])
 
 @section('content')
     <section class="stack">
@@ -53,14 +53,14 @@
                     <h2>Project Link</h2>
                     <p>ProjectはCompanyから生まれる改善の単位です。現在このCompanyに紐付くProjectは {{ $projectsCount }} 件です。</p>
                 </div>
-                <a class="button" href="{{ route('projects.create', ['client_id' => $client->id]) }}">Create Project</a>
+                <a class="button" href="{{ route('projects.create', ['client_id' => $client->id]) }}">Projectを作成</a>
             </div>
             <p class="meta">Client配下のProject一覧はPhase 1-5では作り込みません。Project一覧と詳細で関連を確認します。</p>
         </div>
 
         <div class="panel stack">
             <div>
-                <div class="meta">COMPANY OS</div>
+                <div class="meta">Company OS</div>
                 <h2>会社アカウント</h2>
                 <p>経営指針・経営数値・所属ユーザー・Workspaceを所有する会社アカウントです。Clientと関連付けても、既存Projectは移動しません。</p>
             </div>

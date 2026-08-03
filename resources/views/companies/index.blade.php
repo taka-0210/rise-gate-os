@@ -1,9 +1,9 @@
-@extends('layouts.app', ['title' => '会社を選択 - COMPANY OS'])
+@extends('layouts.app', ['title' => '会社を選択 - Company OS'])
 
 @section('content')
     <section class="stack">
         <div>
-            <div class="meta">COMPANY OS</div>
+            <div class="meta">Company OS</div>
             <h1>会社を選択</h1>
             <p>経営・仕事を確認する会社を選択してください。</p>
         </div>

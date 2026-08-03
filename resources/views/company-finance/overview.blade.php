@@ -1,7 +1,7 @@
-@extends('layouts.app', ['title' => '経営数値 - COMPANY OS'])
+@extends('layouts.app', ['title' => '経営数値 - Company OS'])
 
 @section('content')
-<div class="page-header"><div><div class="meta">COMPANY OS / FINANCE</div><h1>経営数値</h1><p>決算、計画、月次実績をつなぎ、会社の現在地を判断する場所です。</p></div></div>
+<div class="page-header"><div><div class="meta">Company OS / FINANCE</div><h1>経営数値</h1><p>決算、計画、月次実績をつなぎ、会社の現在地を判断する場所です。</p></div></div>
 @if(session('status'))<div class="alert success">{{ session('status') }}</div>@endif
 
 <div class="finance-entries">

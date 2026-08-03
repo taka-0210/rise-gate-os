@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'System Admin Login - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'System Admin Login - Company OS'])
 
 @section('content')
     <section class="panel stack">

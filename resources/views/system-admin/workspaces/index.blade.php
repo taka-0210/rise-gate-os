@@ -4,7 +4,7 @@
     <section class="stack">
         <div>
             <h1>Workspace管理</h1>
-            <p>Rise Gate OSに登録されているすべてのWorkspaceを管理します。</p>
+            <p>Company OSに登録されているすべてのWorkspaceを管理します。</p>
         </div>
         <div class="grid">
             @foreach ($workspaces as $workspace)

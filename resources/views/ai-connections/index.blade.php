@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'AI接続 | RISE GATE OS'])
+@extends('layouts.app', ['title' => 'AI接続 | Company OS'])
 
 @section('content')
     <section class="panel stack">

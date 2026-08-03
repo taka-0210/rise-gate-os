@@ -1,9 +1,9 @@
-﻿@extends('layouts.app', ['title' => 'Register - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Register - Company OS'])
 
 @section('content')
     <section class="panel stack">
         <div>
-            <h1>Rise Gate OS を開始</h1>
+            <h1>Company OS を開始</h1>
             <p>最初のユーザー、Organization、Workspaceを作成します。作成したユーザーはOwnerになります。</p>
         </div>
 

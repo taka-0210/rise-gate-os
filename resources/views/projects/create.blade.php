@@ -1,4 +1,4 @@
-﻿@extends('layouts.app', ['title' => 'Create Project - Rise Gate OS'])
+@extends('layouts.app', ['title' => 'Projectを作成 - Company OS'])
 
 @section('content')
     <style>
@@ -15,7 +15,7 @@
     </style>
     <section class="panel stack">
         <div>
-            <h1>Create Project</h1>
+            <h1>Projectを作成</h1>
             <p>Projectは、クライアントの改善を実行し、進捗を共有する中心単位です。</p>
         </div>
 
@@ -124,7 +124,7 @@
             </div>
 
             <div class="actions">
-                <button type="submit">Create Project</button>
+                <button type="submit">Projectを作成</button>
                 <a href="{{ route('projects.index') }}">Cancel</a>
             </div>
         </form>
