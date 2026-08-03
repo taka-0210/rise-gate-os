@@ -47,14 +47,14 @@ Chapter 8  現在の実装とこれから
 
 ## 全体構成
 
-表紙と読み方を含め、完成時は全37ページ前後を想定します。ページ数は内容を削るための上限ではなく、一つのメッセージを一枚で理解できる密度を保つための目安です。
+表紙と読み方を含め、完成時は全38ページ前後を想定します。ページ数は内容を削るための上限ではなく、一つのメッセージを一枚で理解できる密度を保つための目安です。
 
 | 区分 | 章 | 中心となる問い | 目安 | 状態 |
 |---|---|---|---:|---|
 | Front | 表紙・Blueprintの読み方 | この資料は何で、どう読めばよいか | 2ページ | 構成確定 |
 | Chapter 1 | Company OSはなぜ必要か | 日本を支える中小企業が、自ら進化し続けるために何が必要か | 5ページ | レビュー完了 |
-| Chapter 2 | 会社の進化は、止まらない。 | 「改善に終わりはない」とは何を意味するか | 5ページ | 初版作成済み |
-| Chapter 3 | 会社の進化を構成する概念 | 観察、意味付け、改善、判断、結果、学びに、どのような名前と役割を与えるか | 6ページ | 未作成 |
+| Chapter 2 | 会社の進化は、止まらない。 | 「改善に終わりはない」とは何を意味するか | 5ページ | レビュー反映済み |
+| Chapter 3 | 会社の進化を構成する言葉 | 観察、意味付け、改善、判断、結果、学びに、どのような名前と役割を与えるか | 7ページ | 初版作成済み |
 | Chapter 4 | 会社の意味と知能 | 概念同士のつながり、問い、根拠、説明責任がなぜ必要か | 5ページ | 未作成 |
 | Chapter 5 | Company OSのプロダクト構造 | 標準機能、実行モジュール、AIはどう位置付くか | 5ページ | 未作成 |
 | Chapter 6 | 会社・人・パートナー | 誰が、どの会社・拠点・役割でCompany OSを使うか | 4ページ | 未作成・一部要定義 |
@@ -100,7 +100,9 @@ Chapter 8  現在の実装とこれから
 - 会社が目指す方向が循環全体を照らすこと
 - 循環するたびに会社の経験と知識が育つこと
 
-### Chapter 3: 会社の進化を構成する概念
+### Chapter 3: 会社の進化を構成する言葉
+
+内部整理名: Company OS Dictionary
 
 主要参照:
 
@@ -111,10 +113,14 @@ Chapter 8  現在の実装とこれから
 
 扱う内容:
 
-- Direction、Observation、Sense、Improvement、Decision
-- Task、Project、Result、Knowledge、AI Proposal
-- 事実、解釈、判断、実行の分離
-- ProjectはImprovementを実現する実行モジュールであること
+- Direction、Observation、Sense、Improvement、Decision、Result、Knowledge
+- その名前を選んだ理由
+- 似ている一般用語との違い
+- 事実、解釈、判断、結果、学びの分離
+
+編集上の注意:
+
+Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行手段とAI支援の位置付けを理解してから説明する方が自然です。Chapter 3へ詰め込まず、Product構造を扱うChapter 5で説明します。
 
 ### Chapter 4: 会社の意味と知能
 
@@ -219,7 +225,8 @@ HIT-HUB統合、Branch機能、代理店向け機能は構想段階です。正�
 
 - [`chapter-01-why-company-os.md`](chapter-01-why-company-os.md): Chapter 1「Company OSはなぜ必要か」
 - [`chapter-02-continuous-evolution.md`](chapter-02-continuous-evolution.md): Chapter 2「会社の進化は、止まらない。」
+- [`chapter-03-company-os-dictionary.md`](chapter-03-company-os-dictionary.md): Chapter 3「会社の進化を構成する言葉」
 
 ## 次に行うこと
 
-Chapter 2のメッセージ、用語、順序を確認してからChapter 3へ進みます。現時点ではChapter 3以降の本文を作成しません。
+Chapter 3の言葉、意味、順序を確認してからChapter 4へ進みます。現時点ではChapter 4以降の本文を作成しません。
