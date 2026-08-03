@@ -576,40 +576,19 @@ AI Proposalは承認されても、自動的に対象概念を書き換えませ
 
 ## Relationship Model
 
-Phase2-3で物理方式を確定する前提として、関係には少なくとも次の意味が必要です。
+Phase2-3で、Relationshipを第一級のドメイン概念として確定しました。
 
-```text
-from_concept
-to_concept
-relationship_type
-role
-rationale
-created_by
-created_at
-```
+正本は`company-os-relationship-model.md`です。
 
-必要な関係種別の初期候補は次のとおりです。
+主な決定:
 
-```text
-observed_from
-supports
-contradicts
-interprets
-discovered_from
-aligned_with
-decided_for
-executed_by
-produced
-evaluates
-learned_from
-generated_observation
-references
-supersedes
-derived_from
-related_to
-```
-
-汎用的なGraph Edgeだけで全関係を実装すると、参照整合性と業務ルールが弱くなります。Phase2-3では、重要な関係を専用Relationとして持ち、探索用のGraph表現を併用する案を比較します。
+- 所有、認可、業務整合性は専用FKまたは専用Relationを正本とする。
+- 意味探索に使う関係をRelationship Modelで表現する。
+- Relationshipは理由、根拠、確信度、強さ、時間、可視性、確認状態を持つ。
+- Relationship TypeはRegistryで管理し、自由入力を認めない。
+- AIが生成した意味関係は、人が確認するまで`proposed`とする。
+- 矛盾する意味を削除せず、並存と判断履歴を許容する。
+- `Result generates Observation`をContinuous Evolutionの必須関係とする。
 
 ## Lifecycle Events
 
@@ -663,20 +642,19 @@ Observation remains available for the next cycle
 
 Knowledgeが作られないResultはあり得ます。しかし、評価されたResultがObservationへ戻らず、循環から消えることは認めません。
 
-## Open Decisions for Phase2-3
+## Decisions Handed to Later Phases
 
-次の内容は、関係性設計で確定します。
+Phase2-3でRelationshipの意味モデルを確定しました。次の内容は物理モデル、Company Evolution Graph、権限設計で確定します。
 
-1. 重要関係ごとの専用Relationと汎用Graph Edgeの境界。
+1. 各専用RelationとSemantic Relationshipを同期するDomain Eventの範囲。
 2. 既存Project ImprovementとCompany Improvementを同一Aggregateへ統合するか。
 3. TaskをCompany直下でも作成できるようにするか。
-4. ObservationとResultから生成されるObservationの重複表現。
+4. ResultからObservationを生成するトランザクションと再実行時の一意性。
 5. Senseの正式なコード名称を`Sensemaking`と`Interpretation`のどちらにするか。
 6. Directionのバージョンと、判断時点のDirectionをどう固定するか。
 7. KnowledgeとDocumentの所有・公開範囲。
-8. Domain Eventを監査ログとして永続化する範囲。
+8. Relationship Domain Eventを監査ログとして永続化する範囲。
 9. AI Proposalの既存Project向け実装とCompany向け提案の境界。
 10. Company、Workspace、Projectをまたぐ権限と可視性。
 
-この論理モデルをPhase2-3のネットワーク設計とEvent Stormingセッションの入力とします。
-
+この論理モデルとRelationship Modelを、Company Evolution Graphと物理設計の入力とします。

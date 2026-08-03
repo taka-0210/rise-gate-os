@@ -47,10 +47,11 @@ AI は蓄積された知識を活用するパートナーです。
 
 ## Project Status
 
-- Design version: v1.0 fixed
-- Current phase: Phase 1-6 completed / Operation preparation
-- Laravel implementation: Phase 1 foundation implemented
-- Next step: Operate Rise Gate OS development inside Rise Gate OS itself
+- Core Model: Phase2-1 v1.0 fixed
+- Domain Model: Phase2-2 logical model documented
+- Relationship Model: Phase2-3 v1.0 fixed
+- Laravel implementation: Existing Project Management and Company foundation implemented
+- Next design phase: Company Evolution Graph
 
 ## Implemented Foundation
 
@@ -122,6 +123,7 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 
 - `product/company-os-core-model.md`: Company OSの憲法となるPhase2-1 Core Model
 - `product/company-os-domain-model.md`: Phase2-2 Concept / Domain Model
+- `product/company-os-relationship-model.md`: Phase2-3 意味のネットワークとRelationship Model
 - `philosophy.md`: 思想・目的・価値観
 - `product/company-os-value.md`: COMPANY OSの価値、ChatGPTとの違い、現在地と目指す姿
 - `architecture.md`: システム全体構成と責務分離

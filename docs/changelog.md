@@ -29,6 +29,24 @@ Summary:
 - Event StormingとDomain Eventを設計へ採用し、Event Sourcingは前提にしない方針とした。
 - Phase2-2の論理データモデルを作成し、物理実装前の不変条件と未決事項を整理した。
 
+## Phase2-3 - Company OS Relationship Model v1.0
+
+Status: Fixed as the semantic network model before graph, database, and UI design.
+
+Summary:
+
+- Relationshipを単なる中間テーブルではなく、根拠、責任、確信度、時間を持つ意味主張と定義した。
+- Core ConceptをNode、Relationshipを意味のEdgeとして扱う方針を確定した。
+- Evidence、Intent、Decision、Execution、Outcome、Graph UtilityのRelationship分類を定義した。
+- 正規Relationship Type v1とRelationship Type Registryを定義した。
+- 逆方向Relationshipは重複保存せず、Registryの逆表示から生成する方針とした。
+- Relationshipにreason、context、confidence、strength、valid期間、origin、review、visibilityを持たせる論理構造を定義した。
+- AIが作る意味関係は、人が確認するまで`proposed`とする権限境界を定義した。
+- 矛盾するRelationshipを削除せず、同時に保持して判断履歴を残す方針とした。
+- 所有・認可・参照整合性の正本を専用FK／Relationとし、Semantic Graphだけに依存しない方針とした。
+- `Result generates Observation`をContinuous Evolutionの必須Relationshipとした。
+- Graph Database、Event Sourcing、画面実装は前提にせず、次フェーズでCompany Evolution Graphを設計することとした。
+
 ## v1.0 - Design Fixed
 
 Status: Fixed before Laravel implementation.
