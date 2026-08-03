@@ -159,19 +159,23 @@ Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行
 扱う内容:
 
 - Company OSは一つのシステムではなく、会社が進化し続けるための基盤であること
-- Foundation、Company Core、Business Modulesの3層
+- 会社の正式な土台、進化を担う中心、会社ごとの実務という責任領域
+- Decisionを行動へ渡し、Resultを戻す実行境界
 - 経営理念、経営指針、経営数値、借入、組織・メンバーを支えるFoundation
 - Direction、Observation、Sense、Improvement、Decision、Knowledge、Company Dialogue、Company AIを担うCompany Core
-- Project Management、CRM、Meetingなど、会社ごとに選択できるBusiness Modules
+- Projectを業務領域ではなく実行方式として位置付ける考え方
+- 会社ごとに接続する業務能力と、製品として提供するModuleの区別
 - 現在のRISE GATE OSと、将来のCompany Execution Engineという役割名の検討
 - HIT-HUBは将来統合を検討するBusiness Moduleであり、正式機能ではないこと
 - Company OSの思想をそのまま形にした全体鳥瞰図
 
 編集上の注意:
 
-FoundationとCompany CoreはCompany OSを成立させる共通基盤、Business Modulesは会社ごとに選択・追加できる実務領域として区別します。RISE GATE OSの正式な将来名称、個々のBusiness Moduleの提供範囲、HIT-HUB統合は未確定事項として明示し、完成済みの機能として表現しません。
+責任上の構造と、販売・契約・画面上のModule構成を混在させません。Foundation、Company Core、Business Modulesなどの呼称も責任確定前の仮称として扱います。RISE GATE OSの正式な将来名称、個々の提供範囲、HIT-HUB統合は未確定事項として明示し、完成済みの機能として表現しません。
 
 Project ManagementをBusiness Modulesと同列に置く初版構造は再検討中です。先に[`chapter-05-responsibility-review.md`](chapter-05-responsibility-review.md)で各領域の責任と実行方式の境界を確定し、その後にChapter 5本文と全体鳥瞰図を改訂します。
+
+比較レビューを踏まえた1案の最終推奨構造は、[`chapter-05-final-structure-proposal.md`](chapter-05-final-structure-proposal.md)にまとめています。この提案が承認されるまでは、Chapter 5本文へ反映しません。
 
 ### Chapter 6: 会社・人・パートナー
 
@@ -242,7 +246,8 @@ HIT-HUB統合、Branch機能、代理店向け機能は構想段階です。正�
 - [`chapter-04-meaningful-relationships.md`](chapter-04-meaningful-relationships.md): Chapter 4「会社の出来事は、つながった瞬間に意味を持つ。」
 - [`chapter-05-company-os-product-architecture.md`](chapter-05-company-os-product-architecture.md): Chapter 5「会社の土台・思考・実行を、一つにつなぐ」
 - [`chapter-05-responsibility-review.md`](chapter-05-responsibility-review.md): Chapter 5責任設計レビュー（本文改訂前の比較資料）
+- [`chapter-05-final-structure-proposal.md`](chapter-05-final-structure-proposal.md): Chapter 5最終推奨構造案（承認前）
 
 ## 次に行うこと
 
-Chapter 5責任設計レビューでProjectと実行領域の位置付けを確定し、Chapter 5本文と全体鳥瞰図を改訂してからChapter 6へ進みます。現時点ではChapter 6以降の本文を作成しません。
+Chapter 5最終推奨構造案をレビューし、承認後にChapter 5本文と全体鳥瞰図を改訂してからChapter 6へ進みます。現時点ではChapter 6以降の本文を作成しません。

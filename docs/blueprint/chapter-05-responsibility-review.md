@@ -3,7 +3,7 @@
 ## この資料の位置付け
 
 - 対象: Chapter 5のプロダクト全体構造
-- 状態: 比較・レビュー中
+- 状態: 比較完了・最終推奨案作成済み
 - 目的: 名称より先に、各領域が何に責任を持つかを確定する
 - 対象外: 画面、データベース、Controller、物理ディレクトリ、正式ブランド名の決定
 
@@ -24,6 +24,8 @@ Task / Project / Experiment
 Project ManagementをCRMなどと同じ階層へ置くと、「業務領域」と「実行方式」の違いが見えなくなります。
 
 この資料では、名称を決める前に責任と境界を整理します。
+
+比較後に1案へ絞った結論は、[`chapter-05-final-structure-proposal.md`](chapter-05-final-structure-proposal.md)にまとめています。
 
 ---
 

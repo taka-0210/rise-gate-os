@@ -130,6 +130,7 @@ Evolution Dashboard は、会社の未来へ進むためのホーム画面です
 - `blueprint/chapter-04-meaningful-relationships.md`: Blueprint Chapter 4「会社の出来事は、つながった瞬間に意味を持つ。」
 - `blueprint/chapter-05-company-os-product-architecture.md`: Blueprint Chapter 5「会社の土台・思考・実行を、一つにつなぐ」
 - `blueprint/chapter-05-responsibility-review.md`: Chapter 5責任設計レビューと構造案比較
+- `blueprint/chapter-05-final-structure-proposal.md`: Chapter 5最終推奨構造案
 - `product/company-os-core-model.md`: Company OSの憲法となるPhase2-1 Core Model
 - `product/company-os-domain-model.md`: Phase2-2 Concept / Domain Model
 - `product/company-os-relationship-model.md`: Phase2-3 意味のネットワークとRelationship Model
