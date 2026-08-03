@@ -56,7 +56,7 @@ Chapter 8  現在の実装とこれから
 | Chapter 2 | 会社の進化は、止まらない。 | 「改善に終わりはない」とは何を意味するか | 5ページ | レビュー反映済み |
 | Chapter 3 | 会社の進化を構成する言葉 | 観察、意味付け、改善、判断、結果、学びに、どのような名前と役割を与えるか | 7ページ | レビュー反映済み |
 | Chapter 4 | 会社の出来事は、つながった瞬間に意味を持つ。 | 概念同士のつながり、問い、根拠、説明責任がなぜ必要か | 5ページ | レビュー完了 |
-| Chapter 5 | 会社の土台・思考・実行を、一つにつなぐ | Company OSを支える3層と、その役割の違い | 6ページ | 初版作成済み |
+| Chapter 5 | 会社の土台・思考・実行を、一つにつなぐ | Company OSを支える3層と、その役割の違い | 6ページ | 責任設計レビュー中 |
 | Chapter 6 | 会社・人・パートナー | 誰が、どの会社・拠点・役割でCompany OSを使うか | 4ページ | 未作成・一部要定義 |
 | Chapter 7 | Company OSを会社へ導入する | 会社の観察設計と対話をどう始めるか | 3ページ | 未作成 |
 | Chapter 8 | 現在地とこれから | 現在何が動き、どのようにCompany OS全体へ育てるか | 2ページ | 未作成・一部要定義 |
@@ -171,6 +171,8 @@ Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行
 
 FoundationとCompany CoreはCompany OSを成立させる共通基盤、Business Modulesは会社ごとに選択・追加できる実務領域として区別します。RISE GATE OSの正式な将来名称、個々のBusiness Moduleの提供範囲、HIT-HUB統合は未確定事項として明示し、完成済みの機能として表現しません。
 
+Project ManagementをBusiness Modulesと同列に置く初版構造は再検討中です。先に[`chapter-05-responsibility-review.md`](chapter-05-responsibility-review.md)で各領域の責任と実行方式の境界を確定し、その後にChapter 5本文と全体鳥瞰図を改訂します。
+
 ### Chapter 6: 会社・人・パートナー
 
 主要参照:
@@ -239,7 +241,8 @@ HIT-HUB統合、Branch機能、代理店向け機能は構想段階です。正�
 - [`chapter-03-company-os-dictionary.md`](chapter-03-company-os-dictionary.md): Chapter 3「会社の進化を構成する言葉」
 - [`chapter-04-meaningful-relationships.md`](chapter-04-meaningful-relationships.md): Chapter 4「会社の出来事は、つながった瞬間に意味を持つ。」
 - [`chapter-05-company-os-product-architecture.md`](chapter-05-company-os-product-architecture.md): Chapter 5「会社の土台・思考・実行を、一つにつなぐ」
+- [`chapter-05-responsibility-review.md`](chapter-05-responsibility-review.md): Chapter 5責任設計レビュー（本文改訂前の比較資料）
 
 ## 次に行うこと
 
-Chapter 5の3層構造、全体鳥瞰図、実行領域の名称候補を確認してからChapter 6へ進みます。現時点ではChapter 6以降の本文を作成しません。
+Chapter 5責任設計レビューでProjectと実行領域の位置付けを確定し、Chapter 5本文と全体鳥瞰図を改訂してからChapter 6へ進みます。現時点ではChapter 6以降の本文を作成しません。

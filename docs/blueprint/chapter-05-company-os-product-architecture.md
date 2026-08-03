@@ -2,6 +2,9 @@
 
 内部整理名: Company OS Product Architecture
 
+> [!IMPORTANT]
+> このChapterは責任設計レビュー中です。Project ManagementをBusiness Modulesと同列に置く初版構造は確定していません。先に[`chapter-05-responsibility-review.md`](chapter-05-responsibility-review.md)で責任と実行方式の境界を整理し、その判断後に本文と全体鳥瞰図を改訂します。
+
 ## Chapterの目的
 
 Chapter 4までで、会社は出来事の数ではなく、出来事同士の意味あるつながりによって理解できることを見てきました。
