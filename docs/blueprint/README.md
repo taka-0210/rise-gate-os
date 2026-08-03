@@ -54,8 +54,8 @@ Chapter 8  現在の実装とこれから
 | Front | 表紙・Blueprintの読み方 | この資料は何で、どう読めばよいか | 2ページ | 構成確定 |
 | Chapter 1 | Company OSはなぜ必要か | 日本を支える中小企業が、自ら進化し続けるために何が必要か | 5ページ | レビュー完了 |
 | Chapter 2 | 会社の進化は、止まらない。 | 「改善に終わりはない」とは何を意味するか | 5ページ | レビュー反映済み |
-| Chapter 3 | 会社の進化を構成する言葉 | 観察、意味付け、改善、判断、結果、学びに、どのような名前と役割を与えるか | 7ページ | 初版作成済み |
-| Chapter 4 | 会社の意味と知能 | 概念同士のつながり、問い、根拠、説明責任がなぜ必要か | 5ページ | 未作成 |
+| Chapter 3 | 会社の進化を構成する言葉 | 観察、意味付け、改善、判断、結果、学びに、どのような名前と役割を与えるか | 7ページ | レビュー反映済み |
+| Chapter 4 | 会社の出来事は、つながった瞬間に意味を持つ。 | 概念同士のつながり、問い、根拠、説明責任がなぜ必要か | 5ページ | 初版作成済み |
 | Chapter 5 | Company OSのプロダクト構造 | 標準機能、実行モジュール、AIはどう位置付くか | 5ページ | 未作成 |
 | Chapter 6 | 会社・人・パートナー | 誰が、どの会社・拠点・役割でCompany OSを使うか | 4ページ | 未作成・一部要定義 |
 | Chapter 7 | Company OSを会社へ導入する | 会社の観察設計と対話をどう始めるか | 3ページ | 未作成 |
@@ -122,7 +122,9 @@ Chapter 8  現在の実装とこれから
 
 Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行手段とAI支援の位置付けを理解してから説明する方が自然です。Chapter 3へ詰め込まず、Product構造を扱うChapter 5で説明します。
 
-### Chapter 4: 会社の意味と知能
+### Chapter 4: 会社の出来事は、つながった瞬間に意味を持つ。
+
+内部整理名: Relationship Model
 
 主要参照:
 
@@ -133,7 +135,10 @@ Task、Project、AI ProposalはCore Model上の重要な言葉ですが、実行
 扱う内容:
 
 - Company OSは意味のネットワークであること
-- Relationshipが保持する理由、根拠、確信度、時間、責任
+- 一つの出来事だけでは会社を理解できないこと
+- 星、星座、星雲によるCompany OSの世界観
+- つながりが保持する理由、根拠、確かさ、時間、責任
+- 複数の意味や反証を消さずに残す理由
 - Company OSが答えるべき問い
 - Evidence、反証、不確実性、説明責任
 - 「現時点では判断できない」と言えるCompany Intelligence
@@ -226,7 +231,8 @@ HIT-HUB統合、Branch機能、代理店向け機能は構想段階です。正�
 - [`chapter-01-why-company-os.md`](chapter-01-why-company-os.md): Chapter 1「Company OSはなぜ必要か」
 - [`chapter-02-continuous-evolution.md`](chapter-02-continuous-evolution.md): Chapter 2「会社の進化は、止まらない。」
 - [`chapter-03-company-os-dictionary.md`](chapter-03-company-os-dictionary.md): Chapter 3「会社の進化を構成する言葉」
+- [`chapter-04-meaningful-relationships.md`](chapter-04-meaningful-relationships.md): Chapter 4「会社の出来事は、つながった瞬間に意味を持つ。」
 
 ## 次に行うこと
 
-Chapter 3の言葉、意味、順序を確認してからChapter 4へ進みます。現時点ではChapter 4以降の本文を作成しません。
+Chapter 4のメッセージ、世界観、順序を確認してからChapter 5へ進みます。現時点ではChapter 5以降の本文を作成しません。
