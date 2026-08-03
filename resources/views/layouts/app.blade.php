@@ -355,8 +355,6 @@
                 </form>
             @else
                 <a href="{{ route('login') }}">Login</a>
-                <a href="{{ route('system-admin.login') }}">System Admin</a>
-                <a class="button" href="{{ route('register') }}">Start</a>
             @endauth
         </nav>
     </header>

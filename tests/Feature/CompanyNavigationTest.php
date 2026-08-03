@@ -18,7 +18,11 @@ class CompanyNavigationTest extends TestCase
             ->assertOk()
             ->assertSee('Company OS')
             ->assertSee('by RISE GATE')
-            ->assertDontSee('RISE GATE OS');
+            ->assertSee('ログイン')
+            ->assertDontSee('RISE GATE OS')
+            ->assertDontSee('Company OSを始める')
+            ->assertDontSee('System Admin')
+            ->assertDontSee('Start');
     }
 
     public function test_single_company_user_enters_company_home_without_company_selector(): void

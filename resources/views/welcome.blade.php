@@ -25,11 +25,10 @@
                     </a>
                     <a class="button os-hero__secondary" href="{{ route('projects.index') }}">プロジェクトを見る</a>
                 @else
-                    <a class="button os-hero__primary" href="{{ route('register') }}">
-                        Company OSを始める
+                    <a class="button os-hero__primary" href="{{ route('login') }}">
+                        ログイン
                         <span aria-hidden="true">→</span>
                     </a>
-                    <a class="button os-hero__secondary" href="{{ route('login') }}">ログイン</a>
                 @endauth
             </div>
         </div>
