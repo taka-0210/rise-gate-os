@@ -165,7 +165,8 @@
         .time-row.is-roadmap .time-row-dot,.time-bar.is-roadmap { background:#4f82c4; }
         .time-row.is-improvement .time-row-dot,.time-bar.is-improvement { background:#56a27e; }
         .time-row.is-task .time-row-dot,.time-bar.is-task { background:#b5523d; }
-        .time-bar { position:absolute; top:13px; left:var(--bar-left); width:max(var(--bar-width),6px); height:18px; border-radius:999px; }
+        .time-bar { position:absolute; top:13px; left:var(--bar-left); width:max(var(--bar-width),6px); height:18px; border-radius:0; }
+        .time-bar.is-completed { border-radius:999px; }
         .time-bar.is-editable:not(.is-task) { cursor:grab; }
         .time-bar.is-dragging { cursor:grabbing; opacity:.78; }
         .time-resize-handle { position:absolute; z-index:2; top:-4px; width:10px; height:26px; border:2px solid #fff; border-radius:5px; background:#263f4d; cursor:ew-resize; box-shadow:0 1px 4px rgba(0,0,0,.25); }
@@ -220,6 +221,18 @@
         $relativeDate = fn (?int $day) => $day ? $relativeBase->copy()->addDays($day - 1) : null;
         $relativeOrigin = collect()->concat($roadmaps->pluck('planned_start_date'))->concat($project->improvements->pluck('planned_start_date'))->concat($allTasks->pluck('planned_start_date'))->filter()->min();
         $relativeDay = fn ($day, $date) => $day ?: ($relativeOrigin && $date ? $relativeOrigin->diffInDays($date) + 1 : null);
+        $improvementIsCompleted = function ($improvement): bool {
+            $activeTasks = $improvement->tasks->where('status', '!=', \App\Models\Task::STATUS_ARCHIVED);
+
+            return $activeTasks->isNotEmpty()
+                && $activeTasks->every(fn ($task) => $task->status === \App\Models\Task::STATUS_DONE);
+        };
+        $roadmapIsCompleted = function ($roadmap) use ($improvementIsCompleted): bool {
+            return $roadmap->improvements->isNotEmpty()
+                && $roadmap->improvements->every($improvementIsCompleted);
+        };
+        $projectIsCompleted = $roadmaps->isNotEmpty()
+            && $roadmaps->every($roadmapIsCompleted);
 
         $timeRows = collect();
         $scheduleIssueFor = function (string $type, int $id) use ($scheduleIntegrity): ?string {
@@ -272,6 +285,7 @@
             'editable' => Gate::allows('update', $project),
             'update_url' => route('projects.timeline.update', [$project, 'project', $project->id]),
             'descendant_count' => $projectDescendantCount,
+            'completed' => $projectIsCompleted,
         ]);
         $timelineRoadmaps = $roadmaps->sortBy(fn ($roadmap) => [
             $isRelativeTimeline ? ($roadmap->planned_start_day ?? PHP_INT_MAX) : ($roadmap->planned_start_date?->timestamp ?? PHP_INT_MAX),
@@ -294,7 +308,7 @@
             $roadmapEnd = $isRelativeTimeline ? $relativeDate($relativeDay($roadmap->target_day, $roadmap->target_date)) : ($roadmap->target_date ?: ($roadmapEnds->max() ?: $project->due_date));
             $roadmapDescendantCount = $timelineImprovements->filter(fn ($item) => $item->planned_start_date || $item->target_date)->count()
                 + $roadmapTasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
-            $timeRows->push(['type' => 'roadmap', 'id' => $roadmap->id, 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => !$isRelativeTimeline && $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $roadmap->reached_at, 'schedule_issue' => $scheduleIssueFor('roadmap', $roadmap->id), 'editable' => Gate::allows('update', $roadmap), 'update_url' => route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), 'descendant_count' => $roadmapDescendantCount]);
+            $timeRows->push(['type' => 'roadmap', 'id' => $roadmap->id, 'title' => $roadmap->title, 'start' => $roadmapStart, 'end' => $roadmapEnd, 'inferred' => !$roadmapHasPlan, 'overdue' => !$isRelativeTimeline && $roadmap->target_date && !$roadmap->reached_at && $roadmap->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $roadmap->reached_at, 'schedule_issue' => $scheduleIssueFor('roadmap', $roadmap->id), 'editable' => Gate::allows('update', $roadmap), 'update_url' => route('projects.timeline.update', [$project, 'roadmap', $roadmap->id]), 'descendant_count' => $roadmapDescendantCount, 'completed' => $roadmapIsCompleted($roadmap)]);
             foreach ($timelineImprovements as $improvement) {
                 $initiativeStarts = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[0])->filter();
                 $initiativeEnds = $improvement->tasks->map(fn ($task) => $taskPeriod($task)[1])->filter();
@@ -302,7 +316,7 @@
                 $initiativeStart = $isRelativeTimeline ? $relativeDate($relativeDay($improvement->planned_start_day, $improvement->planned_start_date)) : ($improvement->planned_start_date ?: ($initiativeStarts->min() ?: $roadmap->planned_start_date));
                 $initiativeEnd = $isRelativeTimeline ? $relativeDate($relativeDay($improvement->target_day, $improvement->target_date)) : ($improvement->target_date ?: ($initiativeEnds->max() ?: $roadmap->target_date));
                 $improvementDescendantCount = $improvement->tasks->filter(fn ($item) => $item->planned_start_date || $item->due_date)->count();
-                $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => !$isRelativeTimeline && $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id]), 'descendant_count' => $improvementDescendantCount]);
+                $timeRows->push(['type' => 'improvement', 'id' => $improvement->id, 'title' => $improvement->title, 'start' => $initiativeStart, 'end' => $initiativeEnd, 'inferred' => !$initiativeHasPlan, 'overdue' => !$isRelativeTimeline && $improvement->target_date && !$improvement->completed_at && $improvement->target_date->isPast(), 'reached' => $isRelativeTimeline ? null : $improvement->completed_at, 'schedule_issue' => $scheduleIssueFor('improvement', $improvement->id), 'editable' => Gate::allows('update', $improvement), 'update_url' => route('projects.timeline.update', [$project, 'improvement', $improvement->id]), 'descendant_count' => $improvementDescendantCount, 'completed' => $improvementIsCompleted($improvement)]);
                 $timelineTasks = $improvement->tasks->sortBy(fn ($task) => [
                     $isRelativeTimeline ? ($task->planned_start_day ?? PHP_INT_MAX) : ($task->planned_start_date?->timestamp ?? PHP_INT_MAX),
                     $isRelativeTimeline ? ($task->due_day ?? PHP_INT_MAX) : ($task->due_date?->timestamp ?? PHP_INT_MAX),
@@ -313,7 +327,7 @@
                     $taskHasPlan = $isRelativeTimeline ? ($task->planned_start_day && $task->due_day) : ($task->planned_start_date && $task->due_date);
                     $taskStart ??= $isRelativeTimeline ? $relativeDate($improvement->planned_start_day) : $improvement->planned_start_date;
                     $taskEnd ??= $isRelativeTimeline ? $relativeDate($improvement->target_day) : $improvement->target_date;
-                $timeRows->push(['type' => 'task', 'id' => $task->id, 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => ! $taskHasPlan, 'overdue' => !$isRelativeTimeline && $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null, 'schedule_issue' => $scheduleIssueFor('task', $task->id), 'editable' => Gate::allows('update', $task) && $task->status !== \App\Models\Task::STATUS_DONE, 'update_url' => route('projects.timeline.update', [$project, 'task', $task->id]), 'descendant_count' => 0]);
+                $timeRows->push(['type' => 'task', 'id' => $task->id, 'title' => $task->title, 'status_label' => $taskStatuses[$task->status] ?? $task->status, 'start' => $taskStart, 'end' => $taskEnd, 'inferred' => ! $taskHasPlan, 'overdue' => !$isRelativeTimeline && $task->status === \App\Models\Task::STATUS_IN_PROGRESS && $task->due_date && !$task->completed_at && $task->due_date->isPast(), 'reached' => null, 'schedule_issue' => $scheduleIssueFor('task', $task->id), 'editable' => Gate::allows('update', $task) && $task->status !== \App\Models\Task::STATUS_DONE, 'update_url' => route('projects.timeline.update', [$project, 'task', $task->id]), 'descendant_count' => 0, 'completed' => $task->status === \App\Models\Task::STATUS_DONE]);
                 }
             }
         }
@@ -625,7 +639,7 @@
                             <div class="time-row-track">
                                 @if (!$isRelativeTimeline && $includeTodayInTimeline)<span class="time-today"></span>@endif
                                 @if ($barStart && $barEnd)
-                                    <span class="time-bar is-{{ $row['type'] }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" data-descendant-count="{{ $row['descendant_count'] ?? 0 }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $isRelativeTimeline ? ($axisStart->diffInDays($barStart)+1).'日目〜'.($axisStart->diffInDays($barEnd)+1).'日目' : $barStart->format('Y/m/d').'〜'.$barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
+                                    <span class="time-bar is-{{ $row['type'] }} {{ ! empty($row['completed']) ? 'is-completed' : '' }} {{ $row['overdue'] ? 'is-overdue' : '' }} {{ $row['editable'] ? 'is-editable' : '' }}" data-bar-start="{{ $barStart->toDateString() }}" data-bar-end="{{ $barEnd->toDateString() }}" data-descendant-count="{{ $row['descendant_count'] ?? 0 }}" @if($row['editable']) data-schedule-url="{{ $row['update_url'] }}" data-entity-type="{{ $row['type'] }}" @endif style="--bar-left:{{ $barLeft }}%; --bar-width:{{ $barWidth }}%;" title="{{ ($row['status_label'] ?? null) ? $row['status_label'].' / ' : '' }}{{ $isRelativeTimeline ? ($axisStart->diffInDays($barStart)+1).'日目〜'.($axisStart->diffInDays($barEnd)+1).'日目' : $barStart->format('Y/m/d').'〜'.$barEnd->format('Y/m/d') }}{{ $row['overdue'] ? ' / 期限超過' : '' }}">
                                         @if ($row['editable'] && !($isRelativeTimeline && $row['type'] === 'project'))<i class="time-resize-handle is-start" data-resize="start" title="開始日を変更"></i>@endif
                                         @if ($row['editable'])<i class="time-resize-handle is-end" data-resize="end" title="{{ $row['type'] === 'task' ? '期限を変更' : '終了日を変更' }}"></i>@endif
                                     </span>

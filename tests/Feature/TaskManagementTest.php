@@ -824,6 +824,41 @@ class TaskManagementTest extends TestCase
         $this->assertStringContainsString('is-overdue', $startedBar[1] ?? '');
     }
 
+    public function test_time_view_rounds_bars_only_when_their_descendants_are_completed(): void
+    {
+        [$owner, $workspace, $project] = $this->createProjectOwner();
+        $task = $this->createTask($project, $owner);
+        $project->update(['duration_days' => 30]);
+        $task->improvement->roadmap->update(['planned_start_day' => 1, 'target_day' => 30]);
+        $task->improvement->update(['planned_start_day' => 2, 'target_day' => 20]);
+        $task->update(['planned_start_day' => 3, 'due_day' => 10]);
+
+        $incompleteHtml = $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all']))
+            ->assertOk()
+            ->getContent();
+
+        foreach (['project', 'roadmap', 'improvement', 'task'] as $type) {
+            $this->assertStringNotContainsString("time-bar is-{$type} is-completed", $incompleteHtml);
+        }
+
+        $task->update([
+            'status' => Task::STATUS_DONE,
+            'completed_at' => now(),
+        ]);
+
+        $completedHtml = $this->actingAs($owner)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.show', ['project' => $project, 'view' => 'time', 'schedule_step' => 'all']))
+            ->assertOk()
+            ->getContent();
+
+        foreach (['project', 'roadmap', 'improvement', 'task'] as $type) {
+            $this->assertStringContainsString("time-bar is-{$type} is-completed", $completedHtml);
+        }
+    }
+
     public function test_time_view_can_focus_on_future_plan_without_including_today(): void
     {
         [$owner, $workspace, $project] = $this->createProjectOwner();
