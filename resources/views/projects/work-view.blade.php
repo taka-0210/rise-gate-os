@@ -170,8 +170,8 @@
         .time-bar.is-editable:not(.is-task) { cursor:grab; }
         .time-bar.is-dragging { cursor:grabbing; opacity:.78; }
         .time-resize-handle { position:absolute; z-index:2; top:-4px; width:10px; height:26px; border:2px solid #fff; border-radius:5px; background:#263f4d; cursor:ew-resize; box-shadow:0 1px 4px rgba(0,0,0,.25); }
-        .time-resize-handle.is-start { left:-4px; }
-        .time-resize-handle.is-end { right:-4px; }
+        .time-resize-handle.is-start { left:-10px; }
+        .time-resize-handle.is-end { right:-10px; }
         .time-save-status { position:fixed; z-index:80; right:20px; bottom:20px; max-width:420px; padding:12px 16px; border-radius:8px; background:#263f4d; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2); }
         .time-save-status.is-error { background:#a33f2d; }
         .project-schedule-setup { display:grid; grid-template-columns:minmax(220px,1fr) minmax(160px,.6fr) minmax(160px,.6fr) auto; gap:14px; align-items:end; margin-bottom:16px; padding:18px; border:2px solid #3f69ac; border-radius:12px; background:#f5f8fd; }
