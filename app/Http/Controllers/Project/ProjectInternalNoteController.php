@@ -22,7 +22,7 @@ class ProjectInternalNoteController extends Controller
     {
         $this->authorizeInternalMember($request, $project);
         Gate::authorize('update', $project);
-        $validated = $request->validate([
+        $validated = $request->validateWithBag('internalNote', [
             'body' => ['nullable', 'string', 'max:10000'],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,pdf,csv,xlsx,docx'],
@@ -33,9 +33,12 @@ class ProjectInternalNoteController extends Controller
             'reference_share_with_ai' => ['nullable', 'boolean'],
         ]);
         if (blank($validated['body'] ?? null) && ! $request->hasFile('attachments') && blank($validated['reference_url'] ?? null)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            $exception = \Illuminate\Validation\ValidationException::withMessages([
                 'body' => 'メモ、添付資料、参考URLのいずれかを入力してください。',
             ]);
+            $exception->errorBag = 'internalNote';
+
+            throw $exception;
         }
         $note = $project->internalNotes()->create([
             'body' => $validated['body'] ?? '',

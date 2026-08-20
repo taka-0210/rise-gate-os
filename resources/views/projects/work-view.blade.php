@@ -449,8 +449,8 @@
             </details>
         @endif
 
-        <button type="button" class="ai-drawer-overlay {{ ($errors->any() || session('ai_request_copy_text')) ? 'is-open' : '' }}" data-ai-drawer-close aria-label="AIアシスタントを閉じる"></button>
-        <aside id="ai-assistant-drawer" class="ai-drawer {{ ($errors->any() || session('ai_request_copy_text')) ? 'is-open' : '' }}" aria-label="AIアシスタント" aria-hidden="{{ ($errors->any() || session('ai_request_copy_text')) ? 'false' : 'true' }}">
+        <button type="button" class="ai-drawer-overlay {{ ($errors->aiRequest->any() || session('ai_request_copy_text')) ? 'is-open' : '' }}" data-ai-drawer-close aria-label="AIアシスタントを閉じる"></button>
+        <aside id="ai-assistant-drawer" class="ai-drawer {{ ($errors->aiRequest->any() || session('ai_request_copy_text')) ? 'is-open' : '' }}" aria-label="AIアシスタント" aria-hidden="{{ ($errors->aiRequest->any() || session('ai_request_copy_text')) ? 'false' : 'true' }}">
             <div class="ai-drawer-head">
                 <div>
                     <div class="meta">このProjectをAIと相談する</div>
@@ -505,15 +505,19 @@
                         <div class="field">
                             <label for="ai_request_title">依頼名</label>
                             <input id="ai_request_title" name="title" value="{{ old('title', 'このProjectの計画を提案して') }}" required>
+                            @error('title', 'aiRequest')<div class="error">{{ $message }}</div>@enderror
                         </div>
                         <div class="field">
                             <label for="ai_request_instructions">Codexへの依頼内容</label>
                             <textarea id="ai_request_instructions" name="instructions" rows="5" required placeholder="例：現状を読み取り、次のロードマップ・取り組み・タスクを提案してください。">{{ old('instructions') }}</textarea>
+                            @error('instructions', 'aiRequest')<div class="error">{{ $message }}</div>@enderror
                         </div>
                         <div class="field">
                             <label for="ai_request_attachments">参考資料（最大5ファイル・各10MB）</label>
                             <input id="ai_request_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx">
                             <div class="meta">画像、PDF、Excel、CSV、Wordに対応。資料は非公開領域へ保存されます。</div>
+                            @error('attachments', 'aiRequest')<div class="error">{{ $message }}</div>@enderror
+                            @error('attachments.*', 'aiRequest')<div class="error">{{ $message }}</div>@enderror
                         </div>
                         @if ($canViewInternalNotes && $internalNotes->isNotEmpty())
                             <div class="field">
@@ -524,7 +528,7 @@
                                         <label><input type="checkbox" name="internal_note_ids[]" value="{{ $internalNote->id }}"><span>{{ Str::limit($internalNote->body ?: '参考URL・添付資料のみ', 90) }}@if($internalNote->attachments->isNotEmpty())（資料 {{ $internalNote->attachments->count() }}件）@endif @if($internalNote->references->where('share_with_ai', true)->isNotEmpty())（参考URL {{ $internalNote->references->where('share_with_ai', true)->count() }}件）@endif</span></label>
                                     @endforeach
                                 </div>
-                                @error('internal_note_ids')<div class="error">{{ $message }}</div>@enderror
+                                @error('internal_note_ids', 'aiRequest')<div class="error">{{ $message }}</div>@enderror
                             </div>
                         @endif
                         <div class="actions"><button type="submit">AIに提案を依頼</button></div>
@@ -849,12 +853,12 @@
                 @if ($canCreateInternalNote)
                     <form class="stack" method="POST" action="{{ route('projects.internal-notes.store', $project) }}" enctype="multipart/form-data">
                         @csrf
-                        <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body')<div class="error">{{ $message }}</div>@enderror</div>
-                        <details class="internal-reference-fields" @if(old('reference_url') || $errors->has('reference_url')) open @endif>
+                        <div class="field"><label for="internal_note_body">メモ内容</label><textarea id="internal_note_body" name="body" rows="3" placeholder="社内で共有したい検討内容や注意点を入力">{{ old('body') }}</textarea>@error('body', 'internalNote')<div class="error">{{ $message }}</div>@enderror</div>
+                        <details class="internal-reference-fields" @if(old('reference_url') || $errors->internalNote->has('reference_url')) open @endif>
                             <summary>参考Webページを追加</summary>
                             <div class="internal-reference-fields-body stack">
                                 <div class="meta">Codexに見てほしいページと、参考にする箇所を具体的に登録します。</div>
-                                <div class="field"><label for="reference_url">URL</label><input id="reference_url" name="reference_url" type="url" inputmode="url" placeholder="https://example.com/" value="{{ old('reference_url') }}">@error('reference_url')<div class="error">{{ $message }}</div>@enderror</div>
+                                <div class="field"><label for="reference_url">URL</label><input id="reference_url" name="reference_url" type="url" inputmode="url" placeholder="https://example.com/" value="{{ old('reference_url') }}">@error('reference_url', 'internalNote')<div class="error">{{ $message }}</div>@enderror</div>
                                 <div class="field"><label for="reference_title">ページ名（任意）</label><input id="reference_title" name="reference_title" placeholder="参考サイトのトップページ" value="{{ old('reference_title') }}"></div>
                                 <div class="internal-reference-points">
                                     <div class="field"><label for="reference_points">参考にする点</label><textarea id="reference_points" name="reference_points" rows="3" placeholder="余白、ファーストビュー、導線など">{{ old('reference_points') }}</textarea></div>
@@ -863,7 +867,7 @@
                                 <label class="actions"><input type="checkbox" name="reference_share_with_ai" value="1" style="width:auto;" @checked(old('reference_share_with_ai', true))> このURLをCodexへ共有する</label>
                             </div>
                         </details>
-                        <div class="field"><label for="internal_note_attachments">画像・社内資料（最大5ファイル・各10MB）</label><input id="internal_note_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx"><div class="meta">画像、PDF、Excel、CSV、Wordに対応。ファイルは非公開領域へ保存されます。</div>@error('attachments')<div class="error">{{ $message }}</div>@enderror @error('attachments.*')<div class="error">{{ $message }}</div>@enderror</div>
+                        <div class="field"><label for="internal_note_attachments">画像・社内資料（最大5ファイル・各10MB）</label><input id="internal_note_attachments" type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf,.csv,.xlsx,.docx"><div class="meta">画像、PDF、Excel、CSV、Wordに対応。ファイルは非公開領域へ保存されます。</div>@error('attachments', 'internalNote')<div class="error">{{ $message }}</div>@enderror @error('attachments.*', 'internalNote')<div class="error">{{ $message }}</div>@enderror</div>
                         <div class="actions"><button type="submit">社内メモを追加</button></div>
                     </form>
                 @endif

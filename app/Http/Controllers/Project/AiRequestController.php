@@ -22,7 +22,7 @@ class AiRequestController extends Controller
         Gate::authorize('view', $project);
         $workspace = $request->attributes->get('currentWorkspace');
         abort_unless($workspace && $project->owning_workspace_id === $workspace->id, 404);
-        $validated = $request->validate([
+        $validated = $request->validateWithBag('aiRequest', [
             'title' => ['required', 'string', 'max:255'],
             'instructions' => ['required', 'string', 'max:10000'],
             'attachments' => ['nullable', 'array', 'max:5'],
@@ -43,17 +43,23 @@ class AiRequestController extends Controller
                 ->whereIn('id', $validated['internal_note_ids'])
                 ->get();
             if ($internalNotes->count() !== count($validated['internal_note_ids'])) {
-                throw ValidationException::withMessages([
+                $exception = ValidationException::withMessages([
                     'internal_note_ids' => '選択した社内メモを確認できませんでした。画面を更新して選び直してください。',
                 ]);
+                $exception->errorBag = 'aiRequest';
+
+                throw $exception;
             }
         }
 
         $selectedAttachmentCount = $internalNotes->sum(fn ($note) => $note->attachments->count());
         if (count($request->file('attachments', [])) + $selectedAttachmentCount > 10) {
-            throw ValidationException::withMessages([
+            $exception = ValidationException::withMessages([
                 'attachments' => '直接添付と社内メモの資料を合わせて10件以内にしてください。',
             ]);
+            $exception->errorBag = 'aiRequest';
+
+            throw $exception;
         }
 
         $instructions = $validated['instructions'];

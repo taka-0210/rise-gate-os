@@ -157,6 +157,26 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee('Codexへ共有');
     }
 
+    public function test_empty_internal_note_validation_does_not_open_ai_assistant(): void
+    {
+        [$user, $workspace, $project] = $this->projectOwner('empty-internal-note');
+
+        $response = $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->from(route('projects.show', $project))
+            ->post(route('projects.internal-notes.store', $project));
+
+        $response
+            ->assertRedirect(route('projects.show', $project))
+            ->assertSessionHasErrors(['body'], null, 'internalNote');
+
+        $this->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertSee('メモ、添付資料、参考URLのいずれかを入力してください。')
+            ->assertDontSee('class="ai-drawer is-open"', false)
+            ->assertSee('class="ai-drawer "', false);
+    }
+
     public function test_internal_note_image_is_private_and_viewable_only_by_internal_members(): void
     {
         Storage::fake('local');
