@@ -85,6 +85,41 @@ rsync -a --delete \
 
 install -m 604 "$release_root/deployment/public-index.php" "$public_root/index.php"
 
+# Keep server-owned PHP settings while aligning upload limits with the UI
+# (up to five attachments, 10 MB each).
+php_user_ini="$public_root/.user.ini"
+touch -- "$php_user_ini"
+
+upsert_php_ini_setting() {
+    local key="$1"
+    local value="$2"
+    local temporary_file
+    temporary_file="$(mktemp "$public_root/.user.ini.XXXXXX")"
+
+    awk -v key="$key" -v value="$value" '
+        BEGIN { updated = 0 }
+        $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+            if (! updated) {
+                print key " = " value
+                updated = 1
+            }
+            next
+        }
+        { print }
+        END {
+            if (! updated) {
+                print key " = " value
+            }
+        }
+    ' "$php_user_ini" > "$temporary_file"
+
+    chmod 604 "$temporary_file"
+    mv -- "$temporary_file" "$php_user_ini"
+}
+
+upsert_php_ini_setting upload_max_filesize 10M
+upsert_php_ini_setting post_max_size 55M
+
 cd "$app_root"
 "$php_bin" artisan migrate --force
 "$php_bin" artisan optimize:clear
