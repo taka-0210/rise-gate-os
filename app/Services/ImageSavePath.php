@@ -6,6 +6,22 @@ use RuntimeException;
 
 class ImageSavePath
 {
+    public static function suggestedName(?string $suggestion, string $fallback = ''): string
+    {
+        $name = trim($suggestion ?? '');
+        if ($name === '') {
+            $name = strip_tags($fallback);
+        }
+        $name = preg_replace('/\.png$/i', '', $name);
+        $name = preg_replace('~[\\\\/\x00-\x1f\x7f<>:"|?*]+~u', '_', $name);
+        $name = trim(mb_substr($name, 0, 60), " .\t\n\r\0\x0B");
+        if ($name === '' || preg_match('/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i', $name)) {
+            $name = '画像'.($name !== '' ? '_'.$name : '');
+        }
+
+        return $name.'.png';
+    }
+
     public static function normalize(string $path): string
     {
         $path = str_replace('\\', '/', $path);

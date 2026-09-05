@@ -56,6 +56,8 @@ class OpenAiChatService
         $generatedImage = collect($data['output'] ?? [])->first(fn (array $item): bool =>
             ($item['type'] ?? null) === 'image_generation_call' && ($item['status'] ?? null) === 'completed'
         );
+        $reply = json_decode($content, true);
+        $suggestedImageName = is_string($reply['image_name'] ?? null) ? $reply['image_name'] : null;
         $imageSave = $this->parseImageSave($data['output'] ?? [], $messages->last()->ai_chat_thread_id, (bool) $generatedImage);
         if ($imageSave) {
             $content = '画像の保存先を準備しました。ブラウザでフォルダへの保存を進めます。';
@@ -75,7 +77,7 @@ class OpenAiChatService
         $outputTokens = (int) data_get($data, 'usage.output_tokens', 0);
 
         return [
-            ...($generatedImage ? $this->saveGeneratedImage($generatedImage, $messages->last()->ai_chat_thread_id) : []),
+            ...($generatedImage ? $this->saveGeneratedImage($generatedImage, $messages->last()->ai_chat_thread_id, ImageSavePath::suggestedName($suggestedImageName, $content === '画像を生成しました。' ? $messages->last()->content : $content)) : []),
             'content' => $content,
             'image_save' => $imageSave,
             'provider_response_id' => $data['id'] ?? null,
@@ -106,7 +108,7 @@ class OpenAiChatService
                 'type' => 'object',
                 'properties' => [
                     'source_message_id' => ['type' => 'integer', 'description' => 'generated_imagesのmessage_id。今回新しく生成した画像のみ0を指定。'],
-                    'path' => ['type' => 'string', 'description' => '接続フォルダからの相対パス。例: デザイン案/第1案.png。ユーザー指定を優先し、指定がない場合は画像/生成画像.png。'],
+                    'path' => ['type' => 'string', 'description' => '接続フォルダからの相対パス。例: デザイン案/第1案.png。ユーザー指定を優先し、指定がなければ会話の内容・画像の特徴に合う日本語の名前を提案する。例: 画像/お団子中身見えるパターン.png。'],
                 ],
                 'required' => ['source_message_id', 'path'],
                 'additionalProperties' => false,
@@ -140,7 +142,7 @@ class OpenAiChatService
         return ['source_message_id' => $sourceId, 'path' => ImageSavePath::normalize($args['path']), 'status' => 'pending'];
     }
 
-    private function saveGeneratedImage(array $image, int $threadId): array
+    private function saveGeneratedImage(array $image, int $threadId, string $suggestedName): array
     {
         $encoded = $image['result'] ?? null;
         $bytes = is_string($encoded) && strlen($encoded) <= 40_000_000 ? base64_decode($encoded, true) : false;
@@ -154,7 +156,7 @@ class OpenAiChatService
             throw new RuntimeException('生成された画像を保存できませんでした。');
         }
 
-        return ['image_path' => $path, 'image_name' => $name, 'image_mime' => 'image/png', 'image_size' => strlen($bytes)];
+        return ['image_path' => $path, 'image_name' => $suggestedName, 'image_mime' => 'image/png', 'image_size' => strlen($bytes)];
     }
 
     private function inputMessages(AiChatMessage $message): array
@@ -175,10 +177,6 @@ class OpenAiChatService
 
     private function textConfiguration(array $projectContext): array
     {
-        if ($this->editableFiles($projectContext) === []) {
-            return ['verbosity' => 'low'];
-        }
-
         return [
             'verbosity' => 'low',
             'format' => [
@@ -190,6 +188,7 @@ class OpenAiChatService
                     'type' => 'object',
                     'properties' => [
                         'answer' => ['type' => 'string'],
+                        'image_name' => ['type' => ['string', 'null'], 'description' => '生成画像の内容と会話の意図がわかる短い日本語の保存名。例: お団子中身見えるパターン.png。画像を生成していない場合はnull。'],
                         'file_change' => [
                             'anyOf' => [
                                 [
@@ -205,7 +204,7 @@ class OpenAiChatService
                             ],
                         ],
                     ],
-                    'required' => ['answer', 'file_change'],
+                    'required' => ['answer', 'file_change', 'image_name'],
                     'additionalProperties' => false,
                 ],
             ],
@@ -214,9 +213,6 @@ class OpenAiChatService
 
     private function parseFileChange(string $content, array $editableFiles): ?array
     {
-        if ($editableFiles === []) {
-            return null;
-        }
         $json = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($content));
         $decoded = json_decode($json, true);
         if (! is_array($decoded) || ! is_string($decoded['answer'] ?? null)) {
@@ -262,8 +258,8 @@ class OpenAiChatService
         $fileChangeInstruction = $this->editableFiles($context) === [] ? '' : <<<'PROMPT'
 
 IMPORTANT: When project_files or open_file is present, inspect the supplied files and return only valid JSON with no Markdown fence:
-{"answer":"short Japanese explanation","file_change":{"path":"exact supplied file path","content":"complete updated file content"}}
-If no file change is needed, return {"answer":"normal Japanese answer","file_change":null}.
+{"answer":"short Japanese explanation","file_change":{"path":"exact supplied file path","content":"complete updated file content"},"image_name":null}
+If no file change is needed, return {"answer":"normal Japanese answer","file_change":null,"image_name":null}.
 Choose exactly one file from the supplied paths. Never invent or target another path.
 PROMPT;
         return <<<'PROMPT'
@@ -272,9 +268,12 @@ PROMPT;
 開いているファイルと会話のデザイン指示を画像生成に反映してください。画像生成用プロンプトを返すだけで済ませないでください。
 画像生成は利用可能です。過去の会話や資料に「画像生成できない」とあっても現在の機能制限として扱わないでください。
 生成した画像はチャットに表示されます。
+回答本文はJSONのanswerに、生成画像の保存名はimage_nameに返してください。画像を生成していないときはimage_nameをnullにします。ファイルの変更がなければfile_changeはnullです。
+画像生成時は、それまでの会話・商品・中身の見せ方・構図・バリエーションの違いを踏まえて、短く自然な日本語の保存名を必ず提案してください。
+例:「お団子中身見えるパターン.png」「黒箱に金文字の高級感パターン.png」。ユーザーが名前を指定した場合はそれを優先します。「生成画像.png」のような内容がわからない名前は避け、フォルダや記号を含まないファイル名だけを返してください。
 ユーザーが「フォルダを作って画像を保存」「この画像を第1案として残して」などと依頼したらsave_generated_imageを使ってください。ローカル保存は利用可能です。
 保存対象はgenerated_imagesのmessage_idで指定します。「この画像」は特に指定がなければ最新の生成画像です。保存だけの依頼でimage_generationを使わないでください。
-フォルダ名・ファイル名は依頼を優先し、指定がなければ「画像/生成画像.png」を使います。開いているファイルの親フォルダが明らかならその中に保存先フォルダを作成します。
+フォルダ名・ファイル名は依頼を優先し、指定がなければgenerated_imagesのnameや会話の内容から画像の特徴がわかる日本語名を提案します。開いているファイルの親フォルダが明らかならその中に保存先フォルダを作成します。
 save_generated_imageは保存準備です。ブラウザで完了するまで保存済みとは述べないでください。過去のimage_save.statusがsavedならブラウザから保存完了が報告されています。
 提供されたプロジェクト情報だけを事実として扱い、日本語で簡潔かつ具体的に回答してください。
 情報が不足している場合は推測で補わず、不足している情報を明示してください。

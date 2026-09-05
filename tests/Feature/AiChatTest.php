@@ -527,6 +527,46 @@ class AiChatTest extends TestCase
         $this->assertDatabaseCount('ai_chat_messages', 2);
     }
 
+    public function test_generated_image_uses_ai_filename_from_conversation_in_save_button_and_history(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $thread = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id, 'workspace_id' => $workspace->id, 'user_id' => $user->id,
+        ]);
+        $thread->messages()->create(['role' => 'user', 'content' => 'お団子の中身が見えるパッケージにしたい']);
+        $fixture = UploadedFile::fake()->image('fixture.png', 32, 32);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [
+                ['type' => 'image_generation_call', 'status' => 'completed', 'result' => base64_encode(file_get_contents($fixture->getPathname()))],
+                ['type' => 'message', 'content' => [['type' => 'output_text', 'text' => json_encode([
+                    'answer' => '中身が見えるパターンを作りました。',
+                    'image_name' => 'お団子中身見えるパターン.png', 'file_change' => null,
+                ], JSON_UNESCAPED_UNICODE)]]],
+            ],
+        ])]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => 'それで生成して', 'generate_image' => true])
+            ->assertOk()
+            ->assertJsonPath('message.content', '中身が見えるパターンを作りました。')
+            ->assertJsonPath('message.image_name', 'お団子中身見えるパターン.png')
+            ->assertJsonPath('message.image_suggested_path', '画像/お団子中身見えるパターン.png')
+            ->assertJsonPath('message.file_change', null);
+        $message = $thread->messages()->where('role', 'assistant')->firstOrFail();
+        $this->assertSame('お団子中身見えるパターン.png', $message->image_name);
+        Storage::disk('local')->assertExists($message->image_path);
+        $this->assertStringNotContainsString('お団子', $message->image_path);
+        $this->get(route('projects.workspace', $project))->assertOk()
+            ->assertSee('data-suggested-path="画像/お団子中身見えるパターン.png"', false)
+            ->assertSee('Thinking')->assertSee('chat-thinking-spin');
+        Http::assertSent(fn (Request $request): bool =>
+            in_array('image_name', data_get($request['text'], 'format.schema.required'))
+            && str_contains(json_encode($request['input'], JSON_UNESCAPED_UNICODE), 'お団子の中身が見える')
+        );
+    }
+
     private function projectUser(): array
     {
         $user = User::factory()->create();

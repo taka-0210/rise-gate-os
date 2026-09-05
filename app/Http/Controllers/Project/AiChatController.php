@@ -310,6 +310,8 @@ class AiChatController extends Controller
             'estimated_cost_usd' => $message->estimated_cost_microusd / 1_000_000,
             'created_at' => $message->created_at->toIso8601String(),
             'image_url' => $message->image_path ? route('projects.ai-chat.messages.image', [$message->thread->project_id, $message]) : null,
+            'image_suggested_path' => $message->image_path ? $message->suggestedImagePath() : null,
+            'image_name' => $message->image_name,
             'image_save_url' => $message->role === AiChatMessage::ROLE_ASSISTANT && $message->image_path
                 ? route('projects.ai-chat.messages.image-saved', [$message->thread->project_id, $message]) : null,
             'image_save' => $message->image_save ? [

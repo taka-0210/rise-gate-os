@@ -28,5 +28,18 @@ class AiChatMessage extends Model
         ];
     }
 
+    public function suggestedImagePath(): string
+    {
+        if (! empty($this->image_save['path'])) {
+            return $this->image_save['path'];
+        }
+        $name = $this->image_name;
+        if (preg_match('/^generated-[a-f0-9-]+\.png$/i', $name ?? '')) {
+            $name = null;
+        }
+
+        return '画像/'.\App\Services\ImageSavePath::suggestedName($name, $this->content);
+    }
+
     public function thread(): BelongsTo { return $this->belongsTo(AiChatThread::class, 'ai_chat_thread_id'); }
 }

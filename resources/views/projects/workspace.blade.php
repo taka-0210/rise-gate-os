@@ -222,7 +222,10 @@
     .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
     .ai-message__meta { color:#7d8c94; font-size:9px; }
     .ai-message--user .ai-message__meta { text-align:right; }
-    .ai-message.is-pending .ai-message__bubble { color:#61737c; background:#edf2f4; }
+    .ai-message.is-pending .ai-message__bubble { color:#61737c; background:#edf2f4; display:inline-flex; align-items:center; gap:8px; }
+    .ai-message.is-pending .ai-message__bubble::before { content:""; width:13px; height:13px; border:2px solid #c7d4d9; border-top-color:#286476; border-radius:50%; animation:chat-thinking-spin .8s linear infinite; }
+    @keyframes chat-thinking-spin { to { transform:rotate(360deg); } }
+    @media (prefers-reduced-motion:reduce) { .ai-message.is-pending .ai-message__bubble::before { animation:none; } }
     .ai-chat-error { padding:9px 10px; border:1px solid #dfb5ad; border-radius:7px; color:#8a4338; background:#fff6f4; font-size:11px; }
     .ai-chat-form { display:grid; gap:8px; position:sticky; bottom:0; padding-top:4px; background:#fafcfc; }
     .ai-chat-form textarea { min-height:88px; max-height:220px; resize:vertical; font-size:13px; line-height:1.65; }
@@ -513,7 +516,7 @@
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
                         <article class="ai-message ai-message--{{ $chatMessage->role }}">
-                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@if($chatMessage->role === 'assistant')<a href="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" download="{{ $chatMessage->image_name }}">画像をダウンロード</a><button type="button" data-direct-image-save data-image-url="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" data-saved-url="{{ route('projects.ai-chat.messages.image-saved', [$project, $chatMessage]) }}">フォルダへ保存</button>@endif
+                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@if($chatMessage->role === 'assistant')<a href="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" download="{{ $chatMessage->image_name }}">画像をダウンロード</a><button type="button" data-direct-image-save data-suggested-path="{{ $chatMessage->suggestedImagePath() }}" data-image-url="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" data-saved-url="{{ route('projects.ai-chat.messages.image-saved', [$project, $chatMessage]) }}">フォルダへ保存</button>@endif
                                 @endif{{ $chatMessage->content }}</div>
                             @if($chatMessage->image_save)
                                 @php($imageSaveData = [...$chatMessage->image_save, 'image_url' => route('projects.ai-chat.messages.image', [$project, $chatMessage->image_save['source_message_id']]), 'saved_url' => route('projects.ai-chat.messages.image-saved', [$project, $chatMessage])])
@@ -1327,13 +1330,14 @@
         const image = [...event.clipboardData.files].find(file => file.type.startsWith('image/'));
         if (image) setChatImage(image);
     });
-    const appendDirectImageSave = (parent, imageUrl, savedUrl) => {
+    const appendDirectImageSave = (parent, imageUrl, savedUrl, suggestedPath) => {
         if (!imageUrl || !savedUrl) return;
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.directImageSave = '';
         button.dataset.imageUrl = imageUrl;
         button.dataset.savedUrl = savedUrl;
+        button.dataset.suggestedPath = suggestedPath || '画像/画像.png';
         button.textContent = 'フォルダへ保存';
         parent.append(button);
     };
@@ -1342,7 +1346,7 @@
         if (!button) return;
         if (!button.imageSaveCard) {
             button.imageSaveCard = appendImageSave(button.closest('.ai-message'), {
-                path:'画像/生成画像.png', status:'pending', image_url:button.dataset.imageUrl, saved_url:button.dataset.savedUrl,
+                path:button.dataset.suggestedPath, status:'pending', image_url:button.dataset.imageUrl, saved_url:button.dataset.savedUrl,
             });
         }
         button.imageSaveCard.querySelector('[data-image-save-path]').focus();
@@ -1973,7 +1977,7 @@
         chatError.hidden = true;
         const attachedImageUrl = chatImageObjectUrl;
         const userMessage = appendMessage('user', content, '送信中', false, attachedImageUrl);
-        const pending = appendMessage('assistant', 'AIが回答を作成しています…画像生成には数分かかる場合があります。', '', true);
+        const pending = appendMessage('assistant', 'Thinking', '', true);
         textarea.value = '';
         submit.disabled = true;
         try {
@@ -1995,7 +1999,9 @@
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
             const assistantArticle = appendMessage('assistant', message.content, 'ただ今', false, message.image_url || '', message.file_change, false);
-            appendDirectImageSave(assistantArticle, message.image_url, message.image_save_url);
+            appendDirectImageSave(assistantArticle, message.image_url, message.image_save_url, message.image_suggested_path);
+            const imageDownload = assistantArticle.querySelector('a[download]');
+            if (imageDownload && message.image_name) imageDownload.download = message.image_name;
             const imageSaveCard = appendImageSave(assistantArticle, message.image_save);
             if (imageSaveCard) await saveChatImage(imageSaveCard, false);
             if (body.ui_action === 'open_change_history') {

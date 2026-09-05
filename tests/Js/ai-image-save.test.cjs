@@ -113,5 +113,5 @@ test('workspace script syntax including direct save button integration', () => {
         script = script.slice(0, pos) + 'null' + script.slice(end);
     }
     new vm.Script(script);
-    assert.match(script, /appendDirectImageSave\(assistantArticle, message.image_url, message.image_save_url\)/);
+    assert.match(script, /appendDirectImageSave\(assistantArticle, message.image_url, message.image_save_url, message.image_suggested_path\)/);
 });
