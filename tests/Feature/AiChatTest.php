@@ -357,7 +357,7 @@ class AiChatTest extends TestCase
             ->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.workspace', $project))
             ->assertOk()
-            ->assertSee('読み取り専用AI：接続可能')
+            ->assertSee('AI：会話・画像生成に対応')
             ->assertSee('保存済みの会話です。')
             ->assertSee('data-chat-form', false)
             ->assertSee("payload.set('content', content)", false)
@@ -381,6 +381,78 @@ class AiChatTest extends TestCase
             ->assertSee('通信を確認して、もう一度', false)
             ->assertDontSee('推定利用料')
             ->assertDontSee('$0.0006');
+    }
+
+    public function test_chat_generates_private_image_and_reuses_it_for_follow_up(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-05 12:00:00', 'Asia/Tokyo'));
+        $fixture = UploadedFile::fake()->image('generated.png', 32, 32);
+        $png = file_get_contents($fixture->getPathname());
+        Http::fake(['api.openai.com/v1/responses' => Http::sequence()
+            ->push([
+                'id' => 'resp_generated',
+                'output' => [['type' => 'image_generation_call', 'status' => 'completed', 'result' => base64_encode($png)]],
+            ])
+            ->push(['output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => '背景を確認しました。']]]]])
+        ]);
+
+        $response = $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), [
+                'content' => 'この案のパッケージ画像を作って',
+                'generate_image' => true,
+                'file_path' => 'サイトSNS.txt',
+                'file_content' => '墨黒のマット箱に金の文字',
+            ]);
+        $response->assertOk()->assertJsonPath('message.content', '画像を生成しました。')
+            ->assertJsonPath('message.created_at', '2026-09-05T12:00:00+09:00');
+        $message = $project->aiChatThreads()->firstOrFail()->messages()->where('role', 'assistant')->firstOrFail();
+        $this->assertSame($png, Storage::disk('local')->get($message->image_path));
+        $this->assertStringContainsString('/generated/', $message->image_path);
+        $this->assertSame('image/png', $message->image_mime);
+        $this->get($response->json('message.image_url'))->assertOk()->assertHeader('Content-Type', 'image/png');
+        $this->get(route('projects.workspace', $project))->assertOk()
+            ->assertSee($message->image_name)
+            ->assertSee('画像をダウンロード')
+            ->assertSee('画像を生成する')
+            ->assertSee('message.image_url', false);
+
+        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => 'この画像の背景を教えて'])
+            ->assertOk()->assertJsonPath('message.content', '背景を確認しました。');
+        Http::assertSent(fn (Request $request): bool =>
+            data_get($request['tools'], '0.type') === 'image_generation'
+            && data_get($request->data(), 'tool_choice.type') === 'image_generation'
+            && str_contains($request['instructions'], '墨黒のマット箱に金の文字')
+        );
+        Http::assertSent(fn (Request $request): bool =>
+            str_contains(json_encode($request['input'], JSON_UNESCAPED_SLASHES), 'data:image/png;base64,'.base64_encode($png))
+            && ! isset($request['tool_choice'])
+        );
+
+        $message->thread->update(['user_id' => User::factory()->create()->id]);
+        $this->get($response->json('message.image_url'))->assertNotFound();
+        $this->travelBack();
+    }
+
+    public function test_invalid_generated_image_returns_error_without_saving_success(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [['type' => 'image_generation_call', 'status' => 'completed', 'result' => base64_encode('invalid image')]],
+        ])]);
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '画像を生成して', 'generate_image' => true])
+            ->assertStatus(502)->assertJsonPath('message', '生成された画像を読み取れませんでした。もう一度お試しください。');
+        $this->assertDatabaseMissing('ai_chat_messages', ['role' => 'assistant']);
+        $this->assertDatabaseHas('ai_audit_logs', ['event' => 'ai_chat.failed', 'succeeded' => false]);
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     private function projectUser(): array

@@ -501,7 +501,7 @@
             <div class="ai-body">
                 <div class="ai-context"><strong>参照中のコンテキスト</strong><p data-ai-context>{{ $project->name }} / Project Overview</p></div>
                 <div class="ai-chat-summary">
-                    <span class="ai-chat-status {{ (!$aiChatEnabled || !$aiChatConfigured) ? 'is-off' : '' }}">{{ $aiChatEnabled && $aiChatConfigured ? '読み取り専用AI：接続可能' : 'AIチャット：利用準備が必要' }}</span>
+                    <span class="ai-chat-status {{ (!$aiChatEnabled || !$aiChatConfigured) ? 'is-off' : '' }}">{{ $aiChatEnabled && $aiChatConfigured ? 'AI：会話・画像生成に対応' : 'AIチャット：利用準備が必要' }}</span>
                     <button class="button secondary" type="button" data-usage-toggle>利用料をチェックする</button>
                 </div>
                 <section class="ai-card usage-card" data-usage-card hidden>
@@ -513,7 +513,8 @@
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
                         <article class="ai-message ai-message--{{ $chatMessage->role }}">
-                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@endif{{ $chatMessage->content }}</div>
+                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@if($chatMessage->role === 'assistant')<a href="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" download="{{ $chatMessage->image_name }}">画像をダウンロード</a>@endif
+                                @endif{{ $chatMessage->content }}</div>
                             @if($chatMessage->file_change_path)
                                 <details class="file-change-proposal {{ $chatMessage->file_change_status === 'applied' ? 'is-applied' : ($chatMessage->file_change_status === 'rejected' ? 'is-rejected' : '') }}" data-file-change data-file-change-id="{{ $chatMessage->id }}">
                                     <summary>{{ $chatMessage->file_change_status === 'applied' ? '反映済み' : ($chatMessage->file_change_status === 'rejected' ? '破棄済み' : '変更提案') }}</summary>
@@ -536,12 +537,14 @@
                             </div>
                         </article>
                     @empty
-                        <div class="ai-chat-empty" data-chat-empty>このProjectについてAIと会話できます。<br>AIは情報を読み取りますが、データを変更することはありません。</div>
+                        <div class="ai-chat-empty" data-chat-empty>このProjectについてAIと会話し、画像も生成できます。<br>ファイルの変更案は承認してから反映します。</div>
                     @endforelse
                 </section>
                 <div class="ai-chat-error" data-chat-error hidden></div>
                 <form class="ai-chat-form" data-chat-form data-chat-url="{{ route('projects.ai-chat.messages.store', $project) }}" enctype="multipart/form-data">
                     <textarea name="content" rows="3" maxlength="4000" placeholder="このProjectについて質問する…" @disabled(!$aiChatEnabled || !$aiChatConfigured) required></textarea>
+                    <label class="chat-paste-hint"><input type="checkbox" name="generate_image" value="1" @disabled(!$aiChatEnabled || !$aiChatConfigured)> 画像を生成する（内容を入力して送信）</label>
+                    <span class="chat-paste-hint">画像生成には数分かかる場合があります。画像生成料金は利用ポイントに含まれません。</span>
                     <input type="file" name="image" accept="image/png,image/jpeg,image/webp" hidden data-chat-image-input>
                     <div class="chat-image-preview" data-chat-image-preview hidden><img alt="添付するスクリーンショット"><button type="button" data-chat-image-remove aria-label="画像を削除">×</button></div>
                     <input type="hidden" name="context_key" value="project" data-chat-context-key>
@@ -1263,8 +1266,15 @@
             const image = document.createElement('img');
             image.className = 'ai-message__image';
             image.src = imageUrl;
-            image.alt = '添付画像';
+            image.alt = role === 'assistant' ? '生成された画像' : '添付画像';
             bubble.append(image);
+            if (role === 'assistant') {
+                const download = document.createElement('a');
+                download.href = imageUrl;
+                download.download = 'generated.png';
+                download.textContent = '画像をダウンロード';
+                bubble.append(download, document.createElement('br'));
+            }
         }
         bubble.append(document.createTextNode(content));
         const metadata = document.createElement('div');
@@ -1850,12 +1860,13 @@
         event.preventDefault();
         const textarea = chatForm.elements.content;
         const content = textarea.value.trim();
-        if (!content) return;
+        if (!content || chatForm.dataset.sending === 'true') return;
+        chatForm.dataset.sending = 'true';
         const submit = chatForm.querySelector('button[type="submit"]');
         chatError.hidden = true;
         const attachedImageUrl = chatImageObjectUrl;
         const userMessage = appendMessage('user', content, '送信中', false, attachedImageUrl);
-        const pending = appendMessage('assistant', 'プロジェクトを確認しています…', '', true);
+        const pending = appendMessage('assistant', 'AIが回答を作成しています…画像生成には数分かかる場合があります。', '', true);
         textarea.value = '';
         submit.disabled = true;
         try {
@@ -1875,7 +1886,7 @@
             pending.remove();
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
-            appendMessage('assistant', message.content, 'ただ今', false, '', message.file_change, false);
+            appendMessage('assistant', message.content, 'ただ今', false, message.image_url || '', message.file_change, false);
             if (body.ui_action === 'open_change_history') {
                 const history = workbench.querySelector('[data-change-history-card]');
                 history.open = true;
@@ -1897,6 +1908,7 @@
             chatError.textContent = error.message;
             chatError.hidden = false;
         } finally {
+            delete chatForm.dataset.sending;
             submit.disabled = false;
             textarea.focus();
         }

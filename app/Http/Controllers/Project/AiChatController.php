@@ -31,6 +31,7 @@ class AiChatController extends Controller
 
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:4000'],
+            'generate_image' => ['sometimes', 'boolean'],
             'context_key' => ['nullable', 'string', 'max:255'],
             'context_label' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
@@ -93,6 +94,7 @@ class AiChatController extends Controller
                 $thread->messages()->reorder()->latest('id')->limit(20)->get()->reverse()->values(),
                 $this->projectContext($request, $project, $validated),
                 $request->user()->id,
+                $request->boolean('generate_image'),
             );
             $assistantMessage = $thread->messages()->create([
                 'role' => AiChatMessage::ROLE_ASSISTANT,
@@ -139,6 +141,7 @@ class AiChatController extends Controller
     {
         Gate::authorize('view', $project);
         abort_unless($message->thread?->project_id === $project->id && $message->image_path, 404);
+        abort_unless($message->thread->user_id === $request->user()->id, 404);
         abort_unless(Storage::disk('local')->exists($message->image_path), 404);
 
         return Storage::disk('local')->response($message->image_path, $message->image_name, [

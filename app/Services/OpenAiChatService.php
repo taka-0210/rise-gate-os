@@ -7,11 +7,12 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class OpenAiChatService
 {
-    public function respond(Collection $messages, array $projectContext, int $userId): array
+    public function respond(Collection $messages, array $projectContext, int $userId, bool $generateImage = false): array
     {
         $apiKey = (string) config('services.openai.api_key');
         if ($apiKey === '') {
@@ -21,15 +22,13 @@ class OpenAiChatService
         try {
             $response = Http::withToken($apiKey)
                 ->acceptJson()
-                ->timeout(90)
-                ->retry(2, 500, throw: false)
+                ->timeout(300)
                 ->post('https://api.openai.com/v1/responses', [
                     'model' => config('services.openai.chat_model'),
                     'instructions' => $this->instructions($projectContext),
-                    'input' => $messages->map(fn (AiChatMessage $message): array => [
-                        'role' => $message->role,
-                        'content' => $this->messageContent($message),
-                    ])->values()->all(),
+                    'tools' => [['type' => 'image_generation', 'output_format' => 'png']],
+                    ...($generateImage ? ['tool_choice' => ['type' => 'image_generation']] : []),
+                    'input' => $messages->flatMap(fn (AiChatMessage $message): array => $this->inputMessages($message))->values()->all(),
                     'reasoning' => ['effort' => 'low'],
                     'text' => $this->textConfiguration($projectContext),
                     'max_output_tokens' => $this->editableFiles($projectContext) === [] ? 1200 : 12000,
@@ -54,6 +53,12 @@ class OpenAiChatService
             ->filter()
             ->implode("\n\n");
 
+        $generatedImage = collect($data['output'] ?? [])->first(fn (array $item): bool =>
+            ($item['type'] ?? null) === 'image_generation_call' && ($item['status'] ?? null) === 'completed'
+        );
+        if ($content === '' && $generatedImage) {
+            $content = '画像を生成しました。';
+        }
         if ($content === '') {
             throw new RuntimeException('AIの回答本文を確認できませんでした。');
         }
@@ -66,6 +71,7 @@ class OpenAiChatService
         $outputTokens = (int) data_get($data, 'usage.output_tokens', 0);
 
         return [
+            ...($generatedImage ? $this->saveGeneratedImage($generatedImage, $messages->last()->ai_chat_thread_id) : []),
             'content' => $content,
             'provider_response_id' => $data['id'] ?? null,
             'model' => $data['model'] ?? config('services.openai.chat_model'),
@@ -82,6 +88,36 @@ class OpenAiChatService
                 'file_change_status' => 'pending',
             ] : []),
         ];
+    }
+
+    private function saveGeneratedImage(array $image, int $threadId): array
+    {
+        $encoded = $image['result'] ?? null;
+        $bytes = is_string($encoded) && strlen($encoded) <= 40_000_000 ? base64_decode($encoded, true) : false;
+        $info = $bytes !== false ? @getimagesizefromstring($bytes) : false;
+        if (! $info || ($info['mime'] ?? null) !== 'image/png') {
+            throw new RuntimeException('生成された画像を読み取れませんでした。もう一度お試しください。');
+        }
+        $name = 'generated-'.Str::uuid().'.png';
+        $path = "ai-chat/{$threadId}/generated/{$name}";
+        if (! Storage::disk('local')->put($path, $bytes)) {
+            throw new RuntimeException('生成された画像を保存できませんでした。');
+        }
+
+        return ['image_path' => $path, 'image_name' => $name, 'image_mime' => 'image/png', 'image_size' => strlen($bytes)];
+    }
+
+    private function inputMessages(AiChatMessage $message): array
+    {
+        $input = [['role' => $message->role, 'content' => $this->messageContent($message)]];
+        if ($message->role === AiChatMessage::ROLE_ASSISTANT && $message->image_path && Storage::disk('local')->exists($message->image_path)) {
+            $input[] = ['role' => 'user', 'content' => [
+                ['type' => 'input_text', 'text' => '直前のAI回答で生成された画像（続きの会話の参照用）'],
+                ['type' => 'input_image', 'image_url' => 'data:'.$message->image_mime.';base64,'.base64_encode(Storage::disk('local')->get($message->image_path))],
+            ]];
+        }
+
+        return $input;
     }
 
     private function textConfiguration(array $projectContext): array
@@ -178,7 +214,11 @@ If no file change is needed, return {"answer":"normal Japanese answer","file_cha
 Choose exactly one file from the supplied paths. Never invent or target another path.
 PROMPT;
         return <<<'PROMPT'
-あなたはRISE GATE OSの読み取り専用AIパートナーです。
+あなたはRISE GATE OSのAIパートナーです。プロジェクト情報の参照、変更案の作成、画像の生成ができます。
+画像を作る依頼にはimage_generationツールを使い、1回の回答につき画像を1枚生成してください。
+開いているファイルと会話のデザイン指示を画像生成に反映してください。画像生成用プロンプトを返すだけで済ませないでください。
+画像生成は利用可能です。過去の会話や資料に「画像生成できない」とあっても現在の機能制限として扱わないでください。
+生成した画像はチャットに表示されます。ローカルのプロジェクトファイルへ保存したとは述べないでください。
 提供されたプロジェクト情報だけを事実として扱い、日本語で簡潔かつ具体的に回答してください。
 情報が不足している場合は推測で補わず、不足している情報を明示してください。
 OSのデータを変更した、保存した、承認したとは決して述べないでください。
