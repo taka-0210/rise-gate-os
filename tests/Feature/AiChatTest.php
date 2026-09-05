@@ -423,8 +423,8 @@ class AiChatTest extends TestCase
         $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => 'この画像の背景を教えて'])
             ->assertOk()->assertJsonPath('message.content', '背景を確認しました。');
         Http::assertSent(fn (Request $request): bool =>
-            data_get($request['tools'], '0.type') === 'image_generation'
-            && data_get($request->data(), 'tool_choice.type') === 'image_generation'
+            data_get($request['tools'], '0.name') === 'generate_image'
+            && data_get($request->data(), 'tool_choice.name') === 'generate_image'
             && str_contains($request['instructions'], '墨黒のマット箱に金の文字')
         );
         Http::assertSent(fn (Request $request): bool =>
@@ -613,6 +613,86 @@ class AiChatTest extends TestCase
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.workspace', $project))->assertOk()
             ->assertSee('5.555ポイント')->assertSee('未取得の記録が1件');
+    }
+
+    public function test_images_api_generation_and_edit_usage_is_recorded_separately_and_added_to_points(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key', 'services.openai.image_model' => 'gpt-image-2']);
+        $fixture = UploadedFile::fake()->image('fixture.png', 32, 32);
+        $png = file_get_contents($fixture->getPathname());
+        $imageUsage = ['input_tokens' => 40, 'output_tokens' => 1056, 'total_tokens' => 1096,
+            'input_tokens_details' => ['text_tokens' => 10, 'image_tokens' => 30]];
+        $call = fn (array $refs): array => [
+            'usage' => ['input_tokens' => 100, 'output_tokens' => 50, 'total_tokens' => 150],
+            'output' => [['type' => 'function_call', 'name' => 'generate_image', 'arguments' => json_encode([
+                'prompt' => 'お団子の中身が見えるパッケージ。会話の指示に合わせて白い背景にする。',
+                'image_name' => 'お団子中身見えるパターン.png', 'reference_message_ids' => $refs, 'size' => '1024x1024',
+            ], JSON_UNESCAPED_UNICODE)]],
+        ];
+        Http::fake(['api.openai.com/v1/responses' => Http::response($call([])),
+            'api.openai.com/v1/images/generations' => Http::response(['data' => [['b64_json' => base64_encode($png)]], 'usage' => $imageUsage]),
+        ]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
+        $response = $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '画像を生成して', 'generate_image' => true]);
+        $response->assertOk()->assertJsonPath('message.image_name', 'お団子中身見えるパターン.png')
+            ->assertJsonPath('usage.points', 1.246)->assertJsonPath('usage.image_input_tokens', 40)
+            ->assertJsonPath('usage.image_output_tokens', 1056)->assertJsonPath('usage.image_usage_missing_count', 0);
+        $source = $project->aiChatThreads()->firstOrFail()->messages()->where('role', 'assistant')->firstOrFail();
+        $this->assertSame($png, Storage::disk('local')->get($source->image_path));
+        $this->assertSame($imageUsage, $source->provider_usage['image']);
+        $this->assertSame('gpt-image-2', $source->provider_usage['image_model']);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.openai.com/v1/images/generations'
+            && $request['model'] === 'gpt-image-2' && $request['n'] === 1 && $request['output_format'] === 'png');
+
+        Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::fake(['api.openai.com/v1/responses' => Http::response($call([$source->id])),
+            'api.openai.com/v1/images/edits' => Http::response(['data' => [['b64_json' => base64_encode($png)]],
+                'usage' => ['input_tokens' => 800, 'output_tokens' => 1056, 'total_tokens' => 1856]]),
+        ]);
+        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => 'この画像の背景を白くして'])
+            ->assertOk()->assertJsonPath('usage.total_tokens', 3252)->assertJsonPath('usage.points', 3.252);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.openai.com/v1/images/edits'
+            && $request->hasFile('image[0]', $png, $source->image_name));
+        $this->get(route('projects.workspace', $project))->assertOk()->assertSee('3.252ポイント');
+    }
+
+    public function test_images_api_missing_usage_is_unknown_not_zero(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $fixture = UploadedFile::fake()->image('fixture.png', 32, 32);
+        Http::fake([
+            'api.openai.com/v1/responses' => Http::response(['usage' => ['input_tokens' => 100, 'output_tokens' => 50],
+                'output' => [['type' => 'function_call', 'name' => 'generate_image', 'arguments' => json_encode([
+                    'prompt' => 'お団子', 'image_name' => 'お団子.png', 'reference_message_ids' => [], 'size' => 'auto',
+                ])]]]),
+            'api.openai.com/v1/images/generations' => Http::response(['data' => [['b64_json' => base64_encode(file_get_contents($fixture->getPathname()))]]]),
+        ]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '画像を生成して'])
+            ->assertOk()->assertJsonPath('message.image_input_tokens', null)->assertJsonPath('message.image_output_tokens', null)
+            ->assertJsonPath('usage.points', 0.15)->assertJsonPath('usage.image_usage_missing_count', 1);
+    }
+
+    public function test_image_generation_cannot_send_references_outside_current_conversation(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [['type' => 'function_call', 'name' => 'generate_image', 'arguments' => json_encode([
+                'prompt' => '参照画像を編集', 'image_name' => '画像.png', 'reference_message_ids' => [999999], 'size' => 'auto',
+            ])]],
+        ])]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '画像を編集して'])
+            ->assertStatus(502)->assertJsonPath('message', '参照する画像がこの会話に見つかりません。');
+        Http::assertSentCount(1);
     }
 
     private function projectUser(): array

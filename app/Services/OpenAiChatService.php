@@ -19,6 +19,8 @@ class OpenAiChatService
             throw new RuntimeException('OpenAI APIキーが設定されていません。');
         }
 
+        $projectContext['reference_images'] = $messages->filter(fn (AiChatMessage $message) => $message->image_path)
+            ->map(fn (AiChatMessage $message): array => ['message_id' => $message->id, 'description' => $message->content, 'name' => $message->image_name])->values()->all();
         try {
             $response = Http::withToken($apiKey)
                 ->acceptJson()
@@ -26,8 +28,8 @@ class OpenAiChatService
                 ->post('https://api.openai.com/v1/responses', [
                     'model' => config('services.openai.chat_model'),
                     'instructions' => $this->instructions($projectContext),
-                    'tools' => [['type' => 'image_generation', 'output_format' => 'png'], $this->imageSaveTool()],
-                    ...($generateImage ? ['tool_choice' => ['type' => 'image_generation']] : []),
+                    'tools' => [app(OpenAiImageService::class)->tool(), $this->imageSaveTool()],
+                    ...($generateImage ? ['tool_choice' => ['type' => 'function', 'name' => 'generate_image']] : []),
                     'input' => $messages->flatMap(fn (AiChatMessage $message): array => $this->inputMessages($message))->values()->all(),
                     'reasoning' => ['effort' => 'low'],
                     'text' => $this->textConfiguration($projectContext),
@@ -56,8 +58,17 @@ class OpenAiChatService
         $generatedImage = collect($data['output'] ?? [])->first(fn (array $item): bool =>
             ($item['type'] ?? null) === 'image_generation_call' && ($item['status'] ?? null) === 'completed'
         );
+        $imageCalls = collect($data['output'] ?? [])->filter(fn (array $item): bool =>
+            ($item['type'] ?? null) === 'function_call' && ($item['name'] ?? null) === 'generate_image'
+        );
+        if ($imageCalls->count() > 1) {
+            throw new RuntimeException('画像は1回に1枚ずつ生成してください。');
+        }
+        if ($imageCalls->isNotEmpty()) {
+            $generatedImage = app(OpenAiImageService::class)->generate($imageCalls->first(), $messages);
+        }
         $reply = json_decode($content, true);
-        $suggestedImageName = is_string($reply['image_name'] ?? null) ? $reply['image_name'] : null;
+        $suggestedImageName = $generatedImage['image_name'] ?? (is_string($reply['image_name'] ?? null) ? $reply['image_name'] : null);
         $imageSave = $this->parseImageSave($data['output'] ?? [], $messages->last()->ai_chat_thread_id, (bool) $generatedImage);
         if ($imageSave) {
             $content = '画像の保存先を準備しました。ブラウザでフォルダへの保存を進めます。';
@@ -267,7 +278,7 @@ Choose exactly one file from the supplied paths. Never invent or target another 
 PROMPT;
         return <<<'PROMPT'
 あなたはRISE GATE OSのAIパートナーです。プロジェクト情報の参照、変更案の作成、画像の生成ができます。
-画像を作る依頼にはimage_generationツールを使い、1回の回答につき画像を1枚生成してください。
+画像を作る依頼にはgenerate_imageツールを使い、1回の回答につき画像を1枚生成してください。
 開いているファイルと会話のデザイン指示を画像生成に反映してください。画像生成用プロンプトを返すだけで済ませないでください。
 画像生成は利用可能です。過去の会話や資料に「画像生成できない」とあっても現在の機能制限として扱わないでください。
 生成した画像はチャットに表示されます。
@@ -275,7 +286,7 @@ PROMPT;
 画像生成時は、それまでの会話・商品・中身の見せ方・構図・バリエーションの違いを踏まえて、短く自然な日本語の保存名を必ず提案してください。
 例:「お団子中身見えるパターン.png」「黒箱に金文字の高級感パターン.png」。ユーザーが名前を指定した場合はそれを優先します。「生成画像.png」のような内容がわからない名前は避け、フォルダや記号を含まないファイル名だけを返してください。
 ユーザーが「フォルダを作って画像を保存」「この画像を第1案として残して」などと依頼したらsave_generated_imageを使ってください。ローカル保存は利用可能です。
-保存対象はgenerated_imagesのmessage_idで指定します。「この画像」は特に指定がなければ最新の生成画像です。保存だけの依頼でimage_generationを使わないでください。
+保存対象はgenerated_imagesのmessage_idで指定します。「この画像」は特に指定がなければ最新の生成画像です。保存だけの依頼でgenerate_imageを使わないでください。
 フォルダ名・ファイル名は依頼を優先し、指定がなければgenerated_imagesのnameや会話の内容から画像の特徴がわかる日本語名を提案します。開いているファイルの親フォルダが明らかならその中に保存先フォルダを作成します。
 save_generated_imageは保存準備です。ブラウザで完了するまで保存済みとは述べないでください。過去のimage_save.statusがsavedならブラウザから保存完了が報告されています。
 提供されたプロジェクト情報だけを事実として扱い、日本語で簡潔かつ具体的に回答してください。
