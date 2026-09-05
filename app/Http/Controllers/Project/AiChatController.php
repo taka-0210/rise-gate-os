@@ -123,11 +123,13 @@ class AiChatController extends Controller
                     'input_tokens' => $assistantMessage->input_tokens,
                     'output_tokens' => $assistantMessage->output_tokens,
                     'estimated_cost_microusd' => $assistantMessage->estimated_cost_microusd,
+                    'image_input_tokens' => $assistantMessage->image_input_tokens,
+                    'image_output_tokens' => $assistantMessage->image_output_tokens,
                 ],
                 'occurred_at' => now(),
             ]);
 
-            return response()->json(['message' => $this->messageData($assistantMessage)]);
+            return response()->json(['message' => $this->messageData($assistantMessage), 'usage' => \App\Services\AiChatUsage::summary($thread)]);
         } catch (RuntimeException $exception) {
             AiAuditLog::create([
                 'workspace_id' => $workspace->id,
@@ -306,6 +308,8 @@ class AiChatController extends Controller
             'content' => $message->content,
             'model' => $message->model,
             'input_tokens' => $message->input_tokens,
+            'image_input_tokens' => $message->image_input_tokens,
+            'image_output_tokens' => $message->image_output_tokens,
             'output_tokens' => $message->output_tokens,
             'estimated_cost_usd' => $message->estimated_cost_microusd / 1_000_000,
             'created_at' => $message->created_at->toIso8601String(),

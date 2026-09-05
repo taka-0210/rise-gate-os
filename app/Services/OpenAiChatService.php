@@ -82,6 +82,9 @@ class OpenAiChatService
             'image_save' => $imageSave,
             'provider_response_id' => $data['id'] ?? null,
             'model' => $data['model'] ?? config('services.openai.chat_model'),
+            'image_input_tokens' => $generatedImage ? AiChatUsage::tokens($generatedImage['usage'] ?? null, 'input_tokens') : null,
+            'image_output_tokens' => $generatedImage ? AiChatUsage::tokens($generatedImage['usage'] ?? null, 'output_tokens') : null,
+            'provider_usage' => ['chat' => $data['usage'] ?? null, 'image' => $generatedImage['usage'] ?? null, 'image_model' => $generatedImage['model'] ?? null],
             'input_tokens' => $inputTokens,
             'output_tokens' => $outputTokens,
             'estimated_cost_microusd' => (int) round(

@@ -438,6 +438,7 @@ class ProjectController extends Controller
         return view('projects.workspace', [
             ...$data,
             'aiChatMessages' => $chatMessages,
+            'aiChatUsage' => \App\Services\AiChatUsage::summary($thread),
             'aiChatEnabled' => (bool) $project->owningWorkspace?->aiSetting?->enabled,
             'aiChatConfigured' => (string) config('services.openai.api_key') !== '',
             'aiChatEstimatedCostMicrousd' => $chatMessages->sum('estimated_cost_microusd'),

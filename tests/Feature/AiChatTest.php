@@ -567,6 +567,54 @@ class AiChatTest extends TestCase
         );
     }
 
+    public function test_image_tokens_are_counted_once_with_chat_tokens_and_raw_usage_is_kept(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $fixture = UploadedFile::fake()->image('usage.png', 32, 32);
+        $imageUsage = ['input_tokens' => 40, 'output_tokens' => 1056, 'total_tokens' => 1096,
+            'input_tokens_details' => ['text_tokens' => 10, 'image_tokens' => 30]];
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'usage' => ['input_tokens' => 1200, 'output_tokens' => 200, 'total_tokens' => 1400,
+                'input_tokens_details' => ['cached_tokens' => 400], 'output_tokens_details' => ['reasoning_tokens' => 100]],
+            'output' => [['type' => 'image_generation_call', 'status' => 'completed',
+                'result' => base64_encode(file_get_contents($fixture->getPathname())), 'usage' => $imageUsage]],
+        ])]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '画像を生成して'])
+            ->assertOk()->assertJsonPath('usage.points', 2.496)
+            ->assertJsonPath('usage.total_tokens', 2496)->assertJsonPath('usage.image_usage_missing_count', 0)
+            ->assertJsonPath('message.image_input_tokens', 40)->assertJsonPath('message.image_output_tokens', 1056);
+        $message = $project->aiChatThreads()->firstOrFail()->messages()->where('role', 'assistant')->firstOrFail();
+        $this->assertSame($imageUsage, $message->provider_usage['image']);
+        $this->get(route('projects.workspace', $project))->assertOk()->assertSee('2.496ポイント');
+    }
+
+    public function test_usage_includes_messages_older_than_display_limit_and_marks_unknown_image_usage(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        $thread = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id, 'workspace_id' => $workspace->id, 'user_id' => $user->id,
+        ]);
+        foreach (range(1, 55) as $index) {
+            $thread->messages()->create(['role' => 'assistant', 'content' => '過去の会話', 'input_tokens' => 100, 'output_tokens' => 1]);
+        }
+        $thread->messages()->create(['role' => 'assistant', 'content' => '過去の生成画像', 'image_path' => 'legacy.png']);
+        $other = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id, 'workspace_id' => $workspace->id, 'user_id' => User::factory()->create()->id,
+        ]);
+        $other->messages()->create(['role' => 'assistant', 'content' => '別ユーザーの会話', 'input_tokens' => 999999]);
+        $summary = \App\Services\AiChatUsage::summary($thread);
+        $this->assertSame(5555, $summary['total_tokens']);
+        $this->assertSame('5.555', $summary['points_label']);
+        $this->assertSame(1, $summary['image_usage_missing_count']);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->get(route('projects.workspace', $project))->assertOk()
+            ->assertSee('5.555ポイント')->assertSee('未取得の記録が1件');
+    }
+
     private function projectUser(): array
     {
         $user = User::factory()->create();

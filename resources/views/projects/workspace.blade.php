@@ -509,9 +509,11 @@
                 </div>
                 <section class="ai-card usage-card" data-usage-card hidden>
                     <h3>この会話の利用状況</h3>
-                    @php($chatTokenTotal = $aiChatMessages->sum(fn ($message) => ($message->input_tokens ?? 0) + ($message->output_tokens ?? 0)))
-                    <div class="usage-grid"><div><span>AI利用ポイント</span><strong data-chat-points data-total-tokens="{{ $chatTokenTotal }}">{{ number_format($chatTokenTotal > 0 ? max(1, round($chatTokenTotal / 1000)) : 0) }}ポイント</strong></div></div>
-                    <p class="meta" style="margin-top:8px">AIとの会話や資料の読み取りに使用した利用量の目安です。</p>
+                    <div class="usage-grid"><div><span>AI利用ポイント（取得済み分）</span><strong data-chat-points>{{ $aiChatUsage['points_label'] }}ポイント</strong></div></div>
+                    <p class="meta">会話：入力 <span data-usage-chat-input>{{ number_format($aiChatUsage['chat_input_tokens']) }}</span> ／ 出力 <span data-usage-chat-output>{{ number_format($aiChatUsage['chat_output_tokens']) }}</span> トークン</p>
+                    <p class="meta">画像生成：入力 <span data-usage-image-input>{{ number_format($aiChatUsage['image_input_tokens']) }}</span> ／ 出力 <span data-usage-image-output>{{ number_format($aiChatUsage['image_output_tokens']) }}</span> トークン</p>
+                    <p class="meta" data-usage-missing @if(!$aiChatUsage['image_usage_missing_count']) hidden @endif>画像生成の利用量が未取得の記録が{{ $aiChatUsage['image_usage_missing_count'] }}件あります。取得済み分のみ合計しています。</p>
+                    <p class="meta" style="margin-top:8px">会話と画像生成の入力・出力を合算し、1,000トークン＝1ポイントで換算します。小数点以下も含む利用量の表示で、請求金額ではありません。</p>
                 </section>
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
@@ -551,7 +553,7 @@
                 <form class="ai-chat-form" data-chat-form data-chat-url="{{ route('projects.ai-chat.messages.store', $project) }}" enctype="multipart/form-data">
                     <textarea name="content" rows="3" maxlength="4000" placeholder="このProjectについて質問する…" @disabled(!$aiChatEnabled || !$aiChatConfigured) required></textarea>
                     <label class="chat-paste-hint"><input type="checkbox" name="generate_image" value="1" @disabled(!$aiChatEnabled || !$aiChatConfigured)> 画像を生成する（内容を入力して送信）</label>
-                    <span class="chat-paste-hint">画像生成には数分かかる場合があります。画像生成料金は利用ポイントに含まれません。</span>
+                    <span class="chat-paste-hint">画像生成も利用ポイントの集計対象です。内訳は「利用料をチェックする」から確認できます。</span>
                     <input type="file" name="image" accept="image/png,image/jpeg,image/webp" hidden data-chat-image-input>
                     <div class="chat-image-preview" data-chat-image-preview hidden><img alt="添付するスクリーンショット"><button type="button" data-chat-image-remove aria-label="画像を削除">×</button></div>
                     <input type="hidden" name="context_key" value="project" data-chat-context-key>
@@ -1997,7 +1999,7 @@
             if (message.image_url) chatForm.elements.generate_image.checked = false;
             pending.remove();
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
-            const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
+
             const assistantArticle = appendMessage('assistant', message.content, 'ただ今', false, message.image_url || '', message.file_change, false);
             appendDirectImageSave(assistantArticle, message.image_url, message.image_save_url, message.image_suggested_path);
             const imageDownload = assistantArticle.querySelector('a[download]');
@@ -2014,10 +2016,17 @@
             chatImageInput.value = '';
             chatImagePreview.hidden = true;
             chatImageObjectUrl = '';
-            const points = workbench.querySelector('[data-chat-points]');
-            const totalTokens = Number(points.dataset.totalTokens || 0) + tokens;
-            points.dataset.totalTokens = totalTokens;
-            points.textContent = `${(totalTokens > 0 ? Math.max(1, Math.round(totalTokens / 1000)) : 0).toLocaleString()}ポイント`;
+            if (body.usage) {
+                const usage = body.usage;
+                workbench.querySelector('[data-chat-points]').textContent = usage.points_label + 'ポイント';
+                for (const [selector, key] of [
+                    ['chat-input','chat_input_tokens'], ['chat-output','chat_output_tokens'],
+                    ['image-input','image_input_tokens'], ['image-output','image_output_tokens'],
+                ]) workbench.querySelector('[data-usage-' + selector + ']').textContent = Number(usage[key]).toLocaleString();
+                const missing = workbench.querySelector('[data-usage-missing]');
+                missing.hidden = !usage.image_usage_missing_count;
+                missing.textContent = '画像生成の利用量が未取得の記録が' + usage.image_usage_missing_count + '件あります。取得済み分のみ合計しています。';
+            }
         } catch (error) {
             pending.remove();
             userMessage.querySelector('.ai-message__meta').textContent = '送信できませんでした';
