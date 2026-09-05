@@ -26,7 +26,7 @@ class OpenAiChatService
                 ->post('https://api.openai.com/v1/responses', [
                     'model' => config('services.openai.chat_model'),
                     'instructions' => $this->instructions($projectContext),
-                    'tools' => [['type' => 'image_generation', 'output_format' => 'png']],
+                    'tools' => [['type' => 'image_generation', 'output_format' => 'png'], $this->imageSaveTool()],
                     ...($generateImage ? ['tool_choice' => ['type' => 'image_generation']] : []),
                     'input' => $messages->flatMap(fn (AiChatMessage $message): array => $this->inputMessages($message))->values()->all(),
                     'reasoning' => ['effort' => 'low'],
@@ -56,6 +56,10 @@ class OpenAiChatService
         $generatedImage = collect($data['output'] ?? [])->first(fn (array $item): bool =>
             ($item['type'] ?? null) === 'image_generation_call' && ($item['status'] ?? null) === 'completed'
         );
+        $imageSave = $this->parseImageSave($data['output'] ?? [], $messages->last()->ai_chat_thread_id, (bool) $generatedImage);
+        if ($imageSave) {
+            $content = '画像の保存先を準備しました。ブラウザでフォルダへの保存を進めます。';
+        }
         if ($content === '' && $generatedImage) {
             $content = '画像を生成しました。';
         }
@@ -73,6 +77,7 @@ class OpenAiChatService
         return [
             ...($generatedImage ? $this->saveGeneratedImage($generatedImage, $messages->last()->ai_chat_thread_id) : []),
             'content' => $content,
+            'image_save' => $imageSave,
             'provider_response_id' => $data['id'] ?? null,
             'model' => $data['model'] ?? config('services.openai.chat_model'),
             'input_tokens' => $inputTokens,
@@ -88,6 +93,51 @@ class OpenAiChatService
                 'file_change_status' => 'pending',
             ] : []),
         ];
+    }
+
+    private function imageSaveTool(): array
+    {
+        return [
+            'type' => 'function',
+            'name' => 'save_generated_image',
+            'description' => 'ユーザーが生成画像の保存を依頼した場合だけ、ローカル接続フォルダ内にフォルダを作りPNGを保存する操作を準備する。既存画像の保存では再生成しない。',
+            'strict' => true,
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'source_message_id' => ['type' => 'integer', 'description' => 'generated_imagesのmessage_id。今回新しく生成した画像のみ0を指定。'],
+                    'path' => ['type' => 'string', 'description' => '接続フォルダからの相対パス。例: デザイン案/第1案.png。ユーザー指定を優先し、指定がない場合は画像/生成画像.png。'],
+                ],
+                'required' => ['source_message_id', 'path'],
+                'additionalProperties' => false,
+            ],
+        ];
+    }
+
+    private function parseImageSave(array $output, int $threadId, bool $hasNewImage): ?array
+    {
+        $call = collect($output)->first(fn (array $item): bool =>
+            ($item['type'] ?? null) === 'function_call' && ($item['name'] ?? null) === 'save_generated_image'
+        );
+        if (! $call) {
+            return null;
+        }
+        $args = json_decode($call['arguments'] ?? '', true);
+        if (! is_array($args) || ! is_int($args['source_message_id'] ?? null) || ! is_string($args['path'] ?? null)) {
+            throw new RuntimeException('画像の保存指示を読み取れませんでした。保存先を指定して再度依頼してください。');
+        }
+        $sourceId = $args['source_message_id'];
+        if ($sourceId === 0 && ! $hasNewImage) {
+            throw new RuntimeException('保存する生成画像がありません。先に画像を生成してください。');
+        }
+        if ($sourceId !== 0) {
+            $source = AiChatMessage::where('ai_chat_thread_id', $threadId)->where('role', AiChatMessage::ROLE_ASSISTANT)->find($sourceId);
+            if (! $source?->image_path || $source->image_mime !== 'image/png' || ! Storage::disk('local')->exists($source->image_path)) {
+                throw new RuntimeException('保存する生成画像が見つかりません。この会話の画像を指定してください。');
+            }
+        }
+
+        return ['source_message_id' => $sourceId, 'path' => ImageSavePath::normalize($args['path']), 'status' => 'pending'];
     }
 
     private function saveGeneratedImage(array $image, int $threadId): array
@@ -110,6 +160,9 @@ class OpenAiChatService
     private function inputMessages(AiChatMessage $message): array
     {
         $input = [['role' => $message->role, 'content' => $this->messageContent($message)]];
+        if ($message->role === AiChatMessage::ROLE_ASSISTANT && $message->image_save) {
+            $input[0]['content'] .= "\n画像の保存操作: ".json_encode($message->image_save, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
         if ($message->role === AiChatMessage::ROLE_ASSISTANT && $message->image_path && Storage::disk('local')->exists($message->image_path)) {
             $input[] = ['role' => 'user', 'content' => [
                 ['type' => 'input_text', 'text' => '直前のAI回答で生成された画像（続きの会話の参照用）'],
@@ -218,11 +271,16 @@ PROMPT;
 画像を作る依頼にはimage_generationツールを使い、1回の回答につき画像を1枚生成してください。
 開いているファイルと会話のデザイン指示を画像生成に反映してください。画像生成用プロンプトを返すだけで済ませないでください。
 画像生成は利用可能です。過去の会話や資料に「画像生成できない」とあっても現在の機能制限として扱わないでください。
-生成した画像はチャットに表示されます。ローカルのプロジェクトファイルへ保存したとは述べないでください。
+生成した画像はチャットに表示されます。
+ユーザーが「フォルダを作って画像を保存」「この画像を第1案として残して」などと依頼したらsave_generated_imageを使ってください。ローカル保存は利用可能です。
+保存対象はgenerated_imagesのmessage_idで指定します。「この画像」は特に指定がなければ最新の生成画像です。保存だけの依頼でimage_generationを使わないでください。
+フォルダ名・ファイル名は依頼を優先し、指定がなければ「画像/生成画像.png」を使います。開いているファイルの親フォルダが明らかならその中に保存先フォルダを作成します。
+save_generated_imageは保存準備です。ブラウザで完了するまで保存済みとは述べないでください。過去のimage_save.statusがsavedならブラウザから保存完了が報告されています。
 提供されたプロジェクト情報だけを事実として扱い、日本語で簡潔かつ具体的に回答してください。
 情報が不足している場合は推測で補わず、不足している情報を明示してください。
 OSのデータを変更した、保存した、承認したとは決して述べないでください。
 変更が必要な場合は、実行せずに提案として説明してください。
+ただし画像の保存依頼はsave_generated_imageでブラウザの保存操作を準備できます。image_save.statusがsavedなら保存完了の報告に基づいて回答してください。
 
 現在のプロジェクト情報:
 PROMPT."\n".json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).$fileChangeInstruction;

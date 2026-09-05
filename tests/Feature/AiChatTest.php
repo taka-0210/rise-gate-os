@@ -455,6 +455,78 @@ class AiChatTest extends TestCase
         $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
+    public function test_generated_image_can_be_saved_by_button_or_chat_and_recorded_in_jst(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $thread = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id, 'workspace_id' => $workspace->id, 'user_id' => $user->id,
+        ]);
+        $source = $thread->messages()->create([
+            'role' => 'assistant', 'content' => '第1案です。', 'image_path' => "ai-chat/{$thread->id}/generated/test.png",
+            'image_name' => 'test.png', 'image_mime' => 'image/png',
+        ]);
+        Storage::disk('local')->put($source->image_path, 'stored-image');
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
+        $this->get(route('projects.workspace', $project))->assertOk()
+            ->assertSee('data-direct-image-save', false)->assertSee('フォルダへ保存');
+
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-05 19:00:00', 'Asia/Tokyo'));
+        $this->postJson(route('projects.ai-chat.messages.image-saved', [$project, $source]), ['path' => 'デザイン案/第1案.png'])
+            ->assertOk()->assertJsonPath('saved_at', '2026-09-05T19:00:00+09:00');
+        $this->assertSame('saved', $source->fresh()->image_save['status']);
+
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [[
+                'type' => 'function_call', 'name' => 'save_generated_image',
+                'arguments' => json_encode(['source_message_id' => $source->id, 'path' => 'クライアントA/画像/第1案.png'], JSON_UNESCAPED_UNICODE),
+            ]],
+        ])]);
+        $response = $this->postJson(route('projects.ai-chat.messages.store', $project), [
+            'content' => 'フォルダを作って、この画像を第1案として保存しておいて',
+        ]);
+        $response->assertOk()->assertJsonPath('message.image_save.path', 'クライアントA/画像/第1案.png')
+            ->assertJsonPath('message.image_save.source_message_id', $source->id)
+            ->assertJsonPath('message.image_save.status', 'pending')
+            ->assertJsonPath('message.image_save.image_url', route('projects.ai-chat.messages.image', [$project, $source]));
+        $this->assertSame(1, $thread->messages()->whereNotNull('image_path')->count());
+        Http::assertSent(fn (Request $request): bool =>
+            data_get($request['tools'], '1.name') === 'save_generated_image'
+            && str_contains($request['instructions'], '"message_id":'.$source->id)
+        );
+        $saveUrl = $response->json('message.image_save.saved_url');
+        $this->postJson($saveUrl, ['path' => '../outside.png'])->assertStatus(422);
+        $this->postJson($saveUrl, ['path' => 'クライアントA/画像/第1案.png'])->assertOk()->assertJsonPath('status', 'saved');
+        $this->get(route('projects.workspace', $project))->assertOk()->assertSee('data-image-save-history', false);
+        $thread->update(['user_id' => User::factory()->create()->id]);
+        $this->postJson($saveUrl, ['path' => '画像/第1案.png'])->assertNotFound();
+        $this->travelBack();
+    }
+
+    public function test_ai_cannot_save_an_image_from_another_users_chat(): void
+    {
+        Storage::fake('local');
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $thread = $project->aiChatThreads()->create([
+            'organization_id' => $project->organization_id, 'workspace_id' => $workspace->id, 'user_id' => User::factory()->create()->id,
+        ]);
+        $source = $thread->messages()->create(['role' => 'assistant', 'content' => '他ユーザーの画像', 'image_path' => 'private.png', 'image_mime' => 'image/png']);
+        Storage::disk('local')->put('private.png', 'private-image');
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [['type' => 'function_call', 'name' => 'save_generated_image', 'arguments' => json_encode([
+                'source_message_id' => $source->id, 'path' => '画像/第1案.png',
+            ])]],
+        ])]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '画像を保存して'])
+            ->assertStatus(502)->assertJsonPath('message', '保存する生成画像が見つかりません。この会話の画像を指定してください。');
+        $this->assertDatabaseCount('ai_chat_messages', 2);
+    }
+
     private function projectUser(): array
     {
         $user = User::factory()->create();

@@ -10,6 +10,7 @@ use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Services\OpenAiChatService;
+use App\Services\ImageSavePath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -88,11 +89,15 @@ class AiChatController extends Controller
             ]);
         }
 
+        $context = $this->projectContext($request, $project, $validated);
+        $context['generated_images'] = $thread->messages()->reorder()->where('role', AiChatMessage::ROLE_ASSISTANT)
+            ->whereNotNull('image_path')->latest('id')->limit(30)->get()
+            ->map(fn (AiChatMessage $message): array => ['message_id' => $message->id, 'description' => $message->content, 'name' => $message->image_name])->all();
         $startedAt = microtime(true);
         try {
             $result = $chat->respond(
                 $thread->messages()->reorder()->latest('id')->limit(20)->get()->reverse()->values(),
-                $this->projectContext($request, $project, $validated),
+                $context,
                 $request->user()->id,
                 $request->boolean('generate_image'),
             );
@@ -100,6 +105,9 @@ class AiChatController extends Controller
                 'role' => AiChatMessage::ROLE_ASSISTANT,
                 ...$result,
             ]);
+            if ($assistantMessage->image_save && $assistantMessage->image_save['source_message_id'] === 0) {
+                $assistantMessage->update(['image_save' => [...$assistantMessage->image_save, 'source_message_id' => $assistantMessage->id]]);
+            }
             $thread->touch();
 
             AiAuditLog::create([
@@ -149,6 +157,25 @@ class AiChatController extends Controller
             'Content-Disposition' => 'inline',
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+    public function markImageSaved(Request $request, Project $project, AiChatMessage $message): JsonResponse
+    {
+        Gate::authorize('view', $project);
+        abort_unless($message->thread?->project_id === $project->id
+            && $message->thread->user_id === $request->user()->id
+            && ($message->image_save || ($message->role === AiChatMessage::ROLE_ASSISTANT && $message->image_path && $message->image_mime === 'image/png')), 404);
+        $validated = $request->validate(['path' => ['required', 'string', 'max:240']]);
+        try {
+            $path = ImageSavePath::normalize($validated['path']);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+        $savedAt = now()->timezone('Asia/Tokyo')->toIso8601String();
+        $operation = $message->image_save ?? ['source_message_id' => $message->id];
+        $message->update(['image_save' => [...$operation, 'path' => $path, 'status' => 'saved', 'saved_at' => $savedAt]]);
+
+        return response()->json(['status' => 'saved', 'saved_at' => $savedAt]);
     }
 
     public function markFileChangeApplied(Request $request, Project $project, AiChatMessage $message): JsonResponse
@@ -283,6 +310,13 @@ class AiChatController extends Controller
             'estimated_cost_usd' => $message->estimated_cost_microusd / 1_000_000,
             'created_at' => $message->created_at->toIso8601String(),
             'image_url' => $message->image_path ? route('projects.ai-chat.messages.image', [$message->thread->project_id, $message]) : null,
+            'image_save_url' => $message->role === AiChatMessage::ROLE_ASSISTANT && $message->image_path
+                ? route('projects.ai-chat.messages.image-saved', [$message->thread->project_id, $message]) : null,
+            'image_save' => $message->image_save ? [
+                ...$message->image_save,
+                'image_url' => route('projects.ai-chat.messages.image', [$message->thread->project_id, $message->image_save['source_message_id']]),
+                'saved_url' => route('projects.ai-chat.messages.image-saved', [$message->thread->project_id, $message]),
+            ] : null,
             'file_change' => $message->file_change_path ? [
                 'message_id' => $message->id,
                 'path' => $message->file_change_path,

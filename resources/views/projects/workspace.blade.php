@@ -513,8 +513,12 @@
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
                         <article class="ai-message ai-message--{{ $chatMessage->role }}">
-                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@if($chatMessage->role === 'assistant')<a href="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" download="{{ $chatMessage->image_name }}">画像をダウンロード</a>@endif
+                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@if($chatMessage->role === 'assistant')<a href="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" download="{{ $chatMessage->image_name }}">画像をダウンロード</a><button type="button" data-direct-image-save data-image-url="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" data-saved-url="{{ route('projects.ai-chat.messages.image-saved', [$project, $chatMessage]) }}">フォルダへ保存</button>@endif
                                 @endif{{ $chatMessage->content }}</div>
+                            @if($chatMessage->image_save)
+                                @php($imageSaveData = [...$chatMessage->image_save, 'image_url' => route('projects.ai-chat.messages.image', [$project, $chatMessage->image_save['source_message_id']]), 'saved_url' => route('projects.ai-chat.messages.image-saved', [$project, $chatMessage])])
+                                <div data-image-save-history='@json($imageSaveData)'></div>
+                            @endif
                             @if($chatMessage->file_change_path)
                                 <details class="file-change-proposal {{ $chatMessage->file_change_status === 'applied' ? 'is-applied' : ($chatMessage->file_change_status === 'rejected' ? 'is-rejected' : '') }}" data-file-change data-file-change-id="{{ $chatMessage->id }}">
                                     <summary>{{ $chatMessage->file_change_status === 'applied' ? '反映済み' : ($chatMessage->file_change_status === 'rejected' ? '破棄済み' : '変更提案') }}</summary>
@@ -600,6 +604,7 @@
     <img src="" alt="添付画像の拡大表示" data-chat-image-modal-image>
 </dialog>
 
+<script src="{{ asset('js/ai-image-save.js') }}"></script>
 <script>
 (() => {
     const workbench = document.querySelector('[data-workbench]');
@@ -1322,6 +1327,108 @@
         const image = [...event.clipboardData.files].find(file => file.type.startsWith('image/'));
         if (image) setChatImage(image);
     });
+    const appendDirectImageSave = (parent, imageUrl, savedUrl) => {
+        if (!imageUrl || !savedUrl) return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.directImageSave = '';
+        button.dataset.imageUrl = imageUrl;
+        button.dataset.savedUrl = savedUrl;
+        button.textContent = 'フォルダへ保存';
+        parent.append(button);
+    };
+    workbench.addEventListener('click', event => {
+        const button = event.target.closest('[data-direct-image-save]');
+        if (!button) return;
+        if (!button.imageSaveCard) {
+            button.imageSaveCard = appendImageSave(button.closest('.ai-message'), {
+                path:'画像/生成画像.png', status:'pending', image_url:button.dataset.imageUrl, saved_url:button.dataset.savedUrl,
+            });
+        }
+        button.imageSaveCard.querySelector('[data-image-save-path]').focus();
+    });
+    const imageSaveStamp = value => new Intl.DateTimeFormat('ja-JP', {
+        timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit',
+    }).format(new Date(value));
+    const appendImageSave = (parent, operation) => {
+        if (!operation) return null;
+        const card = document.createElement('div');
+        card.className = 'file-change-proposal';
+        card.imageSaveOperation = operation;
+        const label = document.createElement('label');
+        label.textContent = '画像の保存先（接続フォルダ内）';
+        const input = document.createElement('input');
+        input.value = operation.path;
+        input.maxLength = 240;
+        input.dataset.imageSavePath = '';
+        label.append(input);
+        const status = document.createElement('p');
+        status.dataset.imageSaveStatus = '';
+        status.setAttribute('role', 'status');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.imageSaveButton = '';
+        button.textContent = 'フォルダへ保存';
+        if (operation.status === 'saved') {
+            input.readOnly = true;
+            button.hidden = true;
+            status.textContent = '保存済み：' + operation.path
+                + (operation.saved_at ? ' / ' + imageSaveStamp(operation.saved_at) + ' JST' : '');
+        } else {
+            status.textContent = '必要なフォルダを作成して画像を保存します。';
+        }
+        button.addEventListener('click', () => saveChatImage(card, true));
+        card.append(label, status, button);
+        parent.append(card);
+        return card;
+    };
+    const saveChatImage = async (card, askPermission) => {
+        if (card.dataset.saving === 'true') return;
+        card.dataset.saving = 'true';
+        const input = card.querySelector('[data-image-save-path]');
+        const status = card.querySelector('[data-image-save-status]');
+        const button = card.querySelector('[data-image-save-button]');
+        button.disabled = true;
+        input.readOnly = true;
+        const root = localDirectoryHandle;
+        try {
+            status.textContent = '画像をフォルダへ保存しています…';
+            if (!card.savedLocalPath) {
+                card.savedLocalPath = await RiseGateImageSave.save(root, input.value, card.imageSaveOperation.image_url, askPermission);
+            }
+            status.textContent = '保存完了：' + card.savedLocalPath + '（履歴を記録しています…）';
+            const response = await fetch(card.imageSaveOperation.saved_url, {
+                method:'POST',
+                headers:{'Accept':'application/json', 'Content-Type':'application/json', 'X-CSRF-TOKEN':@json(csrf_token())},
+                body:JSON.stringify({path:card.savedLocalPath}),
+            });
+            if (!response.ok) throw new Error('画像は保存済みですが履歴を記録できませんでした。「履歴の記録を再試行」を押してください。');
+            const result = await response.json();
+            card.imageSaveOperation.status = 'saved';
+            button.hidden = true;
+            status.textContent = '保存完了：' + card.savedLocalPath + ' / ' + imageSaveStamp(result.saved_at) + ' JST';
+        } catch (error) {
+            status.textContent = card.savedLocalPath
+                ? '画像は保存済みです。履歴の記録を再試行してください。'
+                : error.message;
+            button.textContent = card.savedLocalPath ? '履歴の記録を再試行' : 'フォルダへ保存';
+            input.readOnly = Boolean(card.savedLocalPath);
+        } finally {
+            delete card.dataset.saving;
+            button.disabled = false;
+        }
+        if (card.savedLocalPath && root && root === localDirectoryHandle) {
+            try {
+                await renderLocalDirectory(root, localTree);
+                await markFileUpdated(card.savedLocalPath);
+            } catch {
+                status.textContent += '（FILESを開き直すと保存した画像を確認できます）';
+            }
+        }
+    };
+    workbench.querySelectorAll('[data-image-save-history]').forEach(container => {
+        appendImageSave(container, JSON.parse(container.dataset.imageSaveHistory));
+    });
     const hashText = async text => {
         const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
         return [...new Uint8Array(bytes)].map(value => value.toString(16).padStart(2, '0')).join('');
@@ -1883,10 +1990,14 @@
             const body = await response.json();
             if (!response.ok) throw new Error(body.message || 'AIから回答を取得できませんでした。');
             const message = body.message;
+            if (message.image_url) chatForm.elements.generate_image.checked = false;
             pending.remove();
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
             const tokens = Number(message.input_tokens || 0) + Number(message.output_tokens || 0);
-            appendMessage('assistant', message.content, 'ただ今', false, message.image_url || '', message.file_change, false);
+            const assistantArticle = appendMessage('assistant', message.content, 'ただ今', false, message.image_url || '', message.file_change, false);
+            appendDirectImageSave(assistantArticle, message.image_url, message.image_save_url);
+            const imageSaveCard = appendImageSave(assistantArticle, message.image_save);
+            if (imageSaveCard) await saveChatImage(imageSaveCard, false);
             if (body.ui_action === 'open_change_history') {
                 const history = workbench.querySelector('[data-change-history-card]');
                 history.open = true;
