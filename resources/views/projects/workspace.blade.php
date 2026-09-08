@@ -348,7 +348,7 @@
             </nav>
 
             <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
-                <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? 'ブラウザ接続・読み取り専用' : 'Project設定から登録してください' }}</span></div>
+                <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? 'ブラウザ接続・AI保存対応' : 'Project設定から登録してください' }}</span></div>
                 <div class="tree-body" data-local-file-tree><p class="file-note">フォルダへのアクセスを確認しています…</p></div>
                 <p class="file-note" data-local-file-status>Chrome・EdgeでProject設定からフォルダを選択してください。</p>
             </nav>
@@ -546,7 +546,7 @@
                             </div>
                         </article>
                     @empty
-                        <div class="ai-chat-empty" data-chat-empty>このProjectについてAIと会話し、画像も生成できます。<br>ファイルの変更案は承認してから反映します。</div>
+                        <div class="ai-chat-empty" data-chat-empty>このProjectについてAIと会話し、画像も生成できます。<br>接続フォルダへファイルを作成・保存できます。自動保存をOFFにすると変更案を確認してから反映できます。</div>
                     @endforelse
                 </section>
                 <div class="ai-chat-error" data-chat-error hidden></div>
@@ -554,6 +554,7 @@
                     <textarea name="content" rows="3" maxlength="4000" placeholder="このProjectについて質問する…" @disabled(!$aiChatEnabled || !$aiChatConfigured) required></textarea>
                     <label class="chat-paste-hint"><input type="checkbox" name="generate_image" value="1" @disabled(!$aiChatEnabled || !$aiChatConfigured)> 画像を生成する（内容を入力して送信）</label>
                     <span class="chat-paste-hint">画像生成も利用ポイントの集計対象です。内訳は「利用料をチェックする」から確認できます。</span>
+                    <label class="chat-paste-hint"><input type="checkbox" name="auto_save_files" value="1" checked> AIのファイル作成・変更を自動保存（接続フォルダ）</label>
                     <input type="file" name="image" accept="image/png,image/jpeg,image/webp" hidden data-chat-image-input>
                     <div class="chat-image-preview" data-chat-image-preview hidden><img alt="添付するスクリーンショット"><button type="button" data-chat-image-remove aria-label="画像を削除">×</button></div>
                     <input type="hidden" name="context_key" value="project" data-chat-context-key>
@@ -674,7 +675,7 @@
                 container.append(button);
             }
         });
-        localStatus.textContent = `${entries.length}項目を表示中（読み取り専用）`;
+        localStatus.textContent = `${entries.length}項目を表示中`;
     };
     const ensureLocalFolderAccess = async () => {
         localDirectoryHandle ||= await loadLocalHandle();
@@ -1244,7 +1245,7 @@
             apply.className = 'file-change-apply';
             apply.dataset.fileChangeApply = '';
             apply.dataset.filePath = proposal.path;
-            apply.dataset.originalHash = proposal.original_hash;
+            apply.dataset.originalHash = proposal.original_hash || '';
             apply.dataset.applyUrl = proposal.apply_url;
             apply.textContent = '承認してローカルへ反映';
             actions.append(diff, revise, reject, apply);
@@ -1454,13 +1455,22 @@
         }
         return localDirectoryHandle.requestPermission({mode:'readwrite'});
     };
-    const resolveLocalFileHandle = async path => {
+    const validateAiFilePath = path => {
+        const parts = path.split('/');
+        if (!path || path.length > 500 || /[\\:\x00-\x1f<>"|?*]/.test(path)
+            || parts.some(part => !part || part === '.' || part === '..' || /[. ]$/.test(part)
+                || /^(?:\.env(?:$|\.)|\.git$|\.rise-gate$|vendor$|node_modules$|deploy$|deployment$|CON(?:\.|$)|PRN(?:\.|$)|AUX(?:\.|$)|NUL(?:\.|$)|COM[1-9](?:\.|$)|LPT[1-9](?:\.|$))/i.test(part))
+            || (/^storage(\/|$)/i.test(path) && !/^storage\/content\//i.test(path))) {
+            throw new Error('この保存先は保護対象か、接続フォルダ外のため使用できません。');
+        }
+    };
+    const resolveLocalFileHandle = async (path, create = false) => {
         if (!localDirectoryHandle) throw new Error('Project設定からローカルフォルダを選択してください。');
         const parts = path.replaceAll('\\', '/').split('/').filter(Boolean);
         const fileName = parts.pop();
         let directory = localDirectoryHandle;
-        for (const part of parts) directory = await directory.getDirectoryHandle(part);
-        return directory.getFileHandle(fileName);
+        for (const part of parts) directory = await directory.getDirectoryHandle(part, {create});
+        return directory.getFileHandle(fileName, {create});
     };
     const getNestedDirectoryHandle = async (root, parts, create = false) => {
         let directory = root;
@@ -1755,15 +1765,25 @@
         await refreshLocalChangeHistory();
         showWorkbenchNotice('✓ .rise-gate/backups/ を .gitignore に追加しました。', 'info');
     };
+    const readProposalFile = async (path, originalHash) => {
+        validateAiFilePath(path);
+        try {
+            const handle = await resolveLocalFileHandle(path);
+            if (!originalHash) throw new Error('同名ファイルが既にあります。FILESで開いてからAIへ更新を依頼してください。');
+            return {handle, current:await (await handle.getFile()).text()};
+        } catch (error) {
+            if (error.name !== 'NotFoundError' || originalHash) throw error;
+            return {handle:null, current:''};
+        }
+    };
     const openFileChangeDiff = async proposal => {
         if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
         const permission = await localDirectoryHandle.requestPermission({mode:'read'});
         if (permission !== 'granted') throw new Error('差分確認にはローカルフォルダの読み取り許可が必要です。');
         const path = proposalPath(proposal);
-        const handle = await resolveLocalFileHandle(path);
-        const current = await (await handle.getFile()).text();
-        const proposed = proposalContent(proposal);
         const originalHash = proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash;
+        const {current} = await readProposalFile(path, originalHash);
+        const proposed = proposalContent(proposal);
         const state = {proposal, path, current, proposed, changedAfterProposal:originalHash ? !await matchesFileHash(current, originalHash) : false};
         const id = proposal.dataset.fileChangeId || path;
         diffStates.set(id, state);
@@ -1773,7 +1793,11 @@
         workbench.querySelector('[data-ai-context]').textContent = contextLabel;
         workbench.querySelector('[data-chat-context-key]').value = `file:${path}`;
         workbench.querySelector('[data-chat-context-label]').value = contextLabel;
-        setChatFileContext(path, current);
+        if (proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash) {
+            setChatFileContext(path, current);
+        } else {
+            setChatFileContext('', '');
+        }
         if (matchMedia('(max-width:900px)').matches) showMobilePane('main');
     };
     const revealLocalFile = async path => {
@@ -1816,7 +1840,7 @@
         }
         fileButton.scrollIntoView({block:'nearest'});
     };
-    const applyFileChange = async (proposal, apply) => {
+    const applyFileChange = async (proposal, apply, automatic = false, expectedRoot = localDirectoryHandle) => {
         const path = apply.dataset.filePath;
         const status = proposal.querySelector('[data-file-change-status]');
         const originalLabel = apply.textContent;
@@ -1831,9 +1855,13 @@
         status.textContent = '書き込み許可を確認しています…';
         showWorkbenchNotice(`${path}：書き込み許可を確認しています…`);
         try {
-            const permission = await requestLocalWritePermission();
+            validateAiFilePath(path);
+            if (localDirectoryHandle !== expectedRoot) throw new Error('接続フォルダが変わりました。保存先を確認して手動で反映してください。');
+            const permission = automatic
+                ? await localDirectoryHandle.queryPermission({mode:'readwrite'})
+                : await requestLocalWritePermission();
             if (permission !== 'granted') throw new Error('ローカルファイルへの書き込み許可が必要です。');
-            if (!confirm(`「${path}」へ、この変更案を反映しますか？`)) {
+            if (!automatic && !confirm(`「${path}」へ、この変更案を反映しますか？`)) {
                 status.textContent = '';
                 apply.disabled = false;
                 workbenchNotice.hidden = true;
@@ -1842,21 +1870,26 @@
             apply.textContent = '反映中…';
             status.textContent = '反映中：現在のファイルを確認しています…';
             showWorkbenchNotice(`${path}：変更前ファイルを確認しています…`);
-            const handle = await resolveLocalFileHandle(path);
-            const current = await (await handle.getFile()).text();
-            if (!await matchesFileHash(current, apply.dataset.originalHash)) {
+            const originalHash = apply.dataset.originalHash;
+            let {handle, current} = await readProposalFile(path, originalHash);
+            if (originalHash && !await matchesFileHash(current, originalHash)) {
                 throw new Error('提案後にファイルが変更されています。最新内容でAIへ再度依頼してください。');
             }
             status.textContent = '反映中：バックアップを作成しています…';
             showWorkbenchNotice(`${path}：変更前ファイルをバックアップしています…`);
-            await saveLocalBackup(path, current);
-            await createPhysicalBackup(path, current, 'ai_apply');
+            if (handle) {
+                await saveLocalBackup(path, current);
+                await createPhysicalBackup(path, current, 'ai_apply');
+            }
+            if (localDirectoryHandle !== expectedRoot) throw new Error('接続フォルダが変わったため保存を中止しました。');
+            handle ||= await resolveLocalFileHandle(path, true);
             const proposed = preserveLineEndings(proposalContent(proposal), current);
             status.textContent = '反映中：ローカルファイルを書き換えています…';
             showWorkbenchNotice(`${path}：ローカルファイルへ反映しています…`);
             const writable = await handle.createWritable();
             await writable.write(proposed);
             await writable.close();
+            proposal.dataset.localSaved = 'true';
             const updatedFile = await handle.getFile();
             const fileButton = [...workbench.querySelectorAll('[data-file-name]')].find(item => item.dataset.fileName === path);
             if (fileButton) fileButton.dataset.fileCopy = proposed;
@@ -1869,8 +1902,6 @@
                 renderCode(proposed);
                 setFilePreviewTitle(path, updatedFile.lastModified);
             }
-            await markFileUpdated(path);
-            await refreshLocalChangeHistory();
             const response = await fetch(apply.dataset.applyUrl, {
                 method:'POST',
                 headers:{'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
@@ -1879,17 +1910,28 @@
             proposal.classList.add('is-applied');
             proposal.querySelector('summary').textContent = '反映済み';
             proposal.querySelector('[data-file-change-actions]')?.remove();
-            status.textContent = `✓ ${path} を更新しました。変更前の実ファイルは .rise-gate/backups/ に保存しました。`;
+            status.textContent = originalHash
+                ? `✓ ${path} を保存しました。変更前のファイルは .rise-gate/backups/ に保存しました。`
+                : `✓ ${path} を新規作成・保存しました。`;
+            try {
+                await renderLocalDirectory(localDirectoryHandle, localTree);
+                await markFileUpdated(path);
+                await refreshLocalChangeHistory();
+            } catch {
+                status.textContent += '（FILESを開き直すと保存内容を確認できます）';
+            }
             showWorkbenchNotice(status.textContent, 'info', 5000);
             if (activeDiffProposal === proposal) {
                 workbench.querySelector('[data-diff-actions]').hidden = true;
                 workbench.querySelector('[data-diff-status]').textContent = '反映済み・変更前の実ファイルはバックアップ済み';
             }
         } catch (error) {
-            status.textContent = error.message;
-            apply.disabled = false;
+            status.textContent = proposal.dataset.localSaved === 'true'
+                ? 'ファイルは保存されましたが、反映履歴や画面の更新に失敗しました。再保存せず、FILESで保存内容を確認してください。'
+                : error.message;
+            apply.disabled = proposal.dataset.localSaved === 'true';
             apply.textContent = originalLabel;
-            showWorkbenchNotice(error.message, 'error');
+            showWorkbenchNotice(status.textContent, 'error');
         }
     };
     const reviseFileChange = async proposal => {
@@ -1899,14 +1941,18 @@
             if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
             const permission = await localDirectoryHandle.requestPermission({mode:'read'});
             if (permission !== 'granted') throw new Error('修正依頼にはローカルフォルダの読み取り許可が必要です。');
-            const handle = await resolveLocalFileHandle(path);
-            current = await (await handle.getFile()).text();
+            const originalHash = proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash;
+            ({current} = await readProposalFile(path, originalHash));
         }
         const contextLabel = `${@json($project->name)} / File / ${path}`;
         workbench.querySelector('[data-ai-context]').textContent = contextLabel;
         workbench.querySelector('[data-chat-context-key]').value = `file:${path}`;
         workbench.querySelector('[data-chat-context-label]').value = contextLabel;
-        setChatFileContext(path, current);
+        if (proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash) {
+            setChatFileContext(path, current);
+        } else {
+            setChatFileContext('', '');
+        }
         const textarea = chatForm.elements.content;
         textarea.value = `「${path}」の変更提案を修正してください。\n修正内容：`;
         textarea.focus();
@@ -1983,11 +2029,18 @@
         textarea.value = '';
         submit.disabled = true;
         try {
-            const changeRequest = /変更|修正|直し|直して|削除|追加|差し替|書き換|改行|見出し/.test(content);
-            const projectFiles = changeRequest ? await collectProjectTextFiles(content) : [];
+            localDirectoryHandle ||= await loadLocalHandle();
+            const requestRoot = localDirectoryHandle;
+            const autoSave = chatForm.elements.auto_save_files.checked && !!requestRoot;
+            if (autoSave && await requestLocalWritePermission() !== 'granted') {
+                throw new Error('自動保存にはフォルダへの書き込み許可が必要です。許可して再送信するか、自動保存をOFFにしてください。');
+            }
+            const projectFiles = await collectProjectTextFiles(content);
             chatForm.querySelector('[data-chat-project-files]').value = projectFiles.length ? JSON.stringify(projectFiles) : '';
             const payload = new FormData(chatForm);
             payload.set('content', content);
+            payload.set('local_file_access', requestRoot ? '1' : '0');
+            payload.set('auto_save_files', autoSave ? '1' : '0');
             const response = await fetch(chatForm.dataset.chatUrl, {
                 method: 'POST',
                 headers: {'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
@@ -2001,6 +2054,11 @@
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
 
             const assistantArticle = appendMessage('assistant', message.content, 'ただ今', false, message.image_url || '', message.file_change, false);
+            if (autoSave && message.file_change?.status === 'pending') {
+                const proposal = assistantArticle.querySelector('[data-file-change]');
+                proposal.open = true;
+                await applyFileChange(proposal, proposal.querySelector('[data-file-change-apply]'), true, requestRoot);
+            }
             appendDirectImageSave(assistantArticle, message.image_url, message.image_save_url, message.image_suggested_path);
             const imageDownload = assistantArticle.querySelector('a[download]');
             if (imageDownload && message.image_name) imageDownload.download = message.image_name;

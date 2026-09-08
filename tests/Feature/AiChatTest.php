@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AiChatMessage;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Project;
@@ -9,9 +10,12 @@ use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceAiSetting;
+use App\Services\AiChatUsage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -75,7 +79,7 @@ class AiChatTest extends TestCase
                 && $request['model'] === 'gpt-5.6-terra'
                 && $request['store'] === false
                 && str_contains($request['instructions'], $project->name)
-                && str_contains($request['instructions'], 'OSのデータを変更した、保存した、承認したとは決して述べない');
+                && str_contains($request['instructions'], 'OSの業務データを変更した、保存した、承認したとは述べない');
         });
     }
 
@@ -136,6 +140,7 @@ class AiChatTest extends TestCase
             ->assertHeader('content-type', 'image/png');
         Http::assertSent(function (Request $request): bool {
             $payload = json_encode($request['input'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
             return str_contains($payload, 'data:image/png;base64,')
                 && str_contains($payload, 'この画面を見て');
         });
@@ -209,8 +214,7 @@ class AiChatTest extends TestCase
             ->assertJsonPath('message.file_change.status', 'pending');
         $message = $project->aiChatThreads()->firstOrFail()->messages()->reorder()->latest('id')->firstOrFail();
         $this->assertSame('pending', $message->file_change_status);
-        Http::assertSent(fn (Request $request): bool =>
-            data_get($request['text'], 'format.type') === 'json_schema'
+        Http::assertSent(fn (Request $request): bool => data_get($request['text'], 'format.type') === 'json_schema'
             && data_get($request['text'], 'format.strict') === true
             && data_get($request['text'], 'format.name') === 'file_change_proposal'
         );
@@ -285,8 +289,7 @@ class AiChatTest extends TestCase
             ->assertJsonPath('message.file_change.content', $updated)
             ->assertJsonPath('message.file_change.original_hash', hash('sha256', $original));
 
-        Http::assertSent(fn (Request $request): bool =>
-            str_contains($request['instructions'], 'storage/content/hero.json')
+        Http::assertSent(fn (Request $request): bool => str_contains($request['instructions'], 'storage/content/hero.json')
             && ! str_contains($request['instructions'], 'deploy/oxserver-demo')
         );
     }
@@ -389,7 +392,7 @@ class AiChatTest extends TestCase
         [$user, $workspace, $project] = $this->projectUser();
         WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
         config(['services.openai.api_key' => 'test-key']);
-        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-05 12:00:00', 'Asia/Tokyo'));
+        $this->travelTo(Carbon::parse('2026-09-05 12:00:00', 'Asia/Tokyo'));
         $fixture = UploadedFile::fake()->image('generated.png', 32, 32);
         $png = file_get_contents($fixture->getPathname());
         Http::fake(['api.openai.com/v1/responses' => Http::sequence()
@@ -397,7 +400,7 @@ class AiChatTest extends TestCase
                 'id' => 'resp_generated',
                 'output' => [['type' => 'image_generation_call', 'status' => 'completed', 'result' => base64_encode($png)]],
             ])
-            ->push(['output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => '背景を確認しました。']]]]])
+            ->push(['output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => '背景を確認しました。']]]]]),
         ]);
 
         $response = $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
@@ -422,13 +425,11 @@ class AiChatTest extends TestCase
 
         $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => 'この画像の背景を教えて'])
             ->assertOk()->assertJsonPath('message.content', '背景を確認しました。');
-        Http::assertSent(fn (Request $request): bool =>
-            data_get($request['tools'], '0.name') === 'generate_image'
+        Http::assertSent(fn (Request $request): bool => data_get($request['tools'], '0.name') === 'generate_image'
             && data_get($request->data(), 'tool_choice.name') === 'generate_image'
             && str_contains($request['instructions'], '墨黒のマット箱に金の文字')
         );
-        Http::assertSent(fn (Request $request): bool =>
-            str_contains(json_encode($request['input'], JSON_UNESCAPED_SLASHES), 'data:image/png;base64,'.base64_encode($png))
+        Http::assertSent(fn (Request $request): bool => str_contains(json_encode($request['input'], JSON_UNESCAPED_SLASHES), 'data:image/png;base64,'.base64_encode($png))
             && ! isset($request['tool_choice'])
         );
 
@@ -473,7 +474,7 @@ class AiChatTest extends TestCase
         $this->get(route('projects.workspace', $project))->assertOk()
             ->assertSee('data-direct-image-save', false)->assertSee('フォルダへ保存');
 
-        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-05 19:00:00', 'Asia/Tokyo'));
+        $this->travelTo(Carbon::parse('2026-09-05 19:00:00', 'Asia/Tokyo'));
         $this->postJson(route('projects.ai-chat.messages.image-saved', [$project, $source]), ['path' => 'デザイン案/第1案.png'])
             ->assertOk()->assertJsonPath('saved_at', '2026-09-05T19:00:00+09:00');
         $this->assertSame('saved', $source->fresh()->image_save['status']);
@@ -492,8 +493,7 @@ class AiChatTest extends TestCase
             ->assertJsonPath('message.image_save.status', 'pending')
             ->assertJsonPath('message.image_save.image_url', route('projects.ai-chat.messages.image', [$project, $source]));
         $this->assertSame(1, $thread->messages()->whereNotNull('image_path')->count());
-        Http::assertSent(fn (Request $request): bool =>
-            data_get($request['tools'], '1.name') === 'save_generated_image'
+        Http::assertSent(fn (Request $request): bool => data_get($request['tools'], '1.name') === 'save_generated_image'
             && str_contains($request['instructions'], '"message_id":'.$source->id)
         );
         $saveUrl = $response->json('message.image_save.saved_url');
@@ -561,8 +561,7 @@ class AiChatTest extends TestCase
         $this->get(route('projects.workspace', $project))->assertOk()
             ->assertSee('data-suggested-path="画像/お団子中身見えるパターン.png"', false)
             ->assertSee('Thinking')->assertSee('chat-thinking-spin');
-        Http::assertSent(fn (Request $request): bool =>
-            in_array('image_name', data_get($request['text'], 'format.schema.required'))
+        Http::assertSent(fn (Request $request): bool => in_array('image_name', data_get($request['text'], 'format.schema.required'))
             && str_contains(json_encode($request['input'], JSON_UNESCAPED_UNICODE), 'お団子の中身が見える')
         );
     }
@@ -606,7 +605,7 @@ class AiChatTest extends TestCase
             'organization_id' => $project->organization_id, 'workspace_id' => $workspace->id, 'user_id' => User::factory()->create()->id,
         ]);
         $other->messages()->create(['role' => 'assistant', 'content' => '別ユーザーの会話', 'input_tokens' => 999999]);
-        $summary = \App\Services\AiChatUsage::summary($thread);
+        $summary = AiChatUsage::summary($thread);
         $this->assertSame(5555, $summary['total_tokens']);
         $this->assertSame('5.555', $summary['points_label']);
         $this->assertSame(1, $summary['image_usage_missing_count']);
@@ -647,7 +646,7 @@ class AiChatTest extends TestCase
         Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.openai.com/v1/images/generations'
             && $request['model'] === 'gpt-image-2' && $request['n'] === 1 && $request['output_format'] === 'png');
 
-        Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::swap(new Factory);
         Http::fake(['api.openai.com/v1/responses' => Http::response($call([$source->id])),
             'api.openai.com/v1/images/edits' => Http::response(['data' => [['b64_json' => base64_encode($png)]],
                 'usage' => ['input_tokens' => 800, 'output_tokens' => 1056, 'total_tokens' => 1856]]),
@@ -693,6 +692,68 @@ class AiChatTest extends TestCase
             ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '画像を編集して'])
             ->assertStatus(502)->assertJsonPath('message', '参照する画像がこの会話に見つかりません。');
         Http::assertSentCount(1);
+    }
+
+    public function test_ai_can_prepare_a_new_file_in_an_empty_connected_folder_and_remember_completion(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $reply = ['answer' => '保存準備ができました。', 'file_change' => ['path' => 'todo/index.html', 'content' => '<!doctype html><title>TODO</title>'], 'image_name' => null];
+        Http::fake(function () use (&$reply) {
+            return Http::response(['output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => json_encode($reply)]]]]]);
+        });
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
+        $response = $this->postJson(route('projects.ai-chat.messages.store', $project), [
+            'content' => 'TODO管理アプリを作って保存して', 'local_file_access' => true, 'auto_save_files' => true,
+        ])->assertOk()->assertJsonPath('message.file_change.path', 'todo/index.html')
+            ->assertJsonPath('message.file_change.original_hash', null)
+            ->assertJsonPath('message.file_change.status', 'pending');
+        Http::assertSent(fn (Request $request): bool => $request['max_output_tokens'] === 12000
+            && str_contains($request['instructions'], '"auto_save_files":true')
+            && str_contains($request['instructions'], 'Asia/Tokyo'));
+        $id = $response->json('message.id');
+        $this->postJson(route('projects.ai-chat.messages.file-change.applied', [$project, $id]))->assertOk();
+        $message = AiChatMessage::findOrFail($id);
+        $this->assertSame('+09:00', $message->file_change_applied_at->format('P'));
+        $reply = ['answer' => '保存完了が確認できています。', 'file_change' => null, 'image_name' => null];
+        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '保存できた？'])
+            ->assertOk()->assertJsonPath('message.content', '保存完了が確認できています。');
+        Http::assertSent(fn (Request $request): bool => str_contains(json_encode($request['input']), 'applied'));
+    }
+
+    public function test_ai_rejects_unsafe_new_paths_and_requires_a_connected_folder(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
+        $path = '';
+        Http::fake(function () use (&$path) {
+            return Http::response(['output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => json_encode([
+                'answer' => '保存準備', 'file_change' => ['path' => $path, 'content' => 'test'],
+            ])]]]]]);
+        });
+        foreach (['../index.html', '/index.html', 'C:/index.html', 'todo\\index.html', '.env', '.git/config', 'storage/logs/app.log', 'todo/.env.local', 'todo/NUL.txt', 'todo//index.html', 'todo/../index.html'] as $path) {
+            $this->postJson(route('projects.ai-chat.messages.store', $project), [
+                'content' => '作成して', 'local_file_access' => true,
+            ])->assertStatus(502);
+        }
+        $path = 'index.html';
+        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '作成して'])->assertStatus(502);
+        $this->assertDatabaseMissing('ai_chat_messages', ['role' => 'assistant']);
+    }
+
+    public function test_incomplete_ai_generation_is_not_offered_for_saving(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response(['status' => 'incomplete'])]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '作成して', 'local_file_access' => true])
+            ->assertStatus(502);
+        $this->assertDatabaseMissing('ai_chat_messages', ['role' => 'assistant']);
     }
 
     private function projectUser(): array

@@ -9,14 +9,15 @@ use App\Models\AiChatThread;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
-use App\Services\OpenAiChatService;
+use App\Services\AiChatUsage;
 use App\Services\ImageSavePath;
+use App\Services\OpenAiChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AiChatController extends Controller
 {
@@ -33,6 +34,8 @@ class AiChatController extends Controller
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:4000'],
             'generate_image' => ['sometimes', 'boolean'],
+            'local_file_access' => ['sometimes', 'boolean'],
+            'auto_save_files' => ['sometimes', 'boolean'],
             'context_key' => ['nullable', 'string', 'max:255'],
             'context_label' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
@@ -129,7 +132,7 @@ class AiChatController extends Controller
                 'occurred_at' => now(),
             ]);
 
-            return response()->json(['message' => $this->messageData($assistantMessage), 'usage' => \App\Services\AiChatUsage::summary($thread)]);
+            return response()->json(['message' => $this->messageData($assistantMessage), 'usage' => AiChatUsage::summary($thread)]);
         } catch (RuntimeException $exception) {
             AiAuditLog::create([
                 'workspace_id' => $workspace->id,
@@ -243,8 +246,7 @@ class AiChatController extends Controller
 
                 return ['path' => $path, 'content' => $content, 'sha256' => hash('sha256', $content)];
             })
-            ->reject(fn (array $file): bool =>
-                preg_match('~(^|/)\.env($|[./])~i', $file['path'])
+            ->reject(fn (array $file): bool => preg_match('~(^|/)\.env($|[./])~i', $file['path'])
                 || preg_match('~^(vendor|deploy|deployment|\.git|\.rise-gate)(/|$)~i', $file['path'])
                 || (preg_match('~^storage(/|$)~i', $file['path']) && ! preg_match('~^storage/content(/|$)~i', $file['path']))
             )
@@ -253,6 +255,8 @@ class AiChatController extends Controller
             ->all();
 
         return [
+            'local_file_access' => $request->boolean('local_file_access'),
+            'auto_save_files' => $request->boolean('auto_save_files'),
             'currently_open' => $validated['context_label'] ?? null,
             'open_file' => $filePath && $fileContent !== null && ! $protected ? [
                 'path' => $filePath,

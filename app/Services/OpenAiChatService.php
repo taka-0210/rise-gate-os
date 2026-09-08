@@ -33,7 +33,7 @@ class OpenAiChatService
                     'input' => $messages->flatMap(fn (AiChatMessage $message): array => $this->inputMessages($message))->values()->all(),
                     'reasoning' => ['effort' => 'low'],
                     'text' => $this->textConfiguration($projectContext),
-                    'max_output_tokens' => $this->editableFiles($projectContext) === [] ? 1200 : 12000,
+                    'max_output_tokens' => $this->editableFiles($projectContext) === [] && empty($projectContext['local_file_access']) ? 1200 : 12000,
                     'store' => false,
                     'safety_identifier' => hash('sha256', 'rise-gate-os-user-'.$userId),
                 ]);
@@ -47,6 +47,9 @@ class OpenAiChatService
         }
 
         $data = $response->json();
+        if (($data['status'] ?? null) === 'incomplete') {
+            throw new RuntimeException('生成が途中で止まったため保存していません。小さい単位に分けて再度依頼してください。');
+        }
         $content = collect($data['output'] ?? [])
             ->where('type', 'message')
             ->flatMap(fn (array $item) => $item['content'] ?? [])
@@ -55,11 +58,9 @@ class OpenAiChatService
             ->filter()
             ->implode("\n\n");
 
-        $generatedImage = collect($data['output'] ?? [])->first(fn (array $item): bool =>
-            ($item['type'] ?? null) === 'image_generation_call' && ($item['status'] ?? null) === 'completed'
+        $generatedImage = collect($data['output'] ?? [])->first(fn (array $item): bool => ($item['type'] ?? null) === 'image_generation_call' && ($item['status'] ?? null) === 'completed'
         );
-        $imageCalls = collect($data['output'] ?? [])->filter(fn (array $item): bool =>
-            ($item['type'] ?? null) === 'function_call' && ($item['name'] ?? null) === 'generate_image'
+        $imageCalls = collect($data['output'] ?? [])->filter(fn (array $item): bool => ($item['type'] ?? null) === 'function_call' && ($item['name'] ?? null) === 'generate_image'
         );
         if ($imageCalls->count() > 1) {
             throw new RuntimeException('画像は1回に1枚ずつ生成してください。');
@@ -80,7 +81,7 @@ class OpenAiChatService
             throw new RuntimeException('AIの回答本文を確認できませんでした。');
         }
 
-        $structured = $this->parseFileChange($content, $this->editableFiles($projectContext));
+        $structured = $this->parseFileChange($content, $this->editableFiles($projectContext), ! empty($projectContext['local_file_access']));
         if ($structured) {
             $content = $structured['answer'];
         }
@@ -132,8 +133,7 @@ class OpenAiChatService
 
     private function parseImageSave(array $output, int $threadId, bool $hasNewImage): ?array
     {
-        $call = collect($output)->first(fn (array $item): bool =>
-            ($item['type'] ?? null) === 'function_call' && ($item['name'] ?? null) === 'save_generated_image'
+        $call = collect($output)->first(fn (array $item): bool => ($item['type'] ?? null) === 'function_call' && ($item['name'] ?? null) === 'save_generated_image'
         );
         if (! $call) {
             return null;
@@ -186,6 +186,13 @@ class OpenAiChatService
             ]];
         }
 
+        if ($message->role === AiChatMessage::ROLE_ASSISTANT && $message->file_change_path) {
+            $input[0]['content'] .= "\nファイル保存操作: ".json_encode([
+                'path' => $message->file_change_path,
+                'status' => $message->file_change_status,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
         return $input;
     }
 
@@ -196,7 +203,7 @@ class OpenAiChatService
             'format' => [
                 'type' => 'json_schema',
                 'name' => 'file_change_proposal',
-                'description' => 'A Japanese answer and an optional complete replacement for one supplied project file.',
+                'description' => 'A Japanese answer and optional complete content for one existing or new local project file.',
                 'strict' => true,
                 'schema' => [
                     'type' => 'object',
@@ -225,7 +232,7 @@ class OpenAiChatService
         ];
     }
 
-    private function parseFileChange(string $content, array $editableFiles): ?array
+    private function parseFileChange(string $content, array $editableFiles, bool $localFileAccess = false): ?array
     {
         $json = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($content));
         $decoded = json_decode($json, true);
@@ -240,9 +247,13 @@ class OpenAiChatService
             return null;
         }
         $target = collect($editableFiles)->firstWhere('path', $change['path']);
-        if (! $target) {
-            return null;
+        if (! $target && $localFileAccess) {
+            $target = ['path' => LocalAiFilePath::normalize($change['path']), 'sha256' => null];
         }
+        if (! $target) {
+            throw new RuntimeException('ファイルを作成するにはProject設定でローカルフォルダを接続してください。');
+        }
+        LocalAiFilePath::normalize($target['path']);
         if (strlen($change['content']) > 1_000_000) {
             return null;
         }
@@ -269,13 +280,15 @@ class OpenAiChatService
 
     private function instructions(array $context): string
     {
-        $fileChangeInstruction = $this->editableFiles($context) === [] ? '' : <<<'PROMPT'
+        $fileChangeInstruction = <<<'PROMPT'
 
 IMPORTANT: When project_files or open_file is present, inspect the supplied files and return only valid JSON with no Markdown fence:
 {"answer":"short Japanese explanation","file_change":{"path":"exact supplied file path","content":"complete updated file content"},"image_name":null}
 If no file change is needed, return {"answer":"normal Japanese answer","file_change":null,"image_name":null}.
-Choose exactly one file from the supplied paths. Never invent or target another path.
+For existing files choose exactly one supplied path. If local_file_access is true, you may create one new text file with a relative path inside the connected folder. Return the entire working file in file_change.content, not just instructions or a code block in answer. For a simple TODO app, prefer one self-contained index.html with embedded CSS/JavaScript and localStorage persistence. Never overwrite an existing file whose content was not supplied. Never target absolute paths, parent paths, secrets, dependencies, deployment files or backups. Use Asia/Tokyo for date/time displays.
+If auto_save_files is true, the browser will save this response automatically using the user's folder permission. Say that you are preparing the file for saving, not that saving is already complete. If false, the user applies the change from the card. An applied file save operation in conversation history confirms a completed save. Past claims that files cannot be created or saved are obsolete; use the current capabilities.
 PROMPT;
+
         return <<<'PROMPT'
 あなたはRISE GATE OSのAIパートナーです。プロジェクト情報の参照、変更案の作成、画像の生成ができます。
 画像を作る依頼にはgenerate_imageツールを使い、1回の回答につき画像を1枚生成してください。
@@ -291,8 +304,8 @@ PROMPT;
 save_generated_imageは保存準備です。ブラウザで完了するまで保存済みとは述べないでください。過去のimage_save.statusがsavedならブラウザから保存完了が報告されています。
 提供されたプロジェクト情報だけを事実として扱い、日本語で簡潔かつ具体的に回答してください。
 情報が不足している場合は推測で補わず、不足している情報を明示してください。
-OSのデータを変更した、保存した、承認したとは決して述べないでください。
-変更が必要な場合は、実行せずに提案として説明してください。
+OSの業務データを変更した、保存した、承認したとは述べないでください。ローカルファイルは保存操作のstatusがappliedの場合だけ保存完了を報告できます。
+OSの業務データの変更は提案として説明してください。接続されたローカルフォルダ内の通常ファイルはfile_changeで作成・更新できます。作成や保存を依頼されたら説明だけで終わらず、ファイル全体を返してください。local_file_accessがfalseで新規作成が必要な場合はProject設定でフォルダ接続を案内してください。
 ただし画像の保存依頼はsave_generated_imageでブラウザの保存操作を準備できます。image_save.statusがsavedなら保存完了の報告に基づいて回答してください。
 
 現在のプロジェクト情報:
