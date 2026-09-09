@@ -66,3 +66,5 @@ MySQL、Composer/npmパッケージのインストール、任意コマンドの
 開発ツールはFILESの「開発ツール」を開いたときだけ表示します。保存済みコードでの再接続も開いたときに行い、通常のプロジェクト管理・資料作成ではPCの開発ツールへ自動接続しません。接続後に折りたたんでも実行は停止せず、「接続中」を表示します。
 
 開発専用のCodex連携と認証・セットアップの詳細は [codex-development.md](codex-development.md) を参照してください。
+
+管理画面の中央プレビュー：開発専用 app-router.php が X-Frame-Options を、セットアップ済み接続元だけを許可する CSP frame-ancestors に置き換える。複数のCSPヘッダーと他のディレクティブは保持する。接続元は開発ツールのconfig.jsonから読み、リクエストのOriginやRefererから許可しない。設定がないテスト起動では https://os.rise-gate.com のみ。アプリ内のadmin.phpや公開ZIPには変更を加えないため、本番の埋め込み禁止は維持される。

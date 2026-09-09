@@ -201,6 +201,35 @@ class LocalDevelopmentTest extends TestCase
         $zip->close();
     }
 
+    public function test_development_admin_allows_os_embedding_but_preserves_other_policies_and_source(): void
+    {
+        $this->bootHelper();
+        mkdir($this->directory.'/project/public');
+        file_put_contents($this->directory.'/project/public/index.php', '<?php echo "ready";');
+        $source = <<<'PHP'
+<?php
+header('X-Frame-Options: DENY');
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; frame-ancestors 'none'");
+header("Content-Security-Policy: form-action 'self'; frame-ancestors 'self'", false);
+session_start(['cookie_samesite'=>'Lax','cookie_httponly'=>true]);
+echo 'admin';
+PHP;
+        file_put_contents($this->directory.'/project/public/admin.php', $source);
+        [$status,$run]=$this->api('start');
+        $this->assertSame(200,$status);
+        [$status,$body,$headers]=$this->request($run['url'].'admin.php');
+        $this->assertSame(200,$status);
+        $this->assertSame('admin',$body);
+        $headerText=implode("\n",$headers);
+        $this->assertStringNotContainsString('X-Frame-Options:', $headerText);
+        $this->assertStringNotContainsString("frame-ancestors 'none'", $headerText);
+        $this->assertSame(2,substr_count($headerText,'frame-ancestors https://os.rise-gate.com'));
+        $this->assertStringContainsString("default-src 'self'; script-src 'self'", $headerText);
+        $this->assertStringContainsString("form-action 'self'", $headerText);
+        $this->assertStringContainsString('Partitioned',$headerText);
+        $this->assertSame($source,file_get_contents($this->directory.'/project/public/admin.php'));
+        $this->api('stop');
+    }
     private function appForm(string $url, array $values, string $cookie = ''): array
     {
         [$status, $page, $headers] = $this->request($url, 'GET', $cookie ? ['Cookie: '.$cookie] : []);
