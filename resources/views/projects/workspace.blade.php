@@ -105,11 +105,18 @@
     .file-note { margin:12px 10px; padding:10px; border:1px dashed #c7d3d9; border-radius:7px; color:#6a7b84; background:#fff; font-size:10px; line-height:1.55; }
     .viewer-panel { display:none; min-height:100%; }
     .viewer-panel.is-current { display:block; }
-    .browser-preview { min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto minmax(0,1fr); background:#fff; }
+    .browser-preview { min-width:0; min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto auto minmax(0,1fr); background:#fff; }
     .browser-external-notice { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:11px 14px; border-bottom:1px solid #d5dde3; color:#294752; background:#f4f8f9; font-size:12px; }
     .browser-external-notice strong { display:block; margin-bottom:2px; }
     .browser-external-notice span { color:#687b84; font-size:10px; }
     .browser-external-notice .button { flex:0 0 auto; }
+    .responsive-toolbar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:8px; border-bottom:1px solid #d6e0e4; font-size:12px; }
+    .responsive-toolbar button { padding:5px 9px; font-size:12px; background:#fff; color:#155566; border:1px solid #d6e0e4; border-radius:6px; }
+    .responsive-toolbar button[aria-pressed="true"] { background:#155566; color:#fff; }
+    .responsive-toolbar input { width:76px; padding:4px; font-size:12px; }
+    .responsive-stage { min-width:0; overflow:auto; background:#e9eef1; }
+    .responsive-stage .browser-frame { display:block; margin:0 auto; }
+    .responsive-stage .browser-frame[hidden] { display:none; }
     .browser-frame { width:100%; height:100%; min-height:calc(100vh - 170px); border:0; background:#fff; }
     .pdf-frame { width:100%; height:calc(100vh - 112px); min-height:640px; border:0; background:#525659; }
     .image-viewer { min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto minmax(0,1fr); background:#e9eef1; }
@@ -220,6 +227,12 @@
     .workbench-notice.is-error { border-color:#dfaaa2; color:#843c32; background:#fff5f3; }
     .ai-message--user .ai-message__bubble { color:#fff; background:#155566; border-bottom-right-radius:3px; }
     .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
+    .codex-image-picker { font-size:12px; }
+    .codex-image-picker input { font-size:12px; max-width:100%; }
+    .codex-image-previews { display:flex; flex-wrap:wrap; gap:8px; }
+    .codex-image-previews figure { margin:0; padding:6px; border:1px solid #d6e0e4; border-radius:8px; width:110px; overflow-wrap:anywhere; font-size:11px; }
+    .codex-image-previews img { display:block; width:100%; height:75px; object-fit:contain; background:#fff; }
+    .codex-image-previews button { font-size:11px; padding:3px 8px; }
     .codex-activity { padding:10px 12px; border:1px solid #cfe1e5; border-radius:8px; background:#edf5f6; color:#155566; font-size:12px; }
     .codex-activity strong { display:flex; align-items:center; gap:8px; }
     .codex-activity small { display:block; margin-top:4px; color:#61737c; overflow-wrap:anywhere; white-space:pre-wrap; max-height:80px; overflow:auto; }
@@ -473,12 +486,21 @@
 <button type="button" data-open-local-browser>ブラウザで表示</button><a data-open-local-external target="_blank" rel="noopener">別タブで開く</a></div><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
-                <div class="browser-preview">
+                <div class="browser-preview" data-responsive-preview>
+                    <div class="responsive-toolbar" role="group" aria-label="レスポンシブ確認">
+                        <button type="button" data-preview-preset="fit">全幅</button>
+                        <button type="button" data-preview-preset="1280">PC</button>
+                        <button type="button" data-preview-preset="768">タブレット</button>
+                        <button type="button" data-preview-preset="390">スマホ</button>
+                        <label>幅 <input type="number" min="280" max="2560" value="390" data-preview-width aria-label="プレビュー幅（px）"> px</label>
+                        <button type="button" data-preview-refresh>再読み込み</button>
+                        <span data-preview-size role="status"></span>
+                    </div>
                     <div class="browser-external-notice" data-browser-external-notice hidden>
                         <div><strong>管理画面は別タブで操作してください</strong><span>ログインセッションを安全に維持するため、作業ペイン内では閲覧確認のみ行えます。</span></div>
                         <a class="button" data-browser-external-link target="_blank" rel="noopener">管理画面を別タブで開く</a>
                     </div>
-                    <iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" hidden></iframe>
+                    <div class="responsive-stage"><iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" hidden></iframe></div>
                 </div>
             </div>
             <div class="viewer-panel" data-viewer-panel="pdf">
@@ -528,8 +550,11 @@
                 <section class="ai-chat-messages" data-chat-messages aria-live="polite">
                     @forelse($aiChatMessages as $chatMessage)
                         <article class="ai-message ai-message--{{ $chatMessage->role }}">
-                            <div class="ai-message__bubble">@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@if($chatMessage->role === 'assistant')<a href="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" download="{{ $chatMessage->image_name }}">画像をダウンロード</a><button type="button" data-direct-image-save data-suggested-path="{{ $chatMessage->suggestedImagePath() }}" data-image-url="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" data-saved-url="{{ route('projects.ai-chat.messages.image-saved', [$project, $chatMessage]) }}">フォルダへ保存</button>@endif
-                                @endif{{ $chatMessage->content }}</div>
+                            <div class="ai-message__bubble">
+@if($chatMessage->image_path)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" alt="{{ $chatMessage->image_name }}">@if($chatMessage->role === 'assistant')<a href="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" download="{{ $chatMessage->image_name }}">画像をダウンロード</a><button type="button" data-direct-image-save data-suggested-path="{{ $chatMessage->suggestedImagePath() }}" data-image-url="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage]) }}" data-saved-url="{{ route('projects.ai-chat.messages.image-saved', [$project, $chatMessage]) }}">フォルダへ保存</button>@endif
+                                @endif
+                                @foreach(array_slice($chatMessage->attachedImages(), 1, null, true) as $imageIndex => $attachedImage)<img class="ai-message__image" src="{{ route('projects.ai-chat.messages.image', [$project, $chatMessage, 'index' => $imageIndex]) }}" alt="{{ $attachedImage['name'] }}">@endforeach
+{{ $chatMessage->content }}</div>
                             @if($chatMessage->image_save)
                                 @php($imageSaveData = [...$chatMessage->image_save, 'image_url' => route('projects.ai-chat.messages.image', [$project, $chatMessage->image_save['source_message_id']]), 'saved_url' => route('projects.ai-chat.messages.image-saved', [$project, $chatMessage])])
                                 <div data-image-save-history='@json($imageSaveData)'></div>
@@ -567,12 +592,12 @@
                 </section>
                 <div class="ai-chat-error" data-chat-error hidden></div>
                 <form class="ai-chat-form" data-chat-form data-chat-url="{{ route('projects.ai-chat.messages.store', $project) }}" enctype="multipart/form-data">
-                    <textarea name="content" rows="3" maxlength="4000" placeholder="このProjectについて質問する…" @disabled(!$aiChatEnabled || !$aiChatConfigured) required></textarea>
+                    <textarea name="content" rows="3" maxlength="4000" placeholder="このProjectについて質問する…" @disabled(!$aiChatEnabled || !$aiChatConfigured)></textarea>
                     <label class="chat-paste-hint"><input type="checkbox" name="generate_image" value="1" @disabled(!$aiChatEnabled || !$aiChatConfigured)> 画像を生成する（内容を入力して送信）</label>
                     <span class="chat-paste-hint">画像生成も利用ポイントの集計対象です。内訳は「利用料をチェックする」から確認できます。</span>
                     <label class="chat-paste-hint"><input type="checkbox" name="auto_save_files" value="1" checked> AIのファイル作成・変更を自動保存（接続フォルダ）</label>
-                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp" hidden data-chat-image-input>
-                    <div class="chat-image-preview" data-chat-image-preview hidden><img alt="添付するスクリーンショット"><button type="button" data-chat-image-remove aria-label="画像を削除">×</button></div>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden data-chat-image-input>
+                    <div class="codex-image-previews" data-chat-image-preview></div><small>スクショは3枚まで・1枚5MB・合計10MB。入力欄にCtrl＋Vで貼り付けできます。</small>
                     <input type="hidden" name="context_key" value="project" data-chat-context-key>
                     <input type="hidden" name="context_label" value="{{ $project->name }} / Project Overview" data-chat-context-label>
                     <input type="hidden" name="file_path" value="" data-chat-file-path>
@@ -629,6 +654,7 @@
 <script src="{{ asset('js/ai-chat-request.js') }}"></script>
 <script src="{{ asset('js/ai-image-save.js') }}"></script>
 <script src="{{ asset('js/local-development.js') }}"></script>
+<script src="{{ asset('js/responsive-preview.js') }}"></script>
 <script>
 (() => {
     const workbench = document.querySelector('[data-workbench]');
@@ -1311,10 +1337,10 @@
         article.className = `ai-message ai-message--${role}${pending ? ' is-pending' : ''}`;
         const bubble = document.createElement('div');
         bubble.className = 'ai-message__bubble';
-        if (imageUrl) {
+        for (const url of (Array.isArray(imageUrl) ? imageUrl : imageUrl ? [imageUrl] : [])) {
             const image = document.createElement('img');
             image.className = 'ai-message__image';
-            image.src = imageUrl;
+            image.src = url;
             image.alt = role === 'assistant' ? '生成された画像' : '添付画像';
             bubble.append(image);
             if (role === 'assistant') {
@@ -1338,38 +1364,47 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
     const chatImageInput = chatForm?.querySelector('[data-chat-image-input]');
     const chatImagePreview = chatForm?.querySelector('[data-chat-image-preview]');
-    let chatImageObjectUrl = '';
-    const setChatImage = file => {
-        if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) {
-            chatError.textContent = 'PNG・JPG・WebP画像を選択してください。';
-            chatError.hidden = false;
-            return;
+    let chatImages = [];
+    const renderChatImages = () => {
+        chatImagePreview.replaceChildren();
+        for (const entry of chatImages) {
+            const card=document.createElement('figure'), image=document.createElement('img');
+            image.src=entry.url; image.alt=entry.file.name;
+            const caption=document.createElement('figcaption'); caption.textContent=entry.file.name;
+            const remove=document.createElement('button'); remove.type='button'; remove.textContent='削除';
+            remove.setAttribute('aria-label',entry.file.name+'を添付から削除');
+            remove.addEventListener('click',()=>{
+                if(chatForm.dataset.sending==='true')return;
+                URL.revokeObjectURL(entry.url);chatImages=chatImages.filter(item=>item!==entry);renderChatImages();
+            });
+            card.append(image,caption,remove);chatImagePreview.append(card);
         }
-        if (file.size > 5 * 1024 * 1024) {
-            chatError.textContent = '画像は5MB以内にしてください。';
-            chatError.hidden = false;
-            return;
-        }
-        const transfer = new DataTransfer();
-        transfer.items.add(file);
-        chatImageInput.files = transfer.files;
-        if (chatImageObjectUrl) URL.revokeObjectURL(chatImageObjectUrl);
-        chatImageObjectUrl = URL.createObjectURL(file);
-        chatImagePreview.querySelector('img').src = chatImageObjectUrl;
-        chatImagePreview.hidden = false;
-        chatError.hidden = true;
     };
-    chatForm?.querySelector('[data-chat-image-select]')?.addEventListener('click', () => chatImageInput.click());
-    chatImageInput?.addEventListener('change', () => setChatImage(chatImageInput.files[0]));
-    chatForm?.querySelector('[data-chat-image-remove]')?.addEventListener('click', () => {
-        chatImageInput.value = '';
-        chatImagePreview.hidden = true;
-        if (chatImageObjectUrl) URL.revokeObjectURL(chatImageObjectUrl);
-        chatImageObjectUrl = '';
-    });
-    chatForm?.elements.content.addEventListener('paste', event => {
-        const image = [...event.clipboardData.files].find(file => file.type.startsWith('image/'));
-        if (image) setChatImage(image);
+    const addChatImages = files => {
+        if(chatForm.dataset.sending==='true')return;
+        try {
+            const incoming=Array.from(files);
+            if(chatImages.length+incoming.length>3)throw new Error('画像は3枚まで添付できます。');
+            let total=chatImages.reduce((sum,entry)=>sum+entry.file.size,0);
+            for(const file of incoming){
+                if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('PNG・JPEG・WebPの画像を選択してください。');
+                if(!file.size || file.size>5*1024*1024)throw new Error('画像は1枚5MBまでです。');
+                total+=file.size;
+            }
+            if(total>10*1024*1024)throw new Error('画像の合計は10MBまでです。');
+            for(const file of incoming)chatImages.push({file,url:URL.createObjectURL(file)});
+            renderChatImages();chatError.hidden=true;
+        }catch(error){chatError.textContent=error.message;chatError.hidden=false;}
+    };
+    const clearChatImages=()=>{
+        for(const entry of chatImages)URL.revokeObjectURL(entry.url);
+        chatImages=[];chatImageInput.value='';renderChatImages();
+    };
+    chatForm?.querySelector('[data-chat-image-select]')?.addEventListener('click',()=>chatImageInput.click());
+    chatImageInput?.addEventListener('change',()=>{addChatImages(chatImageInput.files);chatImageInput.value='';});
+    chatForm?.elements.content.addEventListener('paste',event=>{
+        const files=Array.from(event.clipboardData?.files || []);
+        if(files.length){event.preventDefault();addChatImages(files);}
     });
     const appendDirectImageSave = (parent, imageUrl, savedUrl, suggestedPath) => {
         if (!imageUrl || !savedUrl) return;
@@ -2074,12 +2109,13 @@
     chatForm?.addEventListener('submit', async event => {
         event.preventDefault();
         const textarea = chatForm.elements.content;
-        const content = textarea.value.trim();
+        const content = textarea.value.trim() || (chatImages.length ? '添付したスクリーンショットを確認してください。' : '');
         if (!content || chatForm.dataset.sending === 'true') return;
         chatForm.dataset.sending = 'true';
         const submit = chatForm.querySelector('button[type="submit"]');
         chatError.hidden = true;
-        const attachedImageUrl = chatImageObjectUrl;
+        const attachedImages = chatImages.map(entry => entry.file);
+        const attachedImageUrl = attachedImages.map(file => URL.createObjectURL(file));
         const userMessage = appendMessage('user', content, '送信中', false, attachedImageUrl);
         const pending = appendMessage('assistant', 'Thinking', '', true);
         textarea.value = '';
@@ -2095,6 +2131,7 @@
             const projectFiles = localDevelopmentConnected ? [] : await collectProjectTextFiles(content);
             chatForm.querySelector('[data-chat-project-files]').value = projectFiles.length ? JSON.stringify(projectFiles) : '';
             const payload = new FormData(chatForm);
+            attachedImages.forEach(file => payload.append('images[]',file));
             payload.set('content', content);
             payload.set('local_file_access', requestRoot ? '1' : '0');
             payload.set('development_mode', '0');
@@ -2148,9 +2185,7 @@
                 refreshLocalChangeHistory().catch(() => {});
             }
             scrollChatTo(userMessage, 'start');
-            chatImageInput.value = '';
-            chatImagePreview.hidden = true;
-            chatImageObjectUrl = '';
+            clearChatImages();
             if (body.usage) {
                 const usage = body.usage;
                 workbench.querySelector('[data-chat-points]').textContent = usage.points_label + 'ポイント';

@@ -98,7 +98,7 @@ while (true) {
         $key = hash('sha256', $origin.'/'.$project);
         $action = $input['action'] ?? '';
         if ($action === 'status') {
-            $result = ['version'=>'2.0.0', 'codexAvailable'=>CodexSession::executable($config) !== null, 'php'=>PHP_VERSION, 'sqlite'=>extension_loaded('pdo_sqlite'),
+            $result = ['version'=>'2.1.0', 'codexImages'=>true, 'codexAvailable'=>CodexSession::executable($config) !== null, 'php'=>PHP_VERSION, 'sqlite'=>extension_loaded('pdo_sqlite'),
                 'folder'=>isset($projects[$key]) ? basename($projects[$key]) : null,
                 'workspace'=>isset($projects[$key]) ? hash('sha256', $projects[$key]) : null,
                 'url'=>$runners[$key]['url'] ?? null, 'time'=>date(DATE_ATOM)];
@@ -146,7 +146,7 @@ while (true) {
                     $session = $codexSessions[$key] ?? null;
                     if (!$session) throw new RuntimeException('先にCodexへ接続してください。', 409);
                     $session->tick();
-                    if ($action === 'codex_send') $session->start($input['prompt'] ?? '', $input['requestId'] ?? '');
+                    if ($action === 'codex_send') $session->start($input['prompt'] ?? '', $input['requestId'] ?? '', $input['images'] ?? []);
                     elseif ($action === 'codex_login') $session->login($input);
                     elseif ($action === 'codex_approve') $session->approve($input);
                     elseif ($action === 'codex_interrupt') $session->interrupt();

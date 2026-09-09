@@ -132,6 +132,33 @@ class LocalDevelopmentTest extends TestCase
         $config = json_decode(file_get_contents($installed.'/config.json'), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame($origins, $config['origins']);
         $this->assertSame(64, strlen($config['token']));
+        $probe=stream_socket_server('tcp://127.0.0.1:0');$address=stream_socket_get_name($probe,false);fclose($probe);
+        $config['port']=(int)substr(strrchr($address,':'),1);
+        $this->base='http://'.$address;$this->token=$config['token'];
+        file_put_contents($installed.'/config.json',json_encode($config));
+        mkdir($this->directory.'/project');mkdir($this->directory.'/project/public');
+        file_put_contents($this->directory.'/project/public/index.php','<?php echo "test";');
+        file_put_contents($installed.'/projects.json',json_encode([hash('sha256','http://localhost/test-project')=>realpath($this->directory.'/project')]));
+        $this->helper=proc_open([PHP_BINARY,'-c',$installed.'/php.ini',$installed.'/tool/helper.php',$installed.'/config.json'],
+            [0=>['pipe','r'],1=>['file',$installed.'/out.log','a'],2=>['file',$installed.'/err.log','a']],$pipes,$installed,null,['bypass_shell'=>true]);
+        fclose($pipes[0]);
+        for($i=0;$i<50;$i++){$connection=@stream_socket_client('tcp://'.$address,$errno,$error,0.1);if($connection){fclose($connection);break;}usleep(50000);}
+        $runSetup=function()use($package,$installed):array{
+            $p=proc_open(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',$package.'/install.ps1',
+                '-InstallRoot',$installed,'-PhpPath',PHP_BINARY,'-NoShortcut','-NoRegistration','-NoLaunch','-SkipCodex'],
+                [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes,$package,null,['bypass_shell'=>true]);
+            fclose($pipes[0]);$out=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);
+            fclose($pipes[1]);fclose($pipes[2]);return[proc_close($p),$out.$err];
+        };
+        $this->assertSame(200,$this->api('start')[0]);
+        [$exit,$output]=$runSetup();$this->assertNotSame(0,$exit,'Running app must prevent update');
+        $this->assertSame(200,$this->api('status')[0]);
+        $this->assertSame(200,$this->api('stop')[0]);
+        [$exit,$output]=$runSetup();$this->assertSame(0,$exit,$output);
+        $this->assertFalse(proc_get_status($this->helper)['running'],'Old idle helper must stop');
+        proc_close($this->helper);$this->helper=null;
+        $this->assertSame($config['token'],json_decode(file_get_contents($installed.'/config.json'),true)['token']);
+        $this->assertSame('<?php echo "test";',file_get_contents($this->directory.'/project/public/index.php'));
         $this->assertStringContainsString('date.timezone=Asia/Tokyo', file_get_contents($installed.'/php.ini'));
     }
 
@@ -143,7 +170,7 @@ class LocalDevelopmentTest extends TestCase
         [$status, $state] = $this->api('status');
         $this->assertSame(200, $status);
         $this->assertTrue($state['sqlite']);
-        $this->assertSame('2.0.0', $state['version']);
+        $this->assertSame('2.1.0', $state['version']);
         $this->assertSame(409, $this->api('codex_poll')[0]);
         $this->assertSame(409, $this->api('codex_connect', ['workspace' => 'stale'])[0]);
         $this->assertStringEndsWith('+09:00', $state['time']);

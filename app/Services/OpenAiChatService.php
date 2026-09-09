@@ -20,7 +20,7 @@ class OpenAiChatService
         }
 
         $projectContext['reference_images'] = $messages->filter(fn (AiChatMessage $message) => $message->image_path)
-            ->map(fn (AiChatMessage $message): array => ['message_id' => $message->id, 'description' => $message->content, 'name' => $message->image_name])->values()->all();
+            ->map(fn (AiChatMessage $message): array => ['message_id' => $message->id, 'description' => $message->content, 'name' => $message->image_name, 'attachment_count' => count($message->attachedImages()), 'attachment_names' => array_column($message->attachedImages(), 'name')])->values()->all();
         try {
             $response = Http::withToken($apiKey)
                 ->acceptJson()
@@ -303,16 +303,15 @@ class OpenAiChatService
 
     private function messageContent(AiChatMessage $message): string|array
     {
-        if ($message->role !== AiChatMessage::ROLE_USER || ! $message->image_path || ! Storage::disk('local')->exists($message->image_path)) {
-            return $message->content;
+        if ($message->role !== AiChatMessage::ROLE_USER) return $message->content;
+        $content = [['type'=>'input_text', 'text'=>$message->content]];
+        foreach ($message->attachedImages() as $image) {
+            if (Storage::disk('local')->exists($image['path'])) {
+                $content[] = ['type'=>'input_image', 'image_url'=>'data:'.$image['mime'].';base64,'.base64_encode(Storage::disk('local')->get($image['path']))];
+            }
         }
-
-        return [
-            ['type' => 'input_text', 'text' => $message->content],
-            ['type' => 'input_image', 'image_url' => 'data:'.$message->image_mime.';base64,'.base64_encode(Storage::disk('local')->get($message->image_path))],
-        ];
+        return count($content) === 1 ? $message->content : $content;
     }
-
     private function instructions(array $context): string
     {
         $fileChangeInstruction = <<<'PROMPT'

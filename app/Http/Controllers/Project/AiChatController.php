@@ -45,10 +45,18 @@ class AiChatController extends Controller
             'context_key' => ['nullable', 'string', 'max:255'],
             'context_label' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'images' => ['nullable', 'array', 'max:3'],
+            'images.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=12000,max_height=12000'],
             'file_path' => ['nullable', 'string', 'max:500'],
             'file_content' => ['nullable', 'string', 'max:1000000'],
             'project_files' => ['nullable', 'json', 'max:1000000'],
         ]);
+
+        $images = $request->file('images', []);
+        if ($request->file('image')) array_unshift($images, $request->file('image'));
+        if (count($images) > 3 || array_sum(array_map(fn ($file) => $file->getSize(), $images)) > 10 * 1024 * 1024) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['images'=>'画像は3枚まで、合計10MB以内で添付してください。']);
+        }
 
         $thread = AiChatThread::firstOrCreate([
             'project_id' => $project->id,
@@ -64,16 +72,22 @@ class AiChatController extends Controller
             'context_key' => $validated['context_key'] ?? null,
             'context_label' => $validated['context_label'] ?? null,
         ]);
-        if ($image = $request->file('image')) {
-            $path = $image->store("ai-chat/{$thread->id}", 'local');
-            $userMessage->update([
-                'image_path' => $path,
-                'image_name' => $image->getClientOriginalName(),
-                'image_mime' => $image->getMimeType(),
-                'image_size' => $image->getSize(),
+        $stored = [];
+        try {
+            foreach ($images as $image) {
+                $stored[] = ['path'=>$image->store("ai-chat/{$thread->id}", 'local'), 'name'=>$image->getClientOriginalName(),
+                    'mime'=>$image->getMimeType(), 'size'=>$image->getSize()];
+            }
+            if ($stored) $userMessage->update([
+                'image_path'=>$stored[0]['path'], 'image_name'=>$stored[0]['name'],
+                'image_mime'=>$stored[0]['mime'], 'image_size'=>$stored[0]['size'],
+                'additional_images'=>array_slice($stored, 1),
             ]);
+        } catch (\Throwable $error) {
+            foreach ($stored as $image) Storage::disk('local')->delete($image['path']);
+            $userMessage->delete();
+            throw $error;
         }
-
         if ($this->requestsBackupRestore($validated['content'])) {
             $assistantMessage = $thread->messages()->create([
                 'role' => AiChatMessage::ROLE_ASSISTANT,
@@ -175,15 +189,17 @@ class AiChatController extends Controller
         Gate::authorize('view', $project);
         abort_unless($message->thread?->project_id === $project->id && $message->image_path, 404);
         abort_unless($message->thread->user_id === $request->user()->id, 404);
-        abort_unless(Storage::disk('local')->exists($message->image_path), 404);
+        $index = $request->query('index', '0');
+        abort_unless(is_string($index) && preg_match('/^[0-2]$/D', $index), 404);
+        $image = $message->attachedImages()[(int) $index] ?? null;
+        abort_unless($image && Storage::disk('local')->exists($image['path']), 404);
 
-        return Storage::disk('local')->response($message->image_path, $message->image_name, [
-            'Content-Type' => $message->image_mime,
+        return Storage::disk('local')->response($image['path'], $image['name'], [
+            'Content-Type' => $image['mime'],
             'Content-Disposition' => 'inline',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
-
     public function markImageSaved(Request $request, Project $project, AiChatMessage $message): JsonResponse
     {
         Gate::authorize('view', $project);

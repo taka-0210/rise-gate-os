@@ -12,14 +12,15 @@ echo '<!doctype html><meta charset="utf-8"><p id="result">RUNNING</p><div id="wo
 const workbench=document.querySelector('#workbench'),localTree=document.createElement('div');
 let localDirectoryHandle={},refreshes=0;
 const renderLocalDirectory=async()=>{refreshes++;};
-const calls=[];
+const calls=[]; let supportsImages=true, sendFails=false;
 let state={phase:'ready',authenticated:true,history:[],approvals:[],error:''};
 window.fetch=()=>{throw new Error('OS server must not receive development chat');};
 window.RiseGateLocalDev={Client:class{
 constructor(project,token,workspace){Object.assign(this,{project,token,workspace});}
 async call(action,args={}){
 calls.push({action,args});
-if(action==='status')return {version:'2.0.0'};
+if(action==='status')return {version:'2.1.0',codexImages:supportsImages};
+if(action==='codex_send' && sendFails)throw new Error('Test send failure');
 if(action==='codex_send')state={...state,phase:'running',history:[{id:'user',role:'user',text:args.prompt,time:'2026-09-09T10:00:00+09:00'}]};
 if(action==='codex_approve')state={...state,approvals:[],phase:'ready'};
 if(action==='codex_interrupt')state={...state,phase:'ready'};
@@ -71,7 +72,30 @@ assert(!codexPanel.querySelector('[data-codex-activity]').classList.contains('is
 codexRender({...state,phase:'running'});
 codexPanel.querySelector('[data-codex-stop]').click();await tick();
 assert(calls.some(c=>c.action==='codex_interrupt'),'stop sent');
-codexPanel.querySelector('[data-codex-back]').click();
+state={...state,phase:'ready'};codexRender(state);
+const png=new File([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR9sAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],'first.png',{type:'image/png'});
+codexAddImages([png,png]);
+assert(codexImages.length===2&&codexPanel.querySelectorAll('[data-codex-image-previews] img').length===2,'multiple previews');
+codexPanel.querySelector('[data-codex-image-previews] button').click();
+assert(codexImages.length===1,'individual removal');
+const clipboard=new DataTransfer();clipboard.items.add(png);
+form.elements.prompt.dispatchEvent(new ClipboardEvent('paste',{clipboardData:clipboard,bubbles:true,cancelable:true}));
+assert(codexImages.length===2,'paste appends');
+codexAddImages([png,png]);assert(codexImages.length===2,'too many rejected');
+supportsImages=false;
+form.querySelector('button[type="submit"]').click();
+for(let i=0;i<100&&form.dataset.sending==='true';i++)await tick();
+assert(codexImages.length===2&&codexPanel.querySelector('[data-codex-error]').textContent.includes('更新'),'old helper retains attachments');
+supportsImages=true;sendFails=true;
+form.querySelector('button[type="submit"]').click();
+for(let i=0;i<100&&form.dataset.sending==='true';i++)await tick();
+assert(codexImages.length===2&&codexPanel.querySelector('[data-codex-error]').textContent.includes('failure'),'failed send retains attachments');
+sendFails=false;form.querySelector('button[type="submit"]').click();
+for(let i=0;i<100&&form.dataset.sending==='true';i++)await tick();
+const imageRequest=calls.filter(c=>c.action==='codex_send').at(-1);
+assert(imageRequest.args.images.length===2&&imageRequest.args.images.every(img=>img.url.startsWith('data:image/png;base64,')),'all images reach local helper');
+assert(codexImages.length===0,'accepted attachments cleared');
+codexAddImages([png]);codexPanel.querySelector('[data-codex-back]').click();
 assert(codexPanel.hidden&&workbench.querySelector('[data-ai-standard]').style.display==='','returns to regular AI');
 workbench.dispatchEvent(new CustomEvent('development-folder-changed'));
 assert(!codexClient&&codexPanel.querySelector('[data-codex-history]').children.length===0,'folder histories separated');

@@ -24,7 +24,10 @@
     </div>
     <div data-codex-approvals></div>
     <form data-codex-form>
-        <label>開発の依頼<textarea name="prompt" rows="4" maxlength="16000" required placeholder="このフォルダにシンプルなTODOアプリを作って…"></textarea></label>
+        <label>開発の依頼<textarea name="prompt" rows="4" maxlength="16000" placeholder="このフォルダにシンプルなTODOアプリを作って…"></textarea></label>
+        <label class="codex-image-picker">スクショを添付<input type="file" data-codex-images accept="image/png,image/jpeg,image/webp" multiple></label>
+        <small>画像を選択するか、入力欄にCtrl＋Vで貼り付け。3枚まで・1枚5MB・合計10MB。</small>
+        <div class="codex-image-previews" data-codex-image-previews></div>
         <button type="submit" disabled>Codexに送信</button>
     </form>
     <small>Codexの利用枠・料金は、このPCのCodex認証に従います（OSのAIポイントとは別です）。</small>

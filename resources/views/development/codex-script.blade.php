@@ -1,6 +1,57 @@
     const codexPanel = workbench.querySelector('[data-codex-panel]');
     let codexClient = null, codexTimer = null, codexPolling = false, codexLastHistory = '', codexLastApprovals = '';
     let codexWasRunning = false;
+    let codexImages = [];
+    const codexImageForm = codexPanel?.querySelector('[data-codex-form]');
+    const codexRenderImages = () => {
+        const list = codexPanel.querySelector('[data-codex-image-previews]'); list.replaceChildren();
+        for (const entry of codexImages) {
+            const card = document.createElement('figure'), img = document.createElement('img');
+            img.src = entry.preview; img.alt = entry.file.name;
+            const caption = document.createElement('figcaption'); caption.textContent = entry.file.name;
+            const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '削除';
+            remove.setAttribute('aria-label', entry.file.name + 'を添付から削除');
+            remove.addEventListener('click', () => {
+                if (codexImageForm.dataset.sending === 'true') return;
+                URL.revokeObjectURL(entry.preview); codexImages = codexImages.filter(item => item !== entry); codexRenderImages();
+            });
+            card.append(img,caption,remove); list.append(card);
+        }
+    };
+    const codexClearImages = () => {
+        for (const entry of codexImages) URL.revokeObjectURL(entry.preview);
+        codexImages = []; codexRenderImages();
+        codexPanel.querySelector('[data-codex-images]').value = '';
+    };
+    const codexAddImages = files => {
+        if (codexImageForm.dataset.sending === 'true') return;
+        const incoming = Array.from(files);
+        try {
+            if (codexImages.length + incoming.length > 3) throw new Error('画像は3枚まで添付できます。');
+            let total = codexImages.reduce((sum, entry) => sum + entry.file.size, 0);
+            for (const file of incoming) {
+                if (!['image/png','image/jpeg','image/webp'].includes(file.type)) throw new Error('PNG・JPEG・WebPの画像を選択してください。');
+                if (!file.size || file.size > 5 * 1024 * 1024) throw new Error('画像は1枚5MBまでです。');
+                total += file.size;
+            }
+            if (total > 10 * 1024 * 1024) throw new Error('画像の合計は10MBまでです。');
+            for (const file of incoming) codexImages.push({file,preview:URL.createObjectURL(file)});
+            codexRenderImages(); codexError('');
+        } catch (error) { codexError(error.message); }
+    };
+    codexPanel?.querySelector('[data-codex-images]').addEventListener('change', event => {
+        codexAddImages(event.target.files); event.target.value = '';
+    });
+    codexImageForm?.elements.prompt.addEventListener('paste', event => {
+        const files = Array.from(event.clipboardData?.items || []).filter(item => item.kind === 'file').map(item => item.getAsFile()).filter(Boolean);
+        if (files.length) { event.preventDefault(); codexAddImages(files); }
+    });
+    const codexReadImage = file => new Promise((resolve,reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({name:file.name,url:reader.result});
+        reader.onerror = () => reject(new Error('画像を読み取れませんでした。もう一度添付してください。'));
+        reader.readAsDataURL(file);
+    });
     let codexActivitySignature = '', codexProgressAt = Date.now();
     const codexActivity = (label, busy = false, detail = '') => {
         const node = codexPanel.querySelector('[data-codex-activity]');
@@ -40,7 +91,7 @@
         codexPanel.querySelector('[data-codex-status]').textContent = (labels[state.phase] || state.phase) + (state.authenticated ? '（' + (state.accountType === 'chatgpt' ? 'ChatGPT' : state.accountType === 'apiKey' ? 'OpenAI API' : state.accountType) + '）' : '');
         codexPanel.querySelector('[data-codex-auth]').hidden = state.authenticated || state.phase === 'connecting';
         codexPanel.querySelector('[data-codex-stop]').disabled = state.phase !== 'running';
-        codexPanel.querySelector('[data-codex-form] button').disabled = state.phase !== 'ready';
+        codexPanel.querySelector('[data-codex-form] button[type="submit"]').disabled = state.phase !== 'ready';
         codexPanel.querySelector('[data-codex-connect]').disabled = ['connecting','running'].includes(state.phase);
         codexError(state.error || '');
         const link = codexPanel.querySelector('[data-codex-login-link]');
@@ -124,7 +175,7 @@
             if (client === codexClient) {
                 codexError(error.message);
                 codexActivity('通信を確認できません', false, '作業が続いている可能性があります。再送せず、接続の回復を待ってください。');
-                codexPanel.querySelector('[data-codex-form] button').disabled = true;
+                codexPanel.querySelector('[data-codex-form] button[type="submit"]').disabled = true;
             }
         }
         finally{codexPolling=false;}
@@ -166,22 +217,30 @@
     codexPanel?.querySelector('[data-codex-form]').addEventListener('submit',async event=>{
         event.preventDefault();const form=event.currentTarget;
         if(form.dataset.sending==='true')return;
-        form.dataset.sending='true';form.querySelector('button').disabled=true;
+        form.dataset.sending='true';form.querySelector('button[type="submit"]').disabled=true;
         const prompt=form.elements.prompt.value.trim();
         try{
             if(!codexClient)throw new Error('先にCodexへ接続してください。');
+            if (!prompt && !codexImages.length) throw new Error('依頼内容またはスクショを入力してください。');
+            const client = codexClient;
             codexActivity('送信中…', true);
-            codexRender(await codexClient.call('codex_send',{prompt,requestId:crypto.randomUUID()}));
-            form.elements.prompt.value='';
-        }catch(error){codexError(error.message);codexActivity('送信結果を確認してください', false, '上のエラー内容を確認してください。');form.querySelector('button').disabled=false;}
+            if (codexImages.length && !(await client.call('status')).codexImages) throw new Error('スクショの送信にはPC側の開発ツールの更新が必要です。添付画像は残しています。');
+            const images = await Promise.all(codexImages.map(entry => codexReadImage(entry.file)));
+            if (client !== codexClient) throw new Error('接続先が変わりました。送信先を確認してください。');
+            const state = await client.call('codex_send',{prompt,images,requestId:crypto.randomUUID()});
+            if (client === codexClient) {
+                codexRender(state); form.elements.prompt.value=''; codexClearImages();
+            }
+        }catch(error){codexError(error.message);codexActivity('送信結果を確認してください', false, '上のエラー内容を確認してください。');form.querySelector('button[type="submit"]').disabled=false;}
         finally{delete form.dataset.sending;}
     });
     workbench.addEventListener('development-folder-changed',()=>{
         clearInterval(codexTimer);codexClient=null;codexWasRunning=false;codexLastHistory='';codexLastApprovals='';
         if(!codexPanel)return;
+        codexClearImages();
         codexActivity('Codexへの接続待ち');
         codexPanel.querySelector('[data-codex-history]').replaceChildren();
         codexPanel.querySelector('[data-codex-approvals]').replaceChildren();
-        codexPanel.querySelector('[data-codex-form] button').disabled=true;
+        codexPanel.querySelector('[data-codex-form] button[type="submit"]').disabled=true;
         codexPanel.querySelector('[data-codex-status]').textContent='選択したフォルダでCodexに接続してください。';
     });

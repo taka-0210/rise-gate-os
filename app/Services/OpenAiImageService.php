@@ -40,14 +40,19 @@ class OpenAiImageService
         }
         $request = Http::withToken((string) config('services.openai.api_key'))->acceptJson()->timeout(300);
         // Only reuse images already included in this same conversation request to OpenAI.
-        foreach ($args['reference_message_ids'] as $index => $id) {
+        $imageIndex = 0;
+        foreach ($args['reference_message_ids'] as $id) {
             $source = is_int($id) ? $messages->first(fn (AiChatMessage $message) => $message->id === $id) : null;
             if (! $source?->image_path || ! in_array($source->image_mime, ['image/png', 'image/jpeg', 'image/webp'], true)
                 || ! Storage::disk('local')->exists($source->image_path)) {
                 throw new RuntimeException('参照する画像がこの会話に見つかりません。');
             }
-            $request->attach("image[{$index}]", Storage::disk('local')->get($source->image_path),
-                $source->image_name, ['Content-Type' => $source->image_mime]);
+            foreach ($source->attachedImages() as $image) {
+                if ($imageIndex >= 4) throw new RuntimeException('画像編集の参照画像は合計4枚までです。参照を絞ってください。');
+                if (! Storage::disk('local')->exists($image['path'])) throw new RuntimeException('参照画像が見つかりません。');
+                $request->attach("image[{$imageIndex}]", Storage::disk('local')->get($image['path']), $image['name'], ['Content-Type'=>$image['mime']]);
+                $imageIndex++;
+            }
         }
         $model = (string) config('services.openai.image_model', 'gpt-image-2');
         try {

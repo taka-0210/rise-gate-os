@@ -99,6 +99,39 @@ PHP);
         $this->await(fn ($state) => $state['phase'] === 'ready');
     }
 
+    public function test_multiple_images_are_sent_as_image_inputs_and_not_saved_in_os_history(): void
+    {
+        $this->connect();
+        $url = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR9sAAAAASUVORK5CYII=';
+        $this->session->start('', 'request-image-0001', [['name'=>'first.png','url'=>$url], ['name'=>'second.png','url'=>$url]]);
+        $state = $this->await(fn ($state) => count($state['approvals']) === 1);
+        $messages = array_map(fn ($line) => json_decode($line, true), file($this->directory.'/requests.jsonl'));
+        $turn = collect($messages)->first(fn ($item) => ($item['method'] ?? '') === 'turn/start');
+        $this->assertSame(['text','image','image'], array_column($turn['params']['input'], 'type'));
+        $this->assertSame($url, $turn['params']['input'][2]['url']);
+        $this->assertStringContainsString('second.png', $state['history'][0]['text']);
+        $this->assertStringNotContainsString('base64', file_get_contents($this->directory.'/codex-test.json'));
+    }
+
+    public function test_invalid_image_does_not_start_a_turn_or_change_history(): void
+    {
+        $this->connect();
+        foreach ([
+            [['name'=>'fake.png','url'=>'data:image/png;base64,'.base64_encode('<html>bad</html>')]],
+            [['name'=>'remote.png','url'=>'https://example.com/private.png']],
+            array_fill(0, 4, ['name'=>'x.png','url'=>'']),
+            [['name'=>'large.png','url'=>'data:image/png;base64,'.str_repeat('A', 7_000_001)]],
+        ] as $images) {
+            try {
+                $this->session->start('確認', 'request-invalid-image', $images);
+                $this->fail('Invalid image accepted');
+            } catch (\RuntimeException $error) {
+                $this->assertNotEmpty($error->getMessage());
+            }
+            $this->assertSame('ready', $this->session->state()['phase']);
+            $this->assertSame([], $this->session->state()['history']);
+        }
+    }
     public function test_stale_approval_cannot_execute_a_command(): void
     {
         $this->connect();

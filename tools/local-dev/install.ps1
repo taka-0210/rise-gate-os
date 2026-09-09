@@ -11,6 +11,29 @@ $ErrorActionPreference = 'Stop'
 if (![Environment]::Is64BitOperatingSystem) { throw 'Windows 64bit が必要です。' }
 $InstallRoot = [IO.Path]::GetFullPath($InstallRoot)
 [IO.Directory]::CreateDirectory($InstallRoot) | Out-Null
+# Do not leave an old in-memory helper running after replacing its files.
+$previousConfigPath = Join-Path $InstallRoot 'config.json'
+if (Test-Path -LiteralPath $previousConfigPath) {
+    $previousConfig = Get-Content -LiteralPath $previousConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $listeners = @(Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort ([int]$previousConfig.port) -State Listen -ErrorAction SilentlyContinue)
+    foreach ($listener in $listeners) {
+        $runningHelper = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $listener.OwningProcess)
+        $expectedHelper = (Join-Path $InstallRoot 'tool\helper.php')
+        $commandLine = ([string]$runningHelper.CommandLine).Replace('/','\')
+        $helperPattern = '(?:^|\s|")' + [regex]::Escape($expectedHelper) + '(?:"|\s|$)'
+        $configPattern = '(?:^|\s|")' + [regex]::Escape($previousConfigPath) + '(?:"|\s|$)'
+        if ($runningHelper.ExecutablePath -ne $previousConfig.php -or $commandLine -notmatch $helperPattern -or $commandLine -notmatch $configPattern) {
+            throw '接続ポートを別のプログラムが使用しています。更新を中止しました。'
+        }
+        $children = @(Get-CimInstance Win32_Process -Filter ('ParentProcessId=' + $runningHelper.ProcessId) | Where-Object { $_.Name -ne 'conhost.exe' })
+        if ($children.Count) {
+            throw '開発アプリまたはCodexが接続中です。作業の完了を待ち、3ペイン左側の開発ツールで「接続を解除」を押してからセットアップを再実行してください。'
+        }
+        Write-Host '更新を反映するため、待機中の開発ツールを終了します。'
+        Stop-Process -Id $runningHelper.ProcessId -ErrorAction Stop
+        Wait-Process -Id $runningHelper.ProcessId -Timeout 10 -ErrorAction SilentlyContinue
+    }
+}
 $runtime = Join-Path $InstallRoot 'php'
 if (!$PhpPath) {
     $PhpPath = Join-Path $runtime 'php.exe'

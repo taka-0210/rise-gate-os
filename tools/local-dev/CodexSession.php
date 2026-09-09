@@ -17,6 +17,7 @@ final class CodexSession
     private ?string $thread = null;
     private ?string $turn = null;
     private ?string $queued = null;
+    private array $queuedImages = [];
     private bool $authenticated = false;
     private ?string $authUrl = null;
     private string $accountType = '';
@@ -98,7 +99,10 @@ final class CodexSession
     {
         $prompt = $this->queued;
         $this->queued = null;
-        $this->rpc('turn/start', ['threadId'=>$this->thread,'input'=>[['type'=>'text','text'=>$prompt,'text_elements'=>[]]]], 'turn');
+        $input = [['type'=>'text','text'=>$prompt,'text_elements'=>[]]];
+        foreach ($this->queuedImages as $image) $input[] = ['type'=>'image','url'=>$image['url']];
+        $this->queuedImages = [];
+        $this->rpc('turn/start', ['threadId'=>$this->thread,'input'=>$input], 'turn');
     }
 
     public function tick(): void
@@ -211,14 +215,34 @@ final class CodexSession
         } else $this->rpc('account/login/start', ['type'=>'chatgpt'], 'login');
     }
 
-    public function start(string $prompt, string $requestId): void
+    public function start(string $prompt, string $requestId, array $images = []): void
     {
         if (!preg_match('/^[a-zA-Z0-9_-]{16,80}$/', $requestId)) throw new \RuntimeException('依頼IDが不正です。');
         if ($this->requestId === $requestId) return;
         if (!$this->authenticated || $this->phase !== 'ready') throw new \RuntimeException('Codexへの接続を確認してください。実行中の場合は完了を待ってください。');
+        if (count($images) > 3) throw new \RuntimeException('画像は3枚まで添付できます。');
+        $validated = []; $total = 0;
+        foreach ($images as $image) {
+            $url = $image['url'] ?? null;
+            $name = $image['name'] ?? 'スクリーンショット';
+            if (!is_string($url) || strlen($url) > 7_000_000 || !preg_match('~^data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$~D', $url, $match)) {
+                throw new \RuntimeException('PNG・JPEG・WebPの画像を添付してください。');
+            }
+            $bytes = base64_decode($match[2], true);
+            if ($bytes === false || base64_encode($bytes) !== $match[2] || strlen($bytes) > 5 * 1024 * 1024) throw new \RuntimeException('画像は1枚5MBまでです。');
+            $total += strlen($bytes);
+            if ($total > 10 * 1024 * 1024) throw new \RuntimeException('画像の合計は10MBまでです。');
+            $info = @getimagesizefromstring($bytes);
+            if (!$info || ($info['mime'] ?? '') !== $match[1] || $info[0] * $info[1] > 40_000_000) throw new \RuntimeException('画像を読み取れません。サイズや形式を確認してください。');
+            if (!is_string($name) || mb_strlen($name) > 200 || preg_match('/[\x00-\x1f]/', $name)) throw new \RuntimeException('画像名を確認してください。');
+            $validated[] = ['url'=>$url,'name'=>$name];
+        }
+        if (trim($prompt) === '' && $validated) $prompt = '添付したスクリーンショットを確認してください。';
         if (trim($prompt)==='' || mb_strlen($prompt)>16000) throw new \RuntimeException('依頼内容は16000文字以内で入力してください。');
         $this->requestId = $requestId; $this->phase = 'running'; $this->queued = $prompt; $this->error = '';
-        $this->record('user', $prompt); $this->save();
+        $this->queuedImages = $validated;
+        $this->record('user', $prompt.($validated ? "\n\n添付画像：".implode('、', array_column($validated, 'name')) : ''));
+        $this->save();
         if ($this->threadLoaded) { $this->beginTurn(); return; }
         $params = ['cwd'=>$this->root,'sandbox'=>'workspace-write','approvalPolicy'=>'on-request','approvalsReviewer'=>'user',
             'developerInstructions'=>'あなたはRISE GATE OSから呼び出された開発担当です。ユーザーが選択した作業フォルダで、依頼に必要なファイルだけを調査し、編集・実行・テストしてください。日本語で簡潔に進捗を伝えてください。PHPとPDO SQLiteを使用できます。PHPアプリは公開ファイルをpublic/、DBをdata/へ分離します。初回設定はアプリ自身で案内してください。日時はAsia/Tokyo。OSのログインやAPIへ依存させない独立アプリを作ります。既存データと秘密情報を保護し、破壊的変更、公開、Git push、追加ソフトの導入はユーザーの明示した依頼の範囲だけで行います。実施していない保存・テストを完了したと報告しないでください。挨拶や説明では不要なファイルを読みません。'];
