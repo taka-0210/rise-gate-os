@@ -7,6 +7,12 @@ date_default_timezone_set('Asia/Tokyo');
 $configPath = $argv[1] ?? '';
 $config = json_decode((string) @file_get_contents($configPath), true, 512, JSON_THROW_ON_ERROR);
 if (!preg_match('/^[a-f0-9]{64}$/', $config['token'] ?? '')) throw new RuntimeException('Invalid setup');
+// Accept the exact legacy PowerShell array wrapper, without broadening the allowlist.
+if (is_array($config['origins']['value'] ?? null)) $config['origins'] = $config['origins']['value'];
+if (!is_array($config['origins'] ?? null) || !array_is_list($config['origins'])
+    || count(array_filter($config['origins'], 'is_string')) !== count($config['origins'])) {
+    throw new RuntimeException('Invalid origin configuration. Run setup again.');
+}
 $stateDir = dirname($configPath);
 $projectsPath = $stateDir.'/projects.json';
 $projects = is_file($projectsPath) ? json_decode(file_get_contents($projectsPath), true) : [];

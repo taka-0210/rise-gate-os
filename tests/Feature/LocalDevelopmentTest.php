@@ -64,7 +64,7 @@ class LocalDevelopmentTest extends TestCase
         return [$status, json_decode($body, true), $headers];
     }
 
-    private function bootHelper(): void
+    private function bootHelper(bool $legacyOrigins = false): void
     {
         $probe = stream_socket_server('tcp://127.0.0.1:0');
         $address = stream_socket_get_name($probe, false);
@@ -73,7 +73,7 @@ class LocalDevelopmentTest extends TestCase
         $this->base = 'http://'.$address;
         mkdir($this->directory.'/project');
         file_put_contents($this->directory.'/config.json', json_encode([
-            'port' => $port, 'token' => $this->token, 'origins' => ['http://localhost'],
+            'port' => $port, 'token' => $this->token, 'origins' => $legacyOrigins ? ['value' => ['http://localhost'], 'Count' => 1] : ['http://localhost'],
         ]));
         file_put_contents($this->directory.'/projects.json', json_encode([
             hash('sha256', 'http://localhost/test-project') => realpath($this->directory.'/project'),
@@ -92,6 +92,47 @@ class LocalDevelopmentTest extends TestCase
             usleep(50000);
         }
         $this->fail('Helper did not start: '.file_get_contents($this->directory.'/stderr.log'));
+    }
+
+    public function test_legacy_powershell_origins_allow_preflight_but_reject_untrusted_sites(): void
+    {
+        $this->bootHelper(true);
+        [$status, , $headers] = $this->request($this->base.'/api', 'OPTIONS', [
+            'Origin: http://localhost', 'Access-Control-Request-Method: POST',
+            'Access-Control-Request-Headers: content-type,x-risegate-token',
+        ]);
+        $this->assertSame(204, $status);
+        $this->assertContains('Access-Control-Allow-Origin: http://localhost', $headers);
+        $this->assertSame(200, $this->api('status')[0]);
+        $this->assertSame(403, $this->api('status', [], 'https://untrusted.example')[0]);
+        $this->assertSame(403, $this->api('status', [], null, 'wrong')[0]);
+    }
+
+    public function test_windows_installer_serializes_downloaded_origins_as_a_plain_array(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Windows PowerShell installer test');
+        }
+        $package = $this->directory.'/package';
+        File::copyDirectory(base_path('tools/local-dev'), $package);
+        file_put_contents($package.'/install.ps1', "\xEF\xBB\xBF".file_get_contents(base_path('tools/local-dev/install.ps1')));
+        $origins = ['https://os.rise-gate.com', 'http://localhost', 'http://127.0.0.1'];
+        file_put_contents($package.'/origins.json', json_encode($origins));
+        $installed = $this->directory.'/installed';
+        $process = proc_open(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+            $package.'/install.ps1', '-InstallRoot', $installed, '-PhpPath', PHP_BINARY,
+            '-NoShortcut', '-NoRegistration', '-NoLaunch',
+        ], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $package, null, ['bypass_shell' => true]);
+        fclose($pipes[0]);
+        $output = stream_get_contents($pipes[1]);
+        $error = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $this->assertSame(0, proc_close($process), $output.$error);
+        $config = json_decode(file_get_contents($installed.'/config.json'), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($origins, $config['origins']);
+        $this->assertSame(64, strlen($config['token']));
+        $this->assertStringContainsString('date.timezone=Asia/Tokyo', file_get_contents($installed.'/php.ini'));
     }
 
     public function test_helper_authorizes_requests_preserves_files_and_exports_without_private_data(): void

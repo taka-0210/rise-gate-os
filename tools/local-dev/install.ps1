@@ -71,7 +71,10 @@ if (!(Test-Path -LiteralPath $configPath)) {
     $rng.Dispose()
     $token = -join ($random | ForEach-Object { $_.ToString('x2') })
     $settingsPath = Join-Path $PSScriptRoot 'origins.json'
-    $origins = if (Test-Path -LiteralPath $settingsPath) { @(Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json) } else { @('https://os.rise-gate.com','http://localhost','http://127.0.0.1') }
+    $parsedOrigins = if (Test-Path -LiteralPath $settingsPath) { Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { @('https://os.rise-gate.com','http://localhost','http://127.0.0.1') }
+    # Strip PowerShell 5.1 pipeline metadata before ConvertTo-Json.
+    # Otherwise arrays from ConvertFrom-Json can become {"value":[...],"Count":...}.
+    [string[]]$origins = @($parsedOrigins | ForEach-Object { [string]$_ })
     foreach ($origin in $origins) {
         $uri = [Uri]$origin
         if ($uri.Scheme -ne 'https' -and !($uri.Scheme -eq 'http' -and $uri.IsLoopback)) { throw '接続元の設定が不正です。' }
