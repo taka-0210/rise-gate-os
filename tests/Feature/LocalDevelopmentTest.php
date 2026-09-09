@@ -121,7 +121,7 @@ class LocalDevelopmentTest extends TestCase
         $installed = $this->directory.'/installed';
         $process = proc_open(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
             $package.'/install.ps1', '-InstallRoot', $installed, '-PhpPath', PHP_BINARY,
-            '-NoShortcut', '-NoRegistration', '-NoLaunch',
+            '-NoShortcut', '-NoRegistration', '-NoLaunch', '-SkipCodex',
         ], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $package, null, ['bypass_shell' => true]);
         fclose($pipes[0]);
         $output = stream_get_contents($pipes[1]);
@@ -143,6 +143,9 @@ class LocalDevelopmentTest extends TestCase
         [$status, $state] = $this->api('status');
         $this->assertSame(200, $status);
         $this->assertTrue($state['sqlite']);
+        $this->assertSame('2.0.0', $state['version']);
+        $this->assertSame(409, $this->api('codex_poll')[0]);
+        $this->assertSame(409, $this->api('codex_connect', ['workspace' => 'stale'])[0]);
         $this->assertStringEndsWith('+09:00', $state['time']);
         $this->assertSame(403, $this->request($this->base.'/', 'GET', ['Origin: http://localhost'])[0]);
         foreach (['../outside.txt', '/absolute', 'C:/outside', '.env', 'data/todo.sqlite', 'public/../../outside', 'CON', 'folder./x'] as $path) {

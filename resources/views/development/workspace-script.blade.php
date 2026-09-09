@@ -5,6 +5,7 @@
     const devShowState = async state => {
         const changedFolder = !localDevelopmentConnected || devClient.workspace !== state.workspace;
         if (changedFolder) {
+            workbench.dispatchEvent(new CustomEvent('development-folder-changed'));
             for (const tab of tabs.querySelectorAll('[data-workspace-tab]')) {
                 if (tab.dataset.tabKind !== 'document') {
                     if (tab.dataset.tabUrl?.startsWith('blob:')) URL.revokeObjectURL(tab.dataset.tabUrl);
@@ -61,8 +62,10 @@
         try {
             if (!devClient) throw new Error('先に開発用ツールへ接続してください。');
             if (action === 'disconnect') {
-                await devClient.call('stop');
+                const helperState = await devClient.call('status');
+                await devClient.call(String(helperState.version).startsWith('2.') ? 'disconnect' : 'stop');
                 sessionStorage.removeItem(devKey);
+                workbench.dispatchEvent(new CustomEvent('development-folder-changed'));
                 devControls.querySelector('[data-dev-connection-label]').textContent = '';
                 devClient = null; localDirectoryHandle = null; localSiteUrl = ''; localDevelopmentConnected = false;
                 localTree.replaceChildren();
@@ -72,8 +75,8 @@
             }
             if (action === 'create') {
                 if (!localDirectoryHandle) throw new Error('先に保存フォルダを選択してください。');
-                chatForm.elements.content.focus();
-                devStatus('AIパートナーに、作りたいアプリやサイトと必要な機能を入力して送信してください。');
+                openCodex();
+                devStatus('右側のCodexへ接続して、作りたいアプリやサイトを依頼してください。');
                 return;
             }
             devStatus(action === 'select' ? 'Windowsのフォルダ選択画面で保存先を選んでください…' : '処理しています…');

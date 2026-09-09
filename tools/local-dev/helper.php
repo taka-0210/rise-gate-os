@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/Workspace.php';
+require __DIR__.'/CodexSession.php';
+use RiseGate\LocalDev\CodexSession;
 use RiseGate\LocalDev\Workspace;
 
 date_default_timezone_set('Asia/Tokyo');
@@ -17,11 +19,13 @@ $stateDir = dirname($configPath);
 $projectsPath = $stateDir.'/projects.json';
 $projects = is_file($projectsPath) ? json_decode(file_get_contents($projectsPath), true) : [];
 $runners = [];
+$codexSessions = [];
 $port = (int) ($config['port'] ?? 41739);
 if ($port < 1024 || $port > 65535) throw new RuntimeException('Invalid port');
 $socket = stream_socket_server('tcp://127.0.0.1:'.$port, $errno, $error);
 if (!$socket) throw new RuntimeException('開発用ツールを起動できません: '.$error);
-register_shutdown_function(function () use (&$runners) {
+register_shutdown_function(function () use (&$runners, &$codexSessions) {
+    foreach ($codexSessions as $session) $session->close();
     foreach ($runners as $runner) {
         if (is_resource($runner['process'])) { proc_terminate($runner['process']); proc_close($runner['process']); }
     }
@@ -44,6 +48,7 @@ function runCommand(array $args, string $cwd): string {
     return trim($out);
 }
 while (true) {
+    foreach ($codexSessions as $session) $session->tick();
     $client = @stream_socket_accept($socket, 1);
     foreach ($runners as $key => $runner) {
         if (!proc_get_status($runner['process'])['running']) { proc_close($runner['process']); unset($runners[$key]); }
@@ -93,11 +98,12 @@ while (true) {
         $key = hash('sha256', $origin.'/'.$project);
         $action = $input['action'] ?? '';
         if ($action === 'status') {
-            $result = ['version'=>'1.0.0', 'php'=>PHP_VERSION, 'sqlite'=>extension_loaded('pdo_sqlite'),
+            $result = ['version'=>'2.0.0', 'codexAvailable'=>CodexSession::executable($config) !== null, 'php'=>PHP_VERSION, 'sqlite'=>extension_loaded('pdo_sqlite'),
                 'folder'=>isset($projects[$key]) ? basename($projects[$key]) : null,
                 'workspace'=>isset($projects[$key]) ? hash('sha256', $projects[$key]) : null,
                 'url'=>$runners[$key]['url'] ?? null, 'time'=>date(DATE_ATOM)];
         } elseif ($action === 'select') {
+            if (isset($codexSessions[$key]) && $codexSessions[$key]->busy()) throw new RuntimeException('Codexの作業を停止してからフォルダを変更してください。');
             if (isset($runners[$key])) throw new RuntimeException('停止してからフォルダを変更してください。');
             if (PHP_OS_FAMILY !== 'Windows') throw new RuntimeException('Windows版を利用してください。');
             $path = runCommand(['powershell.exe','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',__DIR__.'/choose-folder.ps1'], __DIR__);
@@ -107,6 +113,7 @@ while (true) {
             // Never select the helper installation or a parent of it.
             if (str_starts_with(strtolower(realpath(__DIR__).DIRECTORY_SEPARATOR), strtolower($root.DIRECTORY_SEPARATOR))) throw new RuntimeException('開発ツールとは別のフォルダを選択してください。');
             new Workspace($root);
+            if (isset($codexSessions[$key])) { $codexSessions[$key]->close(); unset($codexSessions[$key]); }
             $projects[$key] = $root;
             file_put_contents($projectsPath, json_encode($projects, JSON_UNESCAPED_UNICODE), LOCK_EX);
             $result = ['folder'=>basename($root)];
@@ -117,6 +124,35 @@ while (true) {
             $path = $input['path'] ?? '';
             if (!is_string($path)) throw new RuntimeException('Invalid path', 400);
             $result = match ($action) {
+                'disconnect' => (function () use (&$runners, &$codexSessions, $key) {
+                    if (isset($codexSessions[$key])) { $codexSessions[$key]->close(); unset($codexSessions[$key]); }
+                    if (isset($runners[$key])) { proc_terminate($runners[$key]['process']); proc_close($runners[$key]['process']); unset($runners[$key]); }
+                    return ['disconnected'=>true];
+                })(),
+                'codex_connect' => (function () use (&$codexSessions, $key, $workspace, $stateDir, $config) {
+                    if (isset($codexSessions[$key]) && $codexSessions[$key]->state()['phase'] === 'failed') {
+                        $codexSessions[$key]->close(); unset($codexSessions[$key]);
+                    }
+                    if (!isset($codexSessions[$key])) {
+                        $exe = CodexSession::executable($config);
+                        if (!$exe) throw new RuntimeException('Codexが見つかりません。初回セットアップのCodex導入手順を確認してください。');
+                        $command = [$exe,'app-server','-c','sandbox_workspace_write.network_access=false','-c','sandbox_workspace_write.writable_roots=[]'];
+                        if (PHP_OS_FAMILY === 'Windows') array_push($command, '-c', 'windows.sandbox="unelevated"');
+                        $codexSessions[$key] = new CodexSession($workspace->root, $stateDir, hash('sha256',$key.'/'.$workspace->root), $command);
+                    }
+                    return $codexSessions[$key]->state();
+                })(),
+                'codex_poll', 'codex_send', 'codex_login', 'codex_approve', 'codex_interrupt', 'codex_disconnect' => (function () use (&$codexSessions, $key, $action, $input) {
+                    $session = $codexSessions[$key] ?? null;
+                    if (!$session) throw new RuntimeException('先にCodexへ接続してください。', 409);
+                    $session->tick();
+                    if ($action === 'codex_send') $session->start($input['prompt'] ?? '', $input['requestId'] ?? '');
+                    elseif ($action === 'codex_login') $session->login($input);
+                    elseif ($action === 'codex_approve') $session->approve($input);
+                    elseif ($action === 'codex_interrupt') $session->interrupt();
+                    elseif ($action === 'codex_disconnect') { $session->close(); unset($codexSessions[$key]); return ['disconnected'=>true]; }
+                    return $session->state();
+                })(),
                 'list' => ['entries'=>$workspace->listing($path)],
                 'read' => $workspace->read($path),
                 'create' => $workspace->create($path, $input['kind'] === 'directory' ? 'directory' : 'file'),

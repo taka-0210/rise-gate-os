@@ -34,7 +34,7 @@
 <p data-dev-folder></p>
 <div class="dev-actions">
 <button type="button" data-dev-action="select">保存フォルダを選択</button>
-<button class="dev-primary" type="button" data-dev-action="create">AIに作成を依頼</button>
+<button class="dev-primary" type="button" data-dev-action="create">Codexで開発</button>
 </div><div class="dev-actions dev-run-actions">
 <button type="button" data-dev-action="start">起動</button>
 <button type="button" data-dev-action="stop">停止</button>
@@ -45,7 +45,7 @@
 </div>
 <a data-dev-open hidden target="_blank" rel="noopener noreferrer">別タブで開く</a>
 </div>
-<p class="dev-help">AIに作りたいアプリやサイトを伝え、保存後に「起動」で確認できます。</p>
+<p class="dev-help">「Codexで開発」から作成・修正を依頼し、「起動」で動作を確認できます。</p>
 <p data-dev-status role="status">PHP・DBを使うアプリを、このPCで作成・確認できます。</p>
 <details data-dev-logs-panel hidden><summary>実行ログ（JST）</summary><pre data-dev-logs style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto"></pre></details>
 <dialog data-dev-dialog>

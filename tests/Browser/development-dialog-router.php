@@ -22,7 +22,7 @@ let localDevelopmentConnected = false, localDirectoryHandle = null, localSiteUrl
 const setChatFileContext = () => {};
 const renderLocalDirectory = async () => {};
 const chatForm = {elements:{content:{value:"車両管理アプリを作って", focus(){ this.focused = true; }}}};
-const showBrowserPreview = () => {};
+const showBrowserPreview = () => {}; let codexOpened = false; const openCodex = () => {codexOpened = true;};
 let requests = [];
 window.RiseGateLocalDev = {Client:class {
     constructor(project,token,workspace) { Object.assign(this,{project,token,workspace}); }
@@ -79,7 +79,7 @@ window.RiseGateLocalDev = {Client:class {
         localDirectoryHandle = {};
         document.querySelector('[data-dev-action=create]').click();
         await tick();
-        assert(chatForm.elements.content.focused, 'creation focuses AI input');
+        assert(codexOpened, 'creation opens Codex panel');
         assert(chatForm.elements.content.value === '車両管理アプリを作って', 'existing draft preserved');
         assert(requests.length === 2, 'creation does not invoke a template API');
         assert(!document.querySelector('[data-dev-action=seed]'), 'no TODO-only control');

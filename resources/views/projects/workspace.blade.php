@@ -504,7 +504,8 @@
 
         <aside class="workbench-pane workbench-ai" data-pane="ai" aria-label="AIパートナー">
             <div class="pane-head"><strong>AI パートナー</strong></div>
-            <div class="ai-body">
+            @include('development.codex-panel')
+            <div class="ai-body" data-ai-standard>
                 <div class="ai-context"><strong>参照中のコンテキスト</strong><p data-ai-context>{{ $project->name }} / Project Overview</p></div>
                 <div class="ai-chat-summary">
                     <span class="ai-chat-status {{ (!$aiChatEnabled || !$aiChatConfigured) ? 'is-off' : '' }}">{{ $aiChatEnabled && $aiChatConfigured ? 'AI：会話・画像生成に対応' : 'AIチャット：利用準備が必要' }}</span>
@@ -2079,18 +2080,19 @@
         submit.disabled = true;
         try {
             localDirectoryHandle ||= await loadLocalHandle();
-            const requestRoot = localDirectoryHandle;
+            const requestRoot = localDevelopmentConnected ? null : localDirectoryHandle;
             const requestServerApp = getActiveServerApp();
             const autoSave = chatForm.elements.auto_save_files.checked && !!requestRoot && !requestServerApp;
             if (autoSave && await requestLocalWritePermission() !== 'granted') {
                 throw new Error('自動保存にはフォルダへの書き込み許可が必要です。許可して再送信するか、自動保存をOFFにしてください。');
             }
-            const projectFiles = await collectProjectTextFiles(content);
+            const projectFiles = localDevelopmentConnected ? [] : await collectProjectTextFiles(content);
             chatForm.querySelector('[data-chat-project-files]').value = projectFiles.length ? JSON.stringify(projectFiles) : '';
             const payload = new FormData(chatForm);
             payload.set('content', content);
             payload.set('local_file_access', requestRoot ? '1' : '0');
-            payload.set('development_mode', localDevelopmentConnected && !requestServerApp ? '1' : '0');
+            payload.set('development_mode', '0');
+            if (localDevelopmentConnected) { payload.delete('file_path'); payload.delete('file_content'); }
             payload.set('auto_save_files', autoSave ? '1' : '0');
             const response = await RiseGateChatRequest.send({
                 url: chatForm.dataset.chatUrl, tokenUrl: @json(route('session.token')),
@@ -2168,6 +2170,7 @@
     });
     @include('project-apps.workspace-script')
     @include('development.workspace-script')
+    @include('development.codex-script')
 })();
 </script>
 @endsection

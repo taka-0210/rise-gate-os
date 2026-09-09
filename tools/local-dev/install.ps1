@@ -3,6 +3,7 @@ param(
     [string]$PhpPath = '',
     [switch]$NoShortcut,
     [switch]$NoRegistration,
+    [switch]$SkipCodex,
     [switch]$NoLaunch
 )
 $ErrorActionPreference = 'Stop'
@@ -60,7 +61,7 @@ if ($process.ExitCode -ne 0) {
 Remove-Item -LiteralPath $checkPath
 $tool = Join-Path $InstallRoot 'tool'
 [IO.Directory]::CreateDirectory($tool) | Out-Null
-foreach ($name in @('helper.php','Workspace.php','app-router.php','choose-folder.ps1','launch.ps1','unregister.ps1','templates')) {
+foreach ($name in @('helper.php','CodexSession.php','Workspace.php','app-router.php','choose-folder.ps1','launch.ps1','unregister.ps1','templates')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $tool -Recurse -Force
 }
 $configPath = Join-Path $InstallRoot 'config.json'
@@ -81,6 +82,13 @@ if (!(Test-Path -LiteralPath $configPath)) {
     }
     $configuration = @{ token=$token; origins=$origins; port=41739; php=$PhpPath } | ConvertTo-Json
     [IO.File]::WriteAllText($configPath, $configuration, (New-Object Text.UTF8Encoding($false)))
+}
+if (!$SkipCodex) {
+    $existingCodex = Get-Command codex.exe -ErrorAction SilentlyContinue
+    $extensionCodex = @(Get-ChildItem -Path (Join-Path $env:USERPROFILE '.vscode\extensions\openai.chatgpt-*\bin\windows-x86_64\codex.exe') -ErrorAction SilentlyContinue)
+    if (!$existingCodex -and !$extensionCodex.Count) {
+        & (Join-Path $PSScriptRoot 'install-codex.ps1') -InstallRoot $InstallRoot
+    }
 }
 if (!$NoShortcut) {
     $shell = New-Object -ComObject WScript.Shell
