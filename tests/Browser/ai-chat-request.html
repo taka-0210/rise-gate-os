@@ -20,7 +20,7 @@
         assert(rejected === error, 'expected rejection');
         return {calls, updated};
     };
-    const fresh = {status:200,ok:true,json:async()=>({token:'fresh',user_id:'7'})};
+    const fresh = {status:200,ok:true,headers:new Headers({'Content-Type':'application/json'}),json:async()=>({token:'fresh',user_id:'7'})};
     try {
         let result = await run([response(200)]);
         assert(result.calls.length===1, 'success not repeated');
@@ -36,6 +36,20 @@
         assert(result.calls.length===3, 'retry bounded');
         result = await run([new Error('network')],true);
         assert(result.calls.length===1, 'network failure not resent');
+        for (const status of [200, 404, 413, 500, 502, 503, 504]) {
+            let message = '';
+            try { await RiseGateChatRequest.readJson(new Response('<!DOCTYPE html><html>server error</html>', {status,headers:{'Content-Type':'text/html'}})); }
+            catch (e) { message = e.message; }
+            assert(message.includes('HTTP '+status) && !message.includes('DOCTYPE'), 'HTML response explained: '+status);
+        }
+        let malformed = '';
+        try { await RiseGateChatRequest.readJson(new Response('<!DOCTYPE html>', {headers:{'Content-Type':'application/json'}})); }
+        catch (e) { malformed = e.message; }
+        assert(malformed.includes('HTTP 200'), 'malformed JSON explained');
+        const valid = await RiseGateChatRequest.readJson(new Response('{"message":"ok"}',{headers:{'Content-Type':'application/json'}}));
+        assert(valid.message === 'ok', 'valid JSON preserved');
+        result = await run([response(419), {status:200,ok:true,headers:new Headers({'Content-Type':'text/html'})}],true);
+        assert(result.calls.length===2, 'HTML refresh never resends chat');
         document.querySelector('#result').textContent='PASS: token refresh / identity / bounded retry / preserved payload';
     } catch (e) { document.querySelector('#result').textContent='FAIL: '+e.message; }
 })();

@@ -2101,7 +2101,7 @@
                     if (chatForm.elements._token) chatForm.elements._token.value = token;
                 },
             });
-            const body = await response.json();
+            const body = await RiseGateChatRequest.readJson(response);
             if (!response.ok) throw new Error(body.message || 'AIから回答を取得できませんでした。');
             const message = body.message;
             if (message.image_url) chatForm.elements.generate_image.checked = false;
