@@ -107,6 +107,7 @@
     .viewer-panel.is-current { display:block; }
     .browser-preview { min-width:0; min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto auto minmax(0,1fr); background:#fff; }
     .browser-external-notice { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:11px 14px; border-bottom:1px solid #d5dde3; color:#294752; background:#f4f8f9; font-size:12px; }
+    .browser-external-notice[hidden] { display:none; }
     .browser-external-notice strong { display:block; margin-bottom:2px; }
     .browser-external-notice span { color:#687b84; font-size:10px; }
     .browser-external-notice .button { flex:0 0 auto; }
@@ -507,7 +508,7 @@
                         <span data-preview-size role="status"></span>
                     </div>
                     <div class="browser-external-notice" data-browser-external-notice hidden>
-                        <div><strong>管理画面は別タブで操作してください</strong><span>ログインセッションを安全に維持するため、作業ペイン内では閲覧確認のみ行えます。</span></div>
+                        <div><strong>管理画面のプレビュー</strong><span>ログインや表示がうまくいかない場合は、別タブでも確認できます。</span></div>
                         <a class="button" data-browser-external-link target="_blank" rel="noopener">管理画面を別タブで開く</a>
                     </div>
                     <div class="responsive-stage"><iframe class="browser-frame" data-browser-frame title="ブラウザプレビュー" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" hidden></iframe></div>
