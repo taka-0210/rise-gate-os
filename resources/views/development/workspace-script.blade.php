@@ -45,19 +45,12 @@
         if (!button) return;
         const action = button.dataset.devAction;
         const dialog = devControls.querySelector('[data-dev-dialog]');
-        if (action === 'connect' || action === 'seed') {
-            dialog.dataset.action = action;
-            devControls.querySelector('[data-dev-title]').textContent = action === 'connect' ? '開発用ツールに接続' : '独立したTODOを作成';
-            devControls.querySelector('[data-dev-code-label]').hidden = action !== 'connect';
-            devControls.querySelector('[data-dev-admin]').hidden = action !== 'seed';
+        if (action === 'connect') {
             const form = devControls.querySelector('[data-dev-form]');
             form.reset();
             form.elements.code.type = 'password';
             form.querySelector('[data-dev-code-count]').textContent = '入力：0 / 64文字';
-            form.elements.code.disabled = action !== 'connect';
-            form.elements.login.disabled = form.elements.password.disabled = action !== 'seed';
-            form.elements.code.required = action === 'connect';
-            form.elements.login.required = form.elements.password.required = action === 'seed';
+            form.elements.code.required = true;
             devControls.querySelector('[data-dev-dialog-error]').textContent = '';
             devControls.querySelector('[data-dev-dialog-progress]').textContent = '';
             dialog.showModal();
@@ -73,6 +66,12 @@
                 localTree.replaceChildren();
                 devControls.querySelector('[data-dev-connected]').hidden = true;
                 devStatus('接続を解除しました。ファイルとDBは残っています。');
+                return;
+            }
+            if (action === 'create') {
+                if (!localDirectoryHandle) throw new Error('先に保存フォルダを選択してください。');
+                chatForm.elements.content.focus();
+                devStatus('AIパートナーに、作りたいアプリやサイトと必要な機能を入力して送信してください。');
                 return;
             }
             if (action === 'ask') {
@@ -116,19 +115,11 @@
         const progress = form.querySelector('[data-dev-dialog-progress]');
         form.dataset.busy = 'true';
         buttons.forEach(item => { item.disabled = true; });
-        button.textContent = dialog.dataset.action === 'connect' ? '接続中…' : '作成中…';
+        button.textContent = '接続中…';
         form.querySelector('[data-dev-dialog-error]').textContent = '';
-        progress.textContent = dialog.dataset.action === 'connect'
-            ? '開発用ツールに接続しています。ブラウザに接続許可の確認が出ている場合は許可してください。'
-            : 'TODOのファイルとDBを作成しています…';
+        progress.textContent = '開発用ツールに接続しています。ブラウザに接続許可の確認が出ている場合は許可してください。';
         try {
-            if (dialog.dataset.action === 'connect') await devConnect(form.elements.code.value.trim());
-            else {
-                if (!devClient) throw new Error('先に開発用ツールへ接続してください。');
-                await devClient.call('seed', {login:form.elements.login.value, password:form.elements.password.value});
-                await devShowState(await devClient.call('status'));
-                devStatus('TODOのひな形と管理者を作成しました。「起動」で確認できます。');
-            }
+            await devConnect(form.elements.code.value.trim());
             form.reset(); dialog.close();
         } catch (error) {
             devControls.querySelector('[data-dev-dialog-error]').textContent = error.message === 'Failed to fetch' ? '開発用ツールを起動し、ブラウザのローカルネットワーク接続を許可してください。' : error.message;

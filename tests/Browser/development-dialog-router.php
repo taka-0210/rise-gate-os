@@ -21,7 +21,7 @@ const localTree = document.querySelector('#tree');
 let localDevelopmentConnected = false, localDirectoryHandle = null, localSiteUrl = '';
 const setChatFileContext = () => {};
 const renderLocalDirectory = async () => {};
-const chatForm = {elements:{content:{}}};
+const chatForm = {elements:{content:{value:"車両管理アプリを作って", focus(){ this.focused = true; }}}};
 const showBrowserPreview = () => {};
 let requests = [];
 window.RiseGateLocalDev = {Client:class {
@@ -40,9 +40,6 @@ window.RiseGateLocalDev = {Client:class {
         const save = form.querySelector('[value=save]');
         document.querySelector('[data-dev-action=connect]').click();
         assert(dialog.open, 'dialog opened');
-        assert(form.elements.login.disabled && form.elements.password.disabled, 'hidden admin fields disabled');
-        form.elements.login.value = 'invalid@login';
-        form.elements.password.value = 'x';
         form.elements.code.value = 'a'.repeat(63);
         save.click();
         await tick();
@@ -66,13 +63,17 @@ window.RiseGateLocalDev = {Client:class {
         await tick();
         assert(!dialog.open && localDevelopmentConnected, 'successful connection closes dialog');
         assert(document.querySelector('[data-dev-status]').textContent.includes('接続済み'), 'success visible');
-        document.querySelector('[data-dev-action=seed]').click();
-        assert(form.elements.code.disabled && !form.elements.login.disabled && form.elements.login.required, 'seed fields enabled');
-        form.elements.login.value = 'staff@invalid';
-        form.elements.password.value = 'test-password';
-        assert(!form.checkValidity(), 'invalid account rejected');
-        dialog.close();
-        document.querySelector('#result').textContent = 'PASS: submit / hidden fields / pending / failure / retry / success / seed validation';
+        document.querySelector('[data-dev-action=create]').click();
+        await tick();
+        assert(document.querySelector('[data-dev-status]').textContent.includes('保存フォルダ'), 'creation requires folder');
+        localDirectoryHandle = {};
+        document.querySelector('[data-dev-action=create]').click();
+        await tick();
+        assert(chatForm.elements.content.focused, 'creation focuses AI input');
+        assert(chatForm.elements.content.value === '車両管理アプリを作って', 'existing draft preserved');
+        assert(requests.length === 2, 'creation does not invoke a template API');
+        assert(!document.querySelector('[data-dev-action=seed]'), 'no TODO-only control');
+        document.querySelector('#result').textContent = 'PASS: connect / pending / failure / retry / generic creation / draft preserved';
     } catch (error) {
         document.querySelector('#result').textContent = 'FAIL: ' + error.message;
     }

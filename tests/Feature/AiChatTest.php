@@ -783,7 +783,7 @@ class AiChatTest extends TestCase
             ]);
         }]);
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
-        $payload = ['content' => '独立したPHPのTODOを作成して', 'local_file_access' => true, 'development_mode' => true];
+        $payload = ['content' => '独立したPHPの車両管理アプリを作成して', 'local_file_access' => true, 'development_mode' => true];
         $result = $this->postJson(route('projects.ai-chat.messages.store', $project), $payload)
             ->assertOk()->assertJsonPath('message.file_change.path', 'public/index.php')
             ->assertJsonPath('related_messages.0.file_change.path', 'database.php');
@@ -791,6 +791,7 @@ class AiChatTest extends TestCase
         $this->assertDatabaseCount('ai_chat_messages', 3);
         Http::assertSent(fn (Request $request): bool => isset($request['text']['format']['schema']['properties']['additional_file_changes'])
             && str_contains($request['instructions'], 'PCの補助ツールに接続済み')
+            && str_contains($request['instructions'], '空のフォルダから必要なファイルを生成')
             && ! str_contains($request['instructions'], 'const result = await window.riseGateApp.load()')
         );
         $extraPath = 'PUBLIC/index.php';
