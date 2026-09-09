@@ -58,3 +58,7 @@ MySQL、Composer/npmパッケージのインストール、任意コマンドの
 - https://developer.chrome.com/blog/local-network-access
 - https://www.php.net/manual/en/features.commandline.webserver.php
 - https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist
+
+## セットアップ画面が閉じる・完了しない場合
+配布ZIPのセットアップ.cmdはWindows用の改行で出力し、成功・失敗にかかわらずキー入力を待ってから閉じます。setup.ps1が進行内容とエラーをJST付きで %LOCALAPPDATA%/RiseGateDev/logs/setup-日時-PID.log に保存します。書き込めなければ %TEMP%/RiseGateDev/logs に保存します。PowerShell自体が起動できない場合もCMD画面を残します。
+旧ZIPで画面がすぐ消える場合は、展開フォルダのアドレスバーにcmdと入力してEnterを押し、そのコマンド画面でセットアップ.cmdを実行するとエラーを確認できます。

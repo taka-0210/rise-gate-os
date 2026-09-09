@@ -27,6 +27,10 @@ class DevelopmentSetupController extends Controller
                 if (str_ends_with($relative, '.ps1')) {
                     $content = "\xEF\xBB\xBF".ltrim($content, "\xEF\xBB\xBF");
                 }
+                // cmd.exe expects Windows line endings, regardless of the Git checkout platform.
+                if (str_ends_with($relative, '.cmd')) {
+                    $content = str_replace("\n", "\r\n", str_replace(["\r\n", "\r"], "\n", $content));
+                }
                 $zip->addFromString('RiseGateDev/'.$relative, $content);
             }
         }

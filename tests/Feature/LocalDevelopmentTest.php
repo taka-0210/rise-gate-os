@@ -192,6 +192,42 @@ class LocalDevelopmentTest extends TestCase
         $this->assertStringContainsString('staff work', $page);
     }
 
+    public function test_windows_setup_launcher_keeps_failures_visible_and_records_jst_logs(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Windows command launcher test');
+        }
+        $package = $this->directory.'/日本語 setup';
+        mkdir($package);
+        $cmd = str_replace("\n", "\r\n", str_replace("\r\n", "\n", file_get_contents(base_path('tools/local-dev/セットアップ.cmd'))));
+        file_put_contents($package.'/setup.cmd', $cmd);
+        file_put_contents($package.'/setup.ps1', "\xEF\xBB\xBF".file_get_contents(base_path('tools/local-dev/setup.ps1')));
+        $environment = getenv();
+        $environment['LOCALAPPDATA'] = $this->directory;
+        $environment['TEMP'] = $this->directory;
+        foreach ([true, false] as $fail) {
+            file_put_contents($package.'/install.ps1', $fail ? "throw 'SETUP_TEST_FAILURE'\n" : "Write-Host 'SETUP_TEST_SUCCESS'\n");
+            $process = proc_open('cmd.exe /d /s /c ""'.str_replace('/', '\\', $package).'\setup.cmd""', [
+                0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w'],
+            ], $pipes, $package, $environment, ['bypass_shell' => true]);
+            fclose($pipes[0]);
+            $output = stream_get_contents($pipes[1]);
+            $error = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exit = proc_close($process);
+            $this->assertSame($fail ? 1 : 0, $exit, $output.$error);
+            $this->assertStringContainsString($fail ? 'SETUP_TEST_FAILURE' : 'SETUP_TEST_SUCCESS', $output.$error);
+            $this->assertStringContainsString('Press any key to close this window.', $output);
+        }
+        $logs = glob($this->directory.'/RiseGateDev/logs/setup-*.log');
+        $this->assertCount(2, $logs);
+        $combined = implode("\n", array_map('file_get_contents', $logs));
+        $this->assertStringContainsString('SETUP_TEST_FAILURE', $combined);
+        $this->assertStringContainsString('SETUP_TEST_SUCCESS', $combined);
+        $this->assertMatchesRegularExpression('/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} JST\]/', $combined);
+    }
+
     public function test_setup_download_requires_os_login_and_contains_no_runtime_credentials(): void
     {
         $this->get(route('development.download'))->assertRedirect(route('login'));
@@ -205,6 +241,10 @@ class LocalDevelopmentTest extends TestCase
         $this->assertNotFalse($zip->getFromName('RiseGateDev/helper.php'));
         $this->assertFalse($zip->getFromName('RiseGateDev/config.json'));
         $this->assertStringStartsWith("\xEF\xBB\xBF", $zip->getFromName('RiseGateDev/install.ps1'));
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $zip->getFromName('RiseGateDev/setup.ps1'));
+        $cmd = $zip->getFromName('RiseGateDev/セットアップ.cmd');
+        $this->assertStringNotContainsString("\n", str_replace("\r\n", '', $cmd));
+        $this->assertStringContainsString("\r\npause\r\n", $cmd);
         $zip->close();
         unlink($path);
     }
