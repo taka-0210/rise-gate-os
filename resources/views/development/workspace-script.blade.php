@@ -20,6 +20,7 @@
         const repository = workbench.querySelector('.file-repository');
         if (repository) { repository.firstChild.textContent = '▣ ' + (state.folder || '保存フォルダ未選択'); repository.querySelector('span').textContent = 'PC接続・PHP / SQLite'; }
         localDevelopmentConnected = true;
+        devControls.querySelector('[data-dev-connection-label]').textContent = '接続中';
         localSiteUrl = state.url || '';
         if (state.folder) {
             localDirectoryHandle = devClient.directory(state.folder);
@@ -62,6 +63,7 @@
             if (action === 'disconnect') {
                 await devClient.call('stop');
                 sessionStorage.removeItem(devKey);
+                devControls.querySelector('[data-dev-connection-label]').textContent = '';
                 devClient = null; localDirectoryHandle = null; localSiteUrl = ''; localDevelopmentConnected = false;
                 localTree.replaceChildren();
                 devControls.querySelector('[data-dev-connected]').hidden = true;
@@ -133,4 +135,14 @@
     devControls?.querySelector('[data-dev-dialog]').addEventListener('cancel', event => {
         if (devControls.querySelector('[data-dev-form]').dataset.busy === 'true') event.preventDefault();
     });
-    if (devControls && sessionStorage.getItem(devKey)) devConnect(sessionStorage.getItem(devKey)).catch(() => devStatus('開発用ツールを起動して「接続」を押してください。'));
+    // Opening development tools is an explicit choice; ordinary workspace use never contacts the helper.
+    let devRestorePending = false;
+    devControls?.addEventListener('toggle', async () => {
+        if (!devControls.open || devClient || devRestorePending) return;
+        const token = sessionStorage.getItem(devKey);
+        if (!token) return;
+        devRestorePending = true;
+        try { await devConnect(token); }
+        catch { devStatus('開発用ツールを起動して「接続」を押してください。'); }
+        finally { devRestorePending = false; }
+    });

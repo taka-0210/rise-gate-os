@@ -14,7 +14,7 @@ $controls = preg_replace('/\{\{.*?\}\}/', '/setup', $controls);
 echo '<!doctype html><html lang="ja"><meta charset="utf-8"><title>Development dialog test</title><p id="result">RUNNING</p><div id="workbench"><div class="file-repository">folder<span></span></div><div id="tree"></div><div id="tabs"><button data-workspace-tab="project" data-tab-kind="document"></button></div>'.$controls.'</div>';
 ?>
 <script>
-sessionStorage.clear();
+sessionStorage.clear(); sessionStorage.setItem('rise-gate-dev-test-project', 'a'.repeat(64));
 const workbench = document.querySelector('#workbench');
 const tabs = document.querySelector('#tabs');
 const localTree = document.querySelector('#tree');
@@ -35,6 +35,16 @@ window.RiseGateLocalDev = {Client:class {
     const assert = (test,message) => { if (!test) throw new Error(message); };
     const tick = () => new Promise(resolve => setTimeout(resolve,0));
     try {
+        const controls = document.querySelector('[data-development-controls]');
+        await tick();
+        assert(!controls.open && requests.length === 0 && !localDevelopmentConnected, 'ordinary workspace does not contact helper');
+        controls.querySelector('summary').click();
+        await tick();
+        assert(controls.open && requests.length === 1, 'opening tools restores saved connection');
+        requests[0].reject(new Error('Failed to fetch'));
+        await tick();
+        requests = [];
+        sessionStorage.clear();
         const dialog = document.querySelector('[data-dev-dialog]');
         const form = document.querySelector('[data-dev-form]');
         const save = form.querySelector('[value=save]');

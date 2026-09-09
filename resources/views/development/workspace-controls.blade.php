@@ -1,7 +1,10 @@
 @can('update', $project)
 <style>
 .development-panel { margin:8px; padding:12px; border:1px solid #d6e1e6; border-radius:10px; background:#fff; font-size:12px; line-height:1.6; }
-.development-panel > strong { display:block; font-size:13px; font-weight:700; }
+.development-panel > summary { cursor:pointer; font-size:12px; font-weight:600; color:#285360; }
+.development-panel > summary:focus-visible { outline:2px solid #26879a; outline-offset:4px; border-radius:3px; }
+.development-panel[open] > summary { margin-bottom:10px; }
+.development-panel [data-dev-connection-label] { margin-left:6px; font-size:11px; font-weight:400; }
 .development-panel p { margin:8px 0; }
 .development-panel .dev-setup-links { display:flex; flex-wrap:wrap; gap:4px 12px; margin:3px 0 10px; font-size:11px; }
 .development-panel button { box-sizing:border-box; min-height:32px; margin:0; padding:6px 9px; border:1px solid #cfdee3; border-radius:6px; background:#fff; color:#285360; font-family:inherit; font-size:12px; font-weight:500; line-height:1.4; cursor:pointer; }
@@ -23,8 +26,8 @@
 .development-panel dialog h3 { margin:0 0 12px; font-size:14px; }
 .development-panel dialog button + button { margin-left:6px; }
 </style>
-<section class="development-panel" data-development-controls>
-<strong>ローカルで開発</strong>
+<details class="development-panel" data-development-controls>
+<summary>開発ツール<span data-dev-connection-label></span></summary>
 <p class="dev-setup-links"><a href="{{ route('development.setup') }}" target="_blank" rel="noopener">初回セットアップ</a><a href="risegate-dev://launch">開発用ツールを起動</a></p>
 <button class="dev-connect" type="button" data-dev-action="connect">開発用ツールに接続</button>
 <div data-dev-connected hidden>
@@ -54,5 +57,5 @@
 <button value="cancel" formnovalidate>キャンセル</button><button value="save">決定</button>
 </form>
 </dialog>
-</section>
+</details>
 @endcan
