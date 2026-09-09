@@ -25,13 +25,22 @@
             list.replaceChildren();
             for (const item of state.history || []) {
                 const node = document.createElement(item.role === 'tool' ? 'details' : 'article');
-                node.style.cssText = 'padding:10px;margin:8px 0;border:1px solid #d6e1e6;border-radius:8px;font-size:12px';
+                const conversation = item.role === 'user' || item.role === 'assistant';
+                if (conversation) node.className = 'ai-message ai-message--' + item.role;
+                else node.style.cssText = 'padding:8px 10px;border:1px solid #d6e1e6;border-radius:8px;font-size:11px;color:#61737c;background:#f1f5f6;min-width:0';
                 const label = document.createElement(item.role === 'tool' ? 'summary' : 'strong');
                 label.textContent = ({user:'あなた',assistant:'Codex',tool:'実行・ファイル変更',status:'作業状況'})[item.role] || 'Codex';
                 const text = document.createElement('div'); text.style.whiteSpace='pre-wrap'; text.textContent=item.text;
                 const time = document.createElement('small');
                 time.textContent = new Date(item.time).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})+' JST';
-                node.append(label,text,time); list.append(node);
+                if (conversation) {
+                    const bubble = document.createElement('div'); bubble.className = 'ai-message__bubble';
+                    label.style.cssText = 'display:block;margin-bottom:4px';
+                    bubble.append(label,text);
+                    time.className = 'ai-message__meta';
+                    node.append(bubble,time);
+                } else node.append(label,text,time);
+                list.append(node);
             }
             list.scrollTop=list.scrollHeight;
         }

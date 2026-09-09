@@ -17,7 +17,7 @@
         </details>
     </div>
     <p class="ai-chat-error" role="alert" data-codex-error hidden></p>
-    <section data-codex-history aria-label="Codexとの会話" style="max-height:48vh;overflow:auto;overflow-wrap:anywhere"></section>
+    <section class="ai-chat-messages" data-codex-history aria-label="Codexとの会話" style="max-height:48vh;overflow:auto;overflow-wrap:anywhere"></section>
     <div data-codex-approvals></div>
     <form data-codex-form>
         <label>開発の依頼<textarea name="prompt" rows="4" maxlength="16000" required placeholder="このフォルダにシンプルなTODOアプリを作って…"></textarea></label>
