@@ -11,10 +11,12 @@ use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Services\AiChatUsage;
 use App\Services\ImageSavePath;
+use App\Services\LocalDevelopmentContract;
 use App\Services\OpenAiChatService;
 use App\Services\ProjectAppContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -37,6 +39,7 @@ class AiChatController extends Controller
             'generate_image' => ['sometimes', 'boolean'],
             'local_file_access' => ['sometimes', 'boolean'],
             'auto_save_files' => ['sometimes', 'boolean'],
+            'development_mode' => ['sometimes', 'boolean'],
             'context_key' => ['nullable', 'string', 'max:255'],
             'context_label' => ['nullable', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
@@ -105,10 +108,24 @@ class AiChatController extends Controller
                 $request->user()->id,
                 $request->boolean('generate_image'),
             );
-            $assistantMessage = $thread->messages()->create([
-                'role' => AiChatMessage::ROLE_ASSISTANT,
-                ...$result,
-            ]);
+            $batch = $result['file_change_batch'] ?? [];
+            unset($result['file_change_batch']);
+            [$assistantMessage, $relatedMessages] = DB::transaction(function () use ($thread, $result, $batch) {
+                $primary = $thread->messages()->create(['role' => AiChatMessage::ROLE_ASSISTANT, ...$result]);
+                $related = [];
+                foreach ($batch as $change) {
+                    $related[] = $thread->messages()->create([
+                        'role' => AiChatMessage::ROLE_ASSISTANT,
+                        'content' => '関連ファイル：'.$change['path'],
+                        'file_change_path' => $change['path'],
+                        'file_change_content' => $change['content'],
+                        'file_change_original_hash' => $change['original_hash'],
+                        'file_change_status' => 'pending',
+                    ]);
+                }
+
+                return [$primary, $related];
+            });
             if ($assistantMessage->image_save && $assistantMessage->image_save['source_message_id'] === 0) {
                 $assistantMessage->update(['image_save' => [...$assistantMessage->image_save, 'source_message_id' => $assistantMessage->id]]);
             }
@@ -133,7 +150,7 @@ class AiChatController extends Controller
                 'occurred_at' => now(),
             ]);
 
-            return response()->json(['message' => $this->messageData($assistantMessage), 'usage' => AiChatUsage::summary($thread)]);
+            return response()->json(['message' => $this->messageData($assistantMessage), 'related_messages' => array_map(fn ($message) => $this->messageData($message), $relatedMessages), 'usage' => AiChatUsage::summary($thread)]);
         } catch (RuntimeException $exception) {
             AiAuditLog::create([
                 'workspace_id' => $workspace->id,
@@ -255,10 +272,14 @@ class AiChatController extends Controller
             ->values()
             ->all();
 
+        $development = $request->boolean('development_mode') && $request->boolean('local_file_access') && $request->user()->can('update', $project);
+
         return [
+            'development_mode' => $development,
+            'development_instructions' => $development ? LocalDevelopmentContract::instructions() : null,
             'server_apps' => [
-                'can_create' => $request->user()->can('update', $project),
-                'instructions' => ProjectAppContract::instructions(),
+                'can_create' => ! $development && $request->user()->can('update', $project),
+                'instructions' => $development ? null : ProjectAppContract::instructions(),
             ],
             'local_file_access' => $request->boolean('local_file_access'),
             'auto_save_files' => $request->boolean('auto_save_files'),

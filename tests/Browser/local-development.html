@@ -1,0 +1,50 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>Local development browser test</title>
+<h1>ローカル開発接続テスト</h1><p id="result">RUNNING</p><iframe title="PHPプレビュー" id="preview"></iframe>
+<script src="/public/js/local-development.js"></script>
+<script>
+(async () => {
+    const assert = (value, message) => { if (!value) throw new Error(message); };
+    const client = new RiseGateLocalDev.Client('test-browser', 'b'.repeat(64));
+    try {
+        const state = await client.call('status');
+        assert(state.sqlite, 'SQLite');
+        assert(state.time.endsWith('+09:00'), 'JST');
+        const root = client.directory(state.folder);
+        const pub = await root.getDirectoryHandle('public', {create:true});
+        const file = await pub.getFileHandle('browser.txt', {create:true});
+        const stream = await file.createWritable();
+        await stream.write('日本語と絵文字 🗂️'); await stream.close();
+        assert(await (await file.getFile()).text() === '日本語と絵文字 🗂️', 'UTF-8 file roundtrip');
+        const stale = await pub.getFileHandle('browser.txt');
+        await stale.getFile();
+        const latest = await file.createWritable(); await latest.write('更新'); await latest.close();
+        let conflicted = false;
+        try { const writer = await stale.createWritable(); await writer.write('古い内容'); await writer.close(); }
+        catch (e) { conflicted = e.name === 'InvalidModificationError'; }
+        assert(conflicted, 'stale write rejected');
+        assert(await (await file.getFile()).text() === '更新', 'conflict preserves content');
+        let blocked = false;
+        try { await root.getFileHandle('.env', {create:true}); } catch { blocked = true; }
+        assert(blocked, 'secrets protected');
+        const backups = await (await root.getDirectoryHandle('.rise-gate', {create:true})).getDirectoryHandle('backups', {create:true});
+        const backup = await backups.getFileHandle('example.json', {create:true});
+        const writer = await backup.createWritable(); await writer.write('{}'); await writer.close();
+        const names = [];
+        for await (const [name] of pub.entries()) names.push(name);
+        assert(names.includes('browser.txt'), 'directory adapter');
+        await client.call('seed', {login:'owner',password:'browser-test-password'});
+        const run = await client.call('start');
+        await new Promise((resolve, reject) => {
+            const frame = document.querySelector('#preview');
+            const timer = setTimeout(() => reject(new Error('preview timeout')), 10000);
+            frame.onload = () => { clearTimeout(timer); resolve(); };
+            frame.src = run.url;
+        });
+        document.querySelector('#result').textContent = 'PASS: CORS接続 / フォルダ操作 / 日本語保存 / 競合保護 / PHPプレビュー / JST';
+        window.testClient = client;
+    } catch (error) {
+        document.querySelector('#result').textContent = 'FAIL: ' + error.message;
+        try { await client.call('stop'); } catch {}
+    }
+})();
+</script></html>

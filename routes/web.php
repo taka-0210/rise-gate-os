@@ -73,6 +73,8 @@ Route::prefix('apps/{projectApp}')->name('apps.')->group(function (): void {
 
 Route::middleware(['auth', 'active-user'])->group(function (): void {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+    Route::get('/development/setup', [\App\Http\Controllers\DevelopmentSetupController::class, 'index'])->name('development.setup');
+    Route::get('/development/download', [\App\Http\Controllers\DevelopmentSetupController::class, 'download'])->name('development.download');
 
     Route::get('/companies', [CompanyController::class, 'index'])->middleware('workspace-mode')->name('companies.index');
     Route::post('/companies/{organization}/switch', [CompanyController::class, 'switch'])->middleware('workspace-mode')->name('companies.switch');

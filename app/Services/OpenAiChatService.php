@@ -82,6 +82,30 @@ class OpenAiChatService
         }
 
         $structured = $this->parseFileChange($content, $this->editableFiles($projectContext), ! empty($projectContext['local_file_access']), ! empty($projectContext['server_apps']['can_create']));
+        $batch = [];
+        if (! empty($projectContext['development_mode'])) {
+            if ($structured === null) {
+                throw new RuntimeException('生成ファイルの回答形式が不正です。保存していません。');
+            }
+            $extra = $reply['additional_file_changes'] ?? [];
+            if (! is_array($extra) || ! array_is_list($extra) || count($extra) > 11) {
+                throw new RuntimeException('複数ファイルの回答形式が不正です。保存していません。');
+            }
+            $seen = ! empty($structured['path']) ? [strtolower($structured['path'])] : [];
+            $total = strlen($structured['content'] ?? '');
+            foreach ($extra as $change) {
+                $parsed = $this->parseFileChange(json_encode(['answer' => '', 'file_change' => $change]), $this->editableFiles($projectContext), true);
+                if (empty($parsed['path']) || in_array(strtolower($parsed['path']), $seen, true)) {
+                    throw new RuntimeException('ファイルが重複しているか回答形式が不正です。保存していません。');
+                }
+                $seen[] = strtolower($parsed['path']);
+                $total += strlen($parsed['content']);
+                if ($total > 2_000_000) {
+                    throw new RuntimeException('生成ファイルが大きすぎます。小さい単位で依頼してください。');
+                }
+                $batch[] = $parsed;
+            }
+        }
         if ($structured) {
             $content = $structured['answer'];
         }
@@ -91,6 +115,7 @@ class OpenAiChatService
         return [
             ...($generatedImage ? $this->saveGeneratedImage($generatedImage, $messages->last()->ai_chat_thread_id, ImageSavePath::suggestedName($suggestedImageName, $content === '画像を生成しました。' ? $messages->last()->content : $content)) : []),
             'content' => $content,
+            'file_change_batch' => $batch,
             'image_save' => $imageSave,
             'provider_response_id' => $data['id'] ?? null,
             'model' => $data['model'] ?? config('services.openai.chat_model'),
@@ -208,6 +233,16 @@ class OpenAiChatService
                 'schema' => [
                     'type' => 'object',
                     'properties' => [
+                        ...(! empty($projectContext['development_mode']) ? [
+                            'additional_file_changes' => [
+                                'type' => 'array', 'maxItems' => 11,
+                                'items' => [
+                                    'type' => 'object',
+                                    'properties' => ['path' => ['type' => 'string'], 'content' => ['type' => 'string']],
+                                    'required' => ['path', 'content'], 'additionalProperties' => false,
+                                ],
+                            ],
+                        ] : []),
                         'answer' => ['type' => 'string'],
                         'image_name' => ['type' => ['string', 'null'], 'description' => '生成画像の内容と会話の意図がわかる短い日本語の保存名。例: お団子中身見えるパターン.png。画像を生成していない場合はnull。'],
                         'file_change' => [
@@ -225,7 +260,7 @@ class OpenAiChatService
                             ],
                         ],
                     ],
-                    'required' => ['answer', 'file_change', 'image_name'],
+                    'required' => ['answer', 'file_change', 'image_name', ...(! empty($projectContext['development_mode']) ? ['additional_file_changes'] : [])],
                     'additionalProperties' => false,
                 ],
             ],
@@ -288,6 +323,10 @@ If no file change is needed, return {"answer":"normal Japanese answer","file_cha
 For existing files choose exactly one supplied path. If local_file_access is true, you may create one new text file with a relative path inside the connected folder. Return the entire working file in file_change.content, not just instructions or a code block in answer. For a simple TODO app, prefer one self-contained index.html with embedded CSS/JavaScript. For server persistence use the supplied server_apps.instructions and riseGateApp SDK. If server_apps.can_create is true, a new HTML file may be returned even without a local folder; the user registers it from the response card. Never overwrite an existing file whose content was not supplied. Never target absolute paths, parent paths, secrets, dependencies, deployment files or backups. Use Asia/Tokyo for date/time displays.
 If auto_save_files is true, the browser will save this response automatically using the user's folder permission. Say that you are preparing the file for saving, not that saving is already complete. If false, the user applies the change from the card. An applied file save operation in conversation history confirms a completed save. Past claims that files cannot be created or saved are obsolete; use the current capabilities.
 PROMPT;
+
+        if (! empty($context['development_mode'])) {
+            $fileChangeInstruction = "\nIMPORTANT: development_mode is active. The independent local development contract overrides hosted-app and single-file recommendations. Return JSON with answer, image_name, file_change (first complete file or null), additional_file_changes (up to 11 more complete files; [] if none). Validate all changes together. Existing files must have been supplied; never overwrite unseen files. Do not claim saved or tested before receiving actual results.\n".$context['development_instructions'];
+        }
 
         return <<<'PROMPT'
 あなたはRISE GATE OSのAIパートナーです。プロジェクト情報の参照、変更案の作成、画像の生成ができます。

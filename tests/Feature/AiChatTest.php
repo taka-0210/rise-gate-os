@@ -375,7 +375,7 @@ class AiChatTest extends TestCase
             ->assertSee('.rise-gate/backups/')
             ->assertSee('data-change-history', false)
             ->assertSee('data-add-backup-gitignore', false)
-            ->assertSee('date.getFullYear()', false)
+            ->assertSee("timeZone:'Asia/Tokyo'", false)
             ->assertSee('更新日時：', false)
             ->assertSee('file-preview-title__time', false)
             ->assertSee('revealLocalFile', false)
@@ -763,6 +763,41 @@ class AiChatTest extends TestCase
             ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '作成して', 'local_file_access' => true])
             ->assertStatus(502);
         $this->assertDatabaseMissing('ai_chat_messages', ['role' => 'assistant']);
+    }
+
+    public function test_development_mode_creates_related_files_with_independent_contract_and_separate_history(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        $extraPath = 'database.php';
+        Http::fake(['api.openai.com/v1/responses' => function () use (&$extraPath) {
+            return Http::response([
+                'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => json_encode([
+                    'answer' => '独立したアプリの保存を準備します。',
+                    'file_change' => ['path' => 'public/index.php', 'content' => '<?php echo "TODO";'],
+                    'additional_file_changes' => [['path' => $extraPath, 'content' => '<?php // database']],
+                    'image_name' => null,
+                ])]]]],
+                'usage' => ['input_tokens' => 100, 'output_tokens' => 200],
+            ]);
+        }]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
+        $payload = ['content' => '独立したPHPのTODOを作成して', 'local_file_access' => true, 'development_mode' => true];
+        $result = $this->postJson(route('projects.ai-chat.messages.store', $project), $payload)
+            ->assertOk()->assertJsonPath('message.file_change.path', 'public/index.php')
+            ->assertJsonPath('related_messages.0.file_change.path', 'database.php');
+        $this->assertNotSame($result->json('message.id'), $result->json('related_messages.0.id'));
+        $this->assertDatabaseCount('ai_chat_messages', 3);
+        Http::assertSent(fn (Request $request): bool => isset($request['text']['format']['schema']['properties']['additional_file_changes'])
+            && str_contains($request['instructions'], 'PCの補助ツールに接続済み')
+            && ! str_contains($request['instructions'], 'const result = await window.riseGateApp.load()')
+        );
+        $extraPath = 'PUBLIC/index.php';
+        $this->postJson(route('projects.ai-chat.messages.store', $project), $payload)->assertStatus(502);
+        $extraPath = '../outside.php';
+        $this->postJson(route('projects.ai-chat.messages.store', $project), $payload)->assertStatus(502);
+        $this->assertSame(2, AiChatMessage::where('role', 'assistant')->count());
     }
 
     private function projectUser(): array

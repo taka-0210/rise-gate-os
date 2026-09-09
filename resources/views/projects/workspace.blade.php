@@ -348,7 +348,8 @@
             </nav>
 
             <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
-                @include('project-apps.workspace-controls')
+                @include('development.workspace-controls')
+                <details><summary>OS内に保存した既存アプリ</summary>@include('project-apps.workspace-controls')</details>
                 <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? 'ブラウザ接続・AI保存対応' : 'Project設定から登録してください' }}</span></div>
                 <div class="tree-body" data-local-file-tree><p class="file-note">フォルダへのアクセスを確認しています…</p></div>
                 <p class="file-note" data-local-file-status>Chrome・EdgeでProject設定からフォルダを選択してください。</p>
@@ -619,6 +620,7 @@
 </dialog>
 
 <script src="{{ asset('js/ai-image-save.js') }}"></script>
+<script src="{{ asset('js/local-development.js') }}"></script>
 <script>
 (() => {
     const workbench = document.querySelector('[data-workbench]');
@@ -635,7 +637,8 @@
     const workbenchGrid = workbench.querySelector('.workbench-grid');
     const localTree = workbench.querySelector('[data-local-file-tree]');
     const localStatus = workbench.querySelector('[data-local-file-status]');
-    const localSiteUrl = @json($localConnection?->local_site_url);
+    let localSiteUrl = @json($localConnection?->local_site_url);
+    let localDevelopmentConnected = false;
     let localDirectoryHandle = null;
     const updatedFilePaths = new Set();
     const loadLocalHandle = () => new Promise((resolve, reject) => {
@@ -695,6 +698,7 @@
         await refreshLocalChangeHistory();
     };
     loadLocalHandle().then(async handle => {
+        if (localDevelopmentConnected) return;
         localDirectoryHandle = handle;
         if (!handle) { localTree.innerHTML = '<p class="file-note">Project設定からBROWSEでフォルダを選択してください。</p>'; return; }
         if (await handle.queryPermission({mode:'read'}) === 'granted') {
@@ -784,6 +788,7 @@
     const localBrowserUrl = path => {
         if (!localSiteUrl) return '';
         let relative = String(path || '').replaceAll('\\', '/').replace(/^\/+/, '');
+        if (localDevelopmentConnected && relative.startsWith('public/')) relative = relative.slice(7);
         const base = localSiteUrl.endsWith('/') ? localSiteUrl : `${localSiteUrl}/`;
         try {
             const basePath = new URL(base).pathname.replace(/\/+$/, '');
@@ -797,7 +802,7 @@
         const htmlFile = /\.html?$/i.test(path);
         actions.hidden = !url && !(htmlFile && actions.querySelector('[data-register-app]'));
         const register = actions.querySelector('[data-register-app]');
-        if (register) register.hidden = !htmlFile;
+        if (register) register.hidden = !htmlFile || localDevelopmentConnected;
         actions.querySelector('[data-open-local-browser]').hidden = !url;
         actions.querySelector('[data-open-local-external]').hidden = !url;
         actions.dataset.browserUrl = url;
@@ -819,8 +824,10 @@
     const formatFileSavedAt = value => {
         const date = new Date(Number(value));
         if (Number.isNaN(date.getTime())) return '';
-        const pad = number => String(number).padStart(2, '0');
-        return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+        return new Intl.DateTimeFormat('ja-JP', {
+            timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit',
+            hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23',
+        }).format(date) + ' JST';
     };
     const setFilePreviewTitle = (path, modifiedAt = '') => {
         const title = workbench.querySelector('[data-file-title]');
@@ -1513,11 +1520,11 @@
     };
     const backupDirectoryName = () => {
         const date = new Date();
-        const pad = (value, length = 2) => String(value).padStart(length, '0');
-        const stamp = [
-            `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-            `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}-${pad(date.getMilliseconds(), 3)}`,
-        ].join('_');
+        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+            timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit',
+            hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23',
+        }).formatToParts(date).map(part => [part.type, part.value]));
+        const stamp = `${parts.year}-${parts.month}-${parts.day}_${parts.hour}-${parts.minute}-${parts.second}-${String(date.getMilliseconds()).padStart(3, '0')}`;
         return `${stamp}_${crypto.randomUUID().slice(0, 8)}`;
     };
     const createPhysicalBackup = async (path, content, action = 'ai_apply') => {
@@ -1543,7 +1550,7 @@
         const candidates = [];
         let scannedBytes = 0;
         const allowed = /\.(?:php|html?|css|js|mjs|cjs|json|md|txt|xml|ya?ml|csv|ini|conf|sql)$/i;
-        const ignoredDirectories = new Set(['.git', '.rise-gate', 'vendor', 'node_modules', 'deploy', 'deployment', 'bootstrap/cache']);
+        const ignoredDirectories = new Set(['.git', '.rise-gate', 'vendor', 'node_modules', 'deploy', 'deployment', 'bootstrap/cache', 'data', 'private']);
         const quotedTerms = [...requestText.matchAll(/[「『"]([^」』"]{3,})[」』"]/g)].map(match => match[1]);
         const requestTerms = [...new Set([
             ...quotedTerms,
@@ -2082,6 +2089,7 @@
             const payload = new FormData(chatForm);
             payload.set('content', content);
             payload.set('local_file_access', requestRoot ? '1' : '0');
+            payload.set('development_mode', localDevelopmentConnected && !requestServerApp ? '1' : '0');
             payload.set('auto_save_files', autoSave ? '1' : '0');
             const response = await fetch(chatForm.dataset.chatUrl, {
                 method: 'POST',
@@ -2099,10 +2107,21 @@
             if (requestServerApp && message.file_change) {
                 assistantArticle.querySelector('[data-file-change]').serverAppSource = {...requestServerApp, original_hash:message.file_change.original_hash};
             }
-            if (autoSave && message.file_change?.status === 'pending') {
-                const proposal = assistantArticle.querySelector('[data-file-change]');
-                proposal.open = true;
-                await applyFileChange(proposal, proposal.querySelector('[data-file-change-apply]'), true, requestRoot);
+            const fileArticles = [{article:assistantArticle, message}];
+            for (const related of body.related_messages || []) {
+                fileArticles.push({article:appendMessage('assistant', related.content, 'ただ今', false, '', related.file_change, false), message:related});
+            }
+            if (autoSave) {
+                for (const item of fileArticles) {
+                    if (item.message.file_change?.status !== 'pending') continue;
+                    const proposal = item.article.querySelector('[data-file-change]');
+                    proposal.open = true;
+                    await applyFileChange(proposal, proposal.querySelector('[data-file-change-apply]'), true, requestRoot);
+                    if (!proposal.classList.contains('is-applied')) {
+                        showWorkbenchNotice('ファイルの保存が完了しなかったため、以降の自動保存を停止しました。各提案の状態を確認してください。', 'error');
+                        break;
+                    }
+                }
             }
             appendDirectImageSave(assistantArticle, message.image_url, message.image_save_url, message.image_suggested_path);
             const imageDownload = assistantArticle.querySelector('a[download]');
@@ -2143,6 +2162,7 @@
         }
     });
     @include('project-apps.workspace-script')
+    @include('development.workspace-script')
 })();
 </script>
 @endsection

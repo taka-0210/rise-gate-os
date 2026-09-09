@@ -27,7 +27,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, pdo_sqlite, sqlite3
+          extensions: mbstring, pdo_sqlite, sqlite3, zip
           coverage: none
 
       - name: テスト用パッケージを準備
@@ -47,7 +47,7 @@ jobs:
       - name: 本番用アーカイブを作成
         run: |
           tar -czf "$RUNNER_TEMP/rise-gate-os-${GITHUB_SHA}.tar.gz" \
-            app bootstrap config database deployment public resources routes storage vendor \
+            app bootstrap config database deployment public resources routes storage vendor tools/local-dev \
             artisan composer.json composer.lock
 
       - name: SSHを安全に準備
