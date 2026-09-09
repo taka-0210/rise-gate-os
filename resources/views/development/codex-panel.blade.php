@@ -18,6 +18,10 @@
     </div>
     <p class="ai-chat-error" role="alert" data-codex-error hidden></p>
     <section class="ai-chat-messages" data-codex-history aria-label="Codexとの会話" style="max-height:48vh;overflow:auto;overflow-wrap:anywhere"></section>
+    <div class="codex-activity" data-codex-activity>
+        <strong role="status" data-codex-activity-label>Codexへの接続待ち</strong>
+        <small data-codex-activity-detail></small>
+    </div>
     <div data-codex-approvals></div>
     <form data-codex-form>
         <label>開発の依頼<textarea name="prompt" rows="4" maxlength="16000" required placeholder="このフォルダにシンプルなTODOアプリを作って…"></textarea></label>

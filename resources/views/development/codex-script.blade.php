@@ -1,11 +1,41 @@
     const codexPanel = workbench.querySelector('[data-codex-panel]');
     let codexClient = null, codexTimer = null, codexPolling = false, codexLastHistory = '', codexLastApprovals = '';
     let codexWasRunning = false;
+    let codexActivitySignature = '', codexProgressAt = Date.now();
+    const codexActivity = (label, busy = false, detail = '') => {
+        const node = codexPanel.querySelector('[data-codex-activity]');
+        node.classList.toggle('is-busy', busy);
+        node.querySelector('[data-codex-activity-label]').textContent = label;
+        node.querySelector('[data-codex-activity-detail]').textContent = detail;
+    };
+    const codexRenderActivity = state => {
+        const signature = JSON.stringify([state.phase, state.history, state.approvals]);
+        if (signature !== codexActivitySignature) {
+            codexActivitySignature = signature; codexProgressAt = Date.now();
+        }
+        const history = state.history || [], last = history[history.length - 1];
+        if (state.error) return codexActivity('エラーが発生しました', false, '上のエラー内容を確認してください。');
+        if (state.approvals?.length) return codexActivity('あなたの確認待ち', false, '下の確認内容に回答してください。');
+        if (state.phase === 'connecting') return codexActivity('Codexに接続中…', true);
+        if (state.phase === 'running') {
+            const seconds = Math.floor((Date.now() - codexProgressAt) / 1000);
+            if (seconds >= 60) return codexActivity('進捗の更新待ち', false, '前回の進捗から' + seconds + '秒。開発ツールとの通信は続いていますが、作業が進んでいるかは確認できていません。');
+            // Existing helper events identify commands; do not infer file edits from elapsed time.
+            const executing = last?.role === 'status' && last.text.startsWith('実行中：');
+            const replying = last?.role === 'assistant';
+            return codexActivity(executing ? '実行中…' : replying ? '回答を作成中…' : 'Thinking…（応答待ち）', true,
+                executing ? last.text.slice('実行中：'.length) : '');
+        }
+        if (state.phase === 'failed') return codexActivity('接続を確認してください', false, 'Codexへ再接続してください。');
+        if (state.phase === 'login') return codexActivity('ログイン待ち');
+        codexActivity(last?.role === 'status' ? last.text : '依頼を送信できます');
+    };
     const codexError = text => {
         const node = codexPanel.querySelector('[data-codex-error]');
         node.textContent = text; node.hidden = !text;
     };
     const codexRender = state => {
+        codexRenderActivity(state);
         const labels = {connecting:'Codexへ接続しています…',login:'Codexへのログインが必要です。',ready:'Codexに接続済み',running:'Codexが作業しています…',failed:'Codexへの再接続が必要です。'};
         codexPanel.querySelector('[data-codex-status]').textContent = (labels[state.phase] || state.phase) + (state.authenticated ? '（' + (state.accountType === 'chatgpt' ? 'ChatGPT' : state.accountType === 'apiKey' ? 'OpenAI API' : state.accountType) + '）' : '');
         codexPanel.querySelector('[data-codex-auth]').hidden = state.authenticated || state.phase === 'connecting';
@@ -90,7 +120,13 @@
         codexPolling=true;
         const client=codexClient;
         try{const state=await client.call('codex_poll');if(client===codexClient)codexRender(state);}
-        catch(error){codexError(error.message);}
+        catch(error){
+            if (client === codexClient) {
+                codexError(error.message);
+                codexActivity('通信を確認できません', false, '作業が続いている可能性があります。再送せず、接続の回復を待ってください。');
+                codexPanel.querySelector('[data-codex-form] button').disabled = true;
+            }
+        }
         finally{codexPolling=false;}
     };
     const openCodex=()=>{
@@ -134,14 +170,16 @@
         const prompt=form.elements.prompt.value.trim();
         try{
             if(!codexClient)throw new Error('先にCodexへ接続してください。');
+            codexActivity('送信中…', true);
             codexRender(await codexClient.call('codex_send',{prompt,requestId:crypto.randomUUID()}));
             form.elements.prompt.value='';
-        }catch(error){codexError(error.message);form.querySelector('button').disabled=false;}
+        }catch(error){codexError(error.message);codexActivity('送信結果を確認してください', false, '上のエラー内容を確認してください。');form.querySelector('button').disabled=false;}
         finally{delete form.dataset.sending;}
     });
     workbench.addEventListener('development-folder-changed',()=>{
         clearInterval(codexTimer);codexClient=null;codexWasRunning=false;codexLastHistory='';codexLastApprovals='';
         if(!codexPanel)return;
+        codexActivity('Codexへの接続待ち');
         codexPanel.querySelector('[data-codex-history]').replaceChildren();
         codexPanel.querySelector('[data-codex-approvals]').replaceChildren();
         codexPanel.querySelector('[data-codex-form] button').disabled=true;

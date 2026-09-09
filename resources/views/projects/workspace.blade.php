@@ -220,6 +220,12 @@
     .workbench-notice.is-error { border-color:#dfaaa2; color:#843c32; background:#fff5f3; }
     .ai-message--user .ai-message__bubble { color:#fff; background:#155566; border-bottom-right-radius:3px; }
     .ai-message--assistant .ai-message__bubble { color:#23363f; border:1px solid #d6e0e4; background:#fff; border-bottom-left-radius:3px; }
+    .codex-activity { padding:10px 12px; border:1px solid #cfe1e5; border-radius:8px; background:#edf5f6; color:#155566; font-size:12px; }
+    .codex-activity strong { display:flex; align-items:center; gap:8px; }
+    .codex-activity small { display:block; margin-top:4px; color:#61737c; overflow-wrap:anywhere; white-space:pre-wrap; max-height:80px; overflow:auto; }
+    .codex-activity small:empty { display:none; }
+    .codex-activity.is-busy strong::before { content:""; flex:0 0 12px; width:12px; height:12px; border:2px solid #c7d4d9; border-top-color:#286476; border-radius:50%; animation:chat-thinking-spin .8s linear infinite; }
+    @media (prefers-reduced-motion:reduce) { .codex-activity.is-busy strong::before { animation:none; } }
     .ai-message__meta { color:#7d8c94; font-size:9px; }
     .ai-message--user .ai-message__meta { text-align:right; }
     .ai-message.is-pending .ai-message__bubble { color:#61737c; background:#edf2f4; display:inline-flex; align-items:center; gap:8px; }
