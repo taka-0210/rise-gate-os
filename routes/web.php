@@ -60,6 +60,17 @@ Route::post('/system-admin/login', [SystemAdminSessionController::class, 'store'
 Route::get('/estimate-review/{token}', [\App\Http\Controllers\PublicEstimateController::class, 'show'])->name('public.estimates.show');
 Route::post('/estimate-review/{token}/respond', [\App\Http\Controllers\PublicEstimateController::class, 'respond'])->name('public.estimates.respond');
 
+Route::prefix('apps/{projectApp}')->name('apps.')->group(function (): void {
+    Route::get('/', [\App\Http\Controllers\StandaloneAppController::class, 'run'])->name('run');
+    Route::post('/login', [\App\Http\Controllers\StandaloneAppController::class, 'login'])->middleware('throttle:standalone-app-login')->name('login');
+    Route::post('/logout', [\App\Http\Controllers\StandaloneAppController::class, 'logout'])->name('logout');
+    Route::get('/accounts', [\App\Http\Controllers\StandaloneAppController::class, 'accounts'])->name('accounts');
+    Route::post('/accounts', [\App\Http\Controllers\StandaloneAppController::class, 'storeAccount'])->middleware('throttle:30,1,app-accounts:')->name('accounts.store');
+    Route::put('/accounts/{appAccount}', [\App\Http\Controllers\StandaloneAppController::class, 'updateAccount'])->middleware('throttle:30,1,app-accounts:')->name('accounts.update');
+    Route::get('/data', [\App\Http\Controllers\StandaloneAppController::class, 'readData'])->name('data.read');
+    Route::put('/data', [\App\Http\Controllers\StandaloneAppController::class, 'writeData'])->middleware('throttle:120,1,app-data:')->name('data.write');
+});
+
 Route::middleware(['auth', 'active-user'])->group(function (): void {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
@@ -161,6 +172,10 @@ Route::middleware(['auth', 'active-user'])->group(function (): void {
         Route::post('/clients/{client}/company-account', [ClientCompanyAccountController::class, 'store'])->name('clients.company-account.store');
         Route::get('/projects/schedule', [ProjectController::class, 'schedule'])->name('projects.schedule');
         Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+        Route::get('/projects/{project}/apps', [\App\Http\Controllers\Project\ProjectAppController::class, 'index'])->name('projects.apps.index');
+        Route::post('/projects/{project}/apps', [\App\Http\Controllers\Project\ProjectAppController::class, 'store'])->middleware('throttle:20,1,app-publish:')->name('projects.apps.store');
+        Route::get('/projects/{project}/apps/{projectApp}/source', [\App\Http\Controllers\Project\ProjectAppController::class, 'source'])->name('projects.apps.source');
+        Route::put('/projects/{project}/apps/{projectApp}', [\App\Http\Controllers\Project\ProjectAppController::class, 'update'])->middleware('throttle:20,1,app-publish:')->name('projects.apps.update');
         Route::get('/projects/{project}/workspace', [ProjectController::class, 'workspace'])->name('projects.workspace');
         Route::get('/projects/{project}/handoffs', [ProjectHandoffController::class, 'index'])->name('projects.handoffs.index');
         Route::post('/projects/{project}/handoffs', [ProjectHandoffController::class, 'store'])->name('projects.handoffs.store');

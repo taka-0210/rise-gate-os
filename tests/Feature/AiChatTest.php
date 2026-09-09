@@ -722,7 +722,7 @@ class AiChatTest extends TestCase
         Http::assertSent(fn (Request $request): bool => str_contains(json_encode($request['input']), 'applied'));
     }
 
-    public function test_ai_rejects_unsafe_new_paths_and_requires_a_connected_folder(): void
+    public function test_ai_rejects_unsafe_paths_and_allows_standalone_html_without_a_local_folder(): void
     {
         [$user, $workspace, $project] = $this->projectUser();
         WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
@@ -739,9 +739,18 @@ class AiChatTest extends TestCase
                 'content' => '作成して', 'local_file_access' => true,
             ])->assertStatus(502);
         }
-        $path = 'index.html';
-        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '作成して'])->assertStatus(502);
         $this->assertDatabaseMissing('ai_chat_messages', ['role' => 'assistant']);
+        $path = 'index.html';
+        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '独立ログインのTODOをサーバー保存で作成して'])
+            ->assertOk()->assertJsonPath('message.file_change.path', 'index.html');
+        Http::assertSent(fn (Request $request): bool => str_contains($request['instructions'], 'riseGateApp.save')
+            && str_contains($request['instructions'], 'Company OSのログインとは独立')
+            && $request['max_output_tokens'] === 12000);
+        $path = 'backend.php';
+        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '作成して'])->assertStatus(502);
+        $path = 'index.html';
+        ProjectMember::where('project_id', $project->id)->where('user_id', $user->id)->update(['permission_level' => 'view']);
+        $this->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '作成して', 'server_apps' => ['can_create' => true]])->assertStatus(502);
     }
 
     public function test_incomplete_ai_generation_is_not_offered_for_saving(): void

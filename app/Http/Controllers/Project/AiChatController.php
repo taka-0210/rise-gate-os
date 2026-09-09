@@ -12,6 +12,7 @@ use App\Models\ProjectMember;
 use App\Services\AiChatUsage;
 use App\Services\ImageSavePath;
 use App\Services\OpenAiChatService;
+use App\Services\ProjectAppContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -255,6 +256,10 @@ class AiChatController extends Controller
             ->all();
 
         return [
+            'server_apps' => [
+                'can_create' => $request->user()->can('update', $project),
+                'instructions' => ProjectAppContract::instructions(),
+            ],
             'local_file_access' => $request->boolean('local_file_access'),
             'auto_save_files' => $request->boolean('auto_save_files'),
             'currently_open' => $validated['context_label'] ?? null,

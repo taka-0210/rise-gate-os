@@ -1,0 +1,43 @@
+<!doctype html><meta charset="utf-8"><title>Project app browser smoke test</title>
+<pre id="result">RUNNING</pre><p id="status"></p><iframe id="frame" sandbox="allow-scripts allow-downloads"></iframe>
+<script type="module">
+import {installAppBridge, mountProjectApp} from '../../public/js/project-app-runtime.js';
+const frame = document.getElementById('frame'), result = document.getElementById('result');
+let data = null, revision = 0;
+installAppBridge({
+    frame, endpoint:'/fixed-app/data', csrf:'test-only', status:document.getElementById('status'),
+    request:async (url, options) => {
+        if (options.method === 'PUT') {
+            const body = JSON.parse(options.body);
+            if (body.revision !== revision) return {ok:false, json:async () => ({message:'conflict'})};
+            data = body.data; revision++;
+            return {ok:true, json:async () => ({revision, saved_at:'2026-09-09T12:00:00+09:00'})};
+        }
+        return {ok:true, json:async () => ({data, revision, user:{id:1,name:'staff1',role:'staff'}})};
+    },
+});
+addEventListener('message', event => {
+    if (event.source !== frame.contentWindow || event.data?.smoke !== true) return;
+    result.textContent = event.data.isolated && data?.todos?.[0]?.title === 'Browser test TODO' && revision === 1
+        ? 'PASS: real sandbox, TODO interaction and server bridge' : 'FAIL: ' + JSON.stringify(event.data);
+});
+const html = await (await fetch('../../resources/project-apps/todo.html')).text();
+const automation = `<script>
+let attempts = 0;
+const wait = setInterval(() => {
+    if (++attempts > 80) { clearInterval(wait); parent.postMessage({smoke:true, error:'timeout'}, '*'); return; }
+    if (!document.getElementById('welcome').textContent.includes('staff1')) return;
+    clearInterval(wait);
+    let isolated = false;
+    try { parent.document.body; } catch { isolated = true; }
+    document.getElementById('title').value = 'Browser test TODO';
+    document.getElementById('add').dispatchEvent(new Event('submit', {cancelable:true}));
+    const saved = setInterval(() => {
+        if (document.querySelectorAll('#tasks li').length === 1) {
+            clearInterval(saved); parent.postMessage({smoke:true, isolated}, '*');
+        }
+    }, 30);
+}, 30);
+<\/script>`;
+mountProjectApp(frame, html + automation);
+</script>

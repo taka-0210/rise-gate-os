@@ -348,6 +348,7 @@
             </nav>
 
             <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
+                @include('project-apps.workspace-controls')
                 <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? 'ブラウザ接続・AI保存対応' : 'Project設定から登録してください' }}</span></div>
                 <div class="tree-body" data-local-file-tree><p class="file-note">フォルダへのアクセスを確認しています…</p></div>
                 <p class="file-note" data-local-file-status>Chrome・EdgeでProject設定からフォルダを選択してください。</p>
@@ -461,7 +462,8 @@
             <article class="workbench-document" data-document-panel="ai-proposals"><div class="document-kicker">AI Proposals</div><h1 class="document-title">AI提案</h1><p class="document-summary">AIが作成した変更案は、人が確認・承認するまでプロジェクトへ反映されません。</p><div class="document-list">@forelse($pendingAiProposals as $proposal)<a class="document-row" href="{{ route('projects.ai-proposals.show', [$project,$proposal]) }}"><strong>{{ $proposal->title }}</strong><span class="meta">承認待ち / {{ $proposal->created_at->format('Y/m/d H:i') }}</span></a>@empty<p>承認待ちのAI提案はありません。</p>@endforelse</div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="file">
-                <article class="workbench-document file-preview-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title data-file-path="" title="ファイルを選択">ファイルを選択</h1><div class="file-preview-actions" data-file-preview-actions hidden><button type="button" data-open-local-browser>ブラウザで表示</button><a data-open-local-external target="_blank" rel="noopener">別タブで開く</a></div><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
+                <article class="workbench-document file-preview-document is-current" style="display:block"><div class="document-kicker">File Preview</div><h1 class="document-title" data-file-title data-file-path="" title="ファイルを選択">ファイルを選択</h1><div class="file-preview-actions" data-file-preview-actions hidden>@can('update', $project)<button type="button" data-register-app>アプリとして登録</button>@endcan
+<button type="button" data-open-local-browser>ブラウザで表示</button><a data-open-local-external target="_blank" rel="noopener">別タブで開く</a></div><div class="code-shell"><code class="code-viewer" data-file-content><span class="code-line">左のFILESからファイルを開くと、ここに内容を表示します。</span></code></div></article>
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
                 <div class="browser-preview">
@@ -532,12 +534,18 @@
                                     <span class="file-change-status" data-file-change-status></span>
                                     @if($chatMessage->file_change_status === 'pending')
                                         <div class="file-change-actions" data-file-change-actions>
+
                                             <button class="file-change-apply" type="button" data-file-change-diff>差分を確認</button>
                                             <button type="button" data-file-change-revise>AIへ修正を依頼</button>
                                             <button type="button" data-file-change-reject data-reject-url="{{ route('projects.ai-chat.messages.file-change.rejected', [$project, $chatMessage]) }}">提案を破棄</button>
                                             <button class="file-change-apply" type="button" data-file-change-apply data-file-path="{{ $chatMessage->file_change_path }}" data-original-hash="{{ $chatMessage->file_change_original_hash }}" data-apply-url="{{ route('projects.ai-chat.messages.file-change.applied', [$project, $chatMessage]) }}">承認してローカルへ反映</button>
                                         </div>
                                     @endif
+                                    @can('update', $project)
+                                        @if($chatMessage->file_change_status !== 'rejected' && preg_match('/\.html?$/i', $chatMessage->file_change_path))
+                                            <button type="button" data-register-proposal-app>アプリとして登録</button>
+                                        @endif
+                                    @endcan
                                     <details class="file-change-source"><summary>変更後のファイル全文を表示</summary><pre>{{ $chatMessage->file_change_content }}</pre></details>
                                 </details>
                             @endif
@@ -786,7 +794,12 @@
     const setLocalBrowserActions = path => {
         const actions = workbench.querySelector('[data-file-preview-actions]');
         const url = /\.(?:php|html?)$/i.test(path) ? localBrowserUrl(path) : '';
-        actions.hidden = !url;
+        const htmlFile = /\.html?$/i.test(path);
+        actions.hidden = !url && !(htmlFile && actions.querySelector('[data-register-app]'));
+        const register = actions.querySelector('[data-register-app]');
+        if (register) register.hidden = !htmlFile;
+        actions.querySelector('[data-open-local-browser]').hidden = !url;
+        actions.querySelector('[data-open-local-external]').hidden = !url;
         actions.dataset.browserUrl = url;
         const external = actions.querySelector('[data-open-local-external]');
         external.href = url || '#';
@@ -940,6 +953,10 @@
         }
         const workspaceTab = event.target.closest('[data-workspace-tab]');
         if (workspaceTab && !event.target.closest('[data-close-workspace-tab]')) {
+            if (workspaceTab.dataset.workspaceTab.startsWith('app:')) {
+                const app = projectApps.find(item => 'app:' + item.id === workspaceTab.dataset.workspaceTab);
+                if (app) { await openServerApp(app); return; }
+            }
             const kind = workspaceTab.dataset.tabKind;
             if (kind === 'document') openDocument(workspaceTab.dataset.tabKey);
             else {
@@ -1249,7 +1266,13 @@
             apply.dataset.applyUrl = proposal.apply_url;
             apply.textContent = '承認してローカルへ反映';
             actions.append(diff, revise, reject, apply);
+
             details.append(actions);
+        }
+        if (canManageApps && proposal.status !== 'rejected' && /\.html?$/i.test(proposal.path)) {
+            const register = document.createElement('button');
+            register.type = 'button'; register.dataset.registerProposalApp = '';
+            register.textContent = 'アプリとして登録'; details.append(register);
         }
         const full = document.createElement('details');
         full.className = 'file-change-source';
@@ -1767,6 +1790,14 @@
     };
     const readProposalFile = async (path, originalHash) => {
         validateAiFilePath(path);
+        if (path.startsWith('server-apps/')) {
+            const id = path.split('/')[1];
+            const app = projectApps.find(item => item.id === id);
+            if (!app) throw new Error('保存済みアプリを一覧から開き直してください。');
+            const {app:source} = await appRequest(app.source_url);
+            serverAppSources.set(source.id, source);
+            return {handle:null, current:source.html};
+        }
         try {
             const handle = await resolveLocalFileHandle(path);
             if (!originalHash) throw new Error('同名ファイルが既にあります。FILESで開いてからAIへ更新を依頼してください。');
@@ -1777,10 +1808,12 @@
         }
     };
     const openFileChangeDiff = async proposal => {
-        if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
-        const permission = await localDirectoryHandle.requestPermission({mode:'read'});
-        if (permission !== 'granted') throw new Error('差分確認にはローカルフォルダの読み取り許可が必要です。');
         const path = proposalPath(proposal);
+        if (!path.startsWith('server-apps/')) {
+            if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
+            const permission = await localDirectoryHandle.requestPermission({mode:'read'});
+            if (permission !== 'granted') throw new Error('差分確認にはローカルフォルダの読み取り許可が必要です。');
+        }
         const originalHash = proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash;
         const {current} = await readProposalFile(path, originalHash);
         const proposed = proposalContent(proposal);
@@ -1842,6 +1875,12 @@
     };
     const applyFileChange = async (proposal, apply, automatic = false, expectedRoot = localDirectoryHandle) => {
         const path = apply.dataset.filePath;
+        if (path.startsWith('server-apps/')) {
+            const app = projectApps.find(item => item.id === path.split('/')[1]);
+            if (!app) throw new Error('保存済みアプリを一覧から開き直してください。');
+            openAppRegistration(proposalContent(proposal), proposal.serverAppSource || {...app, original_hash:apply.dataset.originalHash});
+            return;
+        }
         const status = proposal.querySelector('[data-file-change-status]');
         const originalLabel = apply.textContent;
         const protectedPath = /(^|\/)\.env($|[./])|^(vendor|deploy|deployment|\.git|\.rise-gate)(\/|$)/i.test(path)
@@ -1938,9 +1977,11 @@
         const path = proposalPath(proposal);
         let current = [...diffStates.values()].find(state => state.proposal === proposal)?.current;
         if (current === undefined) {
-            if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
-            const permission = await localDirectoryHandle.requestPermission({mode:'read'});
-            if (permission !== 'granted') throw new Error('修正依頼にはローカルフォルダの読み取り許可が必要です。');
+            if (!path.startsWith('server-apps/')) {
+                if (!localDirectoryHandle) throw new Error('FILESを開き、ローカルフォルダへのアクセスを許可してください。');
+                const permission = await localDirectoryHandle.requestPermission({mode:'read'});
+                if (permission !== 'granted') throw new Error('修正依頼にはローカルフォルダの読み取り許可が必要です。');
+            }
             const originalHash = proposal.querySelector('[data-file-change-apply]')?.dataset.originalHash;
             ({current} = await readProposalFile(path, originalHash));
         }
@@ -2031,7 +2072,8 @@
         try {
             localDirectoryHandle ||= await loadLocalHandle();
             const requestRoot = localDirectoryHandle;
-            const autoSave = chatForm.elements.auto_save_files.checked && !!requestRoot;
+            const requestServerApp = getActiveServerApp();
+            const autoSave = chatForm.elements.auto_save_files.checked && !!requestRoot && !requestServerApp;
             if (autoSave && await requestLocalWritePermission() !== 'granted') {
                 throw new Error('自動保存にはフォルダへの書き込み許可が必要です。許可して再送信するか、自動保存をOFFにしてください。');
             }
@@ -2054,6 +2096,9 @@
             userMessage.querySelector('.ai-message__meta').textContent = 'ただ今';
 
             const assistantArticle = appendMessage('assistant', message.content, 'ただ今', false, message.image_url || '', message.file_change, false);
+            if (requestServerApp && message.file_change) {
+                assistantArticle.querySelector('[data-file-change]').serverAppSource = {...requestServerApp, original_hash:message.file_change.original_hash};
+            }
             if (autoSave && message.file_change?.status === 'pending') {
                 const proposal = assistantArticle.querySelector('[data-file-change]');
                 proposal.open = true;
@@ -2097,6 +2142,7 @@
             textarea.focus();
         }
     });
+    @include('project-apps.workspace-script')
 })();
 </script>
 @endsection

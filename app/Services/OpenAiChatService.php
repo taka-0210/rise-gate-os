@@ -33,7 +33,7 @@ class OpenAiChatService
                     'input' => $messages->flatMap(fn (AiChatMessage $message): array => $this->inputMessages($message))->values()->all(),
                     'reasoning' => ['effort' => 'low'],
                     'text' => $this->textConfiguration($projectContext),
-                    'max_output_tokens' => $this->editableFiles($projectContext) === [] && empty($projectContext['local_file_access']) ? 1200 : 12000,
+                    'max_output_tokens' => $this->editableFiles($projectContext) === [] && empty($projectContext['local_file_access']) && empty($projectContext['server_apps']['can_create']) ? 1200 : 12000,
                     'store' => false,
                     'safety_identifier' => hash('sha256', 'rise-gate-os-user-'.$userId),
                 ]);
@@ -81,7 +81,7 @@ class OpenAiChatService
             throw new RuntimeException('AIの回答本文を確認できませんでした。');
         }
 
-        $structured = $this->parseFileChange($content, $this->editableFiles($projectContext), ! empty($projectContext['local_file_access']));
+        $structured = $this->parseFileChange($content, $this->editableFiles($projectContext), ! empty($projectContext['local_file_access']), ! empty($projectContext['server_apps']['can_create']));
         if ($structured) {
             $content = $structured['answer'];
         }
@@ -232,7 +232,7 @@ class OpenAiChatService
         ];
     }
 
-    private function parseFileChange(string $content, array $editableFiles, bool $localFileAccess = false): ?array
+    private function parseFileChange(string $content, array $editableFiles, bool $localFileAccess = false, bool $canCreateApp = false): ?array
     {
         $json = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim($content));
         $decoded = json_decode($json, true);
@@ -247,7 +247,7 @@ class OpenAiChatService
             return null;
         }
         $target = collect($editableFiles)->firstWhere('path', $change['path']);
-        if (! $target && $localFileAccess) {
+        if (! $target && ($localFileAccess || ($canCreateApp && preg_match('/\.html?$/i', $change['path'])))) {
             $target = ['path' => LocalAiFilePath::normalize($change['path']), 'sha256' => null];
         }
         if (! $target) {
@@ -285,7 +285,7 @@ class OpenAiChatService
 IMPORTANT: When project_files or open_file is present, inspect the supplied files and return only valid JSON with no Markdown fence:
 {"answer":"short Japanese explanation","file_change":{"path":"exact supplied file path","content":"complete updated file content"},"image_name":null}
 If no file change is needed, return {"answer":"normal Japanese answer","file_change":null,"image_name":null}.
-For existing files choose exactly one supplied path. If local_file_access is true, you may create one new text file with a relative path inside the connected folder. Return the entire working file in file_change.content, not just instructions or a code block in answer. For a simple TODO app, prefer one self-contained index.html with embedded CSS/JavaScript and localStorage persistence. Never overwrite an existing file whose content was not supplied. Never target absolute paths, parent paths, secrets, dependencies, deployment files or backups. Use Asia/Tokyo for date/time displays.
+For existing files choose exactly one supplied path. If local_file_access is true, you may create one new text file with a relative path inside the connected folder. Return the entire working file in file_change.content, not just instructions or a code block in answer. For a simple TODO app, prefer one self-contained index.html with embedded CSS/JavaScript. For server persistence use the supplied server_apps.instructions and riseGateApp SDK. If server_apps.can_create is true, a new HTML file may be returned even without a local folder; the user registers it from the response card. Never overwrite an existing file whose content was not supplied. Never target absolute paths, parent paths, secrets, dependencies, deployment files or backups. Use Asia/Tokyo for date/time displays.
 If auto_save_files is true, the browser will save this response automatically using the user's folder permission. Say that you are preparing the file for saving, not that saving is already complete. If false, the user applies the change from the card. An applied file save operation in conversation history confirms a completed save. Past claims that files cannot be created or saved are obsolete; use the current capabilities.
 PROMPT;
 
@@ -305,7 +305,7 @@ save_generated_imageは保存準備です。ブラウザで完了するまで保
 提供されたプロジェクト情報だけを事実として扱い、日本語で簡潔かつ具体的に回答してください。
 情報が不足している場合は推測で補わず、不足している情報を明示してください。
 OSの業務データを変更した、保存した、承認したとは述べないでください。ローカルファイルは保存操作のstatusがappliedの場合だけ保存完了を報告できます。
-OSの業務データの変更は提案として説明してください。接続されたローカルフォルダ内の通常ファイルはfile_changeで作成・更新できます。作成や保存を依頼されたら説明だけで終わらず、ファイル全体を返してください。local_file_accessがfalseで新規作成が必要な場合はProject設定でフォルダ接続を案内してください。
+OSの業務データの変更は提案として説明してください。接続されたローカルフォルダ内の通常ファイルはfile_changeで作成・更新できます。作成や保存を依頼されたら説明だけで終わらず、ファイル全体を返してください。local_file_accessがfalseでもserver_apps.can_createがtrueなら新規HTMLアプリを作成できます。サーバー保存や独立ログインの依頼にはserver_apps.instructionsの機能を使い、利用できないと回答しないでください。
 ただし画像の保存依頼はsave_generated_imageでブラウザの保存操作を準備できます。image_save.statusがsavedなら保存完了の報告に基づいて回答してください。
 
 現在のプロジェクト情報:

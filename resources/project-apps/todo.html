@@ -1,0 +1,77 @@
+<html lang="ja"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>TODO管理</title>
+<style>
+*{box-sizing:border-box}body{font:16px system-ui,sans-serif;margin:0;background:#f4f8f8;color:#163e48}main{max-width:720px;margin:32px auto;padding:24px}h1{font-size:30px;margin:0 0 8px}p{color:#5a747c}form{display:flex;gap:10px;margin:24px 0}input[type=text]{min-width:0;flex:1;padding:12px;border:1px solid #c5d7dc;border-radius:8px}button{padding:10px 14px;border:0;border-radius:8px;background:#176779;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:wait}ul{padding:0;list-style:none}li{display:flex;align-items:center;gap:12px;margin:10px 0;background:white;padding:16px;border-radius:12px}li span{flex:1;overflow-wrap:anywhere}li.done span{text-decoration:line-through;color:#7d9299}li button{background:#f0e6e6;color:#834545}.tools{display:flex;gap:10px;flex-wrap:wrap}.tools button{background:#dfecee;color:#28545f}#error{color:#ae3333;white-space:pre-wrap}
+</style></head><body><main>
+<h1>自分のTODO</h1><p id="welcome">読み込み中…</p>
+<form id="add"><input id="title" type="text" maxlength="300" placeholder="やることを入力" required><button>追加</button></form>
+<div class="tools"><button id="reload">再読込</button><button id="export">JSONを書き出す</button><button id="import">JSONを取り込む</button><input id="file" type="file" accept=".json,application/json" hidden></div>
+<p id="error" role="alert"></p><ul id="tasks"></ul>
+</main><script>
+(() => {
+    let state = {todos:[]}, busy = false, loaded = false;
+    const error = document.getElementById('error');
+    const setBusy = value => { busy = value; document.querySelectorAll('button,input').forEach(el => el.disabled = value); };
+    const render = () => {
+        const list = document.getElementById('tasks'); list.replaceChildren();
+        for (const todo of state.todos) {
+            const row = document.createElement('li'); row.className = todo.done ? 'done' : '';
+            const check = document.createElement('input'); check.type = 'checkbox'; check.checked = todo.done;
+            check.onchange = () => commit({...state, todos:state.todos.map(item => item.id === todo.id ? {...item, done:check.checked} : item)});
+            const title = document.createElement('span'); title.textContent = todo.title;
+            const remove = document.createElement('button'); remove.textContent = '削除';
+            remove.onclick = () => commit({...state, todos:state.todos.filter(item => item.id !== todo.id)});
+            row.append(check,title,remove); list.append(row);
+        }
+    };
+    const valid = data => data && Array.isArray(data.todos) && data.todos.length <= 2000
+        && data.todos.every(t => t && typeof t.id === 'string' && typeof t.title === 'string' && t.title.length <= 300 && typeof t.done === 'boolean')
+        && new Set(data.todos.map(t => t.id)).size === data.todos.length;
+    const commit = async next => {
+        if (busy || !loaded) { error.textContent = '再読込してから操作してください。'; render(); return; }
+        setBusy(true); error.textContent = '';
+        try { await riseGateApp.save(next); state = next; }
+        catch (e) { loaded = false; error.textContent = e.message + ' 変更は画面に反映していません。再読込してください。'; }
+        finally { render(); setBusy(false); }
+    };
+    const load = async () => {
+        if (busy) return; setBusy(true); error.textContent = ''; loaded = false;
+        try {
+            const result = await riseGateApp.load();
+            if (result.data !== null && !valid(result.data)) throw new Error('既存データの形式が異なるため上書きしません。元のアプリで確認してください。');
+            state = result.data ?? {todos:[]}; loaded = true;
+            document.getElementById('welcome').textContent = result.user.name + ' さんのTODOをサーバーに保存します。';
+            render();
+        } catch (e) { error.textContent = e.message; }
+        finally { setBusy(false); }
+    };
+    document.getElementById('add').onsubmit = async event => {
+        event.preventDefault(); const field = document.getElementById('title'); const title = field.value.trim();
+        if (!title || busy) return;
+        const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        await commit({...state, todos:[...state.todos,{id,title,done:false}]});
+        if (loaded) field.value = '';
+    };
+    document.getElementById('reload').onclick = load;
+    document.getElementById('export').onclick = () => {
+        if (!loaded) { error.textContent = '先に再読込してください。'; return; }
+        const url = URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));
+        const link = document.createElement('a'); link.href = url; link.download = 'todo.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
+    };
+    document.getElementById('import').onclick = () => document.getElementById('file').click();
+    document.getElementById('file').onchange = async event => {
+        try {
+            const file = event.target.files[0]; if (!file) return;
+            if (file.size > 500000) throw new Error('JSONは500KB以内にしてください。');
+            const data = JSON.parse(await file.text());
+            if (!valid(data)) throw new Error('todos配列（id・title・done）があるJSONを指定してください。');
+            const ids = new Set(state.todos.map(t => t.id));
+            const next = {...state, todos:[...state.todos, ...data.todos.filter(t => !ids.has(t.id))]};
+            if (!valid(next)) throw new Error('取り込み後のTODO件数が上限を超えます。');
+            await commit(next);
+        } catch(e) { error.textContent = e.message; }
+        finally { event.target.value = ''; }
+    };
+    if (!window.riseGateApp) error.textContent = '3ペインでアプリを登録し、専用URLから開いてください。';
+    else load();
+})();
+</script></body></html>
