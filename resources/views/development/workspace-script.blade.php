@@ -31,7 +31,8 @@
         devStatus('接続済み：PHP ' + state.php + ' / SQLite / JST' + (state.url ? '（起動中）' : ''));
     };
     const devConnect = async token => {
-        if (!/^[a-f0-9]{64}$/.test(token)) throw new Error('接続コードを確認してください。');
+        if (token.length !== 64) throw new Error(`接続コードは64文字です（現在${token.length}文字）。起動した画面のコード欄でCtrl＋A → Ctrl＋Cを押し、貼り付け直してください。`);
+        if (!/^[a-f0-9]{64}$/.test(token)) throw new Error('接続コードには数字とa〜fの英字だけを使用します。コード欄の内容だけをコピーしてください。');
         const candidate = new RiseGateLocalDev.Client(@json($project->public_id), token);
         const state = await candidate.call('status');
         if (!state.sqlite) throw new Error('SQLiteが利用できません。セットアップを再実行してください。');
@@ -51,9 +52,14 @@
             devControls.querySelector('[data-dev-admin]').hidden = action !== 'seed';
             const form = devControls.querySelector('[data-dev-form]');
             form.reset();
+            form.elements.code.type = 'password';
+            form.querySelector('[data-dev-code-count]').textContent = '入力：0 / 64文字';
+            form.elements.code.disabled = action !== 'connect';
+            form.elements.login.disabled = form.elements.password.disabled = action !== 'seed';
             form.elements.code.required = action === 'connect';
             form.elements.login.required = form.elements.password.required = action === 'seed';
             devControls.querySelector('[data-dev-dialog-error]').textContent = '';
+            devControls.querySelector('[data-dev-dialog-progress]').textContent = '';
             dialog.showModal();
             return;
         }
@@ -103,8 +109,18 @@
         event.preventDefault();
         const form = event.currentTarget;
         const dialog = form.closest('dialog');
-        const button = event.submitter;
-        button.disabled = true;
+        if (form.dataset.busy === 'true') return;
+        const button = event.submitter || form.querySelector('button[value="save"]');
+        const buttons = [...form.querySelectorAll('button')];
+        const label = button.textContent;
+        const progress = form.querySelector('[data-dev-dialog-progress]');
+        form.dataset.busy = 'true';
+        buttons.forEach(item => { item.disabled = true; });
+        button.textContent = dialog.dataset.action === 'connect' ? '接続中…' : '作成中…';
+        form.querySelector('[data-dev-dialog-error]').textContent = '';
+        progress.textContent = dialog.dataset.action === 'connect'
+            ? '開発用ツールに接続しています。ブラウザに接続許可の確認が出ている場合は許可してください。'
+            : 'TODOのファイルとDBを作成しています…';
         try {
             if (dialog.dataset.action === 'connect') await devConnect(form.elements.code.value.trim());
             else {
@@ -116,6 +132,21 @@
             form.reset(); dialog.close();
         } catch (error) {
             devControls.querySelector('[data-dev-dialog-error]').textContent = error.message === 'Failed to fetch' ? '開発用ツールを起動し、ブラウザのローカルネットワーク接続を許可してください。' : error.message;
-        } finally { button.disabled = false; }
+        } finally {
+            delete form.dataset.busy;
+            buttons.forEach(item => { item.disabled = false; });
+            button.textContent = label;
+            progress.textContent = '';
+        }
+    });
+    devControls?.querySelector('[name="code"]').addEventListener('input', event => {
+        const count = event.target.value.trim().length;
+        devControls.querySelector('[data-dev-code-count]').textContent = '入力：' + count + ' / 64文字';
+    });
+    devControls?.querySelector('[data-dev-show-code]').addEventListener('change', event => {
+        devControls.querySelector('[name="code"]').type = event.target.checked ? 'text' : 'password';
+    });
+    devControls?.querySelector('[data-dev-dialog]').addEventListener('cancel', event => {
+        if (devControls.querySelector('[data-dev-form]').dataset.busy === 'true') event.preventDefault();
     });
     if (devControls && sessionStorage.getItem(devKey)) devConnect(sessionStorage.getItem(devKey)).catch(() => devStatus('開発用ツールを起動して「接続」を押してください。'));

@@ -19,8 +19,9 @@
 <dialog data-dev-dialog>
 <form method="dialog" data-dev-form>
 <h3 data-dev-title>開発用ツールに接続</h3>
-<label data-dev-code-label>起動時の画面に表示された接続コード<input name="code" type="password" autocomplete="off" maxlength="64"></label>
-<div data-dev-admin hidden><p>新しいTODOの管理者を設定します。既存ファイルやDBがあるフォルダでは作成しません。</p><label>管理者ID<input name="login" autocomplete="off" pattern="[a-zA-Z0-9_-]{3,40}"></label><label>パスワード（8文字以上）<input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="128"></label></div>
+<div data-dev-code-label><label>起動時の画面に表示された接続コード（64文字）<input name="code" type="password" autocomplete="off" spellcheck="false" maxlength="128"></label><small data-dev-code-count>入力：0 / 64文字</small><label><input type="checkbox" data-dev-show-code> コードを表示する</label></div>
+<div data-dev-admin hidden><p>新しいTODOの管理者を設定します。既存ファイルやDBがあるフォルダでは作成しません。</p><label>管理者ID<input name="login" autocomplete="off" pattern="[a-zA-Z0-9_\-]{3,40}"></label><label>パスワード（8文字以上）<input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="128"></label></div>
+<p data-dev-dialog-progress role="status" aria-live="polite"></p>
 <p data-dev-dialog-error role="alert"></p>
 <button value="cancel" formnovalidate>キャンセル</button><button value="save">決定</button>
 </form>
