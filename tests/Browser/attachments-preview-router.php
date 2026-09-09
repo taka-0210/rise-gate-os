@@ -2,7 +2,7 @@
 $root=dirname(__DIR__,2);
 $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
 if($path==='/responsive.js'){header('Content-Type: text/javascript');readfile($root.'/public/js/responsive-preview.js');exit;}
-if($path==='/frame'){echo '<!doctype html><style>body{background:blue}@media(max-width:500px){body{background:red}}</style>Viewport';exit;}
+if($path==='/frame'){echo '<!doctype html><style>body{background:blue;min-height:3000px}@media(max-width:500px){body{background:red}}</style>Viewport';exit;}
 $source=file_get_contents($root.'/resources/views/projects/workspace.blade.php');
 $start=strpos($source, '    const chatImageInput =');
 $end=strpos($source, '    const appendDirectImageSave', $start);
@@ -12,7 +12,7 @@ $end=strpos($source, '            <div class="viewer-panel" data-viewer-panel="p
 $preview=substr($source,$start,$end-$start);
 preg_match('~<style>(.*?)</style>~s',$source,$styles);
 echo '<!doctype html><meta charset="utf-8"><style>'.($styles[1]??'').'</style><p id="result">RUNNING</p>';
-echo '<form id="chat"><textarea name="content"></textarea><input type="file" multiple data-chat-image-input><button type="button" data-chat-image-select>選択</button><div data-chat-image-preview></div></form><p id="error"></p><div data-workbench style="width:600px"><details data-development-controls><summary>開発ツール</summary></details>'.$preview.'</div>';
+echo '<form id="chat"><textarea name="content"></textarea><input type="file" multiple data-chat-image-input><button type="button" data-chat-image-select>選択</button><div data-chat-image-preview></div></form><p id="error"></p><div data-workbench style="width:600px"><details data-development-controls><summary>開発ツール</summary></details><section class="workbench-pane workbench-main is-mobile-current" style="height:500px"><div class="workspace-tabs">index.html</div><div class="viewer-panel is-current" data-viewer-panel="browser">'.$preview.'</section></div>';
 ?>
 <script>
 const chatForm=document.querySelector('#chat'),chatError=document.querySelector('#error');
@@ -41,6 +41,14 @@ const preview=document.querySelector('[data-responsive-preview]'),toolbar=previe
 assert(toolbar.hidden,'hidden outside development');
 preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{url:location.origin+'/'}}));
 assert(!toolbar.hidden,'shown for running development app');
+const pane=preview.closest('.workbench-main');
+const before=toolbar.getBoundingClientRect().top;
+frame.contentWindow.scrollTo(0,700);
+pane.scrollTop=400;
+await new Promise(r=>setTimeout(r,50));
+assert(frame.contentWindow.scrollY>0,'site scrolls vertically');
+assert(pane.scrollTop===0&&toolbar.getBoundingClientRect().top===before,'toolbar stays visible during vertical scrolling');
+assert(frame.getBoundingClientRect().bottom<=pane.getBoundingClientRect().bottom+1,'preview fits remaining pane height');
 const preset=value=>document.querySelector('[data-preview-preset="'+value+'"]').click();
 preset('390');await new Promise(r=>setTimeout(r,50));
 assert(frame.contentWindow.innerWidth===390&&frame.contentWindow.matchMedia('(max-width:500px)').matches,'mobile actual viewport');

@@ -105,7 +105,11 @@
     .file-note { margin:12px 10px; padding:10px; border:1px dashed #c7d3d9; border-radius:7px; color:#6a7b84; background:#fff; font-size:10px; line-height:1.55; }
     .viewer-panel { display:none; min-height:100%; }
     .viewer-panel.is-current { display:block; }
-    .browser-preview { min-width:0; min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto auto minmax(0,1fr); background:#fff; }
+    .workbench-main:has(> [data-viewer-panel="browser"].is-current) { display:flex; flex-direction:column; overflow:hidden; }
+    .workbench-main:has(> [data-viewer-panel="browser"].is-current) > .workspace-tabs { flex-shrink:0; }
+    .workbench-main > [data-viewer-panel="browser"] { flex:1; min-height:0; overflow:hidden; }
+    .browser-preview { min-width:0; min-height:0; height:100%; display:flex; flex-direction:column; background:#fff; }
+    .browser-preview > .responsive-toolbar, .browser-preview > .browser-external-notice { flex-shrink:0; }
     .browser-external-notice { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:11px 14px; border-bottom:1px solid #d5dde3; color:#294752; background:#f4f8f9; font-size:12px; }
     .browser-external-notice[hidden] { display:none; }
     .browser-external-notice strong { display:block; margin-bottom:2px; }
@@ -121,10 +125,10 @@
     .responsive-toolbar input[type="number"] { box-sizing:border-box; width:76px; height:30px; margin:0; padding:4px 6px; font-size:12px; }
     .responsive-toolbar input[type="range"] { flex:1; min-width:80px; width:100px; height:30px; margin:0; padding:0; border:0; accent-color:#155566; }
     .responsive-toolbar [data-preview-size] { white-space:nowrap; font-size:11px; color:#61737c; }
-    .responsive-stage { min-width:0; overflow:auto; background:#e9eef1; }
+    .responsive-stage { flex:1; min-width:0; min-height:0; overflow:auto; background:#e9eef1; }
     .responsive-stage .browser-frame { display:block; margin:0 auto; }
     .responsive-stage .browser-frame[hidden] { display:none; }
-    .browser-frame { width:100%; height:100%; min-height:calc(100vh - 170px); border:0; background:#fff; }
+    .browser-frame { width:100%; height:100%; min-height:0; border:0; background:#fff; }
     .pdf-frame { width:100%; height:calc(100vh - 112px); min-height:640px; border:0; background:#525659; }
     .image-viewer { min-height:calc(100vh - 112px); display:grid; grid-template-rows:auto minmax(0,1fr); background:#e9eef1; }
     .image-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 14px; border-bottom:1px solid #cbd5da; color:#425660; background:#f8fafb; font-size:12px; }
@@ -282,6 +286,7 @@
         .pane-resizer { display:none; }
         .workbench-pane { display:none; height:100%; border:0; }
         .workbench-pane.is-mobile-current { display:block; }
+        .workbench-main:not(.is-mobile-current):has(> [data-viewer-panel="browser"].is-current) { display:none; }
     }
     @media (max-width:600px) {
         .main:has(.company-workbench) { width:100%; padding:0; }
@@ -845,10 +850,11 @@
         const actions = workbench.querySelector('[data-file-preview-actions]');
         const url = /\.(?:php|html?)$/i.test(path) ? localBrowserUrl(path) : '';
         const htmlFile = /\.html?$/i.test(path);
-        actions.hidden = !url && !(htmlFile && actions.querySelector('[data-register-app]'));
+        const canStart = localDevelopmentConnected && /\.(?:php|html?)$/i.test(path);
+        actions.hidden = !url && !canStart && !(htmlFile && actions.querySelector('[data-register-app]'));
         const register = actions.querySelector('[data-register-app]');
         if (register) register.hidden = !htmlFile || localDevelopmentConnected;
-        actions.querySelector('[data-open-local-browser]').hidden = !url;
+        actions.querySelector('[data-open-local-browser]').hidden = !url && !canStart;
         actions.querySelector('[data-open-local-external]').hidden = !url;
         actions.dataset.browserUrl = url;
         const external = actions.querySelector('[data-open-local-external]');
@@ -1085,11 +1091,10 @@
             const opensAsPdf = localFile?.type === 'application/pdf' || /\.pdf$/i.test(fileButton.dataset.fileName);
             const opensAsImage = localFile?.type.startsWith('image/') || /\.(?:jpe?g|png|gif|webp|svg|bmp|ico|avif)$/i.test(fileButton.dataset.fileName);
             if (!opensAsPdf && !opensAsImage) renderCode(fileButton.dataset.fileCopy);
-            const opensInBrowser = fileButton.dataset.fileView === 'browser' || /(^|\/)index\.html?$/i.test(fileButton.dataset.fileName);
             const tabId = `file:${fileButton.dataset.fileName}`;
             const existingUrl = tabs.querySelector(`[data-workspace-tab="${CSS.escape(tabId)}"]`)?.dataset.tabUrl;
-            const previewUrl = existingUrl || ((opensAsPdf || opensAsImage) && localFile ? URL.createObjectURL(localFile) : opensInBrowser && fileButton.localFileHandle ? URL.createObjectURL(new Blob([fileButton.dataset.fileCopy], {type:'text/html'})) : (fileButton.dataset.previewUrl || ''));
-            ensureTab({id:tabId, kind:opensAsPdf ? 'pdf' : opensAsImage ? 'image' : opensInBrowser ? 'browser' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl, modifiedAt:localFile?.lastModified});
+            const previewUrl = existingUrl || ((opensAsPdf || opensAsImage) && localFile ? URL.createObjectURL(localFile) : (fileButton.dataset.previewUrl || ''));
+            ensureTab({id:tabId, kind:opensAsPdf ? 'pdf' : opensAsImage ? 'image' : 'file', key:fileButton.dataset.fileName, label:fileButton.dataset.fileName.split('/').pop(), content:fileButton.dataset.fileCopy, url:previewUrl, modifiedAt:localFile?.lastModified});
             if (opensAsPdf) {
                 setChatFileContext();
                 const frame = workbench.querySelector('[data-pdf-frame]');
@@ -1108,9 +1113,6 @@
                 download.href = previewUrl;
                 download.download = fileButton.dataset.fileName.split('/').pop();
                 showViewer('image');
-            } else if (opensInBrowser) {
-                setChatFileContext();
-                showBrowserPreview(previewUrl, fileButton.dataset.fileName);
             } else {
                 setChatFileContext(fileButton.dataset.fileName, fileButton.dataset.fileCopy);
                 showViewer('file');
@@ -1123,13 +1125,28 @@
         }
         const imageSize = event.target.closest('[data-image-size]');
         if (imageSize) workbench.querySelector('[data-image-preview]').classList.toggle('is-original', imageSize.dataset.imageSize === 'original');
-        if (event.target.closest('[data-open-local-browser]')) {
-            const actions = workbench.querySelector('[data-file-preview-actions]');
-            const url = actions.dataset.browserUrl;
-            if (url) {
-                const path = workbench.querySelector('[data-file-title]').dataset.filePath;
+        const browserButton = event.target.closest('[data-open-local-browser]');
+        if (browserButton && !browserButton.disabled) {
+            const path = workbench.querySelector('[data-file-title]').dataset.filePath;
+            browserButton.disabled = true;
+            const label = browserButton.textContent;
+            try {
+                if (localDevelopmentConnected && devClient) {
+                    browserButton.textContent = '起動を確認中…';
+                    const state = await devClient.call('status');
+                    if (!state.url) await devClient.call('start');
+                    await devShowState(await devClient.call('status'));
+                }
+                const url = localBrowserUrl(path);
+                if (!url) throw new Error('開発ツールに接続し、保存フォルダを選択してください。');
+                setLocalBrowserActions(path);
                 ensureTab({id:`browser:${path}`, kind:'browser', key:path, label:`↗ ${path.split('/').pop()}`, url});
                 showBrowserPreview(url, path);
+            } catch (error) {
+                devStatus(error.message);
+            } finally {
+                browserButton.disabled = false;
+                browserButton.textContent = label;
             }
         }
         if (event.target.closest('[data-usage-toggle]')) {
