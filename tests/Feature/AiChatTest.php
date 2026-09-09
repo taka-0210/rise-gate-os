@@ -801,6 +801,39 @@ class AiChatTest extends TestCase
         $this->assertSame(2, AiChatMessage::where('role', 'assistant')->count());
     }
 
+    public function test_encoded_chat_context_reaches_ai_as_original_text_and_keeps_input_limits(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => json_encode([
+                'answer' => '確認しました。', 'file_change' => null, 'image_name' => null,
+            ])]]]],
+            'usage' => ['input_tokens' => 10, 'output_tokens' => 10],
+        ])]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
+        $source = "<?php\n// 日本語 😀\nSELECT * FROM tasks WHERE id = 1;\n  ";
+        $this->postJson(route('projects.ai-chat.messages.store', $project), [
+            'content_base64' => base64_encode('ファイルを確認して'),
+            'file_path' => 'public/index.php',
+            'file_content_base64' => base64_encode($source),
+            'project_files_base64' => base64_encode(json_encode([['path' => 'public/index.php', 'content' => $source]])),
+        ])->assertOk();
+        $this->assertDatabaseHas('ai_chat_messages', ['role' => 'user', 'content' => 'ファイルを確認して']);
+        Http::assertSent(fn (Request $request): bool => str_contains($request['instructions'], 'SELECT * FROM tasks WHERE id = 1'));
+        foreach ([
+            ['content_base64' => 'not-base64!'],
+            ['content_base64' => base64_encode("\xff")],
+            ['content_base64' => base64_encode(str_repeat('あ', 4001))],
+            ['content' => 'raw', 'content_base64' => base64_encode('encoded')],
+        ] as $invalid) {
+            $this->postJson(route('projects.ai-chat.messages.store', $project), $invalid)->assertUnprocessable();
+        }
+        $this->assertSame(1, AiChatMessage::where('role', 'user')->count());
+        Http::assertSentCount(1);
+    }
+
     private function projectUser(): array
     {
         $user = User::factory()->create();

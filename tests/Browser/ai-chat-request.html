@@ -9,7 +9,7 @@
         const calls = []; let updated = ''; let rejected = false;
         try {
             await RiseGateChatRequest.send({url:'/chat', tokenUrl:'/token', userId:'7', payload, token:'old', onToken:t => updated=t}, async (url, options) => {
-                calls.push({url, token:options.headers['X-CSRF-TOKEN'], form:payload.get('_token'), content:payload.get('content')});
+                calls.push({url, token:options.headers['X-CSRF-TOKEN'], form:options.body?.get('_token'), content:options.body ? new TextDecoder().decode(Uint8Array.from(atob(options.body.get('content_base64')), ch => ch.charCodeAt(0))) : null});
                 const item = sequence[calls.length-1];
                 if (!item) throw new Error('Unexpected retry');
                 if (item instanceof Error) throw item;
@@ -36,7 +36,7 @@
         assert(result.calls.length===3, 'retry bounded');
         result = await run([new Error('network')],true);
         assert(result.calls.length===1, 'network failure not resent');
-        for (const status of [200, 404, 413, 500, 502, 503, 504]) {
+        for (const status of [200, 403, 404, 413, 500, 502, 503, 504]) {
             let message = '';
             try { await RiseGateChatRequest.readJson(new Response('<!DOCTYPE html><html>server error</html>', {status,headers:{'Content-Type':'text/html'}})); }
             catch (e) { message = e.message; }
@@ -50,6 +50,18 @@
         assert(valid.message === 'ok', 'valid JSON preserved');
         result = await run([response(419), {status:200,ok:true,headers:new Headers({'Content-Type':'text/html'})}],true);
         assert(result.calls.length===2, 'HTML refresh never resends chat');
+        const original = new FormData();
+        const source = '<?php // 日本語 😀\n SELECT * FROM tasks WHERE id = 1;\n  ';
+        original.set('content', '作成して');
+        original.set('file_content', source);
+        original.set('project_files', JSON.stringify([{path:'index.php',content:source}]));
+        original.set('_token', 'csrf');
+        original.set('image', new File(['image-bytes'], 'test.png'));
+        const wire = RiseGateChatRequest.encodePayload(original);
+        assert(!wire.has('content') && !wire.has('file_content') && !wire.has('project_files'), 'raw code absent');
+        assert(wire.get('_token') === 'csrf' && wire.get('image').name === 'test.png', 'CSRF and attachment preserved');
+        assert(new TextDecoder().decode(Uint8Array.from(atob(wire.get('file_content_base64')), ch => ch.charCodeAt(0))) === source, 'UTF8 and whitespace preserved');
+        assert(original.get('file_content') === source, 'draft remains intact');
         document.querySelector('#result').textContent='PASS: token refresh / identity / bounded retry / preserved payload';
     } catch (e) { document.querySelector('#result').textContent='FAIL: '+e.message; }
 })();

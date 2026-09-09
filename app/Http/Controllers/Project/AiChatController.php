@@ -34,6 +34,8 @@ class AiChatController extends Controller
             return response()->json(['message' => 'このWorkspaceではAI機能が有効になっていません。'], 403);
         }
 
+        \App\Services\AiChatPayload::decode($request);
+
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:4000'],
             'generate_image' => ['sometimes', 'boolean'],
