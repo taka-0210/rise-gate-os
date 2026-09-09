@@ -57,6 +57,7 @@ $iniText = @"
 [PHP]
 extension_dir="$extensionPath"
 extension=mbstring
+extension=fileinfo
 extension=pdo_sqlite
 extension=sqlite3
 extension=zip
@@ -68,7 +69,7 @@ log_errors=1
 [IO.File]::WriteAllText($ini, $iniText, (New-Object Text.UTF8Encoding($false)))
 # Use a temporary PHP file: Windows PowerShell does not reliably preserve quotes in -r arguments.
 $checkPath = Join-Path $InstallRoot 'check.php'
-[IO.File]::WriteAllText($checkPath, '<?php exit(PHP_VERSION_ID >= 80200 && extension_loaded("pdo_sqlite") && extension_loaded("mbstring") && extension_loaded("zip") ? 0 : 1);', (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($checkPath, '<?php exit(PHP_VERSION_ID >= 80200 && extension_loaded("pdo_sqlite") && extension_loaded("mbstring") && extension_loaded("zip") && extension_loaded("fileinfo") ? 0 : 1);', (New-Object Text.UTF8Encoding($false)))
 $process = Start-Process -FilePath $PhpPath -ArgumentList @('-c', ('"' + $ini + '"'), ('"' + $checkPath + '"')) -WindowStyle Hidden -Wait -PassThru
 if ($process.ExitCode -ne 0) {
     Write-Host 'PHPの実行に必要なMicrosoftランタイムを準備します。Windowsから許可を求められた場合は確認してください。'
