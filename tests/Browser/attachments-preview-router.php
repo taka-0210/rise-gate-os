@@ -12,7 +12,7 @@ $end=strpos($source, '            <div class="viewer-panel" data-viewer-panel="p
 $preview=substr($source,$start,$end-$start);
 preg_match('~<style>(.*?)</style>~s',$source,$styles);
 echo '<!doctype html><meta charset="utf-8"><style>'.($styles[1]??'').'</style><p id="result">RUNNING</p>';
-echo '<form id="chat"><textarea name="content"></textarea><input type="file" multiple data-chat-image-input><button type="button" data-chat-image-select>選択</button><div data-chat-image-preview></div></form><p id="error"></p><div style="width:600px">'.$preview.'</div>';
+echo '<form id="chat"><textarea name="content"></textarea><input type="file" multiple data-chat-image-input><button type="button" data-chat-image-select>選択</button><div data-chat-image-preview></div></form><p id="error"></p><div data-workbench style="width:600px"><details data-development-controls><summary>開発ツール</summary></details>'.$preview.'</div>';
 ?>
 <script>
 const chatForm=document.querySelector('#chat'),chatError=document.querySelector('#error');
@@ -58,7 +58,20 @@ preset('fit');assert(frame.style.width==='100%','fit');
 preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{url:''}}));
 assert(toolbar.hidden&&frame.style.width==='100%','stop hides controls and restores full width');
 preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{url:'http://127.0.0.1:9999/'}}));
-assert(toolbar.hidden,'unrelated document preview stays full width');
+assert(!toolbar.hidden,'development preview is not restricted to matching origins');
+preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{active:true,url:''}}));
+assert(!toolbar.hidden,'connected development without runner URL');
+const blob=URL.createObjectURL(new Blob(['<!doctype html><p>local preview</p>'],{type:'text/html'}));
+await new Promise(resolve=>{frame.onload=resolve;frame.src=blob;});
+assert(!toolbar.hidden,'local blob preview remains responsive');
+preset('390');assert(frame.style.width==='390px','blob preview width');
+preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{active:false}}));
+assert(toolbar.hidden,'disconnect hides controls');
+const tools=document.querySelector('[data-development-controls]');tools.open=true;
+await new Promise(resolve=>setTimeout(resolve,50));assert(!toolbar.hidden,'opening development tools enables preview before reconnect');
+tools.open=false;await new Promise(resolve=>setTimeout(resolve,50));
+assert(toolbar.hidden&&frame.style.width==='100%','ordinary workspace use resets preview');
+URL.revokeObjectURL(blob);
 document.querySelector('#result').textContent='PASS: normal AI attachments / paste / limits / actual responsive viewport';
 }catch(error){document.querySelector('#result').textContent='FAIL: '+error.message;}
 })();

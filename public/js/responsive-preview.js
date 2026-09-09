@@ -6,7 +6,8 @@
         const toolbar=preview.querySelector('[data-responsive-toolbar]');
         const label=preview.querySelector('[data-preview-size]');
         const stage=preview.querySelector('.responsive-stage');
-        let developmentUrl='', enabled=false, selected='fit';
+        const tools=preview.closest('[data-workbench]')?.querySelector('[data-development-controls]');
+        let developmentActive=!!tools?.open, enabled=false, selected='fit';
         const syncFit=()=>{
             if(selected!=='fit')return;
             const actual=Math.round(stage.clientWidth);
@@ -28,14 +29,13 @@
             else syncFit();
         };
         const updateVisibility=()=>{
-            let matches=false;
-            try { matches=!!developmentUrl && new URL(frame.src).origin===new URL(developmentUrl).origin; } catch {}
-            enabled=matches;toolbar.hidden=!enabled;
+            enabled=developmentActive && !!frame.getAttribute('src');toolbar.hidden=!enabled;
             if(!enabled)apply('fit');
         };
         preview.addEventListener('development-preview-state',event=>{
-            developmentUrl=event.detail?.url || '';updateVisibility();
+            developmentActive=event.detail?.active ?? !!event.detail?.url;updateVisibility();
         });
+        tools?.addEventListener('toggle',()=>{developmentActive=tools.open;updateVisibility();});
         new MutationObserver(updateVisibility).observe(frame,{attributes:true,attributeFilter:['src']});
         new ResizeObserver(syncFit).observe(stage);
         preview.querySelectorAll('[data-preview-preset]').forEach(button=>button.addEventListener('click',()=>{if(enabled)apply(button.dataset.previewPreset);}));

@@ -664,7 +664,7 @@
 <script src="{{ asset('js/ai-chat-request.js') }}"></script>
 <script src="{{ asset('js/ai-image-save.js') }}"></script>
 <script src="{{ asset('js/local-development.js') }}"></script>
-<script src="{{ asset('js/responsive-preview.js') }}"></script>
+<script src="{{ asset('js/responsive-preview.js').'?v=20260909-2' }}"></script>
 <script>
 (() => {
     const workbench = document.querySelector('[data-workbench]');

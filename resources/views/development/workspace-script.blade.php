@@ -23,7 +23,7 @@
         localDevelopmentConnected = true;
         devControls.querySelector('[data-dev-connection-label]').textContent = '接続中';
         localSiteUrl = state.url || '';
-        workbench.querySelector('[data-responsive-preview]')?.dispatchEvent(new CustomEvent('development-preview-state', {detail:{url:localSiteUrl}}));
+        workbench.querySelector('[data-responsive-preview]')?.dispatchEvent(new CustomEvent('development-preview-state', {detail:{active:true,url:localSiteUrl}}));
         if (state.folder) {
             localDirectoryHandle = devClient.directory(state.folder);
             await renderLocalDirectory(localDirectoryHandle, localTree);
@@ -66,7 +66,7 @@
                 const helperState = await devClient.call('status');
                 await devClient.call(String(helperState.version).startsWith('2.') ? 'disconnect' : 'stop');
                 sessionStorage.removeItem(devKey);
-                workbench.querySelector('[data-responsive-preview]')?.dispatchEvent(new CustomEvent('development-preview-state', {detail:{url:''}}));
+                workbench.querySelector('[data-responsive-preview]')?.dispatchEvent(new CustomEvent('development-preview-state', {detail:{active:false,url:''}}));
                 workbench.dispatchEvent(new CustomEvent('development-folder-changed'));
                 devControls.querySelector('[data-dev-connection-label]').textContent = '';
                 devClient = null; localDirectoryHandle = null; localSiteUrl = ''; localDevelopmentConnected = false;
