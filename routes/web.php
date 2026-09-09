@@ -72,6 +72,7 @@ Route::prefix('apps/{projectApp}')->name('apps.')->group(function (): void {
 });
 
 Route::middleware(['auth', 'active-user'])->group(function (): void {
+    Route::get('/session/token', [\App\Http\Controllers\SessionTokenController::class, '__invoke'])->name('session.token');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::get('/development/setup', [\App\Http\Controllers\DevelopmentSetupController::class, 'index'])->name('development.setup');
     Route::get('/development/download', [\App\Http\Controllers\DevelopmentSetupController::class, 'download'])->name('development.download');

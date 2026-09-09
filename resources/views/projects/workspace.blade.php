@@ -619,6 +619,7 @@
     <img src="" alt="添付画像の拡大表示" data-chat-image-modal-image>
 </dialog>
 
+<script src="{{ asset('js/ai-chat-request.js') }}"></script>
 <script src="{{ asset('js/ai-image-save.js') }}"></script>
 <script src="{{ asset('js/local-development.js') }}"></script>
 <script>
@@ -2091,10 +2092,14 @@
             payload.set('local_file_access', requestRoot ? '1' : '0');
             payload.set('development_mode', localDevelopmentConnected && !requestServerApp ? '1' : '0');
             payload.set('auto_save_files', autoSave ? '1' : '0');
-            const response = await fetch(chatForm.dataset.chatUrl, {
-                method: 'POST',
-                headers: {'Accept':'application/json','X-CSRF-TOKEN':@json(csrf_token())},
-                body: payload,
+            const response = await RiseGateChatRequest.send({
+                url: chatForm.dataset.chatUrl, tokenUrl: @json(route('session.token')),
+                userId: @json((string) auth()->id()), payload,
+                token: chatForm.dataset.csrfToken || @json(csrf_token()),
+                onToken: token => {
+                    chatForm.dataset.csrfToken = token;
+                    if (chatForm.elements._token) chatForm.elements._token.value = token;
+                },
             });
             const body = await response.json();
             if (!response.ok) throw new Error(body.message || 'AIから回答を取得できませんでした。');

@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8"><p id="result">RUNNING</p>
+<script src="../../public/js/ai-chat-request.js"></script>
+<script>
+(async () => {
+    const assert = (value, label) => { if (!value) throw new Error(label); };
+    const response = status => ({status, ok:status === 200});
+    const run = async (sequence, error = false) => {
+        const payload = new FormData(); payload.set('content', '車両管理を作って'); payload.set('_token', 'old');
+        const calls = []; let updated = ''; let rejected = false;
+        try {
+            await RiseGateChatRequest.send({url:'/chat', tokenUrl:'/token', userId:'7', payload, token:'old', onToken:t => updated=t}, async (url, options) => {
+                calls.push({url, token:options.headers['X-CSRF-TOKEN'], form:payload.get('_token'), content:payload.get('content')});
+                const item = sequence[calls.length-1];
+                if (!item) throw new Error('Unexpected retry');
+                if (item instanceof Error) throw item;
+                return item;
+            });
+
+        } catch (e) { rejected = true; if (!error) throw e; }
+        assert(rejected === error, 'expected rejection');
+        return {calls, updated};
+    };
+    const fresh = {status:200,ok:true,json:async()=>({token:'fresh',user_id:'7'})};
+    try {
+        let result = await run([response(200)]);
+        assert(result.calls.length===1, 'success not repeated');
+        result = await run([response(419),fresh,response(200)]);
+        assert(result.calls.length===3 && result.updated==='fresh', 'refresh once');
+        assert(result.calls[2].token==='fresh' && result.calls[2].form==='fresh', 'update form and header');
+        assert(result.calls[2].content==='車両管理を作って', 'preserve request');
+        result = await run([response(419),response(401)],true);
+        assert(result.calls.length===2, 'expired login not resent');
+        result = await run([response(419),{...fresh,json:async()=>({token:'fresh',user_id:'8'})}],true);
+        assert(result.calls.length===2 && !result.updated, 'different user not resent');
+        result = await run([response(419),fresh,response(419)],true);
+        assert(result.calls.length===3, 'retry bounded');
+        result = await run([new Error('network')],true);
+        assert(result.calls.length===1, 'network failure not resent');
+        document.querySelector('#result').textContent='PASS: token refresh / identity / bounded retry / preserved payload';
+    } catch (e) { document.querySelector('#result').textContent='FAIL: '+e.message; }
+})();
+</script>
