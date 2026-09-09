@@ -1,4 +1,4 @@
-<section style="padding:12px;border-bottom:1px solid #d5dde3" aria-label="保存済みアプリ">
+<section hidden aria-label="保存済みアプリ">
 <strong>保存済みアプリ</strong>
 <p class="file-note">専用ログイン・サーバー保存。別端末でも利用できます。</p>
 <div data-project-app-list></div>

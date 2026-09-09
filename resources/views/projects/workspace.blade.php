@@ -110,10 +110,16 @@
     .browser-external-notice strong { display:block; margin-bottom:2px; }
     .browser-external-notice span { color:#687b84; font-size:10px; }
     .browser-external-notice .button { flex:0 0 auto; }
-    .responsive-toolbar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:8px; border-bottom:1px solid #d6e0e4; font-size:12px; }
-    .responsive-toolbar button { padding:5px 9px; font-size:12px; background:#fff; color:#155566; border:1px solid #d6e0e4; border-radius:6px; }
+    .responsive-toolbar { display:flex; gap:8px 12px; align-items:center; flex-wrap:wrap; padding:8px; border-bottom:1px solid #d6e0e4; font-size:12px; }
+    .responsive-toolbar[hidden] { display:none; }
+    .responsive-presets { display:flex; gap:4px; flex-wrap:wrap; }
+    .responsive-toolbar button { box-sizing:border-box; height:30px; flex-shrink:0; white-space:nowrap; padding:0 9px; font-size:12px; line-height:1; background:#fff; color:#155566; border:1px solid #d6e0e4; border-radius:6px; }
     .responsive-toolbar button[aria-pressed="true"] { background:#155566; color:#fff; }
-    .responsive-toolbar input { width:76px; padding:4px; font-size:12px; }
+    .responsive-width-control { display:flex; align-items:center; gap:8px; flex:1 1 260px; min-width:0; }
+    .responsive-width-control label { display:flex; align-items:center; gap:5px; flex-shrink:0; margin:0; white-space:nowrap; font-size:12px; }
+    .responsive-toolbar input[type="number"] { box-sizing:border-box; width:76px; height:30px; margin:0; padding:4px 6px; font-size:12px; }
+    .responsive-toolbar input[type="range"] { flex:1; min-width:80px; width:100px; height:30px; margin:0; padding:0; border:0; accent-color:#155566; }
+    .responsive-toolbar [data-preview-size] { white-space:nowrap; font-size:11px; color:#61737c; }
     .responsive-stage { min-width:0; overflow:auto; background:#e9eef1; }
     .responsive-stage .browser-frame { display:block; margin:0 auto; }
     .responsive-stage .browser-frame[hidden] { display:none; }
@@ -368,7 +374,7 @@
 
             <nav class="workbench-files" data-explorer-panel="files" aria-label="ファイル構成">
                 @include('development.workspace-controls')
-                <details><summary>OS内に保存した既存アプリ</summary>@include('project-apps.workspace-controls')</details>
+                @include('project-apps.workspace-controls')
                 <div class="file-repository">▣ {{ $localConnection?->directory_name ?? 'ローカルフォルダ未設定' }}<span>{{ $localConnection ? 'ブラウザ接続・AI保存対応' : 'Project設定から登録してください' }}</span></div>
                 <div class="tree-body" data-local-file-tree><p class="file-note">フォルダへのアクセスを確認しています…</p></div>
                 <p class="file-note" data-local-file-status>Chrome・EdgeでProject設定からフォルダを選択してください。</p>
@@ -487,12 +493,16 @@
             </div>
             <div class="viewer-panel" data-viewer-panel="browser">
                 <div class="browser-preview" data-responsive-preview>
-                    <div class="responsive-toolbar" role="group" aria-label="レスポンシブ確認">
+                    <div class="responsive-toolbar" data-responsive-toolbar hidden role="group" aria-label="レスポンシブ確認">
+                        <div class="responsive-presets">
                         <button type="button" data-preview-preset="fit">全幅</button>
                         <button type="button" data-preview-preset="1280">PC</button>
                         <button type="button" data-preview-preset="768">タブレット</button>
                         <button type="button" data-preview-preset="390">スマホ</button>
+                        </div><div class="responsive-width-control">
                         <label>幅 <input type="number" min="280" max="2560" value="390" data-preview-width aria-label="プレビュー幅（px）"> px</label>
+                        <input type="range" min="280" max="2560" step="1" value="390" data-preview-slider aria-label="プレビュー幅のスライダー">
+                        </div>
                         <button type="button" data-preview-refresh>再読み込み</button>
                         <span data-preview-size role="status"></span>
                     </div>

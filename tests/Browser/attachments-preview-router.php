@@ -37,6 +37,10 @@ chatForm.dataset.sending='true';addChatImages([image]);assert(chatImages.length=
 chatForm.dataset.sending='false';clearChatImages();assert(!chatImages.length&&!chatImagePreview.children.length,'clear');
 frame.hidden=false;
 await new Promise(resolve=>{frame.onload=resolve;frame.src='/frame';});
+const preview=document.querySelector('[data-responsive-preview]'),toolbar=preview.querySelector('[data-responsive-toolbar]');
+assert(toolbar.hidden,'hidden outside development');
+preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{url:location.origin+'/'}}));
+assert(!toolbar.hidden,'shown for running development app');
 const preset=value=>document.querySelector('[data-preview-preset="'+value+'"]').click();
 preset('390');await new Promise(r=>setTimeout(r,50));
 assert(frame.contentWindow.innerWidth===390&&frame.contentWindow.matchMedia('(max-width:500px)').matches,'mobile actual viewport');
@@ -45,8 +49,16 @@ assert(frame.contentWindow.innerWidth===1280&&!frame.contentWindow.matchMedia('(
 preset('768');assert(frame.style.width==='768px','tablet');
 const width=document.querySelector('[data-preview-width]');width.value=420;width.dispatchEvent(new Event('change'));
 assert(frame.style.width==='420px','custom width');
-width.value=200;width.dispatchEvent(new Event('change'));assert(frame.style.width==='420px','invalid width rejected');
+const slider=document.querySelector('[data-preview-slider]');
+assert(slider.value==='420','numeric input synchronizes slider');
+slider.value='512';slider.dispatchEvent(new Event('input'));
+assert(frame.style.width==='512px'&&width.value==='512','slider synchronizes viewport and number');
+width.value=200;width.dispatchEvent(new Event('change'));assert(frame.style.width==='512px','invalid width rejected');
 preset('fit');assert(frame.style.width==='100%','fit');
+preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{url:''}}));
+assert(toolbar.hidden&&frame.style.width==='100%','stop hides controls and restores full width');
+preview.dispatchEvent(new CustomEvent('development-preview-state',{detail:{url:'http://127.0.0.1:9999/'}}));
+assert(toolbar.hidden,'unrelated document preview stays full width');
 document.querySelector('#result').textContent='PASS: normal AI attachments / paste / limits / actual responsive viewport';
 }catch(error){document.querySelector('#result').textContent='FAIL: '+error.message;}
 })();
