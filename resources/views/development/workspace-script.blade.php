@@ -74,13 +74,6 @@
                 devStatus('AIパートナーに、作りたいアプリやサイトと必要な機能を入力して送信してください。');
                 return;
             }
-            if (action === 'ask') {
-                const text = devControls.querySelector('[data-dev-logs]').textContent.slice(-3000);
-                chatForm.elements.content.value = 'ローカル実行時の次のエラーを、プロジェクトのファイルを確認して修正してください。接続情報やパスワードを新たに書き込まないでください。\n' + text;
-                chatForm.elements.content.focus();
-                devStatus('修正依頼を入力欄に入れました。ログの内容を確認して送信してください。');
-                return;
-            }
             devStatus(action === 'select' ? 'Windowsのフォルダ選択画面で保存先を選んでください…' : '処理しています…');
             const result = await devClient.call(action);
             if (action === 'logs') {
