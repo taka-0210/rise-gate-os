@@ -1,9 +1,12 @@
 <?php
 
-use App\Http\Middleware\EnsureCurrentWorkspace;
-use App\Http\Middleware\EnsureCurrentCompany;
-use App\Http\Middleware\EnsureSystemAdmin;
+use App\Http\Middleware\AuthenticateAiAccessKey;
 use App\Http\Middleware\EnsureActiveUser;
+use App\Http\Middleware\EnsureCredentialSessionIsCurrent;
+use App\Http\Middleware\EnsureCurrentCompany;
+use App\Http\Middleware\EnsureCurrentWorkspace;
+use App\Http\Middleware\EnsureSystemAdmin;
+use App\Http\Middleware\EnsureWorkspaceAiEnabled;
 use App\Http\Middleware\EnsureWorkspaceMode;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,9 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'company' => EnsureCurrentCompany::class,
             'system-admin' => EnsureSystemAdmin::class,
             'active-user' => EnsureActiveUser::class,
+            'credential-session' => EnsureCredentialSessionIsCurrent::class,
             'workspace-mode' => EnsureWorkspaceMode::class,
-            'ai-key' => \App\Http\Middleware\AuthenticateAiAccessKey::class,
-            'ai-enabled' => \App\Http\Middleware\EnsureWorkspaceAiEnabled::class,
+            'ai-key' => AuthenticateAiAccessKey::class,
+            'ai-enabled' => EnsureWorkspaceAiEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

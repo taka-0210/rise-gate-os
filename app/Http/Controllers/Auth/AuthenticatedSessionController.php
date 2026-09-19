@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\AccountAudit;
+use App\Services\AccountLoginLimiter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,24 +18,30 @@ class AuthenticatedSessionController extends Controller
         return view('auth.login');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AccountLoginLimiter $limiter, AccountAudit $audit): RedirectResponse
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
 
+        $limiter->ensureNotLimited($credentials['email'], $request->ip());
         $credentials['is_active'] = true;
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            $limiter->hit($credentials['email'], $request->ip());
+            $audit->record('account.login', 'rejected');
             throw ValidationException::withMessages([
                 'email' => 'メールアドレスまたはパスワードが正しくありません。',
             ]);
         }
 
+        $limiter->clearIdentity($credentials['email'], $request->ip());
         $request->session()->regenerate();
         $request->session()->put('access_mode', 'workspace');
+        $request->session()->put('credential_generation', (int) $request->user()->credential_generation);
         $request->session()->forget('url.intended');
+        $audit->record('account.login', 'success', $request->user(), $request->user());
 
         $companies = $request->user()->organizations()->orderBy('organizations.name')->get();
         if ($companies->count() === 1) {
@@ -50,6 +58,7 @@ class AuthenticatedSessionController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
+        app(AccountAudit::class)->record('account.logout', 'success', $request->user(), $request->user());
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

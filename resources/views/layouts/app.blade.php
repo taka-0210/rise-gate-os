@@ -89,6 +89,7 @@
         }
         .field { display: grid; gap: 6px; }
         .error { color: var(--danger); font-size: 13px; }
+        .notice { padding: 12px 14px; border: 1px solid #a9d6cf; border-radius: 6px; background: #f2fbf9; color: var(--accent-dark); }
         .button, button {
             display: inline-flex;
             align-items: center;
@@ -302,6 +303,7 @@
         </a>
         <nav class="nav">
             @auth
+                <a href="{{ route('account.profile') }}">Account</a>
                 @if (session('access_mode') === 'system_admin')
                     <span class="workspace-pill">System Admin Mode</span>
                     <a href="{{ route('system-admin.members.index') }}">Members</a>

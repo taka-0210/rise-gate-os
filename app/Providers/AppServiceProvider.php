@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,6 +36,20 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(6)->by($id.'|'.$request->ip());
         });
+        RateLimiter::for('account-mail', function (Request $request): array {
+            $subject = $request->user()
+                ? 'user:'.$request->user()->id
+                : 'email:'.Str::lower(trim((string) $request->input('email')));
+            $identity = hash('sha256', $subject.'|'.$request->ip());
+
+            return [
+                Limit::perMinute(config('account.mail.max_per_minute'))->by('account-mail-minute:'.$identity),
+                Limit::perHour(config('account.mail.max_per_hour'))->by('account-mail-hour:'.$identity),
+            ];
+        });
+        RateLimiter::for('account-token', fn (Request $request) => Limit::perMinute(
+            config('account.token.max_attempts_per_minute')
+        )->by('account-token:'.hash('sha256', $request->ip())));
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(Improvement::class, ImprovementPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);

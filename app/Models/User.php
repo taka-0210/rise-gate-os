@@ -17,6 +17,7 @@ class User extends Authenticatable
     protected $attributes = [
         'is_system_admin' => false,
         'is_active' => true,
+        'credential_generation' => 1,
     ];
 
     protected $fillable = [
@@ -30,6 +31,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'credential_generation',
     ];
 
     protected function casts(): array
@@ -39,6 +41,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_system_admin' => 'boolean',
             'is_active' => 'boolean',
+            'credential_generation' => 'integer',
         ];
     }
 
@@ -74,6 +77,11 @@ class User extends Authenticatable
     public function projectLocalConnections(): HasMany
     {
         return $this->hasMany(ProjectLocalConnection::class);
+    }
+
+    public function accountEmailRequests(): HasMany
+    {
+        return $this->hasMany(AccountEmailRequest::class);
     }
 
     public function canAccessWorkspace(int $workspaceId): bool

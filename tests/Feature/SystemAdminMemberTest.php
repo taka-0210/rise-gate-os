@@ -102,6 +102,8 @@ class SystemAdminMemberTest extends TestCase
         $this->assertSame('updated@example.com', $member->email);
         $this->assertTrue($member->is_system_admin);
         $this->assertTrue(Hash::check('new-password', $member->password));
+        $this->assertSame(2, $member->credential_generation);
+        $this->assertNull($member->email_verified_at);
     }
 
     public function test_last_active_system_admin_cannot_be_demoted_or_suspended(): void

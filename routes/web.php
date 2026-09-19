@@ -1,7 +1,11 @@
 <?php
 
 use App\Http\Controllers\AiConnectionController;
+use App\Http\Controllers\Auth\AccountEmailController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Client\ClientCompanyAccountController;
 use App\Http\Controllers\Client\ClientController;
@@ -57,7 +61,16 @@ Route::middleware('guest')->group(function (): void {
 
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+
+    Route::get('/forgot-password', [PasswordResetController::class, 'create'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetController::class, 'store'])->middleware('throttle:account-mail')->name('password.email');
+    Route::get('/reset-password/{token}', [PasswordResetController::class, 'edit'])->name('password.reset');
+    Route::post('/reset-password', [PasswordResetController::class, 'update'])->middleware('throttle:account-token')->name('password.update');
 });
+
+Route::get('/account/email/confirm/{requestId}', [AccountEmailController::class, 'confirm'])
+    ->middleware(['signed:relative', 'throttle:account-token'])
+    ->name('account.email.confirm');
 
 Route::get('/system-admin/login', [SystemAdminSessionController::class, 'create'])->name('system-admin.login');
 Route::post('/system-admin/login', [SystemAdminSessionController::class, 'store'])->name('system-admin.login.store');
@@ -76,9 +89,16 @@ Route::prefix('apps/{projectApp}')->name('apps.')->group(function (): void {
     Route::put('/data', [StandaloneAppController::class, 'writeData'])->middleware('throttle:120,1,app-data:')->name('data.write');
 });
 
-Route::middleware(['auth', 'active-user'])->group(function (): void {
+Route::middleware(['auth', 'active-user', 'credential-session'])->group(function (): void {
     Route::get('/session/token', [SessionTokenController::class, '__invoke'])->name('session.token');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+    Route::get('/account', [ProfileController::class, 'show'])->name('account.profile');
+    Route::patch('/account/profile', [ProfileController::class, 'update'])->name('account.profile.update');
+    Route::put('/account/password', [PasswordController::class, 'update'])->name('account.password.update');
+    Route::post('/account/email/verify', [AccountEmailController::class, 'verifyCurrent'])->middleware('throttle:account-mail')->name('account.email.verify');
+    Route::post('/account/email/change', [AccountEmailController::class, 'requestChange'])->middleware('throttle:account-mail')->name('account.email.change');
+    Route::post('/account/email/change/resend', [AccountEmailController::class, 'resendChange'])->middleware('throttle:account-mail')->name('account.email.change.resend');
+    Route::delete('/account/email/change', [AccountEmailController::class, 'cancelChange'])->name('account.email.change.cancel');
     Route::get('/development/setup', [DevelopmentSetupController::class, 'index'])->name('development.setup');
     Route::get('/development/download', [DevelopmentSetupController::class, 'download'])->name('development.download');
 

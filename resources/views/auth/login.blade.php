@@ -6,6 +6,7 @@
             <h1>Company OSへログイン</h1>
             <p>登録済みのアカウントでCompany OSを利用します。</p>
         </div>
+        @if (session('status')) <div class="notice">{{ session('status') }}</div> @endif
 
         <form class="stack" method="POST" action="{{ route('login') }}">
             @csrf
@@ -28,7 +29,10 @@
 
             <div class="actions">
                 <button type="submit">Login</button>
-                <a href="{{ route('register') }}">新しく始める</a>
+                <a href="{{ route('password.request') }}">Passwordを忘れた場合</a>
+                @if (\App\Models\User::query()->doesntExist())
+                    <a href="{{ route('register') }}">初期セットアップ</a>
+                @endif
             </div>
         </form>
     </section>

@@ -8,6 +8,7 @@ use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\AccountCredentialService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -93,7 +94,7 @@ class MemberController extends Controller
         ]);
     }
 
-    public function update(Request $request, User $user): RedirectResponse
+    public function update(Request $request, User $user, AccountCredentialService $credentials): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -115,18 +116,35 @@ class MemberController extends Controller
             }
         }
 
-        $user->fill([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'is_system_admin' => $validated['is_system_admin'],
-            'is_active' => $validated['is_active'],
-        ]);
+        DB::transaction(function () use ($request, $user, $validated, $credentials): void {
+            $oldEmail = $user->email;
+            $emailChanged = ! hash_equals($oldEmail, $validated['email']);
+            $passwordChanged = ! empty($validated['password']);
+            $disabled = $user->is_active && ! $validated['is_active'];
 
-        if (! empty($validated['password'])) {
-            $user->password = $validated['password'];
-        }
+            $user->fill([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'is_system_admin' => $validated['is_system_admin'],
+                'is_active' => $validated['is_active'],
+            ]);
+            if ($emailChanged) {
+                $user->email_verified_at = null;
+            }
+            if ($passwordChanged) {
+                $user->password = $validated['password'];
+            }
+            $user->save();
 
-        $user->save();
+            if ($emailChanged || $passwordChanged || $disabled) {
+                $credentials->rotate(
+                    $user,
+                    'account.credentials_changed_by_system_admin',
+                    $request->user(),
+                    [$oldEmail],
+                );
+            }
+        });
 
         return redirect()->route('system-admin.members.edit', $user)->with('status', 'メンバー情報を更新しました。');
     }

@@ -75,6 +75,7 @@ class RegisteredUserController extends Controller
         $request->session()->put('current_company_id', $workspace->organization_id);
         $request->session()->put('current_workspace_id', $workspace->id);
         $request->session()->put('access_mode', 'workspace');
+        $request->session()->put('credential_generation', (int) $user->credential_generation);
 
         return redirect()->route('company.home');
     }
