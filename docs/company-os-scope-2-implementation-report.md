@@ -5,7 +5,7 @@
 - Branch: `master`
 - P0基準HEAD: `22edec70ba9e5079c5d309995210e0ba936acd6a`
 - Scope 1基準Commit: `15751f290f366aace117cfd976190d581c1b2cae`（P0基準HEADに包含）
-- Scope 2実装Commit: `P5で確定後に追記`
+- Scope 2実装Commit: `7ee3c28b6dc3c32f0d2e9233cfe3d38aec5b93fa`
 - Timezone: `Asia/Tokyo`
 - Production deploy: 未実施
 - 次Scope: 未着手
