@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable
 {
@@ -48,8 +49,16 @@ class User extends Authenticatable
     public function organizations(): BelongsToMany
     {
         return $this->belongsToMany(Organization::class, 'organization_users')
-            ->withPivot(['role', 'company_role', 'permissions', 'joined_at'])
+            ->withPivot([
+                'role', 'organization_role', 'position', 'membership_status',
+                'company_role', 'permissions', 'joined_at',
+            ])
             ->withTimestamps();
+    }
+
+    public function organizationMemberships(): HasMany
+    {
+        return $this->hasMany(OrganizationUser::class);
     }
 
     public function workspaces(): BelongsToMany
@@ -86,9 +95,20 @@ class User extends Authenticatable
 
     public function canAccessWorkspace(int $workspaceId): bool
     {
+        if (! $this->is_active) {
+            return false;
+        }
+
         return $this->workspaces()
             ->where('workspaces.id', $workspaceId)
             ->where('workspaces.status', Workspace::STATUS_ACTIVE)
+            ->whereExists(function ($query): void {
+                $query->select(DB::raw(1))
+                    ->from('organization_users')
+                    ->whereColumn('organization_users.organization_id', 'workspaces.organization_id')
+                    ->where('organization_users.user_id', $this->id)
+                    ->where('organization_users.membership_status', OrganizationUser::STATUS_ACTIVE);
+            })
             ->exists();
     }
 }

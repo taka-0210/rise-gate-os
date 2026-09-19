@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\AccountEmailRequest;
+use App\Models\OrganizationUser;
 use App\Services\AccountAudit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,11 @@ class ProfileController extends Controller
                 ->where('expires_at', '>', now())
                 ->latest('id')
                 ->first(),
+            'organizationMemberships' => OrganizationUser::query()
+                ->where('user_id', $request->user()->id)
+                ->with(['organization', 'groups' => fn ($query) => $query->whereNull('archived_at')->orderBy('name')])
+                ->orderBy('organization_id')
+                ->get(),
         ]);
     }
 

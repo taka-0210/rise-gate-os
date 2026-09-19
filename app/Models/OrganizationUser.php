@@ -5,34 +5,70 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrganizationUser extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'membership_status' => self::STATUS_ACTIVE,
+    ];
+
     public const ROLE_OWNER = 'owner';
+
     public const ROLE_ADMIN = 'admin';
+
     public const ROLE_MEMBER = 'member';
+
     public const ROLE_VIEWER = 'viewer';
 
+    public const ORGANIZATION_ROLE_OWNER = 'owner';
+
+    public const ORGANIZATION_ROLE_ADMIN = 'admin';
+
+    public const ORGANIZATION_ROLE_MEMBER = 'member';
+
+    public const STATUS_INVITED = 'invited';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_SUSPENDED = 'suspended';
+
+    public const STATUS_LEFT = 'left';
+
     public const COMPANY_ROLE_OWNER = 'owner';
+
     public const COMPANY_ROLE_EXECUTIVE = 'executive';
+
     public const COMPANY_ROLE_ACCOUNTING = 'accounting';
+
     public const COMPANY_ROLE_MANAGER = 'manager';
+
     public const COMPANY_ROLE_MEMBER = 'member';
 
     public const PERMISSION_MEMBERS_MANAGE = 'company.members.manage';
+
     public const PERMISSION_FINANCE_VIEW_PL = 'finance.pl.view';
+
     public const PERMISSION_FINANCE_IMPORT_PL = 'finance.pl.import';
+
     public const PERMISSION_FINANCE_MANAGE_PL = 'finance.pl.manage';
+
     public const PERMISSION_FINANCE_VIEW_BS = 'finance.bs.view';
+
     public const PERMISSION_FINANCE_VIEW_DEBT = 'finance.debt.view';
+
     public const PERMISSION_FINANCE_MANAGE_DEBT = 'finance.debt.manage';
 
     protected $fillable = [
         'organization_id',
         'user_id',
         'role',
+        'organization_role',
+        'position',
+        'membership_status',
         'company_role',
         'permissions',
         'joined_at',
@@ -54,6 +90,25 @@ class OrganizationUser extends Model
             self::COMPANY_ROLE_ACCOUNTING => '経理',
             self::COMPANY_ROLE_MANAGER => '部門責任者',
             self::COMPANY_ROLE_MEMBER => '一般社員',
+        ];
+    }
+
+    public static function organizationRoles(): array
+    {
+        return [
+            self::ORGANIZATION_ROLE_OWNER => 'Owner',
+            self::ORGANIZATION_ROLE_ADMIN => 'Admin',
+            self::ORGANIZATION_ROLE_MEMBER => 'Member',
+        ];
+    }
+
+    public static function membershipStatuses(): array
+    {
+        return [
+            self::STATUS_INVITED => 'Invited',
+            self::STATUS_ACTIVE => 'Active',
+            self::STATUS_SUSPENDED => 'Suspended',
+            self::STATUS_LEFT => 'Left',
         ];
     }
 
@@ -97,5 +152,20 @@ class OrganizationUser extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function groupMemberships(): HasMany
+    {
+        return $this->hasMany(OrganizationGroupMembership::class);
+    }
+
+    public function groups(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            OrganizationGroup::class,
+            'organization_group_memberships',
+            'organization_user_id',
+            'organization_group_id',
+        )->withPivot(['added_by'])->withTimestamps();
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Organization;
+use App\Models\OrganizationUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -13,6 +14,7 @@ class CompanyController extends Controller
     {
         $companies = $request->user()
             ->organizations()
+            ->wherePivot('membership_status', OrganizationUser::STATUS_ACTIVE)
             ->withCount('workspaces')
             ->orderBy('organizations.name')
             ->get();
@@ -30,7 +32,10 @@ class CompanyController extends Controller
     public function switch(Request $request, Organization $organization): RedirectResponse
     {
         abort_unless(
-            $request->user()->organizations()->where('organizations.id', $organization->id)->exists(),
+            $request->user()->organizations()
+                ->wherePivot('membership_status', OrganizationUser::STATUS_ACTIVE)
+                ->where('organizations.id', $organization->id)
+                ->exists(),
             403
         );
 

@@ -60,6 +60,8 @@ class RegisteredUserController extends Controller
 
             $organization->users()->attach($user->id, [
                 'role' => OrganizationUser::ROLE_OWNER,
+                'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+                'membership_status' => OrganizationUser::STATUS_ACTIVE,
                 'joined_at' => now(),
             ]);
 

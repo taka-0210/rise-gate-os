@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Organization;
+use App\Models\OrganizationUser;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\User;
@@ -27,7 +28,12 @@ class RiseGateOsOperationSeeder extends Seeder
             ['name' => 'Rise Gate']
         );
 
-        $organization->users()->syncWithoutDetaching([$user->id => ['role' => 'owner', 'joined_at' => now()]]);
+        $organization->users()->syncWithoutDetaching([$user->id => [
+            'role' => OrganizationUser::ROLE_OWNER,
+            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+            'joined_at' => now(),
+        ]]);
         $workspace->users()->syncWithoutDetaching([$user->id => ['role' => 'owner', 'joined_at' => now()]]);
 
         $riseGateClient = Client::firstOrCreate(
@@ -54,7 +60,8 @@ class RiseGateOsOperationSeeder extends Seeder
         $this->improvement($organization, $workspace, $riseGateOsProject, $user, 'Unregistered user invitation', Improvement::STATUS_PROPOSED, 'Invite users who do not have accounts yet.');
         $this->improvement($organization, $workspace, $riseGateOsProject, $user, 'Client contact management', Improvement::STATUS_PROPOSED, 'Manage client contacts and connect them to users and project members.');
         $this->improvement($organization, $workspace, $riseGateOsProject, $user, 'Improvement editing', Improvement::STATUS_IMPLEMENTED, 'Improvements must be editable so status, assignee, result, impact, and next action can grow through operation.');
-        $this->improvement($organization, $workspace, $riseGateOsProject, $user, 'Project editing', Improvement::STATUS_IMPLEMENTED, 'Projects must be editable because client, summary, due date, and priority can change during operation.');        $this->improvement($organization, $workspace, $riseGateHomeProject, $user, 'Make website improvements project based', Improvement::STATUS_PROPOSED, 'Gather website improvements in the project.');
+        $this->improvement($organization, $workspace, $riseGateOsProject, $user, 'Project editing', Improvement::STATUS_IMPLEMENTED, 'Projects must be editable because client, summary, due date, and priority can change during operation.');
+        $this->improvement($organization, $workspace, $riseGateHomeProject, $user, 'Make website improvements project based', Improvement::STATUS_PROPOSED, 'Gather website improvements in the project.');
         $this->improvement($organization, $workspace, $hitOkinawaProject, $user, 'Visualize pre-release website checks', Improvement::STATUS_PROPOSED, 'Share pre-release checks with client-visible improvements.', Improvement::VISIBILITY_CLIENT);
     }
 
@@ -114,4 +121,3 @@ class RiseGateOsOperationSeeder extends Seeder
         );
     }
 }
-

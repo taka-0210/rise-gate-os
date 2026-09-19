@@ -16,6 +16,28 @@
         </section>
 
         <section class="panel stack">
+            <div>
+                <h2>所属Organization</h2>
+                <p>ここでは本人の所属情報だけを確認できます。Organization Role・Position・GroupはOrganizationごとに保持されます。</p>
+            </div>
+            <div class="grid">
+                @forelse ($organizationMemberships as $membership)
+                    <article class="card stack">
+                        <div>
+                            <div class="meta">{{ \App\Models\OrganizationUser::membershipStatuses()[$membership->membership_status] ?? $membership->membership_status }}</div>
+                            <h3>{{ $membership->organization->name }}</h3>
+                        </div>
+                        <p><strong>Organization Role:</strong> {{ \App\Models\OrganizationUser::organizationRoles()[$membership->organization_role] ?? '未解決' }}</p>
+                        <p><strong>Position:</strong> {{ $membership->position ?: '未設定' }}</p>
+                        <p><strong>Group:</strong> {{ $membership->groups->pluck('name')->join(' / ') ?: 'Groupなし' }}</p>
+                    </article>
+                @empty
+                    <p class="meta">所属Organizationはありません。Account管理は引き続き利用できます。</p>
+                @endforelse
+            </div>
+        </section>
+
+        <section class="panel stack">
             <h2>Profile</h2>
             <form class="stack" method="POST" action="{{ route('account.profile.update') }}">
                 @csrf

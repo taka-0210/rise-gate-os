@@ -8,11 +8,14 @@ use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceAiSetting;
+use App\Services\Organization\OrganizationAccess;
 use Illuminate\Validation\ValidationException;
 
 class AiProjectContextGuard
 {
     public const SCOPE_ONE_CATEGORIES = ['project_metadata', 'roadmaps', 'improvements', 'tasks'];
+
+    public function __construct(private readonly OrganizationAccess $organizationAccess) {}
 
     public function assertKeyIdentity(AiAccessKey $key): void
     {
@@ -22,7 +25,7 @@ class AiProjectContextGuard
         if (! $user || ! $user->is_active || ! $workspace || $workspace->status !== Workspace::STATUS_ACTIVE || ! $workspace->organization) {
             throw ValidationException::withMessages(['ai_context' => 'AI接続のUserまたはWorkspaceが無効です。']);
         }
-        if (! $user->organizations()->where('organizations.id', $workspace->organization_id)->exists()
+        if (! $this->organizationAccess->hasActiveMembership($user, $workspace->organization)
             || ! $user->workspaces()->where('workspaces.id', $workspace->id)->exists()) {
             throw ValidationException::withMessages(['ai_context' => '現在の所属ではこのWorkspaceをAIから参照できません。']);
         }
@@ -61,7 +64,7 @@ class AiProjectContextGuard
         $workspace = Workspace::query()->whereKey($project->owning_workspace_id)
             ->where('organization_id', $project->organization_id)->where('status', Workspace::STATUS_ACTIVE)->first();
         if (! $workspace
-            || ! $user->organizations()->where('organizations.id', $project->organization_id)->exists()
+            || ! $this->organizationAccess->hasActiveMembership($user, $workspace->organization)
             || ! $user->workspaces()->where('workspaces.id', $workspace->id)->exists()) {
             throw ValidationException::withMessages(['ai_context' => '現在の所属ではこのProjectをAIから参照できません。']);
         }

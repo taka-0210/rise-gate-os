@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Organization;
 use App\Models\OrganizationUser;
 use App\Services\Company\CompanyAccess;
+use App\Services\Organization\OrganizationAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\View;
@@ -12,14 +12,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureCurrentCompany
 {
-    public function __construct(private readonly CompanyAccess $companyAccess)
-    {
-    }
+    public function __construct(
+        private readonly CompanyAccess $companyAccess,
+        private readonly OrganizationAccess $organizationAccess,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        $companies = $user->organizations()->orderBy('organizations.name')->get();
+        $companies = $user->organizations()
+            ->wherePivot('membership_status', OrganizationUser::STATUS_ACTIVE)
+            ->orderBy('organizations.name')
+            ->get();
 
         if ($companies->isEmpty()) {
             $request->session()->forget(['current_company_id', 'current_workspace_id']);
@@ -53,6 +57,7 @@ class EnsureCurrentCompany
             'canManageCompanyMembers',
             $this->companyAccess->canManageMembers($user, $company)
         );
+        View::share('canManageOrganization', $this->organizationAccess->canManage($user, $company));
         View::share(
             'canViewCompanyDebt',
             $this->companyAccess->allows($user, $company, OrganizationUser::PERMISSION_FINANCE_VIEW_DEBT)

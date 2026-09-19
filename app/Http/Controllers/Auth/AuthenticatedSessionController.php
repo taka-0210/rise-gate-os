@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\OrganizationUser;
 use App\Services\AccountAudit;
 use App\Services\AccountLoginLimiter;
 use Illuminate\Http\RedirectResponse;
@@ -43,7 +44,10 @@ class AuthenticatedSessionController extends Controller
         $request->session()->forget('url.intended');
         $audit->record('account.login', 'success', $request->user(), $request->user());
 
-        $companies = $request->user()->organizations()->orderBy('organizations.name')->get();
+        $companies = $request->user()->organizations()
+            ->wherePivot('membership_status', OrganizationUser::STATUS_ACTIVE)
+            ->orderBy('organizations.name')
+            ->get();
         if ($companies->count() === 1) {
             $request->session()->put('current_company_id', $companies->first()->id);
             $request->session()->forget('current_workspace_id');

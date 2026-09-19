@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\OrganizationUser;
 use App\Models\Workspace;
 use App\Services\Company\CompanyAccess;
+use App\Services\Organization\OrganizationAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\View;
@@ -12,9 +13,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureCurrentWorkspace
 {
-    public function __construct(private readonly CompanyAccess $companyAccess)
-    {
-    }
+    public function __construct(
+        private readonly CompanyAccess $companyAccess,
+        private readonly OrganizationAccess $organizationAccess,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -42,6 +44,7 @@ class EnsureCurrentWorkspace
 
             if (! $workspace) {
                 $request->session()->forget('current_workspace_id');
+
                 return redirect()->route('company.home');
             }
 
@@ -71,6 +74,10 @@ class EnsureCurrentWorkspace
         View::share(
             'canManageCompanyMembers',
             $this->companyAccess->canManageMembers($user, $currentWorkspace->organization)
+        );
+        View::share(
+            'canManageOrganization',
+            $this->organizationAccess->canManage($user, $currentWorkspace->organization),
         );
 
         return $next($request);

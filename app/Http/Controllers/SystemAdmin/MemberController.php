@@ -75,6 +75,10 @@ class MemberController extends Controller
 
             $organization->users()->syncWithoutDetaching([$user->id => [
                 'role' => $organizationRole,
+                'organization_role' => $organizationRole === OrganizationUser::ROLE_OWNER
+                    ? OrganizationUser::ORGANIZATION_ROLE_OWNER
+                    : OrganizationUser::ORGANIZATION_ROLE_MEMBER,
+                'membership_status' => OrganizationUser::STATUS_ACTIVE,
                 'joined_at' => now(),
             ]]);
             $workspace->users()->attach($user->id, [
@@ -155,10 +159,18 @@ class MemberController extends Controller
         $workspace = Workspace::query()->with('organization')->findOrFail($validated['workspace_id']);
 
         DB::transaction(function () use ($user, $workspace, $validated): void {
-            $workspace->organization->users()->syncWithoutDetaching([$user->id => [
-                'role' => OrganizationUser::ROLE_MEMBER,
-                'joined_at' => now(),
-            ]]);
+            OrganizationUser::query()->firstOrCreate(
+                [
+                    'organization_id' => $workspace->organization_id,
+                    'user_id' => $user->id,
+                ],
+                [
+                    'role' => OrganizationUser::ROLE_MEMBER,
+                    'organization_role' => OrganizationUser::ORGANIZATION_ROLE_MEMBER,
+                    'membership_status' => OrganizationUser::STATUS_ACTIVE,
+                    'joined_at' => now(),
+                ],
+            );
             $workspace->users()->attach($user->id, [
                 'role' => $validated['workspace_role'],
                 'joined_at' => now(),

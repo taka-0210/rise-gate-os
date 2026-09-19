@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Organization;
+use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,7 +35,13 @@ class SystemAdminMemberTest extends TestCase
 
         $this->assertFalse($user->is_system_admin);
         $this->assertSame($organization->id, $workspace->organization_id);
-        $this->assertDatabaseHas('organization_users', ['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'owner']);
+        $this->assertDatabaseHas('organization_users', [
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'role' => 'owner',
+            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+        ]);
         $this->assertDatabaseHas('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => 'owner']);
     }
 
@@ -70,7 +77,13 @@ class SystemAdminMemberTest extends TestCase
 
         $response->assertRedirect(route('system-admin.members.index'));
         $user = User::where('email', 'staff@example.com')->firstOrFail();
-        $this->assertDatabaseHas('organization_users', ['organization_id' => $organization->id, 'user_id' => $user->id, 'role' => 'member']);
+        $this->assertDatabaseHas('organization_users', [
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'role' => 'member',
+            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_MEMBER,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+        ]);
         $this->assertDatabaseHas('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => 'member']);
         $this->assertDatabaseCount('workspaces', 1);
     }
@@ -144,6 +157,42 @@ class SystemAdminMemberTest extends TestCase
         $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->delete(route('system-admin.members.workspaces.destroy', [$member, $workspace]))->assertRedirect();
         $this->assertDatabaseMissing('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $member->id]);
         $this->assertDatabaseMissing('organization_users', ['organization_id' => $organization->id, 'user_id' => $member->id]);
+    }
+
+    public function test_adding_another_workspace_does_not_downgrade_existing_organization_roles(): void
+    {
+        $admin = User::factory()->create(['is_system_admin' => true]);
+        $member = User::factory()->create();
+        $organization = Organization::create(['name' => 'Existing Owner Org', 'slug' => 'existing-owner-org']);
+        $workspace = Workspace::create([
+            'organization_id' => $organization->id,
+            'name' => 'Second Workspace',
+            'slug' => 'second-workspace',
+        ]);
+        OrganizationUser::create([
+            'organization_id' => $organization->id,
+            'user_id' => $member->id,
+            'role' => OrganizationUser::ROLE_OWNER,
+            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+            'joined_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['access_mode' => 'system_admin'])
+            ->post(route('system-admin.members.workspaces.store', $member), [
+                'workspace_id' => $workspace->id,
+                'workspace_role' => 'member',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('organization_users', [
+            'organization_id' => $organization->id,
+            'user_id' => $member->id,
+            'role' => OrganizationUser::ROLE_OWNER,
+            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+        ]);
     }
 
     public function test_last_workspace_owner_cannot_be_removed(): void

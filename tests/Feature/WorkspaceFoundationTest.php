@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Organization;
+use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,6 +37,8 @@ class WorkspaceFoundationTest extends TestCase
             'organization_id' => $organization->id,
             'user_id' => $user->id,
             'role' => 'owner',
+            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
         ]);
         $this->assertDatabaseHas('workspace_members', [
             'workspace_id' => $workspace->id,

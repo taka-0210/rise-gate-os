@@ -334,6 +334,9 @@
                         @if ($canManageCompanyMembers ?? false)
                             <a href="{{ route('company-members.index') }}">会社設定</a>
                         @endif
+                        @if ($canManageOrganization ?? false)
+                            <a href="{{ route('organization-management.index') }}">Organization設定</a>
+                        @endif
                         <a href="{{ route('workspaces.index') }}">Workspaces</a>
                     @endisset
                     @isset($currentWorkspace)
@@ -367,6 +370,7 @@
                     request()->routeIs('company-finance.*') => ['経営数値', route('company-finance.index')],
                     request()->routeIs('company-loans.*') => ['借入管理', route('company-loans.index')],
                     request()->routeIs('company-members.*') => ['会社設定', route('company-members.index')],
+                    request()->routeIs('organization-management.*') => ['Organization設定', route('organization-management.index')],
                     request()->routeIs('company-observations.*') => ['気付き・観察', route('company-observations.index')],
                     request()->routeIs('clients.*') => ['顧客企業', route('clients.index')],
                     request()->routeIs('projects.*') || request()->routeIs('estimates.*') => ['Project Management', route('projects.index')],

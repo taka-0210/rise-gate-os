@@ -7,11 +7,14 @@ use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Organization\OrganizationAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class AiProposalAuthorization
 {
+    public function __construct(private readonly OrganizationAccess $organizationAccess) {}
+
     public function canReview(User $user, Project $project, ?AiProposal $proposal = null): bool
     {
         if (! $this->hasActiveTenantAccess($user, $project)) {
@@ -83,7 +86,7 @@ class AiProposalAuthorization
             return false;
         }
 
-        return $user->organizations()->where('organizations.id', $project->organization_id)->exists()
+        return $this->organizationAccess->hasActiveMembership($user, $workspace->organization)
             && $user->workspaces()->where('workspaces.id', $workspace->id)->exists();
     }
 }
