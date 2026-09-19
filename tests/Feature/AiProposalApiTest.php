@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AiAccessKey;
+use App\Models\AiProposal;
 use App\Models\AiProposalItem;
 use App\Models\AiRequest;
 use App\Models\AiRequestAttachment;
@@ -15,6 +16,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceAiSetting;
+use App\Services\AiProposalContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -50,12 +52,15 @@ class AiProposalApiTest extends TestCase
         [$workspace, $project] = $this->workspaceProject('project-metadata');
         $payload = [
             'project_public_id' => $project->public_id,
+            'contract_version' => AiProposalContract::VERSION,
+            'expected_project_version' => $project->plan_version,
             'idempotency_key' => 'project-metadata-001',
             'title' => 'Project基本情報の更新',
             'items' => [[
                 'operation' => 'update',
                 'entity_type' => 'project',
                 'target_public_id' => $project->public_id,
+                'expected_version' => $project->plan_version,
                 'attributes' => [
                     'summary' => 'AIが提案した概要',
                     'current_state' => 'AIが整理した現状',
@@ -104,6 +109,28 @@ class AiProposalApiTest extends TestCase
         $this->assertDatabaseCount('ai_proposal_items', 1);
     }
 
+    public function test_same_idempotency_key_rejects_different_proposal_content(): void
+    {
+        [$workspace, $project] = $this->workspaceProject('idempotency-mismatch');
+        $token = $this->accessKey($workspace);
+        $first = $this->payload($project);
+        $first['evidence']['source'] = 'same-request';
+        $second = $first;
+        $second['title'] = 'Different proposal content';
+
+        $this->withToken($token)->postJson('/api/v1/ai/proposals', $first)->assertCreated();
+        $this->withToken($token)->postJson('/api/v1/ai/proposals', $second)->assertStatus(409);
+
+        $this->assertDatabaseCount('ai_proposals', 1);
+        $this->assertDatabaseCount('ai_proposal_items', 1);
+
+        $sameWithDifferentKeyOrder = $first;
+        $sameWithDifferentKeyOrder['evidence'] = array_reverse($first['evidence'], true);
+        $this->withToken($token)->postJson('/api/v1/ai/proposals', $sameWithDifferentKeyOrder)
+            ->assertOk()
+            ->assertJsonPath('duplicate', true);
+    }
+
     public function test_key_cannot_create_proposal_in_another_workspace(): void
     {
         [$workspace] = $this->workspaceProject('internal');
@@ -145,7 +172,7 @@ class AiProposalApiTest extends TestCase
         $this->assertDatabaseCount('tasks', 0);
     }
 
-    public function test_api_accepts_delete_proposal_with_empty_attributes(): void
+    public function test_api_rejects_delete_proposal_in_scope_one(): void
     {
         [$workspace, $project, $user] = $this->workspaceProject('delete-api');
         $roadmap = Roadmap::create([
@@ -158,23 +185,59 @@ class AiProposalApiTest extends TestCase
 
         $payload = [
             'project_public_id' => $project->public_id,
+            'contract_version' => AiProposalContract::VERSION,
+            'expected_project_version' => $project->fresh()->plan_version,
             'idempotency_key' => 'delete-api-001',
             'title' => 'Delete empty default',
             'items' => [[
                 'operation' => 'delete',
                 'entity_type' => 'roadmap',
                 'target_public_id' => $roadmap->public_id,
+                'expected_version' => $roadmap->plan_version,
                 'attributes' => [],
             ]],
         ];
 
         $this->withToken($this->accessKey($workspace))
             ->postJson('/api/v1/ai/proposals', $payload)
-            ->assertCreated()
-            ->assertJsonPath('valid_items_count', 1)
-            ->assertJsonPath('invalid_items_count', 0);
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('items.0.operation');
 
         $this->assertNotSoftDeleted($roadmap);
+    }
+
+    public function test_api_rejects_unknown_contract_timeline_financial_and_role_changes(): void
+    {
+        [$workspace, $project] = $this->workspaceProject('scope-boundary');
+        $token = $this->accessKey($workspace);
+
+        $unknown = $this->payload($project);
+        $unknown['contract_version'] = 'project-plan.v999';
+        $this->withToken($token)->postJson('/api/v1/ai/proposals', $unknown)
+            ->assertUnprocessable()->assertJsonValidationErrors('contract_version');
+
+        $timeline = $this->payload($project);
+        $timeline['idempotency_key'] = 'timeline-boundary';
+        $timeline['mode'] = AiProposal::MODE_REPLACE_TIMELINE;
+        $this->withToken($token)->postJson('/api/v1/ai/proposals', $timeline)
+            ->assertUnprocessable()->assertJsonValidationErrors('mode');
+
+        $financial = $this->payload($project);
+        $financial['idempotency_key'] = 'financial-boundary';
+        $financial['items'][0]['entity_type'] = 'financial_period';
+        $this->withToken($token)->postJson('/api/v1/ai/proposals', $financial)
+            ->assertUnprocessable()->assertJsonValidationErrors('items.0.entity_type');
+
+        $role = $this->payload($project);
+        $role['idempotency_key'] = 'role-boundary';
+        $role['items'][0] = [
+            'operation' => 'update', 'entity_type' => 'project',
+            'target_public_id' => $project->public_id, 'expected_version' => $project->plan_version,
+            'attributes' => ['owner_user_id' => 999],
+        ];
+        $this->withToken($token)->postJson('/api/v1/ai/proposals', $role)
+            ->assertCreated()->assertJsonPath('valid_items_count', 0)->assertJsonPath('invalid_items_count', 1);
+        $this->assertNotSame(999, $project->fresh()->owner_user_id);
     }
 
     public function test_member_key_only_reads_projects_the_member_has_joined(): void
@@ -187,9 +250,10 @@ class AiProposalApiTest extends TestCase
             'owner_user_id' => $user->id,
             'name' => 'Hidden Project',
         ]);
-        ProjectMember::create([
+        ProjectMember::updateOrCreate([
             'project_id' => $visibleProject->id,
             'user_id' => $user->id,
+        ], [
             'workspace_id' => $workspace->id,
             'project_role' => ProjectMember::ROLE_OWNER,
             'permission_level' => ProjectMember::PERMISSION_ADMIN,
@@ -234,13 +298,84 @@ class AiProposalApiTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_forbidden_plan_categories_do_not_expose_counts_or_load_hierarchy(): void
+    {
+        [$workspace, $project, $user] = $this->workspaceProject('category-filter');
+        $roadmap = Roadmap::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Hidden Roadmap',
+            'created_by' => $user->id,
+        ]);
+        $improvement = Improvement::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'roadmap_id' => $roadmap->id,
+            'title' => 'Hidden Theme',
+            'proposed_by' => $user->id,
+        ]);
+        Task::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'improvement_id' => $improvement->id,
+            'title' => 'Hidden Action',
+            'created_by' => $user->id,
+        ]);
+        $token = $this->accessKey($workspace, [AiAccessKey::SCOPE_PROJECTS_READ], null, $user);
+        $workspace->aiSetting()->update(['allowed_data_categories' => ['project_metadata']]);
+
+        $this->withToken($token)->getJson('/api/v1/ai/projects')
+            ->assertOk()
+            ->assertJsonPath('projects.0.roadmaps_count', null)
+            ->assertJsonPath('projects.0.improvements_count', null)
+            ->assertJsonPath('projects.0.tasks_count', null)
+            ->assertJsonMissing(['title' => 'Hidden Roadmap']);
+
+        $this->withToken($token)->getJson('/api/v1/ai/projects/'.$project->public_id)
+            ->assertOk()
+            ->assertJsonPath('project.roadmaps', [])
+            ->assertJsonMissing(['title' => 'Hidden Roadmap'])
+            ->assertJsonMissing(['title' => 'Hidden Theme'])
+            ->assertJsonMissing(['title' => 'Hidden Action']);
+    }
+
+    public function test_project_plan_context_enforces_entity_limit_and_omits_execution_fields(): void
+    {
+        [$workspace, $project, $user] = $this->workspaceProject('context-bound');
+        Roadmap::create([
+            'organization_id' => $workspace->organization_id,
+            'workspace_id' => $workspace->id,
+            'project_id' => $project->id,
+            'title' => 'Bounded Roadmap',
+            'status' => Roadmap::STATUS_COMPLETED,
+            'created_by' => $user->id,
+        ]);
+        $token = $this->accessKey($workspace, [AiAccessKey::SCOPE_PROJECTS_READ], null, $user);
+
+        $response = $this->withToken($token)->getJson('/api/v1/ai/projects/'.$project->public_id)->assertOk();
+        $context = $response->json('project');
+        $this->assertArrayNotHasKey('status', $context);
+        $this->assertArrayNotHasKey('priority', $context);
+        $this->assertArrayNotHasKey('owner_user_id', $context);
+        $this->assertArrayNotHasKey('status', $context['roadmaps'][0]);
+
+        config(['services.ai.scope_one_context_max_entities' => 0]);
+        $this->withToken($token)->getJson('/api/v1/ai/projects/'.$project->public_id)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ai_context');
+    }
+
     public function test_codex_mcp_exposes_read_and_pending_proposal_tools(): void
     {
         Storage::fake('local');
         [$workspace, $project, $user] = $this->workspaceProject('mcp');
-        ProjectMember::create([
+        ProjectMember::updateOrCreate([
             'project_id' => $project->id,
             'user_id' => $user->id,
+        ], [
             'workspace_id' => $workspace->id,
             'project_role' => ProjectMember::ROLE_OWNER,
             'permission_level' => ProjectMember::PERMISSION_ADMIN,
@@ -352,20 +487,25 @@ class AiProposalApiTest extends TestCase
     {
         return [
             'project_public_id' => $project->public_id,
+            'contract_version' => AiProposalContract::VERSION,
+            'expected_project_version' => $project->plan_version,
             'idempotency_key' => 'codex-session-001',
-            'title' => '進捗更新の提案',
-            'summary' => 'テスト完了を根拠に更新します。',
-            'evidence' => ['tests' => ['AiProposalApiTest: PASS']],
+            'title' => 'Project plan proposal',
+            'summary' => 'Create one roadmap draft.',
+            'evidence' => ['tests' => ['AiProposalApiTest']],
             'items' => [[
                 'operation' => 'create',
-                'entity_type' => 'task',
-                'attributes' => ['title' => 'API連携を確認する', 'priority' => 'high'],
+                'entity_type' => 'roadmap',
+                'expected_version' => $project->plan_version,
+                'attributes' => ['title' => 'API integration check'],
             ]],
         ];
+
     }
 
     private function accessKey(Workspace $workspace, array $scopes = [AiAccessKey::SCOPE_PROPOSALS_CREATE], $expiresAt = null, ?User $user = null): string
     {
+        $user ??= $workspace->owner;
         WorkspaceAiSetting::updateOrCreate(['workspace_id' => $workspace->id], [
             'enabled' => true,
             'provider' => 'member_managed_ai',
@@ -376,7 +516,7 @@ class AiProposalApiTest extends TestCase
         $token = 'rgos_test_'.bin2hex(random_bytes(24));
         AiAccessKey::create([
             'workspace_id' => $workspace->id,
-            'user_id' => $user?->id,
+            'user_id' => $user->id,
             'name' => 'Test Codex',
             'token_hash' => hash('sha256', $token),
             'scopes' => $scopes,
@@ -396,12 +536,22 @@ class AiProposalApiTest extends TestCase
             'name' => 'WS '.$slug,
             'slug' => $slug,
         ]);
+        $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $user->workspaces()->attach($workspace->id, ['role' => 'owner', 'joined_at' => now()]);
         $project = Project::create([
             'organization_id' => $organization->id,
             'owning_workspace_id' => $workspace->id,
             'billing_workspace_id' => $workspace->id,
             'owner_user_id' => $user->id,
             'name' => 'Project '.$slug,
+        ]);
+        ProjectMember::create([
+            'project_id' => $project->id,
+            'user_id' => $user->id,
+            'workspace_id' => $workspace->id,
+            'project_role' => ProjectMember::ROLE_OWNER,
+            'permission_level' => ProjectMember::PERMISSION_ADMIN,
+            'status' => ProjectMember::STATUS_ACTIVE,
         ]);
 
         return [$workspace, $project, $user];

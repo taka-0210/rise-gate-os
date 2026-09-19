@@ -43,4 +43,11 @@ return [
         'output_usd_per_million' => env('OPENAI_OUTPUT_USD_PER_MILLION', 15.00),
     ],
 
+    'ai' => [
+        // Operational kill switch: keeps proposals/history readable while stopping new Apply operations.
+        'scope_one_apply_enabled' => env('AI_SCOPE_ONE_APPLY_ENABLED', true),
+        'scope_one_context_max_entities' => env('AI_SCOPE_ONE_CONTEXT_MAX_ENTITIES', 500),
+        'scope_one_context_max_chars' => env('AI_SCOPE_ONE_CONTEXT_MAX_CHARS', 100000),
+    ],
+
 ];

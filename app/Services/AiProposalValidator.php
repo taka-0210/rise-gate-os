@@ -4,25 +4,16 @@ namespace App\Services;
 
 use App\Models\AiProposal;
 use App\Models\AiProposalItem;
-use App\Models\Improvement;
 use App\Models\Project;
-use App\Models\Roadmap;
-use App\Models\Task;
 use App\Support\AiTextIntegrity;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class AiProposalValidator
 {
     public const STATUS_VALID = 'valid';
-    public const STATUS_INVALID = 'invalid';
 
-    private const ALLOWED_ATTRIBUTES = [
-        'project' => ['summary', 'current_state', 'desired_future_state'],
-        'roadmap' => ['title', 'purpose', 'status', 'sort_order', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
-        'improvement' => ['title', 'roadmap_public_id', 'current_state', 'desired_state', 'problem', 'hypothesis', 'action', 'result', 'impact', 'next_action', 'planned_effort_days', 'status', 'visibility', 'planned_start_date', 'target_date', 'planned_start_day', 'target_day'],
-        'task' => ['title', 'improvement_public_id', 'description', 'status', 'priority', 'planned_start_date', 'due_date', 'planned_start_day', 'due_day'],
-    ];
+    public const STATUS_INVALID = 'invalid';
 
     public function validate(AiProposal $proposal): AiProposal
     {
@@ -30,7 +21,7 @@ class AiProposalValidator
         $proposalErrors = $this->proposalErrors($proposal);
 
         foreach ($proposal->items as $item) {
-            $errors = array_merge($proposalErrors, $this->errors($proposal->project, $item));
+            $errors = array_values(array_unique([...$proposalErrors, ...$this->itemErrors($proposal, $item)]));
             $item->update([
                 'validation_status' => $errors === [] ? self::STATUS_VALID : self::STATUS_INVALID,
                 'validation_message' => $errors === [] ? null : implode("\n", $errors),
@@ -40,84 +31,142 @@ class AiProposalValidator
         return $proposal->fresh('items');
     }
 
-    private function proposalErrors(AiProposal $proposal): array
+    /** @return array<int, string> */
+    public function proposalErrors(AiProposal $proposal): array
     {
-        if (! $proposal->replacesTimeline()) {
-            return [];
-        }
-
+        $proposal->loadMissing(['project', 'items']);
         $errors = [];
-        if (! $proposal->items->contains(fn (AiProposalItem $item): bool =>
-            $item->entity_type === 'roadmap'
-            && $item->operation === AiProposalItem::OPERATION_CREATE
-        )) {
-            $errors[] = '全面置換には、新しいタイムラインのRoadmapが1件以上必要です。';
+        if ($proposal->contract_version !== AiProposalContract::VERSION) {
+            $errors[] = 'この提案は旧形式または未対応形式です。最新状態から再提案してください。';
+        }
+        if ($proposal->capability !== AiProposalContract::CAPABILITY) {
+            $errors[] = '未対応のAI変更Capabilityです。';
+        }
+        if ($proposal->risk_level !== AiProposalContract::RISK_LEVEL) {
+            $errors[] = '未対応のRisk Levelです。';
+        }
+        if ($proposal->approval_policy !== AiProposalContract::APPROVAL_POLICY) {
+            $errors[] = '未対応の承認Policyです。';
+        }
+        if ($proposal->mode !== AiProposal::MODE_DIFFERENTIAL) {
+            $errors[] = 'Scope 1ではTimeline全置換を適用できません。';
+        }
+        if (! $proposal->expected_project_version) {
+            $errors[] = 'Projectの期待版がありません。最新状態から再提案してください。';
+        }
+        if ((int) $proposal->project?->plan_version !== (int) $proposal->expected_project_version) {
+            $errors[] = 'Project計画が提案後に変更されています。最新状態から再提案してください。';
+        }
+        if ($proposal->items->isEmpty() || $proposal->items->count() > 100) {
+            $errors[] = '提案項目は1〜100件で指定してください。';
+        }
+        if ($proposal->content_hash && ! hash_equals((string) $proposal->content_hash, AiProposalContract::proposalHash($proposal))) {
+            $errors[] = '提案内容が作成後に変更されています。再確認が必要です。';
         }
 
         $referenceKeys = $proposal->items->pluck('reference_key')->filter();
         if ($referenceKeys->duplicates()->isNotEmpty()) {
-            $errors[] = '全面置換の参照キーは重複できません。';
+            $errors[] = '提案内の参照キーは重複できません。';
         }
 
-        return $errors;
+        $seenReferences = [];
+        $seenTargets = [];
+        foreach ($proposal->items->sortBy([['sort_order', 'asc'], ['id', 'asc']]) as $item) {
+            foreach ($item->depends_on ?? [] as $dependency) {
+                if (! isset($seenReferences[$dependency])) {
+                    $errors[] = '依存先は同じ提案内で先に定義された参照キーである必要があります。';
+                }
+            }
+            if ($item->parent_reference && isset($seenReferences[$item->parent_reference])
+                && ! in_array($item->parent_reference, $item->depends_on ?? [], true)) {
+                $errors[] = '新規親への参照はdepends_onにも含めてください。';
+            }
+            if ($item->reference_key) {
+                $seenReferences[$item->reference_key] = true;
+            }
+
+            if ($item->operation === AiProposalItem::OPERATION_UPDATE && $item->target_public_id) {
+                $targetKey = $item->entity_type.':'.$item->target_public_id;
+                if (isset($seenTargets[$targetKey])) {
+                    $errors[] = '同じ対象を1つの提案で複数回更新できません。';
+                }
+                $seenTargets[$targetKey] = true;
+            }
+        }
+
+        return array_values(array_unique($errors));
     }
 
-    private function errors(Project $project, AiProposalItem $item): array
+    /** @return array<int, string> */
+    public function itemErrors(AiProposal $proposal, AiProposalItem $item): array
     {
+        $project = $proposal->project;
         $attributes = $item->attributes ?? [];
-        $allowed = self::ALLOWED_ATTRIBUTES[$item->entity_type] ?? [];
-        $unknown = array_diff(array_keys($attributes), $allowed);
+        $allowed = AiProposalContract::ALLOWED_ATTRIBUTES[$item->entity_type] ?? [];
         $errors = [];
 
+        if (! $item->public_id) {
+            $errors[] = '安定したProposal Item IDがありません。';
+        }
+        if (! AiProposalContract::supports($item)) {
+            $errors[] = 'Scope 1で許可されていない対象または操作です。';
+        }
+        if (! $item->expected_version) {
+            $errors[] = '対象の期待版がありません。';
+        }
+        if (($item->after ?? $attributes) !== $attributes) {
+            $errors[] = '変更後データと適用データが一致しません。';
+        }
+        if ($attributes === []) {
+            $errors[] = '変更項目を1件以上指定してください。';
+        }
         if (AiTextIntegrity::containsMojibake($attributes)) {
             $errors[] = AiTextIntegrity::ERROR_MESSAGE;
         }
 
+        $unknown = array_diff(array_keys($attributes), $allowed);
         if ($unknown !== []) {
             $errors[] = '許可されていない項目: '.implode(', ', $unknown);
         }
 
-        if ($proposal = $item->proposal) {
-            $replacementError = $this->replacementError($proposal, $project, $item);
-            if ($replacementError) {
-                $errors[] = $replacementError;
-            }
-        }
-
-        if ($item->entity_type === 'project') {
-            if ($item->operation !== AiProposalItem::OPERATION_UPDATE) {
-                $errors[] = 'Project基本情報は更新提案だけを受け付けます。';
-            }
-            if (array_intersect(array_keys($attributes), self::ALLOWED_ATTRIBUTES['project']) === []) {
-                $errors[] = '概要・現状・目指す未来のカタチのいずれかを指定してください。';
-            }
-        }
-
-        if (in_array($item->operation, [AiProposalItem::OPERATION_UPDATE, AiProposalItem::OPERATION_DELETE], true) && ! $this->targetExists($project, $item)) {
-            $errors[] = '更新対象がこのProject内に存在しません。';
-        }
-
-        if ($item->operation === AiProposalItem::OPERATION_DELETE) {
-            if ($attributes !== []) {
-                $errors[] = '削除提案に変更属性は指定できません。';
-            }
-
-            $childError = $this->deleteChildError($project, $item);
-            if ($childError) {
-                $errors[] = $childError;
-            }
-
-            return array_values(array_unique($errors));
-        }
-
         $validator = Validator::make($attributes, $this->rules($item));
         if ($validator->fails()) {
-            $errors = array_merge($errors, $validator->errors()->all());
+            $errors = [...$errors, ...$validator->errors()->all()];
         }
 
-        $relationError = $this->relationError($project, $item);
-        if ($relationError) {
-            $errors[] = $relationError;
+        if ($item->operation === AiProposalItem::OPERATION_CREATE) {
+            if ($item->target_public_id) {
+                $errors[] = '新規作成には既存対象IDを指定できません。';
+            }
+            if ($item->before !== null) {
+                $errors[] = '新規作成の変更前データは空である必要があります。';
+            }
+            if ((int) $item->expected_version !== (int) $proposal->expected_project_version) {
+                $errors[] = '新規作成の期待版がProject計画版と一致しません。';
+            }
+            if ($relationError = $this->createRelationError($proposal, $item)) {
+                $errors[] = $relationError;
+            }
+        }
+
+        if ($item->operation === AiProposalItem::OPERATION_UPDATE) {
+            if (! $item->target_public_id) {
+                $errors[] = '更新対象IDがありません。';
+            }
+            if ($item->reference_key || $item->parent_reference || ($item->depends_on ?? []) !== []) {
+                $errors[] = '更新では親移動や提案内参照を指定できません。';
+            }
+            $target = $this->target($project, $item->entity_type, $item->target_public_id);
+            if (! $target) {
+                $errors[] = '更新対象がこのProject内に存在しません。';
+            } else {
+                if ((int) $target->plan_version !== (int) $item->expected_version) {
+                    $errors[] = '更新対象が提案後に変更されています。';
+                }
+                if (AiProposalContract::snapshot($target, $item->entity_type) !== ($item->before ?? [])) {
+                    $errors[] = '変更前データが現在の対象と一致しません。';
+                }
+            }
         }
 
         return array_values(array_unique($errors));
@@ -125,7 +174,9 @@ class AiProposalValidator
 
     private function rules(AiProposalItem $item): array
     {
-        $titleRule = $item->operation === AiProposalItem::OPERATION_CREATE ? ['required', 'string', 'max:255'] : ['sometimes', 'string', 'max:255'];
+        $title = $item->operation === AiProposalItem::OPERATION_CREATE
+            ? ['required', 'string', 'max:255']
+            : ['sometimes', 'string', 'max:255'];
 
         return match ($item->entity_type) {
             'project' => [
@@ -133,182 +184,58 @@ class AiProposalValidator
                 'current_state' => ['sometimes', 'nullable', 'string', 'max:5000'],
                 'desired_future_state' => ['sometimes', 'nullable', 'string', 'max:5000'],
             ],
-            'roadmap' => [
-                'title' => $titleRule,
-                'purpose' => ['nullable', 'string'],
-                'status' => ['sometimes', Rule::in(array_keys(Roadmap::statuses()))],
-                'sort_order' => ['sometimes', 'integer', 'min:0'],
-                'planned_start_date' => ['nullable', 'date'],
-                'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
-                'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
-                'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
-            ],
+            'roadmap' => ['title' => $title, 'purpose' => ['sometimes', 'nullable', 'string', 'max:10000']],
             'improvement' => [
-                'title' => $titleRule,
-                'roadmap_public_id' => ['nullable', 'string'],
-                'current_state' => ['nullable', 'string'],
-                'desired_state' => ['nullable', 'string'],
-                'problem' => ['nullable', 'string'],
-                'hypothesis' => ['nullable', 'string'],
-                'action' => ['nullable', 'string'],
-                'result' => ['nullable', 'string'],
-                'impact' => ['nullable', 'string'],
-                'next_action' => ['nullable', 'string'],
-                'planned_effort_days' => ['sometimes', 'nullable', 'numeric', 'min:0.25', 'max:999.99'],
-                'status' => ['sometimes', Rule::in(array_keys(Improvement::statuses()))],
-                'visibility' => ['sometimes', Rule::in(array_keys(Improvement::visibilities()))],
-                'planned_start_date' => ['nullable', 'date'],
-                'target_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
-                'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:target_day'],
-                'target_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
+                'title' => $title,
+                'current_state' => ['sometimes', 'nullable', 'string', 'max:10000'],
+                'desired_state' => ['sometimes', 'nullable', 'string', 'max:10000'],
+                'problem' => ['sometimes', 'nullable', 'string', 'max:10000'],
+                'hypothesis' => ['sometimes', 'nullable', 'string', 'max:10000'],
+                'action' => ['sometimes', 'nullable', 'string', 'max:10000'],
+                'next_action' => ['sometimes', 'nullable', 'string', 'max:10000'],
             ],
-            'task' => [
-                'title' => $titleRule,
-                'improvement_public_id' => ['nullable', 'string'],
-                'description' => ['nullable', 'string'],
-                'status' => ['sometimes', Rule::in(array_keys(Task::statuses()))],
-                'priority' => ['sometimes', Rule::in(array_keys(Task::priorities()))],
-                'planned_start_date' => ['nullable', 'date'],
-                'due_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
-                'planned_start_day' => ['nullable', 'integer', 'min:1', 'lte:due_day'],
-                'due_day' => ['nullable', 'integer', 'min:1', 'max:3650'],
-            ],
+            'task' => ['title' => $title, 'description' => ['sometimes', 'nullable', 'string', 'max:10000']],
             default => [],
         };
     }
 
-    private function replacementError(AiProposal $proposal, Project $project, AiProposalItem $item): ?string
+    private function createRelationError(AiProposal $proposal, AiProposalItem $item): ?string
     {
-        if (! $proposal->replacesTimeline()) {
-            return null;
+        $expectedParentType = AiProposalContract::parentType($item->entity_type);
+        if (! $expectedParentType) {
+            return $item->parent_reference ? 'この対象には親参照を指定できません。' : null;
+        }
+        if (! $item->parent_reference) {
+            return '新規作成には有効な親参照が必要です。';
         }
 
-        if ($item->entity_type === 'project') {
-            return $item->operation === AiProposalItem::OPERATION_UPDATE
-                ? null
-                : '全面置換ではProject基本情報は更新提案だけを指定できます。';
-        }
-
-        if ($item->operation !== AiProposalItem::OPERATION_CREATE) {
-            return '全面置換では既存項目の更新・削除を列挙せず、新しいタイムラインを追加項目だけで指定してください。';
-        }
-
-        if ($item->entity_type === 'improvement' && ! $item->parent_reference) {
-            return '全面置換の取り組みには、新規Roadmapの親参照が必要です。';
-        }
-        if ($item->entity_type === 'task' && ! $item->parent_reference) {
-            return '全面置換のTaskには、新規取り組みの親参照が必要です。';
-        }
-
-        $attributes = $item->attributes ?? [];
-        $start = $attributes['planned_start_day'] ?? null;
-        $end = $attributes[$item->entity_type === 'task' ? 'due_day' : 'target_day'] ?? null;
-        if ($project->duration_days && $start && $end
-            && ($start < 1 || $end > $project->duration_days)) {
-            return "期間はProjectの1日目〜{$project->duration_days}日目の範囲内で設定してください。";
-        }
-
-        if (! $item->parent_reference || ! $start || ! $end) {
-            return null;
-        }
-
-        $parent = $proposal->items()
-            ->where('reference_key', $item->parent_reference)
+        $parentItem = $proposal->items
             ->where('sort_order', '<', $item->sort_order)
-            ->first();
-        if (! $parent) {
+            ->firstWhere('reference_key', $item->parent_reference);
+        if ($parentItem) {
+            return $parentItem->entity_type === $expectedParentType
+                && $parentItem->operation === AiProposalItem::OPERATION_CREATE
+                ? null
+                : '提案内の親参照の種類または操作が不正です。';
+        }
+
+        return $this->target($proposal->project, $expectedParentType, $item->parent_reference)
+            ? null
+            : '親参照がこのProject内に存在しないか、親項目より先に定義されていません。';
+    }
+
+    private function target(Project $project, string $type, ?string $publicId): ?Model
+    {
+        if (! $publicId) {
             return null;
         }
 
-        $parentAttributes = $parent->attributes ?? [];
-        $parentStart = $parentAttributes['planned_start_day'] ?? null;
-        $parentEnd = $parentAttributes['target_day'] ?? null;
-        if ($parentStart && $parentEnd && ($start < $parentStart || $end > $parentEnd)) {
-            return $item->entity_type === 'task'
-                ? 'Task期間は親の取り組み期間内で設定してください。'
-                : '取り組み期間は親のRoadmap期間内で設定してください。';
-        }
-
-        return null;
-    }
-
-    private function deleteChildError(Project $project, AiProposalItem $item): ?string
-    {
-        $deletedTargets = $item->proposal->items()
-            ->where('operation', AiProposalItem::OPERATION_DELETE)
-            ->pluck('target_public_id')
-            ->filter();
-
-        if ($item->entity_type === 'roadmap') {
-            $remaining = $project->improvements()
-                ->whereHas('roadmap', fn ($query) => $query->where('public_id', $item->target_public_id))
-                ->whereNotIn('public_id', $deletedTargets)
-                ->exists();
-
-            return $remaining ? '取り組みが残っているRoadmapは削除できません。子要素も同じ提案で削除してください。' : null;
-        }
-
-        if ($item->entity_type === 'improvement') {
-            $remaining = $project->tasks()
-                ->whereHas('improvement', fn ($query) => $query->where('public_id', $item->target_public_id))
-                ->whereNotIn('public_id', $deletedTargets)
-                ->exists();
-
-            return $remaining ? 'Taskが残っている取り組みは削除できません。子要素も同じ提案で削除してください。' : null;
-        }
-
-        return null;
-    }
-
-    private function targetExists(Project $project, AiProposalItem $item): bool
-    {
-        if (! $item->target_public_id) {
-            return false;
-        }
-
-        return match ($item->entity_type) {
-            'project' => hash_equals($project->public_id, $item->target_public_id),
-            'roadmap' => $project->roadmaps()->where('public_id', $item->target_public_id)->exists(),
-            'improvement' => $project->improvements()->where('public_id', $item->target_public_id)->exists(),
-            'task' => $project->tasks()->where('public_id', $item->target_public_id)->exists(),
-            default => false,
+        return match ($type) {
+            'project' => hash_equals((string) $project->public_id, $publicId) ? $project : null,
+            'roadmap' => $project->roadmaps()->where('public_id', $publicId)->first(),
+            'improvement' => $project->improvements()->where('public_id', $publicId)->first(),
+            'task' => $project->tasks()->where('public_id', $publicId)->first(),
+            default => null,
         };
-    }
-
-    private function relationError(Project $project, AiProposalItem $item): ?string
-    {
-        $attributes = $item->attributes ?? [];
-
-        if ($item->parent_reference) {
-            $expectedParentType = match ($item->entity_type) {
-                'improvement' => 'roadmap',
-                'task' => 'improvement',
-                default => null,
-            };
-            $parent = $item->proposal->items()
-                ->where('reference_key', $item->parent_reference)
-                ->where('sort_order', '<', $item->sort_order)
-                ->first();
-
-            if (! $expectedParentType || ! $parent || $parent->entity_type !== $expectedParentType || $parent->operation !== AiProposalItem::OPERATION_CREATE) {
-                return '提案内の親参照が無効、または親項目より先に配置されていません。';
-            }
-
-            return null;
-        }
-
-        if ($item->entity_type === 'improvement' && ! empty($attributes['roadmap_public_id'])) {
-            return $project->roadmaps()->where('public_id', $attributes['roadmap_public_id'])->exists()
-                ? null
-                : '指定したRoadmapがこのProject内に存在しません。';
-        }
-
-        if ($item->entity_type === 'task' && ! empty($attributes['improvement_public_id'])) {
-            return $project->improvements()->where('public_id', $attributes['improvement_public_id'])->exists()
-                ? null
-                : '指定した取り組みがこのProject内に存在しません。';
-        }
-
-        return null;
     }
 }

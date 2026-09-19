@@ -7,11 +7,12 @@ use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\Roadmap;
 use App\Models\Task;
-use App\Services\ScheduleIntegrityService;
 use App\Services\RelativeScheduleService;
+use App\Services\ScheduleIntegrityService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -124,6 +125,7 @@ class TimelineScheduleController extends Controller
                 && ! ($attributes['cascade_children'] ?? false)) {
                 throw ValidationException::withMessages(['schedule' => $newInvalid->first()]);
             }
+
             return $after;
         });
 
@@ -220,23 +222,27 @@ class TimelineScheduleController extends Controller
 
     private function resetDescendantSchedules(string $type, Project|Roadmap|Improvement $model): void
     {
+        $version = DB::raw('plan_version + 1');
         if ($type === 'project') {
-            $model->roadmaps()->update(['planned_start_date' => null, 'target_date' => null]);
-            $model->improvements()->update(['planned_start_date' => null, 'target_date' => null]);
-            $model->tasks()->update(['planned_start_date' => null, 'due_date' => null]);
+            $model->roadmaps()->update(['planned_start_date' => null, 'target_date' => null, 'plan_version' => $version]);
+            $model->improvements()->update(['planned_start_date' => null, 'target_date' => null, 'plan_version' => $version]);
+            $model->tasks()->update(['planned_start_date' => null, 'due_date' => null, 'plan_version' => $version]);
+            DB::table('projects')->where('id', $model->id)->increment('plan_version');
 
             return;
         }
 
         if ($type === 'roadmap') {
             $improvementIds = $model->improvements()->pluck('id');
-            $model->improvements()->update(['planned_start_date' => null, 'target_date' => null]);
-            Task::query()->whereIn('improvement_id', $improvementIds)->update(['planned_start_date' => null, 'due_date' => null]);
+            $model->improvements()->update(['planned_start_date' => null, 'target_date' => null, 'plan_version' => $version]);
+            Task::query()->whereIn('improvement_id', $improvementIds)->update(['planned_start_date' => null, 'due_date' => null, 'plan_version' => $version]);
+            DB::table('projects')->where('id', $model->project_id)->increment('plan_version');
 
             return;
         }
 
-        $model->tasks()->update(['planned_start_date' => null, 'due_date' => null]);
+        $model->tasks()->update(['planned_start_date' => null, 'due_date' => null, 'plan_version' => $version]);
+        DB::table('projects')->where('id', $model->project_id)->increment('plan_version');
     }
 
     private function scheduleStart(string $type, Project|Roadmap|Improvement $model): Carbon
@@ -249,7 +255,7 @@ class TimelineScheduleController extends Controller
         return ($type === 'project' ? $model->due_date : $model->target_date)->copy();
     }
 
-    private function projectBoundaryViolations(Project $project): \Illuminate\Support\Collection
+    private function projectBoundaryViolations(Project $project): Collection
     {
         $violations = collect();
         if (! $project->start_date || ! $project->due_date) {

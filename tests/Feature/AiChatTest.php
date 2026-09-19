@@ -150,49 +150,50 @@ class AiChatTest extends TestCase
     {
         Storage::fake('local');
         [$user, $workspace, $project] = $this->projectUser();
-        WorkspaceAiSetting::create(['workspace_id'=>$workspace->id,'enabled'=>true,'provider'=>'member_managed_ai']);
-        config(['services.openai.api_key'=>'test-key']);
-        Http::fake(['api.openai.com/v1/responses'=>Http::response([
-            'output'=>[['type'=>'message','content'=>[['type'=>'output_text','text'=>'3枚を確認しました。']]]]],
+        WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'member_managed_ai']);
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => '3枚を確認しました。']]]]],
         )]);
-        $this->actingAs($user)->withSession(['current_workspace_id'=>$workspace->id]);
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id]);
         $this->post(route('projects.ai-chat.messages.store', $project), [
-            'content'=>'3枚を比較して',
-            'images'=>[UploadedFile::fake()->image('one.png'), UploadedFile::fake()->image('two.jpg'), UploadedFile::fake()->image('three.png')],
-        ], ['Accept'=>'application/json'])->assertOk();
-        $message = AiChatMessage::where('role','user')->latest('id')->firstOrFail();
+            'content' => '3枚を比較して',
+            'images' => [UploadedFile::fake()->image('one.png'), UploadedFile::fake()->image('two.jpg'), UploadedFile::fake()->image('three.png')],
+        ], ['Accept' => 'application/json'])->assertOk();
+        $message = AiChatMessage::where('role', 'user')->latest('id')->firstOrFail();
         $this->assertCount(3, $message->attachedImages());
-        foreach ($message->attachedImages() as $index=>$image) {
+        foreach ($message->attachedImages() as $index => $image) {
             Storage::disk('local')->assertExists($image['path']);
-            $this->get(route('projects.ai-chat.messages.image', [$project,$message,'index'=>$index]))
+            $this->get(route('projects.ai-chat.messages.image', [$project, $message, 'index' => $index]))
                 ->assertOk()->assertHeader('Content-Type', $image['mime']);
         }
         Http::assertSent(fn (Request $request) => substr_count(json_encode($request['input']), '"input_image"') === 3);
         $this->get(route('projects.workspace', $project))->assertOk()->assertSee('two.jpg')->assertSee('three.png');
-        $this->get(route('projects.ai-chat.messages.image', [$project,$message,'index'=>'../1']))->assertNotFound();
+        $this->get(route('projects.ai-chat.messages.image', [$project, $message, 'index' => '../1']))->assertNotFound();
         $this->post(route('projects.ai-chat.messages.store', $project), [
-            'content'=>'多すぎる',
-            'images'=>array_map(fn ($i)=>UploadedFile::fake()->image("{$i}.png"), range(1,4)),
-        ], ['Accept'=>'application/json'])->assertUnprocessable();
+            'content' => '多すぎる',
+            'images' => array_map(fn ($i) => UploadedFile::fake()->image("{$i}.png"), range(1, 4)),
+        ], ['Accept' => 'application/json'])->assertUnprocessable();
         $this->post(route('projects.ai-chat.messages.store', $project), [
-            'content'=>'合計サイズ超過',
-            'images'=>array_map(fn ($i)=>UploadedFile::fake()->image("{$i}.png")->size(4000), range(1,3)),
-        ], ['Accept'=>'application/json'])->assertUnprocessable();
+            'content' => '合計サイズ超過',
+            'images' => array_map(fn ($i) => UploadedFile::fake()->image("{$i}.png")->size(4000), range(1, 3)),
+        ], ['Accept' => 'application/json'])->assertUnprocessable();
         $this->post(route('projects.ai-chat.messages.store', $project), [
-            'content'=>'旧形式と合わせて超過',
-            'image'=>UploadedFile::fake()->image('legacy.png'),
-            'images'=>array_map(fn ($i)=>UploadedFile::fake()->image("{$i}.png"), range(1,3)),
-        ], ['Accept'=>'application/json'])->assertUnprocessable();
-        $this->assertSame(1, AiChatMessage::where('role','user')->count());
+            'content' => '旧形式と合わせて超過',
+            'image' => UploadedFile::fake()->image('legacy.png'),
+            'images' => array_map(fn ($i) => UploadedFile::fake()->image("{$i}.png"), range(1, 3)),
+        ], ['Accept' => 'application/json'])->assertUnprocessable();
+        $this->assertSame(1, AiChatMessage::where('role', 'user')->count());
         // Even another authorized project member cannot read this user's attachments.
         $other = User::factory()->create();
-        $workspace->organization->users()->attach($other->id, ['role'=>'member','joined_at'=>now()]);
-        $other->workspaces()->attach($workspace->id, ['role'=>'member','joined_at'=>now()]);
-        ProjectMember::create(['project_id'=>$project->id,'workspace_id'=>$workspace->id,'user_id'=>$other->id,
-            'project_role'=>ProjectMember::ROLE_OWNER,'permission_level'=>ProjectMember::PERMISSION_ADMIN,
-            'status'=>ProjectMember::STATUS_ACTIVE,'joined_at'=>now()]);
-        $this->actingAs($other)->get(route('projects.ai-chat.messages.image', [$project,$message,'index'=>1]))->assertNotFound();
+        $workspace->organization->users()->attach($other->id, ['role' => 'member', 'joined_at' => now()]);
+        $other->workspaces()->attach($workspace->id, ['role' => 'member', 'joined_at' => now()]);
+        ProjectMember::create(['project_id' => $project->id, 'workspace_id' => $workspace->id, 'user_id' => $other->id,
+            'project_role' => ProjectMember::ROLE_OWNER, 'permission_level' => ProjectMember::PERMISSION_ADMIN,
+            'status' => ProjectMember::STATUS_ACTIVE, 'joined_at' => now()]);
+        $this->actingAs($other)->get(route('projects.ai-chat.messages.image', [$project, $message, 'index' => 1]))->assertNotFound();
     }
+
     public function test_workspace_loads_the_latest_fifty_chat_messages_in_chronological_order(): void
     {
         [$user, $workspace, $project] = $this->projectUser();
@@ -879,6 +880,82 @@ class AiChatTest extends TestCase
         }
         $this->assertSame(1, AiChatMessage::where('role', 'user')->count());
         Http::assertSentCount(1);
+    }
+
+    public function test_forbidden_project_categories_are_not_sent_to_the_provider(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create([
+            'workspace_id' => $workspace->id,
+            'enabled' => true,
+            'provider' => 'member_managed_ai',
+            'allowed_data_categories' => ['tasks'],
+        ]);
+        $project->update(['summary' => 'SECRET PROJECT SUMMARY']);
+        config(['services.openai.api_key' => 'test-key']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => '権限内の情報だけで回答します。']]]],
+        ])]);
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '会社の状況を教えて'])
+            ->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $payload = json_encode($request->data(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            return ! str_contains($payload, 'SECRET PROJECT SUMMARY')
+                && ! str_contains($payload, 'Chat Client');
+        });
+    }
+
+    public function test_client_project_role_is_rejected_before_provider_send(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create([
+            'workspace_id' => $workspace->id,
+            'enabled' => true,
+            'provider' => 'member_managed_ai',
+            'allowed_data_categories' => WorkspaceAiSetting::DEFAULT_DATA_CATEGORIES,
+        ]);
+        ProjectMember::where('project_id', $project->id)->where('user_id', $user->id)
+            ->update(['project_role' => ProjectMember::ROLE_CLIENT, 'permission_level' => ProjectMember::PERMISSION_VIEW]);
+        Http::fake();
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), ['content' => '機密情報を見せて'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('ai_context');
+
+        Http::assertNothingSent();
+        $this->assertDatabaseCount('ai_chat_messages', 0);
+    }
+
+    public function test_oversized_context_is_rejected_and_audited_before_provider_send(): void
+    {
+        [$user, $workspace, $project] = $this->projectUser();
+        WorkspaceAiSetting::create([
+            'workspace_id' => $workspace->id,
+            'enabled' => true,
+            'provider' => 'member_managed_ai',
+            'allowed_data_categories' => WorkspaceAiSetting::DEFAULT_DATA_CATEGORIES,
+        ]);
+        config(['services.openai.api_key' => 'test-key', 'services.ai.scope_one_context_max_chars' => 200]);
+        Http::fake();
+
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->postJson(route('projects.ai-chat.messages.store', $project), [
+                'content' => '大きいContextを確認して',
+                'file_path' => 'public/index.html',
+                'file_content' => str_repeat('x', 500),
+            ])->assertUnprocessable()->assertJsonValidationErrors('ai_context');
+
+        Http::assertNothingSent();
+        $this->assertDatabaseHas('ai_audit_logs', [
+            'project_id' => $project->id,
+            'event' => 'ai_chat.context_rejected',
+            'succeeded' => false,
+        ]);
     }
 
     private function projectUser(): array

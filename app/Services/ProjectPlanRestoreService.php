@@ -76,7 +76,7 @@ class ProjectPlanRestoreService
         foreach ($entities['roadmaps'] as $publicId => $data) {
             $roadmapModels[$publicId] = $this->restoreModel(
                 Roadmap::withTrashed()->where('project_id', $project->id)->where('public_id', $publicId)->first(),
-                new Roadmap(),
+                new Roadmap,
                 [
                     'public_id' => $publicId,
                     'organization_id' => $project->organization_id,
@@ -94,7 +94,7 @@ class ProjectPlanRestoreService
             $roadmapPublicId = $data['roadmap_public_id'];
             $improvementModels[$publicId] = $this->restoreModel(
                 Improvement::withTrashed()->where('project_id', $project->id)->where('public_id', $publicId)->first(),
-                new Improvement(),
+                new Improvement,
                 [
                     'public_id' => $publicId,
                     'organization_id' => $project->organization_id,
@@ -112,7 +112,7 @@ class ProjectPlanRestoreService
             $improvementPublicId = $data['improvement_public_id'];
             $this->restoreModel(
                 Task::withTrashed()->where('project_id', $project->id)->where('public_id', $publicId)->first(),
-                new Task(),
+                new Task,
                 [
                     'public_id' => $publicId,
                     'organization_id' => $project->organization_id,
@@ -157,11 +157,12 @@ class ProjectPlanRestoreService
     private function deleteMissingQuery($query, array $publicIds): void
     {
         if ($publicIds === []) {
-            $query->delete();
+            $query->get()->each->delete();
+
             return;
         }
 
-        $query->whereNotIn('public_id', $publicIds)->delete();
+        $query->whereNotIn('public_id', $publicIds)->get()->each->delete();
     }
 
     private function entities(array $snapshot): array

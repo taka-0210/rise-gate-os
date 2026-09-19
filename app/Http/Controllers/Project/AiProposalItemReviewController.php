@@ -8,10 +8,10 @@ use App\Models\AiProposalItem;
 use App\Models\AiProposalItemReview;
 use App\Models\AiRequest;
 use App\Models\Project;
+use App\Services\AiProposalAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -27,12 +27,14 @@ class AiProposalItemReviewController extends Controller
             'reviews.*.merge_target_item_id' => ['nullable', 'integer'],
         ]);
 
-        $items = $aiProposal->items()->whereIn('id', array_keys($validated['reviews']))->get()->keyBy('id');
-        if ($items->count() !== count($validated['reviews'])) {
-            throw ValidationException::withMessages(['reviews' => '提案に含まれない項目が指定されています。']);
-        }
+        DB::transaction(function () use ($request, $project, $aiProposal, $validated): void {
+            $locked = AiProposal::query()->lockForUpdate()->findOrFail($aiProposal->id);
+            $this->authorizeProposal($request, $project, $locked);
+            $items = $locked->items()->whereIn('id', array_keys($validated['reviews']))->get()->keyBy('id');
+            if ($items->count() !== count($validated['reviews'])) {
+                throw ValidationException::withMessages(['reviews' => '提案に含まれない項目が指定されています。']);
+            }
 
-        DB::transaction(function () use ($request, $aiProposal, $items, $validated): void {
             foreach ($validated['reviews'] as $itemId => $reviewInput) {
                 $item = $items->get((int) $itemId);
                 $action = $reviewInput['action'];
@@ -46,7 +48,7 @@ class AiProposalItemReviewController extends Controller
                 $mergeTargetId = null;
                 if ($action === AiProposalItemReview::ACTION_MERGE) {
                     $mergeTargetId = (int) ($reviewInput['merge_target_item_id'] ?? 0);
-                    $mergeTarget = $aiProposal->items()
+                    $mergeTarget = $locked->items()
                         ->whereKey($mergeTargetId)
                         ->where('entity_type', $item->entity_type)
                         ->first();
@@ -59,6 +61,7 @@ class AiProposalItemReviewController extends Controller
 
                 if ($action === AiProposalItemReview::ACTION_KEEP && $comment === '' && ! $mergeTargetId) {
                     $item->review()->delete();
+
                     continue;
                 }
 
@@ -85,27 +88,32 @@ class AiProposalItemReviewController extends Controller
             'merge_target_item_id' => ['nullable', 'integer', 'required_if:action,merge'],
         ]);
 
-        $mergeTargetId = null;
-        if ($validated['action'] === AiProposalItemReview::ACTION_MERGE) {
-            $mergeTarget = $aiProposal->items()
-                ->whereKey($validated['merge_target_item_id'])
-                ->where('entity_type', $item->entity_type)
-                ->first();
-            if (! $mergeTarget || $mergeTarget->is($item)) {
-                throw ValidationException::withMessages([
-                    'merge_target_item_id' => '同じ提案内の別の同種項目を選択してください。',
-                ]);
-            }
-            $mergeTargetId = $mergeTarget->id;
-        }
+        DB::transaction(function () use ($request, $project, $aiProposal, $item, $validated): void {
+            $locked = AiProposal::query()->lockForUpdate()->findOrFail($aiProposal->id);
+            $this->authorizeProposal($request, $project, $locked, $item);
 
-        $item->review()->updateOrCreate([], [
-            'reviewed_by' => $request->user()->id,
-            'action' => $validated['action'],
-            'comment' => $validated['comment'] ?? null,
-            'merge_target_item_id' => $mergeTargetId,
-            'resolved_at' => $validated['action'] === AiProposalItemReview::ACTION_KEEP ? now() : null,
-        ]);
+            $mergeTargetId = null;
+            if ($validated['action'] === AiProposalItemReview::ACTION_MERGE) {
+                $mergeTarget = $locked->items()
+                    ->whereKey($validated['merge_target_item_id'])
+                    ->where('entity_type', $item->entity_type)
+                    ->first();
+                if (! $mergeTarget || $mergeTarget->is($item)) {
+                    throw ValidationException::withMessages([
+                        'merge_target_item_id' => '同じ提案内の別の同種項目を選択してください。',
+                    ]);
+                }
+                $mergeTargetId = $mergeTarget->id;
+            }
+
+            $item->review()->updateOrCreate([], [
+                'reviewed_by' => $request->user()->id,
+                'action' => $validated['action'],
+                'comment' => $validated['comment'] ?? null,
+                'merge_target_item_id' => $mergeTargetId,
+                'resolved_at' => $validated['action'] === AiProposalItemReview::ACTION_KEEP ? now() : null,
+            ]);
+        });
 
         return back()->with('status', '項目へのレビュー指示を保存しました。');
     }
@@ -113,39 +121,59 @@ class AiProposalItemReviewController extends Controller
     public function destroy(Request $request, Project $project, AiProposal $aiProposal, AiProposalItem $item): RedirectResponse
     {
         $this->authorizeProposal($request, $project, $aiProposal, $item);
-        $item->review()?->delete();
+        DB::transaction(function () use ($request, $project, $aiProposal, $item): void {
+            $locked = AiProposal::query()->lockForUpdate()->findOrFail($aiProposal->id);
+            $this->authorizeProposal($request, $project, $locked, $item);
+            $item->review()?->delete();
+        });
 
         return back()->with('status', '項目へのレビュー指示を削除しました。');
     }
 
     public function requestRevision(Request $request, Project $project, AiProposal $aiProposal): RedirectResponse
     {
-        $this->authorizeProposal($request, $project, $aiProposal);
+        $this->authorizeProposal($request, $project, $aiProposal, null, [
+            AiProposal::STATUS_PENDING,
+            AiProposal::STATUS_APPROVED,
+        ]);
         $validated = $request->validate([
             'overall_feedback' => ['nullable', 'string', 'max:5000'],
         ]);
         $overallFeedback = trim((string) ($validated['overall_feedback'] ?? ''));
-        $aiProposal->load(['items.review.mergeTarget']);
-        $reviews = $aiProposal->items->pluck('review')->filter()
-            ->whereNull('resolved_at')
-            ->values();
-
-        if ($reviews->isEmpty() && $overallFeedback === '') {
-            throw ValidationException::withMessages([
-                'overall_feedback' => '提案全体への追加指示を入力するか、項目別レビューを1件以上登録してください。',
+        $aiRequest = DB::transaction(function () use ($request, $project, $aiProposal, $overallFeedback): AiRequest {
+            $locked = AiProposal::query()->lockForUpdate()->findOrFail($aiProposal->id);
+            $this->authorizeProposal($request, $project, $locked, null, [
+                AiProposal::STATUS_PENDING,
+                AiProposal::STATUS_APPROVED,
             ]);
-        }
+            $locked->load(['items.review.mergeTarget']);
+            $reviews = $locked->items->pluck('review')->filter()->whereNull('resolved_at')->values();
+            if ($reviews->isEmpty() && $overallFeedback === '') {
+                throw ValidationException::withMessages([
+                    'overall_feedback' => '提案全体への追加指示を入力するか、項目別レビューを1件以上登録してください。',
+                ]);
+            }
 
-        $instructions = $this->revisionInstructions($aiProposal, $overallFeedback);
-        $aiRequest = DB::transaction(function () use ($request, $project, $aiProposal, $instructions): AiRequest {
-            return $project->aiRequests()->create([
-                'title' => 'AI提案「'.$aiProposal->title.'」のレビュー反映',
+            $instructions = $this->revisionInstructions($locked, $overallFeedback);
+            $aiRequest = $project->aiRequests()->create([
+                'title' => 'AI提案「'.$locked->title.'」のレビュー反映',
                 'instructions' => $instructions,
                 'organization_id' => $project->organization_id,
                 'workspace_id' => $project->owning_workspace_id,
                 'requested_by' => $request->user()->id,
                 'status' => AiRequest::STATUS_PENDING,
             ]);
+            $locked->update([
+                'status' => AiProposal::STATUS_REJECTED,
+                'reviewed_by' => $request->user()->id,
+                'reviewed_at' => now(),
+                'approved_by' => null,
+                'approved_at' => null,
+                'approved_content_hash' => null,
+                'approved_project_version' => null,
+            ]);
+
+            return $aiRequest;
         });
 
         $copyText = "RISE GATE OSのプロジェクト「{$project->name}」にAI修正依頼「{$aiRequest->title}」を登録しました。未処理のAI依頼を確認し、提案全体と項目別のレビュー指示を反映した新しい提案を作成してください。日本語はUTF-8のまま保持し、文字化けや疑問符への置換がないことを確認してから提案を送信してください。";
@@ -196,13 +224,18 @@ class AiProposalItemReviewController extends Controller
         return implode("\n", $lines);
     }
 
-    private function authorizeProposal(Request $request, Project $project, AiProposal $proposal, ?AiProposalItem $item = null): void
-    {
-        Gate::authorize('update', $project);
+    private function authorizeProposal(
+        Request $request,
+        Project $project,
+        AiProposal $proposal,
+        ?AiProposalItem $item = null,
+        array $allowedStatuses = [AiProposal::STATUS_PENDING],
+    ): void {
+        app(AiProposalAuthorization::class)->authorize($request->user(), $project, $proposal);
         $workspace = $request->attributes->get('currentWorkspace');
         abort_unless($workspace && $project->owning_workspace_id === $workspace->id, 404);
         abort_unless($proposal->project_id === $project->id, 404);
-        abort_unless($proposal->status === AiProposal::STATUS_PENDING, 422);
+        abort_unless(in_array($proposal->status, $allowedStatuses, true), 422);
         if ($item) {
             abort_unless($item->ai_proposal_id === $proposal->id, 404);
         }

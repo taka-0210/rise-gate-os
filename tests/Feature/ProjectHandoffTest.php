@@ -64,6 +64,15 @@ class ProjectHandoffTest extends TestCase
 
         $handoff = ProjectHandoff::firstOrFail();
         $this->assertNull($project->handoffs()->where('status', ProjectHandoff::STATUS_APPROVED)->first());
+        $this->withToken($token)->postJson('/api/mcp/rise-gate-os', [
+            'jsonrpc' => '2.0',
+            'id' => 15,
+            'method' => 'tools/call',
+            'params' => ['name' => 'get_project_plan', 'arguments' => ['project_public_id' => $project->public_id]],
+        ])->assertOk()
+            ->assertJsonPath('result.structuredContent.handoff.completed_work', null)
+            ->assertJsonPath('result.structuredContent.handoff.next_work', null)
+            ->assertJsonPath('result.structuredContent.handoff.pending_proposals_count', 1);
 
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])

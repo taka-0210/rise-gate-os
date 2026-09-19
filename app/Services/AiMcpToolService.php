@@ -9,57 +9,90 @@ use App\Models\AiRequestAttachment;
 use App\Models\Project;
 use App\Models\ProjectHandoff;
 use App\Models\ProjectMember;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AiMcpToolService
 {
-    public function __construct(private readonly AiProposalValidator $validator) {}
+    public function __construct(
+        private readonly AiProposalValidator $validator,
+        private readonly AiProposalFactory $proposalFactory,
+        private readonly AiProjectContextGuard $contextGuard,
+    ) {}
 
     public function listProjects(AiAccessKey $key): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+        $allowedCategories = $this->contextGuard->assertWorkspaceCategories($key);
 
-        return ['projects' => $this->visibleProjects($key)
-            ->withCount(['roadmaps', 'improvements', 'tasks'])
-            ->orderBy('name')
-            ->get()
-            ->map(fn (Project $project) => [
-                'public_id' => $project->public_id,
-                'name' => $project->name,
-                'summary' => $project->summary,
-                'status' => $project->status,
-                'priority' => $project->priority,
-                'roadmaps_count' => $project->roadmaps_count,
-                'improvements_count' => $project->improvements_count,
-                'tasks_count' => $project->tasks_count,
-            ])->all()];
+        $query = $this->visibleProjects($key);
+        $countRelations = array_values(array_filter([
+            in_array('roadmaps', $allowedCategories, true) ? 'roadmaps' : null,
+            in_array('improvements', $allowedCategories, true) ? 'improvements' : null,
+            in_array('tasks', $allowedCategories, true) ? 'tasks' : null,
+        ]));
+        if ($countRelations !== []) {
+            $query->withCount($countRelations);
+        }
+        $projects = $query->orderBy('name')->get();
+
+        return ['projects' => $projects->map(fn (Project $project) => [
+            'public_id' => $project->public_id,
+            'name' => $project->name,
+            'summary' => $project->summary,
+            'plan_version' => $project->plan_version,
+            'roadmaps_count' => in_array('roadmaps', $allowedCategories, true) ? $project->roadmaps_count : null,
+            'improvements_count' => in_array('improvements', $allowedCategories, true) ? $project->improvements_count : null,
+            'tasks_count' => in_array('tasks', $allowedCategories, true) ? $project->tasks_count : null,
+        ])->all()];
     }
 
     public function getProjectPlan(AiAccessKey $key, string $publicId): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+        $this->contextGuard->assertKeyIdentity($key);
         $project = $this->visibleProjects($key)
             ->where('public_id', $publicId)
-            ->with(['roadmaps.improvements.tasks'])
             ->firstOrFail();
+        $allowedCategories = $this->contextGuard->assertProposalContext($key, $project);
+        $load = [];
+        if (in_array('roadmaps', $allowedCategories, true)) {
+            $load[] = 'roadmaps';
+        }
+        if (in_array('roadmaps', $allowedCategories, true) && in_array('improvements', $allowedCategories, true)) {
+            $load[] = 'roadmaps.improvements';
+        }
+        if (in_array('roadmaps', $allowedCategories, true)
+            && in_array('improvements', $allowedCategories, true)
+            && in_array('tasks', $allowedCategories, true)) {
+            $load[] = 'roadmaps.improvements.tasks';
+        }
+        if ($load !== []) {
+            $project->load($load);
+        }
         $latestHandoff = $project->handoffs()
             ->where('status', ProjectHandoff::STATUS_APPROVED)
             ->latest('reviewed_at')
             ->first();
+        $entityCount = $project->relationLoaded('roadmaps')
+            ? $project->roadmaps->sum(fn ($roadmap): int => 1
+                + ($roadmap->relationLoaded('improvements') ? $roadmap->improvements->sum(fn ($improvement): int => 1
+                    + ($improvement->relationLoaded('tasks') ? $improvement->tasks->count() : 0)) : 0))
+            : 0;
+        if ($entityCount > (int) config('services.ai.scope_one_context_max_entities', 500)) {
+            throw ValidationException::withMessages(['ai_context' => 'Project計画がAI Contextの件数上限を超えています。対象を分けて確認してください。']);
+        }
 
-        return [
+        $context = [
             'public_id' => $project->public_id,
+            'plan_version' => $project->plan_version,
+            'proposal_contract_version' => AiProposalContract::VERSION,
             'name' => $project->name,
             'summary' => $project->summary,
             'current_state' => $project->current_state,
             'desired_future_state' => $project->desired_future_state,
-            'status' => $project->status,
-            'priority' => $project->priority,
-            'start_date' => $project->start_date?->toDateString(),
-            'due_date' => $project->due_date?->toDateString(),
-            'duration_days' => $project->duration_days,
             'handoff' => [
                 'completed_work' => $latestHandoff?->completed_work,
                 'next_work' => $latestHandoff?->next_work,
@@ -68,54 +101,47 @@ class AiMcpToolService
                     ->where('status', ProjectHandoff::STATUS_PENDING)
                     ->count(),
             ],
-            'roadmaps' => $project->roadmaps->map(fn ($roadmap) => [
+            'roadmaps' => ! in_array('roadmaps', $allowedCategories, true) ? [] : $project->roadmaps->map(fn ($roadmap) => [
                 'public_id' => $roadmap->public_id,
+                'plan_version' => $roadmap->plan_version,
                 'title' => $roadmap->title,
                 'purpose' => $roadmap->purpose,
-                'status' => $roadmap->taskProgress()['key'],
-                'status_label' => $roadmap->taskProgress()['label'],
-                'progress_percentage' => $roadmap->taskProgress()['percentage'],
-                'planned_start_date' => $roadmap->planned_start_date?->toDateString(),
-                'target_date' => $roadmap->target_date?->toDateString(),
-                'planned_start_day' => $roadmap->planned_start_day,
-                'target_day' => $roadmap->target_day,
-                'improvements' => $roadmap->improvements->map(fn ($improvement) => [
+                'improvements' => ! in_array('improvements', $allowedCategories, true) ? [] : $roadmap->improvements->map(fn ($improvement) => [
                     'public_id' => $improvement->public_id,
+                    'plan_version' => $improvement->plan_version,
                     'title' => $improvement->title,
-                    'status' => $improvement->taskProgress()['key'],
-                    'status_label' => $improvement->taskProgress()['label'],
-                    'progress_percentage' => $improvement->taskProgress()['percentage'],
+                    'current_state' => $improvement->current_state,
+                    'desired_state' => $improvement->desired_state,
+                    'problem' => $improvement->problem,
+                    'hypothesis' => $improvement->hypothesis,
+                    'action' => $improvement->action,
                     'next_action' => $improvement->next_action,
-                    'planned_effort_days' => $improvement->planned_effort_days !== null ? (float) $improvement->planned_effort_days : null,
-                    'planned_start_date' => $improvement->planned_start_date?->toDateString(),
-                    'target_date' => $improvement->target_date?->toDateString(),
-                    'planned_start_day' => $improvement->planned_start_day,
-                    'target_day' => $improvement->target_day,
-                    'tasks' => $improvement->tasks->map(fn ($task) => [
+                    'tasks' => ! in_array('tasks', $allowedCategories, true) ? [] : $improvement->tasks->map(fn ($task) => [
                         'public_id' => $task->public_id,
+                        'plan_version' => $task->plan_version,
                         'title' => $task->title,
                         'description' => $task->description,
-                        'status' => $task->status,
-                        'priority' => $task->priority,
-                        'planned_start_date' => $task->planned_start_date?->toDateString(),
-                        'due_date' => $task->due_date?->toDateString(),
-                        'planned_start_day' => $task->planned_start_day,
-                        'due_day' => $task->due_day,
-                        'assigned_to' => $task->assigned_to,
                     ])->values()->all(),
                 ])->values()->all(),
             ])->values()->all(),
         ];
+        if (strlen(json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) > (int) config('services.ai.scope_one_context_max_chars', 100000)) {
+            throw ValidationException::withMessages(['ai_context' => 'Project計画がAI Contextの文字数上限を超えています。対象を分けて確認してください。']);
+        }
+
+        return $context;
     }
 
     public function listAiRequests(AiAccessKey $key): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+        $this->contextGuard->assertWorkspaceCategories($key, AiProjectContextGuard::SCOPE_ONE_CATEGORIES);
+        $projectIds = $this->visibleProjects($key)->pluck('id');
 
         return ['requests' => AiRequest::query()
             ->where('workspace_id', $key->workspace_id)
+            ->whereIn('project_id', $projectIds)
             ->where('status', AiRequest::STATUS_PENDING)
-            ->whereHas('project.members', fn ($q) => $q->where('user_id', $key->user_id)->where('status', ProjectMember::STATUS_ACTIVE))
             ->with(['project:id,public_id,name', 'requester:id,name', 'attachments'])
             ->oldest()->get()->map(fn (AiRequest $request) => [
                 'public_id' => $request->public_id,
@@ -132,12 +158,14 @@ class AiMcpToolService
     public function claimAiRequest(AiAccessKey $key, string $publicId): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
+        $this->contextGuard->assertWorkspaceCategories($key, AiProjectContextGuard::SCOPE_ONE_CATEGORIES);
 
         return DB::transaction(function () use ($key, $publicId): array {
-            $request = AiRequest::query()->lockForUpdate()
+            $request = AiRequest::query()->with('project')->lockForUpdate()
                 ->where('workspace_id', $key->workspace_id)->where('public_id', $publicId)
                 ->whereHas('project.members', fn ($q) => $q->where('user_id', $key->user_id)->where('status', ProjectMember::STATUS_ACTIVE))
                 ->firstOrFail();
+            $this->contextGuard->assertProposalContext($key, $request->project);
             if ($request->status === AiRequest::STATUS_PENDING) {
                 $request->update(['status' => AiRequest::STATUS_PROCESSING, 'claimed_by_access_key_id' => $key->id, 'claimed_at' => now()]);
             } elseif ($request->status !== AiRequest::STATUS_PROCESSING || $request->claimed_by_access_key_id !== $key->id) {
@@ -158,13 +186,15 @@ class AiMcpToolService
     public function getAiRequestAttachment(AiAccessKey $key, string $requestPublicId, string $attachmentPublicId): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROJECTS_READ);
-        $request = AiRequest::query()
+        $this->contextGuard->assertWorkspaceCategories($key, AiProjectContextGuard::SCOPE_ONE_CATEGORIES);
+        $request = AiRequest::query()->with('project')
             ->where('workspace_id', $key->workspace_id)
             ->where('public_id', $requestPublicId)
             ->whereHas('project.members', fn ($query) => $query
                 ->where('user_id', $key->user_id)
                 ->where('status', ProjectMember::STATUS_ACTIVE))
             ->firstOrFail();
+        $this->contextGuard->assertProposalContext($key, $request->project);
         if ($request->status !== AiRequest::STATUS_PROCESSING || $request->claimed_by_access_key_id !== $key->id) {
             throw ValidationException::withMessages(['request' => '先にこのAI依頼を引き受けてください。']);
         }
@@ -209,12 +239,14 @@ class AiMcpToolService
     public function submitProposal(AiAccessKey $key, array $arguments): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROPOSALS_CREATE);
+        $this->contextGuard->assertKeyIdentity($key);
         $project = $this->visibleProjects($key)
             ->where('public_id', $arguments['project_public_id'] ?? '')
             ->whereHas('members', fn ($members) => $members
                 ->when($key->user_id, fn ($query) => $query->where('user_id', $key->user_id))
                 ->whereIn('permission_level', [ProjectMember::PERMISSION_ADMIN, ProjectMember::PERMISSION_EDIT, ProjectMember::PERMISSION_COMMENT]))
             ->firstOrFail();
+        $this->contextGuard->assertProposalContext($key, $project, $arguments['items'] ?? []);
 
         $existing = AiProposal::query()
             ->where('workspace_id', $key->workspace_id)
@@ -222,47 +254,50 @@ class AiMcpToolService
             ->where('idempotency_key', $arguments['idempotency_key'])
             ->first();
         if ($existing) {
+            if ($existing->project_id !== $project->id || $existing->requested_by !== $key->user_id) {
+                throw ValidationException::withMessages(['idempotency_key' => 'Idempotency Keyは別の提案ですでに使用されています。']);
+            }
+            if (! $this->proposalFactory->matchesInput($existing, $arguments)) {
+                throw ValidationException::withMessages(['idempotency_key' => '同じIdempotency Keyを異なる提案内容には使用できません。']);
+            }
+
             return $this->proposalResult($existing, true);
         }
 
-        $proposal = DB::transaction(function () use ($key, $project, $arguments): AiProposal {
-            $proposal = AiProposal::create([
-                'organization_id' => $project->organization_id,
-                'workspace_id' => $key->workspace_id,
-                'project_id' => $project->id,
-                'source' => 'codex',
-                'mode' => $arguments['mode'] ?? AiProposal::MODE_DIFFERENTIAL,
-                'idempotency_key' => $arguments['idempotency_key'],
-                'title' => $arguments['title'],
-                'summary' => $arguments['summary'] ?? null,
-                'evidence' => $arguments['evidence'] ?? null,
-                'status' => AiProposal::STATUS_PENDING,
-                'requested_by' => $key->user_id,
-            ]);
-            foreach ($arguments['items'] as $index => $item) {
-                $proposal->items()->create([
-                    'operation' => $item['operation'],
-                    'entity_type' => $item['entity_type'],
-                    'target_public_id' => $item['target_public_id'] ?? null,
-                    'reference_key' => $item['reference_key'] ?? null,
-                    'parent_reference' => $item['parent_reference'] ?? null,
-                    'attributes' => $item['attributes'],
-                    'sort_order' => ($index + 1) * 10,
-                ]);
-            }
-            if (! empty($arguments['ai_request_public_id'])) {
-                $aiRequest = AiRequest::query()->lockForUpdate()
-                    ->where('workspace_id', $key->workspace_id)->where('project_id', $project->id)
-                    ->where('public_id', $arguments['ai_request_public_id'])->firstOrFail();
-                if (! in_array($aiRequest->status, [AiRequest::STATUS_PENDING, AiRequest::STATUS_PROCESSING], true)
-                    || ($aiRequest->claimed_by_access_key_id && $aiRequest->claimed_by_access_key_id !== $key->id)) {
-                    throw ValidationException::withMessages(['request' => 'このAI依頼には提案を紐づけられません。']);
+        try {
+            $proposal = DB::transaction(function () use ($key, $project, $arguments): AiProposal {
+                $proposal = $this->proposalFactory->create($key, $project, $arguments);
+                if (! empty($arguments['ai_request_public_id'])) {
+                    $aiRequest = AiRequest::query()->lockForUpdate()
+                        ->where('workspace_id', $key->workspace_id)->where('project_id', $project->id)
+                        ->where('public_id', $arguments['ai_request_public_id'])->firstOrFail();
+                    if (! in_array($aiRequest->status, [AiRequest::STATUS_PENDING, AiRequest::STATUS_PROCESSING], true)
+                        || ($aiRequest->claimed_by_access_key_id && $aiRequest->claimed_by_access_key_id !== $key->id)) {
+                        throw ValidationException::withMessages(['request' => 'このAI依頼には提案を紐づけられません。']);
+                    }
+                    $aiRequest->update(['status' => AiRequest::STATUS_PROPOSED, 'claimed_by_access_key_id' => $key->id, 'claimed_at' => $aiRequest->claimed_at ?? now(), 'ai_proposal_id' => $proposal->id]);
                 }
-                $aiRequest->update(['status' => AiRequest::STATUS_PROPOSED, 'claimed_by_access_key_id' => $key->id, 'claimed_at' => $aiRequest->claimed_at ?? now(), 'ai_proposal_id' => $proposal->id]);
+
+                return $proposal;
+            });
+        } catch (UniqueConstraintViolationException $error) {
+            $proposal = AiProposal::query()
+                ->where('workspace_id', $key->workspace_id)
+                ->where('source', 'codex')
+                ->where('idempotency_key', $arguments['idempotency_key'])
+                ->first();
+            if (! $proposal) {
+                throw $error;
+            }
+            if ($proposal->project_id !== $project->id || $proposal->requested_by !== $key->user_id) {
+                throw ValidationException::withMessages(['idempotency_key' => 'Idempotency Keyは別の提案ですでに使用されています。']);
+            }
+            if (! $this->proposalFactory->matchesInput($proposal, $arguments)) {
+                throw ValidationException::withMessages(['idempotency_key' => '同じIdempotency Keyを異なる提案内容には使用できません。']);
             }
 
-            return $proposal;
-        });
+            return $this->proposalResult($proposal, true);
+        }
 
         return $this->proposalResult($this->validator->validate($proposal), false);
     }
@@ -270,6 +305,7 @@ class AiMcpToolService
     public function submitHandoffProposal(AiAccessKey $key, array $arguments): array
     {
         $this->requireScope($key, AiAccessKey::SCOPE_PROPOSALS_CREATE);
+        $this->contextGuard->assertKeyIdentity($key);
         $project = $this->visibleProjects($key)
             ->where('public_id', $arguments['project_public_id'])
             ->whereHas('members', fn ($members) => $members
@@ -280,6 +316,7 @@ class AiMcpToolService
                     ProjectMember::PERMISSION_COMMENT,
                 ]))
             ->firstOrFail();
+        $this->contextGuard->assertProposalContext($key, $project);
 
         $existing = $project->handoffs()
             ->where('idempotency_key', $arguments['idempotency_key'])
@@ -327,9 +364,11 @@ class AiMcpToolService
     {
         return Project::query()
             ->where('owning_workspace_id', $key->workspace_id)
+            ->where('organization_id', $key->workspace->organization_id)
             ->when($key->user_id, fn ($query) => $query->whereHas('members', fn ($members) => $members
                 ->where('user_id', $key->user_id)
-                ->where('status', ProjectMember::STATUS_ACTIVE)));
+                ->where('status', ProjectMember::STATUS_ACTIVE)
+                ->where('project_role', '!=', ProjectMember::ROLE_CLIENT)));
     }
 
     private function requireScope(AiAccessKey $key, string $scope): void

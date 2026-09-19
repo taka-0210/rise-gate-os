@@ -52,7 +52,7 @@ class AiProposalItemReviewTest extends TestCase
         $this->assertDatabaseHas('ai_proposal_item_reviews', ['ai_proposal_item_id' => $secondTask->id, 'action' => 'exclude']);
     }
 
-    public function test_member_can_save_item_instruction_and_unresolved_instruction_blocks_apply(): void
+    public function test_member_can_save_item_instruction_and_unresolved_instruction_blocks_approval(): void
     {
         [$user, $workspace, $project, $proposal, $item] = $this->fixture();
 
@@ -70,7 +70,7 @@ class AiProposalItemReviewTest extends TestCase
         ]);
 
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
-            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
             ->assertSessionHasErrors('reviews');
     }
 

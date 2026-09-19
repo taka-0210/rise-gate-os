@@ -2,28 +2,36 @@
 
 namespace App\Models;
 
+use App\Support\TaskProgress;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
-use App\Support\TaskProgress;
 
 class Improvement extends Model
 {
     use HasFactory, SoftDeletes;
 
     public const STATUS_PROPOSED = 'proposed';
+
     public const STATUS_PLANNED = 'planned';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_IMPLEMENTED = 'implemented';
+
     public const STATUS_MEASURED = 'measured';
+
     public const STATUS_CLOSED = 'closed';
+
     public const STATUS_ARCHIVED = 'archived';
 
     public const VISIBILITY_INTERNAL = 'internal';
+
     public const VISIBILITY_PROJECT = 'project';
+
     public const VISIBILITY_CLIENT = 'client';
 
     protected $fillable = [
@@ -66,6 +74,7 @@ class Improvement extends Model
     protected function casts(): array
     {
         return [
+            'plan_version' => 'integer',
             'implemented_at' => 'datetime',
             'planned_start_date' => 'date',
             'target_date' => 'date',

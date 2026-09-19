@@ -8,6 +8,7 @@ use App\Models\AiAuditLog;
 use App\Models\AiProposal;
 use App\Models\Project;
 use App\Services\AiMcpToolService;
+use App\Services\AiProposalContract;
 use App\Support\AiTextIntegrity;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -134,6 +135,12 @@ class AiMcpController extends Controller
             'metadata' => [
                 'operation_count' => is_array($arguments['items'] ?? null) ? count($arguments['items']) : null,
                 'idempotency_key' => $arguments['idempotency_key'] ?? null,
+                'resource_ids' => array_filter([
+                    'project' => $arguments['project_public_id'] ?? null,
+                    'request' => $arguments['request_public_id'] ?? null,
+                    'attachment' => $arguments['attachment_public_id'] ?? null,
+                    'proposal' => is_array($result) ? ($result['proposal_id'] ?? null) : null,
+                ]),
             ],
             'occurred_at' => now(),
         ]);
@@ -150,18 +157,23 @@ class AiMcpController extends Controller
     {
         $validated = Validator::validate($arguments, [
             'project_public_id' => ['required', 'string'],
+            'contract_version' => ['required', Rule::in([AiProposalContract::VERSION])],
+            'expected_project_version' => ['required', 'integer', 'min:1'],
             'idempotency_key' => ['required', 'string', 'max:120'],
             'title' => ['required', 'string', 'max:255'],
-            'mode' => ['sometimes', Rule::in(array_keys(\App\Models\AiProposal::modes()))],
+            'mode' => ['sometimes', Rule::in([AiProposal::MODE_DIFFERENTIAL])],
             'summary' => ['nullable', 'string'],
             'evidence' => ['nullable', 'array'],
             'ai_request_public_id' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
-            'items.*.operation' => ['required', Rule::in(['create', 'update', 'delete'])],
+            'items.*.operation' => ['required', Rule::in(['create', 'update'])],
             'items.*.entity_type' => ['required', Rule::in(['project', 'roadmap', 'improvement', 'task'])],
             'items.*.target_public_id' => ['nullable', 'string'],
             'items.*.reference_key' => ['nullable', 'string', 'max:120'],
             'items.*.parent_reference' => ['nullable', 'string', 'max:120'],
+            'items.*.depends_on' => ['sometimes', 'array'],
+            'items.*.depends_on.*' => ['string', 'max:120', 'distinct'],
+            'items.*.expected_version' => ['required', 'integer', 'min:1'],
             'items.*.attributes' => ['present', 'array'],
         ]);
 
@@ -235,12 +247,14 @@ class AiMcpController extends Controller
                     'type' => 'object',
                     'properties' => [
                         'project_public_id' => ['type' => 'string'],
+                        'contract_version' => ['type' => 'string', 'enum' => [AiProposalContract::VERSION]],
+                        'expected_project_version' => ['type' => 'integer', 'minimum' => 1],
                         'idempotency_key' => ['type' => 'string'],
                         'title' => ['type' => 'string'],
                         'mode' => [
                             'type' => 'string',
-                            'enum' => array_keys(\App\Models\AiProposal::modes()),
-                            'description' => '通常はdifferential。現在のタイムライン全体を1番から再構成する場合はreplace_timeline。',
+                            'enum' => [AiProposal::MODE_DIFFERENTIAL],
+                            'description' => 'Scope 1ではdifferentialのみ指定できます。',
                         ],
                         'summary' => ['type' => ['string', 'null']],
                         'evidence' => ['type' => ['object', 'null'], 'additionalProperties' => true],
@@ -248,18 +262,20 @@ class AiMcpController extends Controller
                         'items' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 100, 'items' => [
                             'type' => 'object',
                             'properties' => [
-                                'operation' => ['type' => 'string', 'enum' => ['create', 'update', 'delete']],
+                                'operation' => ['type' => 'string', 'enum' => ['create', 'update']],
                                 'entity_type' => ['type' => 'string', 'enum' => ['project', 'roadmap', 'improvement', 'task']],
                                 'target_public_id' => ['type' => ['string', 'null']],
                                 'reference_key' => ['type' => ['string', 'null']],
                                 'parent_reference' => ['type' => ['string', 'null']],
+                                'depends_on' => ['type' => 'array', 'items' => ['type' => 'string']],
+                                'expected_version' => ['type' => 'integer', 'minimum' => 1],
                                 'attributes' => ['type' => 'object', 'additionalProperties' => true],
                             ],
-                            'required' => ['operation', 'entity_type', 'attributes'],
+                            'required' => ['operation', 'entity_type', 'expected_version', 'attributes'],
                             'additionalProperties' => false,
                         ]],
                     ],
-                    'required' => ['project_public_id', 'idempotency_key', 'title', 'items'],
+                    'required' => ['project_public_id', 'contract_version', 'expected_project_version', 'idempotency_key', 'title', 'items'],
                     'additionalProperties' => false,
                 ],
                 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true],

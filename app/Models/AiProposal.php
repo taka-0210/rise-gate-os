@@ -14,12 +14,17 @@ class AiProposal extends Model
     use SoftDeletes;
 
     public const MODE_DIFFERENTIAL = 'differential';
+
     public const MODE_REPLACE_TIMELINE = 'replace_timeline';
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_REJECTED = 'rejected';
+
     public const STATUS_APPLIED = 'applied';
+
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
@@ -27,7 +32,9 @@ class AiProposal extends Model
         'idempotency_key', 'title', 'summary', 'status', 'evidence',
         'requested_by', 'reviewed_by', 'reviewed_at', 'applied_at',
         'handed_off_by', 'handed_off_at', 'failure_reason',
-        'applied_plan_version_id',
+        'applied_plan_version_id', 'contract_version', 'capability', 'risk_level',
+        'content_hash', 'expected_project_version', 'approval_policy',
+        'approved_content_hash', 'approved_project_version', 'approved_by', 'approved_at',
     ];
 
     protected function casts(): array
@@ -37,6 +44,9 @@ class AiProposal extends Model
             'reviewed_at' => 'datetime',
             'applied_at' => 'datetime',
             'handed_off_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'expected_project_version' => 'integer',
+            'approved_project_version' => 'integer',
         ];
     }
 
@@ -47,14 +57,60 @@ class AiProposal extends Model
         });
     }
 
-    public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
-    public function workspace(): BelongsTo { return $this->belongsTo(Workspace::class); }
-    public function project(): BelongsTo { return $this->belongsTo(Project::class); }
-    public function requester(): BelongsTo { return $this->belongsTo(User::class, 'requested_by'); }
-    public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
-    public function appliedPlanVersion(): BelongsTo { return $this->belongsTo(ProjectPlanVersion::class, 'applied_plan_version_id'); }
-    public function items(): HasMany { return $this->hasMany(AiProposalItem::class)->orderBy('sort_order')->orderBy('id'); }
-    public function aiRequest() { return $this->hasOne(AiRequest::class); }
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function requester(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function appliedPlanVersion(): BelongsTo
+    {
+        return $this->belongsTo(ProjectPlanVersion::class, 'applied_plan_version_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(AiProposalItem::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function applyAttempts(): HasMany
+    {
+        return $this->hasMany(AiProposalApplyAttempt::class);
+    }
+
+    public function undos(): HasMany
+    {
+        return $this->hasMany(AiProposalUndo::class);
+    }
+
+    public function aiRequest()
+    {
+        return $this->hasOne(AiRequest::class);
+    }
 
     public function itemReviews(): HasManyThrough
     {

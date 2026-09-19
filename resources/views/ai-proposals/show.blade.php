@@ -187,19 +187,31 @@
         </div>
 
         @include('ai-proposals._item-review-summary')
+        @include('ai-proposals._scope-one-actions')
 
         @if ($canReview && $proposal->status === \App\Models\AiProposal::STATUS_PENDING)
             <div class="card stack">
-                <h2>確認と反映</h2>
-                @if ($itemCounts['invalid'] > 0)
+                <h2>提案内容を確認</h2>
+                @if ($proposal->contract_version !== \App\Services\AiProposalContract::VERSION)
+                    <p class="error">この提案は旧形式です。本データへ適用せず、最新状態から再提案してください。</p>
+                    <form method="POST" action="{{ route('projects.ai-proposals.request-revision', [$project, $proposal]) }}">
+                        @csrf
+                        <input type="hidden" name="overall_feedback" value="最新のProject状態とScope 1 Contractで、同じ目的の変更を再提案してください。">
+                        <button type="submit">最新形式で再提案を依頼</button>
+                    </form>
+                @elseif ($itemCounts['invalid'] > 0)
                     <p class="error">検証エラーがあるため反映できません。提案内容を修正して再送してください。</p>
                 @else
-                    <p>{{ $proposal->replacesTimeline() ? '承認すると、現在のタイムラインを保存したあと、下記の内容へ全面置換します。' : '承認すると、下記の変更を一つの処理として本データへ反映します。' }}</p>
+                    <p>変更前後の内容を確認します。この操作では本データを変更しません。</p>
                 @endif
                 <div class="actions">
-                    <form method="POST" action="{{ route('projects.ai-proposals.apply', [$project, $proposal]) }}">
+                    <form method="POST" action="{{ route('projects.ai-proposals.approve', [$project, $proposal]) }}">
                         @csrf
-                        <button type="submit" @disabled($itemCounts['invalid'] > 0 || $unresolvedReviewCount > 0)>承認して反映</button>
+                        <button type="submit" @disabled(
+                            $proposal->contract_version !== \App\Services\AiProposalContract::VERSION
+                            || $itemCounts['invalid'] > 0
+                            || $unresolvedReviewCount > 0
+                        )>内容を確認</button>
                     </form>
                     <form method="POST" action="{{ route('projects.ai-proposals.reject', [$project, $proposal]) }}">
                         @csrf
@@ -302,7 +314,7 @@
         <div class="card stack">
             <div>
                 <h2>変更内容</h2>
-                <p>現在は閲覧のみです。承認・反映処理は次の段階で追加します。</p>
+                <p>適用対象と変更前後を確認できます。内部の識別子や検証結果は監査用情報です。</p>
             </div>
             @forelse ($proposal->items as $item)
                 <article style="border-top:1px solid var(--line); padding-top:16px;">
@@ -315,7 +327,16 @@
                     @if ($item->reference_key || $item->parent_reference)
                         <p class="meta">参照キー: {{ $item->reference_key ?: '—' }} / 親参照: {{ $item->parent_reference ?: '—' }}</p>
                     @endif
-                    <pre style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ json_encode($item->attributes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                    <div class="grid">
+                        <div>
+                            <div class="meta">変更前</div>
+                            <pre style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ json_encode($item->before, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                        </div>
+                        <div>
+                            <div class="meta">変更後</div>
+                            <pre style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ json_encode($item->after ?? $item->attributes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                        </div>
+                    </div>
                     @if ($item->validation_message)<div class="error">{{ $item->validation_message }}</div>@endif
                 </article>
             @empty

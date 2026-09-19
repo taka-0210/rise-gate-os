@@ -14,10 +14,13 @@ use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\AiProposalContract;
+use App\Services\AiProposalValidator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -273,7 +276,7 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee('新しいタスクを登録する')
             ->assertSee('承認待ち')
             ->assertSee('承認待ちから外す')
-            ->assertSee('現在は閲覧のみです');
+            ->assertSee('本データへ適用せず、最新状態から再提案してください');
         $this->assertDatabaseCount('tasks', 0);
         $this->assertDatabaseHas('ai_proposals', ['id' => $proposal->id, 'status' => 'pending']);
     }
@@ -377,6 +380,12 @@ class AiProposalFoundationTest extends TestCase
             ['operation' => 'create', 'entity_type' => 'task', 'parent_reference' => 'improvement-1', 'attributes' => ['title' => 'AI Task'], 'sort_order' => 30],
         ]);
 
+        $this->makeScopeOne($proposal, $project);
+        app(AiProposalValidator::class)->validate($proposal);
+        $this->actingAs($user)
+            ->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
+            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
@@ -448,6 +457,7 @@ class AiProposalFoundationTest extends TestCase
             ],
         ]);
 
+        $this->makeScopeOne($proposal, $project);
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
             ->get(route('projects.ai-proposals.show', [$project, $proposal]))
             ->assertOk()
@@ -455,6 +465,9 @@ class AiProposalFoundationTest extends TestCase
             ->assertSee('情報発信をSNSに依存している。')
             ->assertSee('自社サイトと管理画面を継続運用できる。');
 
+        $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
+            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
         $this->actingAs($user)->withSession(['current_workspace_id' => $workspace->id])
             ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
             ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
@@ -483,16 +496,21 @@ class AiProposalFoundationTest extends TestCase
             'attributes' => ['title' => 'Unsafe Task', 'password' => 'secret'],
         ]);
 
+        $this->makeScopeOne($proposal, $project);
+        $item = $proposal->items()->firstOrFail();
+        $item->update(['attributes' => ['title' => 'Unsafe Task', 'password' => 'secret'], 'after' => ['title' => 'Unsafe Task', 'password' => 'secret']]);
+        $proposal->refresh()->load('items');
+        $proposal->update(['content_hash' => AiProposalContract::proposalHash($proposal)]);
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
             ->assertSessionHasErrors('proposal');
 
         $this->assertDatabaseMissing('tasks', ['title' => 'Unsafe Task']);
         $this->assertSame(AiProposal::STATUS_PENDING, $proposal->fresh()->status);
     }
 
-    public function test_project_admin_can_apply_hierarchical_delete_proposal_safely(): void
+    public function test_scope_one_rejects_hierarchical_delete_without_changing_data(): void
     {
         [$user, $workspace, $project] = $this->projectOwner('delete');
         $roadmap = Roadmap::create([
@@ -525,23 +543,20 @@ class AiProposalFoundationTest extends TestCase
             ['operation' => 'delete', 'entity_type' => 'improvement', 'target_public_id' => $improvement->public_id, 'attributes' => [], 'sort_order' => 20],
         ]);
 
+        $this->makeScopeOne($proposal, $project);
+        app(AiProposalValidator::class)->validate($proposal);
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->get(route('projects.ai-proposals.show', [$project, $proposal]))
-            ->assertOk()
-            ->assertSeeInOrder(['ロードマップ', '1', '→', '0', '取り組み', '1', '→', '0', 'タスク', '0', '→', '0']);
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
+            ->assertSessionHasErrors('proposal');
 
-        $this->actingAs($user)
-            ->withSession(['current_workspace_id' => $workspace->id])
-            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
-            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
-
-        $this->assertSoftDeleted($improvement);
-        $this->assertSoftDeleted($roadmap);
-        $this->assertSame(AiProposal::STATUS_APPLIED, $proposal->fresh()->status);
+        $this->assertNotSoftDeleted($improvement);
+        $this->assertNotSoftDeleted($roadmap);
+        $this->assertSame(AiProposal::STATUS_PENDING, $proposal->fresh()->status);
+        $this->assertStringContainsString('Scope 1で許可されていない', $proposal->items()->firstOrFail()->validation_message);
     }
 
-    public function test_delete_proposal_is_invalid_when_children_would_remain(): void
+    public function test_scope_one_rejects_delete_even_when_children_would_remain(): void
     {
         [$user, $workspace, $project] = $this->projectOwner('unsafe-delete');
         $roadmap = Roadmap::create([
@@ -576,13 +591,15 @@ class AiProposalFoundationTest extends TestCase
             'attributes' => [],
         ]);
 
+        $this->makeScopeOne($proposal, $project);
+        app(AiProposalValidator::class)->validate($proposal);
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
             ->assertSessionHasErrors('proposal');
 
         $this->assertNotSoftDeleted($roadmap);
-        $this->assertStringContainsString('取り組みが残っている', $proposal->items()->firstOrFail()->fresh()->validation_message);
+        $this->assertStringContainsString('Scope 1で許可されていない', $proposal->items()->firstOrFail()->fresh()->validation_message);
     }
 
     private function proposal(Project $project, User $user): AiProposal
@@ -610,7 +627,7 @@ class AiProposalFoundationTest extends TestCase
         return $proposal;
     }
 
-    public function test_project_admin_can_replace_the_entire_timeline_and_keep_the_previous_snapshot(): void
+    public function test_scope_one_rejects_entire_timeline_replacement_without_changing_data(): void
     {
         [$user, $workspace, $project] = $this->projectOwner('replace-timeline');
         $project->update(['duration_days' => 30]);
@@ -693,48 +710,23 @@ class AiProposalFoundationTest extends TestCase
             ],
         ]);
 
-        $this->actingAs($user)
-            ->withSession(['current_workspace_id' => $workspace->id])
-            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
-            ->assertRedirect(route('projects.ai-proposals.show', [$project, $proposal]));
-
-        $this->assertSoftDeleted($oldTask);
-        $this->assertSoftDeleted($oldImprovement);
-        $this->assertSoftDeleted($oldRoadmap);
-        $this->assertDatabaseHas('roadmaps', [
-            'project_id' => $project->id,
-            'title' => 'Domain and server preparation',
-            'status' => Roadmap::STATUS_COMPLETED,
-            'sort_order' => 10,
-        ]);
-        $this->assertDatabaseHas('improvements', [
-            'project_id' => $project->id,
-            'title' => 'Acquire the domain',
-            'status' => Improvement::STATUS_IMPLEMENTED,
-        ]);
-        $newTask = Task::where('project_id', $project->id)
-            ->where('title', 'Complete the domain contract')
-            ->firstOrFail();
-        $this->assertSame(Task::STATUS_DONE, $newTask->status);
-        $this->assertNotNull($newTask->completed_at);
-
-        $version = $proposal->fresh()->appliedPlanVersion;
-        $this->assertSame(\App\Models\ProjectPlanVersion::TYPE_PROPOSAL_BEFORE, $version->version_type);
-        $this->assertSame('Old Roadmap', data_get($version->plan_snapshot, 'roadmaps.0.title'));
-        $newRoadmap = $project->roadmaps()->firstOrFail();
-        $this->assertSame('Domain and server preparation', $newRoadmap->title);
-        $this->assertSame('AI提案を反映する直前のタイムラインを自動保存しました。', $version->note);
+        $this->makeScopeOne($proposal, $project);
+        $proposal->update(['mode' => AiProposal::MODE_REPLACE_TIMELINE]);
+        $proposal->refresh()->load('items');
+        $proposal->update(['content_hash' => AiProposalContract::proposalHash($proposal)]);
+        app(AiProposalValidator::class)->validate($proposal);
 
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->post(route('projects.timeline-snapshots.restore', [$project, $version]), [
-                'confirmed' => '1',
-            ])
-            ->assertRedirect();
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
+            ->assertSessionHasErrors('proposal');
 
-        $this->assertNotSoftDeleted($oldRoadmap->fresh());
-        $this->assertSoftDeleted($newRoadmap);
-        $this->assertSame('Old Roadmap', $project->roadmaps()->firstOrFail()->title);
+        $this->assertNotSoftDeleted($oldTask);
+        $this->assertNotSoftDeleted($oldImprovement);
+        $this->assertNotSoftDeleted($oldRoadmap);
+        $this->assertDatabaseMissing('roadmaps', ['project_id' => $project->id, 'title' => 'Domain and server preparation']);
+        $this->assertSame(AiProposal::STATUS_PENDING, $proposal->fresh()->status);
+        $this->assertStringContainsString('Timeline全置換', $proposal->items()->firstOrFail()->validation_message);
     }
 
     public function test_timeline_replacement_requires_at_least_one_new_roadmap(): void
@@ -757,13 +749,19 @@ class AiProposalFoundationTest extends TestCase
             'attributes' => ['summary' => 'Only project metadata'],
         ]);
 
+        $this->makeScopeOne($proposal, $project);
+        $proposal->update(['mode' => AiProposal::MODE_REPLACE_TIMELINE]);
+        $proposal->refresh()->load('items');
+        $proposal->update(['content_hash' => AiProposalContract::proposalHash($proposal)]);
+        app(AiProposalValidator::class)->validate($proposal);
+
         $this->actingAs($user)
             ->withSession(['current_workspace_id' => $workspace->id])
-            ->post(route('projects.ai-proposals.apply', [$project, $proposal]))
+            ->post(route('projects.ai-proposals.approve', [$project, $proposal]))
             ->assertSessionHasErrors('proposal');
 
         $this->assertStringContainsString(
-            'Roadmap',
+            'Timeline全置換',
             $proposal->items()->firstOrFail()->fresh()->validation_message,
         );
     }
@@ -797,5 +795,40 @@ class AiProposalFoundationTest extends TestCase
         ]);
 
         return [$user, $workspace, $project];
+    }
+
+    private function makeScopeOne(AiProposal $proposal, Project $project): void
+    {
+        $project->refresh();
+        $proposal->update([
+            'mode' => AiProposal::MODE_DIFFERENTIAL,
+            'contract_version' => AiProposalContract::VERSION,
+            'capability' => AiProposalContract::CAPABILITY,
+            'risk_level' => AiProposalContract::RISK_LEVEL,
+            'approval_policy' => AiProposalContract::APPROVAL_POLICY,
+            'expected_project_version' => $project->plan_version,
+        ]);
+        foreach ($proposal->items as $item) {
+            $allowed = AiProposalContract::ALLOWED_ATTRIBUTES[$item->entity_type];
+            $after = Arr::only($item->attributes, $allowed);
+            $target = match ($item->entity_type) {
+                'project' => $project,
+                'roadmap' => $project->roadmaps()->where('public_id', $item->target_public_id)->first(),
+                'improvement' => $project->improvements()->where('public_id', $item->target_public_id)->first(),
+                'task' => $project->tasks()->where('public_id', $item->target_public_id)->first(),
+            };
+            $item->update([
+                'attributes' => $after,
+                'after' => $after,
+                'before' => $target ? Arr::only($target->getAttributes(), $allowed) : null,
+                'expected_version' => $target?->plan_version ?? $project->plan_version,
+                'depends_on' => $item->parent_reference
+                    && $proposal->items->contains('reference_key', $item->parent_reference)
+                        ? [$item->parent_reference]
+                        : [],
+            ]);
+        }
+        $proposal->refresh()->load('items');
+        $proposal->update(['content_hash' => AiProposalContract::proposalHash($proposal)]);
     }
 }

@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AiAuditLog;
 use App\Models\AiChatMessage;
 use App\Models\AiChatThread;
-use App\Models\Improvement;
 use App\Models\Project;
-use App\Models\ProjectMember;
+use App\Services\AiChatPayload;
 use App\Services\AiChatUsage;
+use App\Services\AiProjectContextGuard;
 use App\Services\ImageSavePath;
 use App\Services\LocalDevelopmentContract;
 use App\Services\OpenAiChatService;
@@ -19,12 +19,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AiChatController extends Controller
 {
-    public function store(Request $request, Project $project, OpenAiChatService $chat): JsonResponse
+    public function store(Request $request, Project $project, OpenAiChatService $chat, AiProjectContextGuard $contextGuard): JsonResponse
     {
         Gate::authorize('view', $project);
         $workspace = $request->attributes->get('currentWorkspace');
@@ -34,7 +35,7 @@ class AiChatController extends Controller
             return response()->json(['message' => 'このWorkspaceではAI機能が有効になっていません。'], 403);
         }
 
-        \App\Services\AiChatPayload::decode($request);
+        AiChatPayload::decode($request);
 
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:4000'],
@@ -51,11 +52,21 @@ class AiChatController extends Controller
             'file_content' => ['nullable', 'string', 'max:1000000'],
             'project_files' => ['nullable', 'json', 'max:1000000'],
         ]);
+        $allowedCategories = $contextGuard->allowedCategoriesForUser($request->user(), $project);
+        $context = $this->projectContext($request, $project, $validated, $allowedCategories);
+        if ($this->contextTooLarge($context)) {
+            $this->auditContextRejection($workspace->id, $request->user()->id, $project);
+            throw ValidationException::withMessages([
+                'ai_context' => 'AIへ送る情報が上限を超えています。対象ファイルや範囲を減らしてください。',
+            ]);
+        }
 
         $images = $request->file('images', []);
-        if ($request->file('image')) array_unshift($images, $request->file('image'));
+        if ($request->file('image')) {
+            array_unshift($images, $request->file('image'));
+        }
         if (count($images) > 3 || array_sum(array_map(fn ($file) => $file->getSize(), $images)) > 10 * 1024 * 1024) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['images'=>'画像は3枚まで、合計10MB以内で添付してください。']);
+            throw ValidationException::withMessages(['images' => '画像は3枚まで、合計10MB以内で添付してください。']);
         }
 
         $thread = AiChatThread::firstOrCreate([
@@ -75,16 +86,20 @@ class AiChatController extends Controller
         $stored = [];
         try {
             foreach ($images as $image) {
-                $stored[] = ['path'=>$image->store("ai-chat/{$thread->id}", 'local'), 'name'=>$image->getClientOriginalName(),
-                    'mime'=>$image->getMimeType(), 'size'=>$image->getSize()];
+                $stored[] = ['path' => $image->store("ai-chat/{$thread->id}", 'local'), 'name' => $image->getClientOriginalName(),
+                    'mime' => $image->getMimeType(), 'size' => $image->getSize()];
             }
-            if ($stored) $userMessage->update([
-                'image_path'=>$stored[0]['path'], 'image_name'=>$stored[0]['name'],
-                'image_mime'=>$stored[0]['mime'], 'image_size'=>$stored[0]['size'],
-                'additional_images'=>array_slice($stored, 1),
-            ]);
+            if ($stored) {
+                $userMessage->update([
+                    'image_path' => $stored[0]['path'], 'image_name' => $stored[0]['name'],
+                    'image_mime' => $stored[0]['mime'], 'image_size' => $stored[0]['size'],
+                    'additional_images' => array_slice($stored, 1),
+                ]);
+            }
         } catch (\Throwable $error) {
-            foreach ($stored as $image) Storage::disk('local')->delete($image['path']);
+            foreach ($stored as $image) {
+                Storage::disk('local')->delete($image['path']);
+            }
             $userMessage->delete();
             throw $error;
         }
@@ -112,10 +127,15 @@ class AiChatController extends Controller
             ]);
         }
 
-        $context = $this->projectContext($request, $project, $validated);
         $context['generated_images'] = $thread->messages()->reorder()->where('role', AiChatMessage::ROLE_ASSISTANT)
             ->whereNotNull('image_path')->latest('id')->limit(30)->get()
-            ->map(fn (AiChatMessage $message): array => ['message_id' => $message->id, 'description' => $message->content, 'name' => $message->image_name])->all();
+            ->map(fn (AiChatMessage $message): array => ['message_id' => $message->id, 'description' => mb_substr($message->content, 0, 500), 'name' => $message->image_name])->all();
+        if ($this->contextTooLarge($context)) {
+            $this->auditContextRejection($workspace->id, $request->user()->id, $project);
+            throw ValidationException::withMessages([
+                'ai_context' => 'AIへ送る情報が上限を超えています。対象ファイルや範囲を減らしてください。',
+            ]);
+        }
         $startedAt = microtime(true);
         try {
             $result = $chat->respond(
@@ -162,12 +182,14 @@ class AiChatController extends Controller
                     'estimated_cost_microusd' => $assistantMessage->estimated_cost_microusd,
                     'image_input_tokens' => $assistantMessage->image_input_tokens,
                     'image_output_tokens' => $assistantMessage->image_output_tokens,
+                    'resource_ids' => ['project' => $project->public_id],
+                    'context_categories' => $allowedCategories,
                 ],
                 'occurred_at' => now(),
             ]);
 
             return response()->json(['message' => $this->messageData($assistantMessage), 'related_messages' => array_map(fn ($message) => $this->messageData($message), $relatedMessages), 'usage' => AiChatUsage::summary($thread)]);
-        } catch (RuntimeException $exception) {
+        } catch (\Throwable $exception) {
             AiAuditLog::create([
                 'workspace_id' => $workspace->id,
                 'user_id' => $request->user()->id,
@@ -177,11 +199,29 @@ class AiChatController extends Controller
                 'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
                 'request_fingerprint' => hash('sha256', $userMessage->content),
                 'error_message' => $exception->getMessage(),
+                'metadata' => [
+                    'resource_ids' => ['project' => $project->public_id],
+                    'context_categories' => $allowedCategories,
+                ],
                 'occurred_at' => now(),
             ]);
 
             return response()->json(['message' => $exception->getMessage()], 502);
         }
+    }
+
+    private function auditContextRejection(int $workspaceId, int $userId, Project $project): void
+    {
+        AiAuditLog::create([
+            'workspace_id' => $workspaceId,
+            'user_id' => $userId,
+            'project_id' => $project->id,
+            'event' => 'ai_chat.context_rejected',
+            'succeeded' => false,
+            'error_message' => 'AI Contextの文字数上限を超えています。',
+            'metadata' => ['resource_ids' => ['project' => $project->public_id]],
+            'occurred_at' => now(),
+        ]);
     }
 
     public function image(Request $request, Project $project, AiChatMessage $message): StreamedResponse
@@ -200,6 +240,7 @@ class AiChatController extends Controller
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
+
     public function markImageSaved(Request $request, Project $project, AiChatMessage $message): JsonResponse
     {
         Gate::authorize('view', $project);
@@ -258,11 +299,21 @@ class AiChatController extends Controller
             && preg_match('/(?:元に戻|戻そ|戻して|復元|もど)/u', $content) === 1;
     }
 
-    private function projectContext(Request $request, Project $project, array $validated): array
+    private function projectContext(Request $request, Project $project, array $validated, array $allowedCategories): array
     {
-        $memberRole = $project->members()->where('user_id', $request->user()->id)
-            ->where('status', ProjectMember::STATUS_ACTIVE)->value('project_role');
-        $project->load(['client', 'roadmaps.improvements.tasks']);
+        $load = [];
+        if (in_array('roadmaps', $allowedCategories, true)) {
+            $load[] = 'roadmaps';
+        }
+        if (in_array('roadmaps', $allowedCategories, true) && in_array('improvements', $allowedCategories, true)) {
+            $load[] = 'roadmaps.improvements';
+        }
+        if (in_array('roadmaps', $allowedCategories, true) && in_array('improvements', $allowedCategories, true) && in_array('tasks', $allowedCategories, true)) {
+            $load[] = 'roadmaps.improvements.tasks';
+        }
+        if ($load !== []) {
+            $project->load($load);
+        }
 
         $filePath = $validated['file_path'] ?? null;
         $fileContent = $validated['file_content'] ?? null;
@@ -317,35 +368,37 @@ class AiChatController extends Controller
                 ],
             ] : null,
             'project_files' => $projectFiles,
-            'project' => [
+            'project' => ! in_array('project_metadata', $allowedCategories, true) ? null : [
                 'name' => $project->name,
-                'client' => $project->client?->name,
                 'summary' => $project->summary,
                 'current_state' => $project->current_state,
                 'desired_future_state' => $project->desired_future_state,
-                'status' => $project->status,
-                'priority' => $project->priority,
-                'period' => [$project->start_date?->toDateString(), $project->due_date?->toDateString()],
             ],
-            'roadmaps' => $project->roadmaps->map(fn ($roadmap): array => [
+            'roadmaps' => ! in_array('roadmaps', $allowedCategories, true) ? [] : $project->roadmaps->map(fn ($roadmap): array => [
                 'title' => $roadmap->title,
                 'purpose' => $roadmap->purpose,
-                'status' => $roadmap->status,
-                'improvements' => $roadmap->improvements
-                    ->when($memberRole === ProjectMember::ROLE_CLIENT, fn ($items) => $items->where('visibility', Improvement::VISIBILITY_CLIENT))
+                'improvements' => ! in_array('improvements', $allowedCategories, true) ? [] : $roadmap->improvements
                     ->map(fn ($improvement): array => [
                         'title' => $improvement->title,
-                        'status' => $improvement->status,
                         'current_state' => $improvement->current_state,
                         'desired_state' => $improvement->desired_state,
-                        'tasks' => $improvement->tasks->map(fn ($task): array => [
+                        'problem' => $improvement->problem,
+                        'hypothesis' => $improvement->hypothesis,
+                        'action' => $improvement->action,
+                        'next_action' => $improvement->next_action,
+                        'tasks' => ! in_array('tasks', $allowedCategories, true) ? [] : $improvement->tasks->map(fn ($task): array => [
                             'title' => $task->title,
-                            'status' => $task->status,
-                            'due_date' => $task->due_date?->toDateString(),
+                            'description' => $task->description,
                         ])->values()->all(),
                     ])->values()->all(),
             ])->values()->all(),
         ];
+    }
+
+    private function contextTooLarge(array $context): bool
+    {
+        return strlen(json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))
+            > (int) config('services.ai.scope_one_context_max_chars', 100000);
     }
 
     private function messageData(AiChatMessage $message): array

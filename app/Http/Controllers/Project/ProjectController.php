@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Project;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
-use App\Models\AiProposal;
 use App\Models\AiChatThread;
+use App\Models\AiProposal;
+use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
 use App\Models\ProjectMember;
@@ -13,8 +13,9 @@ use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\ScheduleIntegrityService;
+use App\Services\AiChatUsage;
 use App\Services\RelativeScheduleService;
+use App\Services\ScheduleIntegrityService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ProjectController extends Controller
@@ -438,7 +440,7 @@ class ProjectController extends Controller
         return view('projects.workspace', [
             ...$data,
             'aiChatMessages' => $chatMessages,
-            'aiChatUsage' => \App\Services\AiChatUsage::summary($thread),
+            'aiChatUsage' => AiChatUsage::summary($thread),
             'aiChatEnabled' => (bool) $project->owningWorkspace?->aiSetting?->enabled,
             'aiChatConfigured' => (string) config('services.openai.api_key') !== '',
             'aiChatEstimatedCostMicrousd' => $chatMessages->sum('estimated_cost_microusd'),
@@ -561,7 +563,7 @@ class ProjectController extends Controller
                     ->orWhereDate('target_date', '>', $validated['due_date']))
                 ->count();
             if ($count > 0) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'start_date' => "この変更により、ロードマップ{$count}件がProjectの期間外になります。先にロードマップの日程を調整してください。",
                 ]);
             }
@@ -604,14 +606,17 @@ class ProjectController extends Controller
             Improvement::withTrashed()->where('project_id', $project->id)->update([
                 'organization_id' => $destination->organization_id,
                 'workspace_id' => $destination->id,
+                'plan_version' => DB::raw('plan_version + 1'),
             ]);
             Task::withTrashed()->where('project_id', $project->id)->update([
                 'organization_id' => $destination->organization_id,
                 'workspace_id' => $destination->id,
+                'plan_version' => DB::raw('plan_version + 1'),
             ]);
             Roadmap::withTrashed()->where('project_id', $project->id)->update([
                 'organization_id' => $destination->organization_id,
                 'workspace_id' => $destination->id,
+                'plan_version' => DB::raw('plan_version + 1'),
             ]);
             $project->members()
                 ->where('user_id', $request->user()->id)

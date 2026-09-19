@@ -13,13 +13,19 @@ class Task extends Model
     use HasFactory, SoftDeletes;
 
     public const STATUS_TODO = 'todo';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_DONE = 'done';
+
     public const STATUS_ARCHIVED = 'archived';
 
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_NORMAL = 'normal';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_URGENT = 'urgent';
 
     protected $fillable = [
@@ -52,6 +58,7 @@ class Task extends Model
     protected function casts(): array
     {
         return [
+            'plan_version' => 'integer',
             'planned_start_date' => 'date',
             'due_date' => 'date',
             'planned_start_day' => 'integer',

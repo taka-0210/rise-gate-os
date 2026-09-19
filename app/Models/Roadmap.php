@@ -2,21 +2,24 @@
 
 namespace App\Models;
 
+use App\Support\EffortProgress;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
-use App\Support\EffortProgress;
 
 class Roadmap extends Model
 {
     use HasFactory, SoftDeletes;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
@@ -39,6 +42,7 @@ class Roadmap extends Model
     protected function casts(): array
     {
         return [
+            'plan_version' => 'integer',
             'planned_start_date' => 'date',
             'target_date' => 'date',
             'planned_start_day' => 'integer',

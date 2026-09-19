@@ -15,15 +15,23 @@ class Project extends Model
     use HasFactory, SoftDeletes;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_PROPOSED = 'proposed';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_ON_HOLD = 'on_hold';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_ARCHIVED = 'archived';
 
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_NORMAL = 'normal';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_URGENT = 'urgent';
 
     protected $fillable = [
@@ -58,6 +66,7 @@ class Project extends Model
     protected function casts(): array
     {
         return [
+            'plan_version' => 'integer',
             'start_date' => 'date',
             'due_date' => 'date',
             'duration_days' => 'integer',
