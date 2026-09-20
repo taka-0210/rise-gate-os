@@ -29,7 +29,7 @@
                     <span class="meta">明細 {{ $domain->items_count }}件</span>
                 </div>
                 <h2>{{ $domain->name }}</h2>
-                @if ($domain->description)<p>{{ IlluminateSupportStr::limit($domain->description, 180) }}</p>@endif
+                @if ($domain->description)<p>{{ \Illuminate\Support\Str::limit($domain->description, 180) }}</p>@endif
             </a>
         @empty
             <div class="panel stack">

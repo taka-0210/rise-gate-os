@@ -60,6 +60,23 @@ class BusinessDomainTest extends TestCase
         $this->assertSame('organization_self_reported', $revision->snapshot['source']);
     }
 
+    public function test_index_renders_a_domain_with_description_without_server_error(): void
+    {
+        $organization = $this->organization('description-index');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $description = '実利用確認で一覧へ表示する概要です。';
+        $this->createDomain($owner, $organization, [
+            'name' => '概要あり事業',
+            'description' => $description,
+        ]);
+
+        $this->asCompany($owner, $organization)
+            ->get(route('business-domains.index'))
+            ->assertOk()
+            ->assertSee('概要あり事業')
+            ->assertSee($description);
+    }
+
     public function test_active_staff_view_current_values_but_only_owner_or_granted_staff_can_edit_and_view_history(): void
     {
         $organization = $this->organization('permissions');
