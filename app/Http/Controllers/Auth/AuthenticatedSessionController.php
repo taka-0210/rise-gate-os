@@ -8,6 +8,7 @@ use App\Services\AccountAudit;
 use App\Services\AccountLoginLimiter;
 use App\Services\Organization\OrganizationInvitationClaim;
 use App\Services\Organization\OrganizationSessionContext;
+use App\Services\Organization\OwnerOnboardingClaim;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -50,6 +51,9 @@ class AuthenticatedSessionController extends Controller
         $request->session()->forget('url.intended');
         $audit->record('account.login', 'success', $request->user(), $request->user());
 
+        if ($request->session()->has(OwnerOnboardingClaim::SESSION_KEY)) {
+            return redirect()->route('owner-onboarding.show');
+        }
         if ($request->session()->has(OrganizationInvitationClaim::SESSION_KEY)) {
             return redirect()->route('invitations.onboarding');
         }

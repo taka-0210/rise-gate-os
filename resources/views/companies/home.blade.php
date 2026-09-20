@@ -2,6 +2,20 @@
 
 @section('content')
     <section class="stack">
+        @if (session('status'))
+            <div class="panel">{{ session('status') }}</div>
+        @endif
+
+        @if (session('owner_onboarding_completed'))
+            <div class="panel stack">
+                <div class="meta">NEXT STEP / OPTIONAL</div>
+                <h2>Staffを迎える</h2>
+                <p>今はSkipしてCompany OSを使い始められます。必要なときにOrganization設定からStaff Invitationを送れます。</p>
+                @if ($canManageOrganization ?? false)
+                    <div><a class="button" href="{{ route('organization-management.index') }}">Staff Invitationへ</a></div>
+                @endif
+            </div>
+        @endif
         <div class="page-header">
             <div>
                 <div class="meta">Company OS / COMPANY HOME</div>
@@ -61,6 +75,7 @@
             </div>
         </div>
 
+        @if ($personalWorkspaceCreationEnabled || $personalWorkspaces->isNotEmpty())
         <div class="panel stack">
             <div><div class="meta">PERSONAL</div><h2>個人Workspace</h2></div>
             <div class="grid">
@@ -71,5 +86,6 @@
                 @endforelse
             </div>
         </div>
+        @endif
     </section>
 @endsection

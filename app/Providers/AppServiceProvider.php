@@ -60,6 +60,15 @@ class AppServiceProvider extends ServiceProvider
 
             return [Limit::perMinute((int) config('invitation.max_requests_per_minute'))->by(hash('sha256', $identity))];
         });
+        RateLimiter::for('owner-onboarding', function (Request $request): array {
+            $identity = implode('|', [
+                $request->user()?->id ?: 'guest',
+                Str::lower(trim((string) $request->input('email'))),
+                $request->ip(),
+            ]);
+
+            return [Limit::perMinute((int) config('owner_onboarding.max_requests_per_minute'))->by(hash('sha256', $identity))];
+        });
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(Improvement::class, ImprovementPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);

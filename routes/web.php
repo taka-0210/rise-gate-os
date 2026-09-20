@@ -24,6 +24,7 @@ use App\Http\Controllers\EstimateController;
 use App\Http\Controllers\InvitationOnboardingController;
 use App\Http\Controllers\OrganizationInvitationController;
 use App\Http\Controllers\OrganizationManagementController;
+use App\Http\Controllers\OwnerOnboardingController;
 use App\Http\Controllers\Project\AiChatController;
 use App\Http\Controllers\Project\AiProposalController;
 use App\Http\Controllers\Project\AiProposalItemReviewController;
@@ -48,6 +49,7 @@ use App\Http\Controllers\SessionTokenController;
 use App\Http\Controllers\StandaloneAppController;
 use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdminSessionController;
 use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
+use App\Http\Controllers\SystemAdmin\OwnerOnboardingController as SystemAdminOwnerOnboardingController;
 use App\Http\Controllers\SystemAdmin\WorkspaceController as SystemAdminWorkspaceController;
 use App\Http\Controllers\UserAvatarController;
 use App\Http\Controllers\Workspace\WorkspaceBusinessProfileController;
@@ -85,6 +87,15 @@ Route::post('/invitation/onboarding/register', [InvitationOnboardingController::
     ->middleware('throttle:invitation')
     ->name('invitations.register');
 
+Route::get('/owner-onboarding/{onboarding}/claim', [OwnerOnboardingController::class, 'claim'])
+    ->middleware('throttle:account-token')
+    ->name('owner-onboarding.claim');
+Route::get('/owner-onboarding', [OwnerOnboardingController::class, 'show'])
+    ->name('owner-onboarding.show');
+Route::post('/owner-onboarding/register', [OwnerOnboardingController::class, 'register'])
+    ->middleware('throttle:owner-onboarding')
+    ->name('owner-onboarding.register');
+
 Route::get('/system-admin/login', [SystemAdminSessionController::class, 'create'])->name('system-admin.login');
 Route::post('/system-admin/login', [SystemAdminSessionController::class, 'store'])->name('system-admin.login.store');
 
@@ -115,6 +126,12 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
     Route::post('/invitation/onboarding/accept', [InvitationOnboardingController::class, 'accept'])
         ->middleware('throttle:invitation')
         ->name('invitations.accept');
+    Route::post('/owner-onboarding/prepare', [OwnerOnboardingController::class, 'prepare'])
+        ->middleware('throttle:owner-onboarding')
+        ->name('owner-onboarding.prepare');
+    Route::post('/owner-onboarding/complete', [OwnerOnboardingController::class, 'complete'])
+        ->middleware('throttle:owner-onboarding')
+        ->name('owner-onboarding.complete');
     Route::put('/account/password', [PasswordController::class, 'update'])->name('account.password.update');
     Route::post('/account/email/verify', [AccountEmailController::class, 'verifyCurrent'])->middleware('throttle:account-mail')->name('account.email.verify');
     Route::post('/account/email/change', [AccountEmailController::class, 'requestChange'])->middleware('throttle:account-mail')->name('account.email.change');
@@ -195,6 +212,10 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
     Route::middleware('system-admin')->prefix('system-admin')->name('system-admin.')->group(function (): void {
         Route::post('/exit', [SystemAdminSessionController::class, 'exit'])->name('exit');
         Route::get('/members', [SystemAdminMemberController::class, 'index'])->name('members.index');
+        Route::get('/owner-onboardings', [SystemAdminOwnerOnboardingController::class, 'index'])->name('owner-onboardings.index');
+        Route::post('/owner-onboardings', [SystemAdminOwnerOnboardingController::class, 'store'])->middleware('throttle:owner-onboarding')->name('owner-onboardings.store');
+        Route::post('/owner-onboardings/{ownerOnboarding}/resend', [SystemAdminOwnerOnboardingController::class, 'resend'])->middleware('throttle:owner-onboarding')->name('owner-onboardings.resend');
+        Route::delete('/owner-onboardings/{ownerOnboarding}', [SystemAdminOwnerOnboardingController::class, 'revoke'])->middleware('throttle:owner-onboarding')->name('owner-onboardings.revoke');
         Route::post('/members', [SystemAdminMemberController::class, 'store'])->name('members.store');
         Route::get('/members/{user}/edit', [SystemAdminMemberController::class, 'edit'])->name('members.edit');
         Route::put('/members/{user}', [SystemAdminMemberController::class, 'update'])->name('members.update');

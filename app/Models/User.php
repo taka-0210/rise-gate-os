@@ -103,6 +103,11 @@ class User extends Authenticatable
         return $this->hasMany(OrganizationInvitation::class, 'claimed_user_id');
     }
 
+    public function ownerOnboardings(): HasMany
+    {
+        return $this->hasMany(OwnerOnboarding::class, 'claimed_user_id');
+    }
+
     public function canAccessWorkspace(int $workspaceId): bool
     {
         if (! $this->is_active) {

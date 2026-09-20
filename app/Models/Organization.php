@@ -20,12 +20,14 @@ class Organization extends Model
         'slug',
         'fiscal_year_end_month',
         'standard_workspace_id',
+        'personal_workspace_creation_enabled',
     ];
 
     protected function casts(): array
     {
         return [
             'fiscal_year_end_month' => 'integer',
+            'personal_workspace_creation_enabled' => 'boolean',
         ];
     }
 

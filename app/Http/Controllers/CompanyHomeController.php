@@ -26,6 +26,7 @@ class CompanyHomeController extends Controller
             'company' => $company,
             'sharedWorkspaces' => $workspaces->where('type', Workspace::TYPE_SHARED),
             'personalWorkspaces' => $workspaces->where('type', Workspace::TYPE_PERSONAL),
+            'personalWorkspaceCreationEnabled' => (bool) $company->personal_workspace_creation_enabled,
             'financialPeriodCount' => CompanyFinancialPeriod::query()
                 ->where('organization_id', $company->id)
                 ->where('status', CompanyFinancialPeriod::STATUS_ACTUAL)

@@ -5,7 +5,7 @@
         <div><a href="{{ route('company.home') }}">← {{ $currentCompany->name }}</a></div>
         <div>
             <h1>新しいWorkspace</h1>
-            <p>{{ $currentCompany->name }}の中に、共有または個人用の仕事場を作成します。</p>
+            <p>{{ $currentCompany->name }}の中に、新しい仕事場を作成します。</p>
         </div>
         <div class="panel stack">
             <div class="card">
@@ -23,9 +23,15 @@
                     <label for="type">Workspaceの種類</label>
                     <select id="type" name="type" required>
                         <option value="shared" @selected(old('type', 'shared') === 'shared')>共有Workspace</option>
-                        <option value="personal" @selected(old('type') === 'personal')>個人Workspace</option>
+                        @if ($personalWorkspaceCreationEnabled)
+                            <option value="personal" @selected(old('type') === 'personal')>個人Workspace</option>
+                        @endif
                     </select>
-                    <p class="meta">個人Workspaceも会社の資産です。原則として本人だけが利用し、会社Ownerが管理できます。</p>
+                    @if ($personalWorkspaceCreationEnabled)
+                        <p class="meta">個人Workspaceも会社の資産です。原則として本人だけが利用し、会社Ownerが管理できます。</p>
+                    @else
+                        <p class="meta">このOrganizationでは個人Workspaceの新規作成は有効化されていません。</p>
+                    @endif
                     @error('type') <div class="error">{{ $message }}</div> @enderror
                 </div>
                 <div class="field">

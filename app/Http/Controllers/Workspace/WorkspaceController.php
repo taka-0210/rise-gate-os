@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Workspace;
 
 use App\Http\Controllers\Controller;
-use App\Models\Workspace;
-use App\Models\WorkspaceMember;
+use App\Models\Improvement;
 use App\Models\Organization;
 use App\Models\OrganizationUser;
-use App\Models\Improvement;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +48,7 @@ class WorkspaceController extends Controller
     {
         return view('workspaces.create', [
             'currentCompany' => $request->attributes->get('currentCompany'),
+            'personalWorkspaceCreationEnabled' => (bool) $request->attributes->get('currentCompany')->personal_workspace_creation_enabled,
         ]);
     }
 
@@ -60,6 +61,12 @@ class WorkspaceController extends Controller
         ]);
         $user = $request->user();
         $organization = $request->attributes->get('currentCompany');
+        abort_if(
+            $validated['type'] === Workspace::TYPE_PERSONAL
+            && ! $organization->personal_workspace_creation_enabled,
+            403,
+            'このOrganizationでは個人Workspaceの新規作成を利用できません。',
+        );
         $companyMembership = OrganizationUser::query()
             ->where('organization_id', $organization->id)
             ->where('user_id', $user->id)
@@ -90,6 +97,7 @@ class WorkspaceController extends Controller
 
         if ($workspace->status === Workspace::STATUS_ACTIVE) {
             $request->session()->put('current_workspace_id', $workspace->id);
+
             return redirect()->route('company.home')->with('status', 'Workspaceを作成しました。');
         }
 

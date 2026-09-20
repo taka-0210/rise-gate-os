@@ -310,6 +310,7 @@
                 @if (session('access_mode') === 'system_admin')
                     <span class="workspace-pill">System Admin Mode</span>
                     <a href="{{ route('system-admin.members.index') }}">Members</a>
+                    <a href="{{ route('system-admin.owner-onboardings.index') }}">Owner Onboarding</a>
                     <a href="{{ route('system-admin.workspaces.index') }}">Workspaces</a>
                     <form method="POST" action="{{ route('system-admin.exit') }}">
                         @csrf

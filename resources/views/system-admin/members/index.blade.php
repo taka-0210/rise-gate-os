@@ -4,7 +4,7 @@
     <section class="stack">
         <div>
             <h1>システム管理</h1>
-            <p>Company OSのメンバーを登録し、専用Workspaceの作成または既存Workspaceへの所属を行います。</p>
+            <p>Company OSのAccount状態と既存Workspace所属を管理します。</p>
         </div>
 
         @if (session('status'))
@@ -15,6 +15,7 @@
             <h2>Staff追加</h2>
             <p>通常StaffのAccount作成は、対象Organizationの管理画面からInvitationを利用してください。</p>
             <p class="meta">System Adminから初期Passwordや恒久Passwordを設定することはできません。</p>
+            <div><a class="button" href="{{ route('system-admin.owner-onboardings.index') }}">新しい会社のOwner開始を承認</a></div>
         </div>
 
         <div class="stack">
