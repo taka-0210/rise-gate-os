@@ -8,6 +8,7 @@ use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\Organization\OrganizationSessionContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,7 +25,7 @@ class RegisteredUserController extends Controller
         return view('auth.register');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, OrganizationSessionContext $sessionContext): RedirectResponse
     {
         abort_if(User::query()->exists(), 404);
 
@@ -74,7 +75,11 @@ class RegisteredUserController extends Controller
         });
 
         Auth::login($user);
-        $request->session()->put('current_company_id', $workspace->organization_id);
+        $membership = OrganizationUser::query()
+            ->where('organization_id', $workspace->organization_id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        $sessionContext->select($request, $membership);
         $request->session()->put('current_workspace_id', $workspace->id);
         $request->session()->put('access_mode', 'workspace');
         $request->session()->put('credential_generation', (int) $user->credential_generation);

@@ -74,6 +74,10 @@
                             <div class="meta">GROUP</div>
                             <p>{{ $membership->groups->whereNull('archived_at')->pluck('name')->join(' / ') ?: 'Groupなし' }}</p>
                         </div>
+
+                        @include('organization-management.partials.membership-lifecycle', [
+                            'actions' => $lifecycleActions[$membership->id] ?? [],
+                        ])
                     </article>
                 @endforeach
             </div>
@@ -166,8 +170,10 @@
         .inline-form input, .inline-form select { flex:1 1 180px; min-width:0; }
         .compact-stack { gap:8px; }
         .organization-group-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .organization-member__lifecycle { border-top:1px solid var(--line); padding-top:14px; }
+        .organization-lifecycle-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
         @media (max-width:700px) {
-            .organization-member__forms, .organization-group-grid { grid-template-columns:1fr; }
+            .organization-member__forms, .organization-group-grid, .organization-lifecycle-actions { grid-template-columns:1fr; }
             .inline-form { align-items:stretch; flex-direction:column; }
             .inline-form button, .inline-form input, .inline-form select { width:100%; flex:0 0 auto; }
             .organization-group-member { align-items:flex-start; }

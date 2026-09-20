@@ -177,6 +177,7 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::delete('/company/organization/invitations/{organizationInvitation}', [OrganizationInvitationController::class, 'revoke'])->middleware('throttle:invitation')->name('organization-management.invitations.revoke');
         Route::put('/company/organization/memberships/{organizationMembership}/role', [OrganizationManagementController::class, 'updateRole'])->name('organization-management.memberships.role');
         Route::put('/company/organization/memberships/{organizationMembership}/position', [OrganizationManagementController::class, 'updatePosition'])->name('organization-management.memberships.position');
+        Route::patch('/company/organization/memberships/{organizationMembership}/lifecycle', [OrganizationManagementController::class, 'updateMembershipLifecycle'])->name('organization-management.memberships.lifecycle');
         Route::post('/company/organization/groups', [OrganizationManagementController::class, 'storeGroup'])->name('organization-management.groups.store');
         Route::put('/company/organization/groups/{organizationGroup}', [OrganizationManagementController::class, 'updateGroup'])->name('organization-management.groups.update');
         Route::delete('/company/organization/groups/{organizationGroup}', [OrganizationManagementController::class, 'archiveGroup'])->name('organization-management.groups.archive');

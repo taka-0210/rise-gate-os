@@ -198,7 +198,11 @@ class SystemAdminMemberTest extends TestCase
 
         $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->delete(route('system-admin.members.workspaces.destroy', [$member, $workspace]))->assertRedirect();
         $this->assertDatabaseMissing('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $member->id]);
-        $this->assertDatabaseMissing('organization_users', ['organization_id' => $organization->id, 'user_id' => $member->id]);
+        $this->assertDatabaseHas('organization_users', [
+            'organization_id' => $organization->id,
+            'user_id' => $member->id,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+        ]);
     }
 
     public function test_adding_another_workspace_does_not_downgrade_existing_organization_roles(): void

@@ -16,6 +16,8 @@ class OrganizationAuditEvent extends Model
 
     public const OUTCOME_REJECTED = 'rejected';
 
+    public const OUTCOME_CONFLICT = 'conflict';
+
     protected $fillable = [
         'organization_id',
         'actor_user_id',

@@ -39,6 +39,11 @@
                         <p><strong>Organization Role:</strong> {{ \App\Models\OrganizationUser::organizationRoles()[$membership->organization_role] ?? '未解決' }}</p>
                         <p><strong>Position:</strong> {{ $membership->position ?: '未設定' }}</p>
                         <p><strong>Group:</strong> {{ $membership->groups->pluck('name')->join(' / ') ?: 'Groupなし' }}</p>
+                        @if ($membership->membership_status === \App\Models\OrganizationUser::STATUS_SUSPENDED)
+                            <p class='notice'>この会社での利用は一時停止中です。Account管理と他の利用中Organizationは引き続き利用できます。</p>
+                        @elseif ($membership->membership_status === \App\Models\OrganizationUser::STATUS_LEFT)
+                            <p class='notice'>この会社での所属は終了しています。再参加には会社管理者による別の手続きが必要です。</p>
+                        @endif
                     </article>
                 @empty
                     <p class="meta">所属Organizationはありません。Account管理は引き続き利用できます。</p>

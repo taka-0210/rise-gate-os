@@ -14,6 +14,8 @@ class OrganizationUser extends Model
 
     protected $attributes = [
         'membership_status' => self::STATUS_ACTIVE,
+        'access_epoch' => 1,
+        'lifecycle_version' => 1,
     ];
 
     public const ROLE_OWNER = 'owner';
@@ -69,6 +71,11 @@ class OrganizationUser extends Model
         'organization_role',
         'position',
         'membership_status',
+        'access_epoch',
+        'lifecycle_version',
+        'status_changed_at',
+        'status_changed_by_user_id',
+        'status_change_reason',
         'company_role',
         'permissions',
         'joined_at',
@@ -78,6 +85,9 @@ class OrganizationUser extends Model
     {
         return [
             'joined_at' => 'datetime',
+            'access_epoch' => 'integer',
+            'lifecycle_version' => 'integer',
+            'status_changed_at' => 'datetime',
             'permissions' => 'array',
         ];
     }
@@ -105,10 +115,10 @@ class OrganizationUser extends Model
     public static function membershipStatuses(): array
     {
         return [
-            self::STATUS_INVITED => 'Invited',
-            self::STATUS_ACTIVE => 'Active',
-            self::STATUS_SUSPENDED => 'Suspended',
-            self::STATUS_LEFT => 'Left',
+            self::STATUS_INVITED => '招待中',
+            self::STATUS_ACTIVE => '利用中',
+            self::STATUS_SUSPENDED => '一時停止',
+            self::STATUS_LEFT => '退職・所属終了',
         ];
     }
 
@@ -154,6 +164,11 @@ class OrganizationUser extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function statusChangedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'status_changed_by_user_id');
+    }
+
     public function groupMemberships(): HasMany
     {
         return $this->hasMany(OrganizationGroupMembership::class);
@@ -172,5 +187,10 @@ class OrganizationUser extends Model
     public function invitations(): HasMany
     {
         return $this->hasMany(OrganizationInvitation::class);
+    }
+
+    public function lifecycleOperations(): HasMany
+    {
+        return $this->hasMany(OrganizationMembershipLifecycleOperation::class);
     }
 }

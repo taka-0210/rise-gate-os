@@ -7,16 +7,21 @@ use App\Models\OrganizationInvitation;
 use App\Models\OrganizationUser;
 use App\Services\Organization\OrganizationAccess;
 use App\Services\Organization\OrganizationAdministration;
+use App\Services\Organization\OrganizationMembershipLifecycle;
 use App\Services\Organization\StandardWorkspaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class OrganizationManagementController extends Controller
 {
-    public function index(Request $request, OrganizationAccess $access): View
-    {
+    public function index(
+        Request $request,
+        OrganizationAccess $access,
+        OrganizationMembershipLifecycle $lifecycle,
+    ): View {
         $organization = $request->attributes->get('currentCompany');
         $access->authorizeManage($request->user(), $organization);
 
@@ -32,6 +37,18 @@ class OrganizationManagementController extends Controller
             ->orderBy('name')
             ->get();
 
+        $actorMembership = $access->membership($request->user(), $organization);
+        $lifecycleActions = $memberships->mapWithKeys(function (OrganizationUser $membership) use (
+            $actorMembership,
+            $lifecycle,
+        ): array {
+            $commands = $actorMembership ? $lifecycle->availableCommands($actorMembership, $membership) : [];
+
+            return [$membership->id => collect($commands)->mapWithKeys(
+                fn (string $command): array => [$command => (string) Str::uuid()],
+            )->all()];
+        })->all();
+
         return view('organization-management.index', [
             'organization' => $organization,
             'memberships' => $memberships,
@@ -42,7 +59,8 @@ class OrganizationManagementController extends Controller
                 ->with(['groups', 'sponsor'])
                 ->latest('id')
                 ->get(),
-            'actorMembership' => $access->membership($request->user(), $organization),
+            'actorMembership' => $actorMembership,
+            'lifecycleActions' => $lifecycleActions,
             'standardWorkspace' => $organization->standardWorkspace,
         ]);
     }
@@ -91,6 +109,38 @@ class OrganizationManagementController extends Controller
         );
 
         return back()->with('success', 'Positionを更新しました。');
+    }
+
+    public function updateMembershipLifecycle(
+        Request $request,
+        OrganizationUser $organizationMembership,
+        OrganizationMembershipLifecycle $lifecycle,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'command' => ['required', Rule::in([
+                OrganizationMembershipLifecycle::COMMAND_SUSPEND,
+                OrganizationMembershipLifecycle::COMMAND_END,
+                OrganizationMembershipLifecycle::COMMAND_RESUME,
+            ])],
+            'reason' => ['required', 'string', 'max:500'],
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'request_id' => ['required', 'string', 'max:64'],
+        ]);
+        $lifecycle->execute(
+            $request->user(),
+            $request->attributes->get('currentCompany'),
+            $organizationMembership,
+            $validated['command'],
+            $validated['reason'],
+            (int) $validated['expected_version'],
+            $validated['request_id'],
+        );
+
+        return back()->with('success', match ($validated['command']) {
+            OrganizationMembershipLifecycle::COMMAND_SUSPEND => 'Organization所属を一時停止しました。',
+            OrganizationMembershipLifecycle::COMMAND_END => 'Organization所属を終了しました。',
+            OrganizationMembershipLifecycle::COMMAND_RESUME => 'Organization所属を再開しました。',
+        });
     }
 
     public function storeGroup(Request $request, OrganizationAdministration $administration): RedirectResponse

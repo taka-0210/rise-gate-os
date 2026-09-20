@@ -8,6 +8,10 @@
             <p>経営・仕事を確認する会社を選択してください。</p>
         </div>
         @if ($companies->isEmpty())
+            <div class='notice stack'>
+                <p>停止・退職を含む所属履歴はAccountで確認できます。</p>
+                <p><a href='{{ route('account.profile') }}'>Accountと所属履歴を確認する</a></p>
+            </div>
             <div class="panel"><p>所属している会社アカウントがありません。会社管理者からの招待が必要です。</p></div>
         @else
             <div class="grid">

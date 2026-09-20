@@ -7,6 +7,7 @@ use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Services\Organization\OrganizationInvitationAcceptance;
 use App\Services\Organization\OrganizationInvitationClaim;
+use App\Services\Organization\OrganizationSessionContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -109,10 +110,14 @@ class InvitationOnboardingController extends Controller
     public function accept(
         Request $request,
         OrganizationInvitationAcceptance $acceptance,
+        OrganizationSessionContext $sessionContext,
     ): RedirectResponse {
         $invitation = $acceptance->accept($request, $request->user())->load('organization.standardWorkspace');
-        $request->session()->put('current_company_id', $invitation->organization_id);
-        $request->session()->forget('current_workspace_id');
+        $membership = OrganizationUser::query()
+            ->where('organization_id', $invitation->organization_id)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+        $sessionContext->select($request, $membership);
 
         $workspaceIds = $request->user()->workspaces()
             ->where('workspaces.organization_id', $invitation->organization_id)

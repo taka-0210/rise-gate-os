@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\OrganizationUser;
 use App\Models\Workspace;
 use App\Services\Company\PromoteClientToCompanyAccount;
+use App\Services\Organization\OrganizationSessionContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -17,6 +19,7 @@ class ClientCompanyAccountController extends Controller
         Request $request,
         Client $client,
         PromoteClientToCompanyAccount $promoter,
+        OrganizationSessionContext $sessionContext,
     ): RedirectResponse {
         $currentWorkspace = $request->attributes->get('currentWorkspace');
         abort_unless($client->workspace_id === $currentWorkspace->id, 404);
@@ -33,7 +36,11 @@ class ClientCompanyAccountController extends Controller
         }
 
         if ($workspace->status === Workspace::STATUS_ACTIVE) {
-            $request->session()->put('current_company_id', $workspace->organization_id);
+            $membership = OrganizationUser::query()
+                ->where('organization_id', $workspace->organization_id)
+                ->where('user_id', $request->user()->id)
+                ->firstOrFail();
+            $sessionContext->select($request, $membership);
             $request->session()->put('current_workspace_id', $workspace->id);
 
             return redirect()

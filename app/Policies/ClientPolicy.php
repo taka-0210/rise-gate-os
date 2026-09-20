@@ -10,6 +10,10 @@ class ClientPolicy
 {
     public function create(User $user, Workspace $workspace): bool
     {
+        if (! $user->canAccessWorkspace($workspace->id)) {
+            return false;
+        }
+
         $role = $user->workspaces()
             ->where('workspaces.id', $workspace->id)
             ->first()?->pivot?->role;
@@ -24,6 +28,10 @@ class ClientPolicy
 
     public function delete(User $user, Client $client): bool
     {
+        if (! $user->canAccessWorkspace($client->workspace_id)) {
+            return false;
+        }
+
         $role = $user->workspaces()
             ->where('workspaces.id', $client->workspace_id)
             ->first()?->pivot?->role;

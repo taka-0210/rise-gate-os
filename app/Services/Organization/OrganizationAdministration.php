@@ -278,7 +278,6 @@ class OrganizationAdministration
             $group = $this->lockedGroup($organization, $group);
             $this->assertGroupActive($group);
             $target = $this->lockedTarget($organization, $target);
-            $this->assertActiveTarget($target);
 
             $membership = OrganizationGroupMembership::query()
                 ->where('organization_group_id', $group->id)

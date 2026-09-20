@@ -7,6 +7,7 @@ use App\Models\OrganizationUser;
 use App\Services\AccountAudit;
 use App\Services\AccountLoginLimiter;
 use App\Services\Organization\OrganizationInvitationClaim;
+use App\Services\Organization\OrganizationSessionContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,8 +21,12 @@ class AuthenticatedSessionController extends Controller
         return view('auth.login');
     }
 
-    public function store(Request $request, AccountLoginLimiter $limiter, AccountAudit $audit): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        AccountLoginLimiter $limiter,
+        AccountAudit $audit,
+        OrganizationSessionContext $sessionContext,
+    ): RedirectResponse {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
@@ -54,13 +59,16 @@ class AuthenticatedSessionController extends Controller
             ->orderBy('organizations.name')
             ->get();
         if ($companies->count() === 1) {
-            $request->session()->put('current_company_id', $companies->first()->id);
-            $request->session()->forget('current_workspace_id');
+            $membership = OrganizationUser::query()
+                ->where('organization_id', $companies->first()->id)
+                ->where('user_id', $request->user()->id)
+                ->firstOrFail();
+            $sessionContext->select($request, $membership);
 
             return redirect()->route('company.home');
         }
 
-        $request->session()->forget(['current_company_id', 'current_workspace_id']);
+        $sessionContext->clear($request);
 
         return redirect()->route('companies.index');
     }

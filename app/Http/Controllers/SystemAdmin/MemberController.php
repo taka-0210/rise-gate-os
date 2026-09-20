@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SystemAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
 use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
@@ -48,19 +49,60 @@ class MemberController extends Controller
             'is_active' => ['required', 'boolean'],
         ]);
 
-        if ($user->is_system_admin && (! $validated['is_system_admin'] || ! $validated['is_active'])) {
-            $otherActiveAdmins = User::query()
-                ->whereKeyNot($user->id)
-                ->where('is_system_admin', true)
-                ->where('is_active', true)
-                ->exists();
-
-            if (! $otherActiveAdmins) {
-                throw ValidationException::withMessages(['is_system_admin' => '最後の有効なSystem Adminは解除・停止できません。']);
-            }
-        }
-
         DB::transaction(function () use ($request, $user, $validated, $credentials): void {
+            $organizationIds = OrganizationUser::query()
+                ->where('user_id', $user->id)
+                ->orderBy('organization_id')
+                ->pluck('organization_id');
+            Organization::query()
+                ->whereIn('id', $organizationIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id']);
+
+            $user = User::query()->lockForUpdate()->findOrFail($user->id);
+            if ($user->is_system_admin && (! $validated['is_system_admin'] || ! $validated['is_active'])) {
+                $otherActiveAdmins = User::query()
+                    ->whereKeyNot($user->id)
+                    ->where('is_system_admin', true)
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->exists();
+
+                if (! $otherActiveAdmins) {
+                    throw ValidationException::withMessages(['is_system_admin' => '最後の有効なSystem Adminは解除・停止できません。']);
+                }
+            }
+            if ($user->is_active && ! $validated['is_active']) {
+                $activeOwnerOrganizationIds = OrganizationUser::query()
+                    ->where('user_id', $user->id)
+                    ->whereIn('organization_id', $organizationIds)
+                    ->where('organization_role', OrganizationUser::ORGANIZATION_ROLE_OWNER)
+                    ->where('membership_status', OrganizationUser::STATUS_ACTIVE)
+                    ->orderBy('organization_id')
+                    ->pluck('organization_id');
+                foreach ($activeOwnerOrganizationIds as $organizationId) {
+                    $hasOtherActiveOwner = OrganizationUser::query()
+                        ->where('organization_id', $organizationId)
+                        ->whereKeyNot(
+                            OrganizationUser::query()
+                                ->where('organization_id', $organizationId)
+                                ->where('user_id', $user->id)
+                                ->value('id'),
+                        )
+                        ->where('organization_role', OrganizationUser::ORGANIZATION_ROLE_OWNER)
+                        ->where('membership_status', OrganizationUser::STATUS_ACTIVE)
+                        ->whereHas('user', fn ($query) => $query->where('is_active', true))
+                        ->lockForUpdate()
+                        ->exists();
+                    if (! $hasOtherActiveOwner) {
+                        throw ValidationException::withMessages([
+                            'is_active' => '最後のactive Organization OwnerはAccount停止できません。',
+                        ]);
+                    }
+                }
+            }
+
             $oldEmail = $user->email;
             $emailChanged = ! hash_equals($oldEmail, $validated['email']);
             $disabled = $user->is_active && ! $validated['is_active'];
@@ -95,7 +137,11 @@ class MemberController extends Controller
         $workspace = Workspace::query()->with('organization')->findOrFail($validated['workspace_id']);
 
         DB::transaction(function () use ($user, $workspace, $validated): void {
-            OrganizationUser::query()->firstOrCreate(
+            Organization::query()->whereKey($workspace->organization_id)->lockForUpdate()->firstOrFail();
+            if (! $user->is_active) {
+                throw ValidationException::withMessages(['workspace_id' => '停止中のAccountはWorkspaceへ追加できません。']);
+            }
+            $organizationMembership = OrganizationUser::query()->lockForUpdate()->firstOrCreate(
                 [
                     'organization_id' => $workspace->organization_id,
                     'user_id' => $user->id,
@@ -107,6 +153,11 @@ class MemberController extends Controller
                     'joined_at' => now(),
                 ],
             );
+            if ($organizationMembership->membership_status !== OrganizationUser::STATUS_ACTIVE) {
+                throw ValidationException::withMessages([
+                    'workspace_id' => '停止・退職中のOrganization所属へWorkspaceを追加できません。',
+                ]);
+            }
             $workspace->users()->attach($user->id, [
                 'role' => $validated['workspace_role'],
                 'joined_at' => now(),
@@ -118,9 +169,12 @@ class MemberController extends Controller
 
     public function updateWorkspace(Request $request, User $user, Workspace $workspace): RedirectResponse
     {
-        abort_unless($user->canAccessWorkspace($workspace->id), 404);
+        $workspaceMembership = WorkspaceMember::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
         $validated = $request->validate(['workspace_role' => ['required', Rule::in($this->workspaceRoles())]]);
-        $currentRole = $user->workspaces()->where('workspaces.id', $workspace->id)->firstOrFail()->pivot->role;
+        $currentRole = $workspaceMembership->role;
         $this->guardLastWorkspaceOwner($workspace, $user, $currentRole, $validated['workspace_role']);
 
         $workspace->users()->updateExistingPivot($user->id, ['role' => $validated['workspace_role']]);
@@ -130,20 +184,14 @@ class MemberController extends Controller
 
     public function destroyWorkspace(User $user, Workspace $workspace): RedirectResponse
     {
-        abort_unless($user->canAccessWorkspace($workspace->id), 404);
-        $currentRole = $user->workspaces()->where('workspaces.id', $workspace->id)->firstOrFail()->pivot->role;
+        $workspaceMembership = WorkspaceMember::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+        $currentRole = $workspaceMembership->role;
         $this->guardLastWorkspaceOwner($workspace, $user, $currentRole, null);
 
-        DB::transaction(function () use ($user, $workspace): void {
-            $workspace->users()->detach($user->id);
-            $hasOtherWorkspaceInOrganization = $user->workspaces()
-                ->where('workspaces.organization_id', $workspace->organization_id)
-                ->exists();
-
-            if (! $hasOtherWorkspaceInOrganization) {
-                $workspace->organization->users()->detach($user->id);
-            }
-        });
+        $workspace->users()->detach($user->id);
 
         return back()->with('status', 'Workspace所属を解除しました。');
     }

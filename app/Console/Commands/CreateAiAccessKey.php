@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\AiAccessKey;
+use App\Models\OrganizationUser;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
@@ -10,6 +11,7 @@ use Illuminate\Support\Str;
 class CreateAiAccessKey extends Command
 {
     protected $signature = 'ai:key:create {workspace : WorkspaceのID・slug・名前} {user? : 接続するメンバーのメールアドレス。省略時はWorkspace所有者} {--name=Codex} {--days=90}';
+
     protected $description = '承認待ちAI提案を作成するための限定APIキーを発行します';
 
     public function handle(): int
@@ -23,6 +25,7 @@ class CreateAiAccessKey extends Command
 
         if (! $workspace) {
             $this->error('Workspaceが見つかりません。');
+
             return self::FAILURE;
         }
 
@@ -32,6 +35,19 @@ class CreateAiAccessKey extends Command
             : $workspace->owner;
         if (! $user) {
             $this->error('このWorkspaceに所属するメンバーが見つかりません。');
+
+            return self::FAILURE;
+        }
+
+        $hasActiveOrganizationMembership = $user->is_active
+            && OrganizationUser::query()
+                ->where('organization_id', $workspace->organization_id)
+                ->where('user_id', $user->id)
+                ->where('membership_status', OrganizationUser::STATUS_ACTIVE)
+                ->exists();
+        if (! $hasActiveOrganizationMembership) {
+            $this->error('このメンバーはWorkspaceのOrganizationでactiveではありません。');
+
             return self::FAILURE;
         }
 

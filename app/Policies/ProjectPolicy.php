@@ -11,6 +11,10 @@ class ProjectPolicy
 {
     public function create(User $user, Workspace $workspace): bool
     {
+        if (! $user->canAccessWorkspace($workspace->id)) {
+            return false;
+        }
+
         $role = $user->workspaces()
             ->where('workspaces.id', $workspace->id)
             ->first()?->pivot?->role;
@@ -20,22 +24,21 @@ class ProjectPolicy
 
     public function view(User $user, Project $project): bool
     {
-        return $project->members()
-            ->where('user_id', $user->id)
-            ->where('status', ProjectMember::STATUS_ACTIVE)
-            ->exists();
+        return $this->activeProjectMembership($user, $project) !== null;
     }
 
     public function update(User $user, Project $project): bool
     {
-        return $project->members()
+        $membership = $project->members()
             ->where('user_id', $user->id)
             ->where('status', ProjectMember::STATUS_ACTIVE)
             ->whereIn('permission_level', [
                 ProjectMember::PERMISSION_ADMIN,
                 ProjectMember::PERMISSION_EDIT,
             ])
-            ->exists();
+            ->first();
+
+        return $membership !== null && $user->canAccessWorkspace($membership->workspace_id);
     }
 
     public function manageMembers(User $user, Project $project, string $currentWorkspaceRole): bool
@@ -44,22 +47,24 @@ class ProjectPolicy
             return false;
         }
 
-        return $project->members()
+        $membership = $project->members()
             ->where('user_id', $user->id)
             ->where('permission_level', ProjectMember::PERMISSION_ADMIN)
             ->where('status', ProjectMember::STATUS_ACTIVE)
-            ->exists();
+            ->first();
+
+        return $membership !== null && $user->canAccessWorkspace($membership->workspace_id);
     }
 
     public function move(User $user, Project $project): bool
     {
-        $hasProjectAdminPermission = $project->members()
+        $membership = $project->members()
             ->where('user_id', $user->id)
             ->where('permission_level', ProjectMember::PERMISSION_ADMIN)
             ->where('status', ProjectMember::STATUS_ACTIVE)
-            ->exists();
+            ->first();
 
-        if (! $hasProjectAdminPermission) {
+        if (! $membership || ! $user->canAccessWorkspace($membership->workspace_id)) {
             return false;
         }
 
@@ -72,13 +77,13 @@ class ProjectPolicy
 
     public function delete(User $user, Project $project): bool
     {
-        $hasProjectAdminPermission = $project->members()
+        $membership = $project->members()
             ->where('user_id', $user->id)
             ->where('permission_level', ProjectMember::PERMISSION_ADMIN)
             ->where('status', ProjectMember::STATUS_ACTIVE)
-            ->exists();
+            ->first();
 
-        if (! $hasProjectAdminPermission) {
+        if (! $membership || ! $user->canAccessWorkspace($membership->workspace_id)) {
             return false;
         }
 
@@ -87,5 +92,17 @@ class ProjectPolicy
             ->first()?->pivot?->role;
 
         return in_array($workspaceRole, ['owner', 'admin'], true);
+    }
+
+    private function activeProjectMembership(User $user, Project $project): ?ProjectMember
+    {
+        $membership = $project->members()
+            ->where('user_id', $user->id)
+            ->where('status', ProjectMember::STATUS_ACTIVE)
+            ->first();
+
+        return $membership && $user->canAccessWorkspace($membership->workspace_id)
+            ? $membership
+            : null;
     }
 }
