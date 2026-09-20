@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AiConnectionController;
+use App\Http\Controllers\BusinessDomainController;
 use App\Http\Controllers\Auth\AccountEmailController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordController;
@@ -145,6 +146,18 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
 
     Route::middleware(['workspace-mode', 'company'])->group(function (): void {
         Route::get('/company', CompanyHomeController::class)->name('company.home');
+        Route::get('/company/business-domains', [BusinessDomainController::class, 'index'])->name('business-domains.index');
+        Route::get('/company/business-domains/create', [BusinessDomainController::class, 'create'])->name('business-domains.create');
+        Route::post('/company/business-domains', [BusinessDomainController::class, 'store'])->name('business-domains.store');
+        Route::get('/company/business-domains/editors', [BusinessDomainController::class, 'editors'])->name('business-domains.editors');
+        Route::post('/company/business-domains/editors/{organizationMembership}', [BusinessDomainController::class, 'grantEditor'])->name('business-domains.editors.grant');
+        Route::delete('/company/business-domains/editors/{organizationMembership}', [BusinessDomainController::class, 'revokeEditor'])->name('business-domains.editors.revoke');
+        Route::get('/company/business-domains/{businessDomain}', [BusinessDomainController::class, 'show'])->name('business-domains.show');
+        Route::get('/company/business-domains/{businessDomain}/edit', [BusinessDomainController::class, 'edit'])->name('business-domains.edit');
+        Route::put('/company/business-domains/{businessDomain}', [BusinessDomainController::class, 'update'])->name('business-domains.update');
+        Route::post('/company/business-domains/{businessDomain}/archive', [BusinessDomainController::class, 'archive'])->name('business-domains.archive');
+        Route::post('/company/business-domains/{businessDomain}/reopen', [BusinessDomainController::class, 'reopen'])->name('business-domains.reopen');
+        Route::get('/company/business-domains/{businessDomain}/revisions/{revision}', [BusinessDomainController::class, 'revision'])->whereNumber('revision')->name('business-domains.revisions.show');
         Route::get('/company/observations', [CompanyObservationController::class, 'index'])->name('company-observations.index');
         Route::post('/company/observations', [CompanyObservationController::class, 'store'])->name('company-observations.store');
         Route::get('/company/observations/{companyObservation}', [CompanyObservationController::class, 'show'])->name('company-observations.show');

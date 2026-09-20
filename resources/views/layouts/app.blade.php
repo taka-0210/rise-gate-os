@@ -371,6 +371,7 @@
         @if (session('access_mode') !== 'system_admin' && isset($currentCompany))
             @php
                 $module = match (true) {
+                    request()->routeIs('business-domains.*') => ['事業領域', route('business-domains.index')],
                     request()->routeIs('company-finance.*') => ['経営数値', route('company-finance.index')],
                     request()->routeIs('company-loans.*') => ['借入管理', route('company-loans.index')],
                     request()->routeIs('company-members.*') => ['会社設定', route('company-members.index')],

@@ -109,4 +109,14 @@ class Organization extends Model
     {
         return $this->hasMany(CompanyImprovement::class);
     }
+
+    public function businessDomains(): HasMany
+    {
+        return $this->hasMany(BusinessDomain::class);
+    }
+
+    public function businessDomainEditorGrants(): HasMany
+    {
+        return $this->hasMany(BusinessDomainEditorGrant::class);
+    }
 }

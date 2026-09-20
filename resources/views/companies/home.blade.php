@@ -26,6 +26,14 @@
         </div>
 
         <div class="grid">
+            <a class="card" href="{{ route('business-domains.index') }}">
+                <div class="meta">BUSINESS DOMAIN / OPTIONAL</div>
+                <h2>事業領域</h2>
+                <p>現在の事業領域 {{ $businessDomainCount }}件。何を、誰に、どんな価値として届けるかを会社の共通情報として整理します。</p>
+                @if ($canEditBusinessDomains)
+                    <span class="badge">編集可能</span>
+                @endif
+            </a>
             <a class="card" href="{{ route('company-observations.index') }}">
                 <div class="meta">OBSERVATION FIRST</div>
                 <h2>気付き・観察</h2>

@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BusinessDomain;
 use App\Models\CompanyFinancialPeriod;
 use App\Models\CompanyLoan;
 use App\Models\CompanyObservation;
 use App\Models\Workspace;
+use App\Services\BusinessDomain\BusinessDomainAccess;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CompanyHomeController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, BusinessDomainAccess $businessDomainAccess): View
     {
         $company = $request->attributes->get('currentCompany');
         $workspaces = $request->user()
@@ -42,6 +44,11 @@ class CompanyHomeController extends Controller
                 ->where('organization_id', $company->id)
                 ->where('importance', CompanyObservation::IMPORTANCE_UNREVIEWED)
                 ->count(),
+            'businessDomainCount' => BusinessDomain::query()
+                ->where('organization_id', $company->id)
+                ->where('status', BusinessDomain::STATUS_ACTIVE)
+                ->count(),
+            'canEditBusinessDomains' => $businessDomainAccess->canEdit($request->user(), $company),
         ]);
     }
 }
