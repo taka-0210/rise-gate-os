@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\OrganizationAuditEvent;
 use App\Models\OrganizationGroup;
 use App\Models\OrganizationGroupMembership;
+use App\Models\OrganizationInvitation;
 use App\Models\OrganizationUser;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -198,6 +199,15 @@ class OrganizationAdministration
             if ($group->memberships()->exists()) {
                 throw ValidationException::withMessages([
                     'group' => '所属メンバーがいるGroupは保管できません。先に所属を解除してください。',
+                ]);
+            }
+
+            if ($group->plannedInvitations()
+                ->where('organization_invitations.status', OrganizationInvitation::STATUS_PENDING)
+                ->where('organization_invitations.expires_at', '>', now())
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'group' => '有効なStaff Invitationから参照されているGroupは保管できません。招待を取消してから再実行してください。',
                 ]);
             }
 

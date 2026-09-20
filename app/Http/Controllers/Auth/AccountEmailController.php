@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\AccountEmailRequest;
 use App\Services\AccountEmailService;
+use App\Services\Organization\OrganizationInvitationClaim;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -87,6 +88,10 @@ class AccountEmailController extends Controller
             return redirect()->route('login')->with('status', 'Emailを変更しました。新しいEmailでログインしてください。');
         }
 
-        return redirect()->route('account.profile')->with('status', '現在のEmailを確認しました。');
+        $route = $request->session()->has(OrganizationInvitationClaim::SESSION_KEY)
+            ? 'invitations.onboarding'
+            : 'account.profile';
+
+        return redirect()->route($route)->with('status', '現在のEmailを確認しました。');
     }
 }

@@ -377,6 +377,7 @@
                         ])>
                             <div class="actions" style="justify-content: space-between; align-items: flex-start;">
                                 <div>
+                                    <x-user-avatar :user='$member->user' :size='40' />
                                     <h2>{{ $member->user->name }}</h2>
                                     <div class="meta">{{ $member->user->email }}</div>
                                 </div>

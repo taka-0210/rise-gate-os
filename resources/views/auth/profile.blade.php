@@ -1,6 +1,15 @@
 @extends('layouts.app', ['title' => 'Account - Company OS'])
 
 @section('content')
+    <section class='panel stack' style='margin-bottom:20px'>
+        <h2>Avatar</h2>
+        <div class='identity-row'><x-user-avatar :user='$user' :size='72' /><p>任意です。PNG / JPEG / WebP、5MB以下。Private保存し、安全なWebPへ再変換します。</p></div>
+        <form class='stack' method='POST' action='{{ route('account.avatar.update') }}' enctype='multipart/form-data'>
+            @csrf
+            <input name='avatar' type='file' accept='image/png,image/jpeg,image/webp' required>
+            <button type='submit'>Avatarを更新</button>
+        </form>
+    </section>
     <div class="stack">
         <section class="panel stack">
             <div>

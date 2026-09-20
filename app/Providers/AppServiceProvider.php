@@ -50,6 +50,16 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('account-token', fn (Request $request) => Limit::perMinute(
             config('account.token.max_attempts_per_minute')
         )->by('account-token:'.hash('sha256', $request->ip())));
+        RateLimiter::for('invitation', function (Request $request): array {
+            $identity = implode('|', [
+                $request->user()?->id ?: 'guest',
+                $request->session()->get('current_company_id', 'none'),
+                Str::lower(trim((string) $request->input('email'))),
+                $request->ip(),
+            ]);
+
+            return [Limit::perMinute((int) config('invitation.max_requests_per_minute'))->by(hash('sha256', $identity))];
+        });
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(Improvement::class, ImprovementPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);

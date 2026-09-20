@@ -43,6 +43,9 @@ class User extends Authenticatable
             'is_system_admin' => 'boolean',
             'is_active' => 'boolean',
             'credential_generation' => 'integer',
+            'avatar_width' => 'integer',
+            'avatar_height' => 'integer',
+            'avatar_updated_at' => 'datetime',
         ];
     }
 
@@ -91,6 +94,11 @@ class User extends Authenticatable
     public function accountEmailRequests(): HasMany
     {
         return $this->hasMany(AccountEmailRequest::class);
+    }
+
+    public function organizationInvitations(): HasMany
+    {
+        return $this->hasMany(OrganizationInvitation::class, 'claimed_user_id');
     }
 
     public function canAccessWorkspace(int $workspaceId): bool

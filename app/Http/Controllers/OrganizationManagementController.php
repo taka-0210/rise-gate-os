@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\OrganizationGroup;
+use App\Models\OrganizationInvitation;
 use App\Models\OrganizationUser;
 use App\Services\Organization\OrganizationAccess;
 use App\Services\Organization\OrganizationAdministration;
+use App\Services\Organization\StandardWorkspaceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -35,7 +37,26 @@ class OrganizationManagementController extends Controller
             'memberships' => $memberships,
             'groups' => $groups,
             'canChangeRoles' => $access->canChangeRoles($request->user(), $organization),
+            'invitations' => OrganizationInvitation::query()
+                ->where('organization_id', $organization->id)
+                ->with(['groups', 'sponsor'])
+                ->latest('id')
+                ->get(),
+            'actorMembership' => $access->membership($request->user(), $organization),
+            'standardWorkspace' => $organization->standardWorkspace,
         ]);
+    }
+
+    public function initializeStandardWorkspace(
+        Request $request,
+        StandardWorkspaceService $workspaces,
+    ): RedirectResponse {
+        $workspaces->initialize(
+            $request->user(),
+            $request->attributes->get('currentCompany'),
+        );
+
+        return back()->with('success', '空の標準Workspaceを初期設定しました。既存Workspaceと既存所属は変更していません。');
     }
 
     public function updateRole(

@@ -18,6 +18,7 @@
             </div>
             <div class="card stack">
                 <div class="meta">担当者</div>
+                @if ($task->assignee)<x-user-avatar :user='$task->assignee' :size='40' />@endif
                 <h2>{{ $task->assignee?->name ?? '未設定' }}</h2>
             </div>
         </div>

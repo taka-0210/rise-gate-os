@@ -19,6 +19,7 @@
                 <div class="member-access__identity">
                     <div>
                         <div class="meta">ユーザーアカウント</div>
+                        <x-user-avatar :user='$membership->user' :size='40' />
                         <h2>{{ $membership->user->name }}</h2>
                         <p>{{ $membership->user->email }}</p>
                     </div>

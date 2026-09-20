@@ -168,4 +168,9 @@ class OrganizationUser extends Model
             'organization_group_id',
         )->withPivot(['added_by'])->withTimestamps();
     }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(OrganizationInvitation::class);
+    }
 }

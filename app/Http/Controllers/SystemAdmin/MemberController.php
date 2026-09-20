@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\SystemAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Organization;
 use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
@@ -12,7 +11,6 @@ use App\Services\AccountCredentialService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -23,71 +21,12 @@ class MemberController extends Controller
     {
         return view('system-admin.members.index', [
             'members' => User::query()->with('workspaces.organization')->orderBy('name')->get(),
-            'workspaces' => Workspace::query()->with('organization')->orderBy('name')->get(),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'assignment_type' => ['required', Rule::in(['new_workspace', 'existing_workspace'])],
-            'organization_name' => ['nullable', 'required_if:assignment_type,new_workspace', 'string', 'max:255'],
-            'workspace_name' => ['nullable', 'required_if:assignment_type,new_workspace', 'string', 'max:255'],
-            'workspace_id' => ['nullable', 'required_if:assignment_type,existing_workspace', 'integer', 'exists:workspaces,id'],
-            'workspace_role' => ['nullable', 'required_if:assignment_type,existing_workspace', Rule::in([
-                WorkspaceMember::ROLE_ADMIN,
-                WorkspaceMember::ROLE_MEMBER,
-                WorkspaceMember::ROLE_VIEWER,
-            ])],
-        ]);
-
-        DB::transaction(function () use ($validated): void {
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'password' => $validated['password'],
-            ]);
-
-            if ($validated['assignment_type'] === 'new_workspace') {
-                $organization = Organization::create([
-                    'name' => $validated['organization_name'],
-                    'slug' => $this->uniqueOrganizationSlug($validated['organization_name']),
-                ]);
-                $workspace = Workspace::create([
-                    'organization_id' => $organization->id,
-                    'owner_user_id' => $user->id,
-                    'name' => $validated['workspace_name'],
-                    'slug' => $this->uniqueWorkspaceSlug($organization, $validated['workspace_name']),
-                    'billing_type' => Workspace::BILLING_INCLUDED,
-                    'status' => Workspace::STATUS_ACTIVE,
-                ]);
-                $organizationRole = OrganizationUser::ROLE_OWNER;
-                $workspaceRole = WorkspaceMember::ROLE_OWNER;
-            } else {
-                $workspace = Workspace::query()->with('organization')->findOrFail($validated['workspace_id']);
-                $organization = $workspace->organization;
-                $organizationRole = OrganizationUser::ROLE_MEMBER;
-                $workspaceRole = $validated['workspace_role'];
-            }
-
-            $organization->users()->syncWithoutDetaching([$user->id => [
-                'role' => $organizationRole,
-                'organization_role' => $organizationRole === OrganizationUser::ROLE_OWNER
-                    ? OrganizationUser::ORGANIZATION_ROLE_OWNER
-                    : OrganizationUser::ORGANIZATION_ROLE_MEMBER,
-                'membership_status' => OrganizationUser::STATUS_ACTIVE,
-                'joined_at' => now(),
-            ]]);
-            $workspace->users()->attach($user->id, [
-                'role' => $workspaceRole,
-                'joined_at' => now(),
-            ]);
-        });
-
-        return redirect()->route('system-admin.members.index')->with('status', 'メンバーを登録しました。');
+        abort(410, 'Staff accounts must be created through an organization invitation.');
     }
 
     public function edit(User $user): View
@@ -103,7 +42,8 @@ class MemberController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'password' => ['prohibited'],
+            'password_confirmation' => ['prohibited'],
             'is_system_admin' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
         ]);
@@ -123,7 +63,6 @@ class MemberController extends Controller
         DB::transaction(function () use ($request, $user, $validated, $credentials): void {
             $oldEmail = $user->email;
             $emailChanged = ! hash_equals($oldEmail, $validated['email']);
-            $passwordChanged = ! empty($validated['password']);
             $disabled = $user->is_active && ! $validated['is_active'];
 
             $user->fill([
@@ -135,12 +74,9 @@ class MemberController extends Controller
             if ($emailChanged) {
                 $user->email_verified_at = null;
             }
-            if ($passwordChanged) {
-                $user->password = $validated['password'];
-            }
             $user->save();
 
-            if ($emailChanged || $passwordChanged || $disabled) {
+            if ($emailChanged || $disabled) {
                 $credentials->rotate(
                     $user,
                     'account.credentials_changed_by_system_admin',
@@ -244,27 +180,5 @@ class MemberController extends Controller
         if (! $hasOtherOwner) {
             throw ValidationException::withMessages(['workspace_role' => 'Workspaceの最後のOwnerは変更・解除できません。']);
         }
-    }
-
-    private function uniqueOrganizationSlug(string $name): string
-    {
-        return $this->uniqueSlug(Str::slug($name) ?: 'organization', fn (string $slug): bool => Organization::where('slug', $slug)->exists());
-    }
-
-    private function uniqueWorkspaceSlug(Organization $organization, string $name): string
-    {
-        return $this->uniqueSlug(Str::slug($name) ?: 'workspace', fn (string $slug): bool => $organization->workspaces()->where('slug', $slug)->exists());
-    }
-
-    private function uniqueSlug(string $base, callable $exists): string
-    {
-        $slug = $base;
-        $index = 2;
-
-        while ($exists($slug)) {
-            $slug = $base.'-'.$index++;
-        }
-
-        return $slug;
     }
 }

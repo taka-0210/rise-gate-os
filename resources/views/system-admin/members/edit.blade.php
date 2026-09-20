@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => 'メンバー編集 - Company OS'])
 
 @section('content')
-    <section class="stack">
+    <section class="stack system-admin-member-edit">
         <div class="actions">
             <a href="{{ route('system-admin.members.index') }}">← メンバー一覧</a>
         </div>
@@ -21,10 +21,7 @@
                 @csrf @method('PUT')
                 <div class="field"><label for="name">氏名</label><input id="name" name="name" value="{{ old('name', $member->name) }}" required></div>
                 <div class="field"><label for="email">メールアドレス</label><input id="email" name="email" type="email" value="{{ old('email', $member->email) }}" required></div>
-                <div class="grid">
-                    <div class="field"><label for="password">新しいパスワード</label><input id="password" name="password" type="password"><div class="meta">変更しない場合は空欄</div></div>
-                    <div class="field"><label for="password_confirmation">新しいパスワード（確認）</label><input id="password_confirmation" name="password_confirmation" type="password"></div>
-                </div>
+                <p class="meta">Password変更・RecoveryはStaff本人のAccount画面から行います。</p>
                 <input type="hidden" name="is_system_admin" value="0">
                 <label><input style="width:auto" type="checkbox" name="is_system_admin" value="1" @checked(old('is_system_admin', $member->is_system_admin))> System Admin権限を付与</label>
                 <input type="hidden" name="is_active" value="0">
@@ -74,4 +71,23 @@
             </form>
         </div>
     </section>
+    <style>
+        .system-admin-member-edit,
+        .system-admin-member-edit > *,
+        .system-admin-member-edit .panel,
+        .system-admin-member-edit form,
+        .system-admin-member-edit select {
+            min-width: 0;
+            max-width: 100%;
+        }
+        @media (max-width: 760px) {
+            .system-admin-member-edit .actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .system-admin-member-edit .actions select {
+                width: 100% !important;
+            }
+        }
+    </style>
 @endsection

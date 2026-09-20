@@ -37,6 +37,7 @@
         <div class="grid">
             <div class="card">
                 <h2>担当者</h2>
+                @if ($improvement->assignee)<x-user-avatar :user='$improvement->assignee' :size='36' />@endif
                 <p>{{ $improvement->assignee?->name ?? '未設定' }}</p>
             </div>
             <div class="card">

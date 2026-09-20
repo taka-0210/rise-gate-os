@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OrganizationUser;
 use App\Services\AccountAudit;
 use App\Services\AccountLoginLimiter;
+use App\Services\Organization\OrganizationInvitationClaim;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,6 +44,10 @@ class AuthenticatedSessionController extends Controller
         $request->session()->put('credential_generation', (int) $request->user()->credential_generation);
         $request->session()->forget('url.intended');
         $audit->record('account.login', 'success', $request->user(), $request->user());
+
+        if ($request->session()->has(OrganizationInvitationClaim::SESSION_KEY)) {
+            return redirect()->route('invitations.onboarding');
+        }
 
         $companies = $request->user()->organizations()
             ->wherePivot('membership_status', OrganizationUser::STATUS_ACTIVE)

@@ -278,6 +278,8 @@
         @media (prefers-reduced-motion: reduce) {
             .os-network__orbit--inner, .os-cosmos__satellite-track, .os-cosmos__satellite, .os-cosmos__ai-track, .os-cosmos__ai-signal, .os-cosmos__planet::before, .os-cosmos__stars { animation: none; }
         }
+        .user-avatar { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; border-radius:50%; overflow:hidden; background:#e7eef8; color:#17365f; font-weight:700; vertical-align:middle; }
+        .user-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
         @media (max-width: 760px) {
             .topbar { align-items: flex-start; flex-direction: column; }
             .nav-separator { display:none; }
@@ -303,6 +305,7 @@
         </a>
         <nav class="nav">
             @auth
+                <x-user-avatar :user='auth()->user()' :size='34' />
                 <a href="{{ route('account.profile') }}">Account</a>
                 @if (session('access_mode') === 'system_admin')
                     <span class="workspace-pill">System Admin Mode</span>

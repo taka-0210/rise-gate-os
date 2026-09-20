@@ -29,6 +29,7 @@
                     <article class="card organization-member">
                         <div class="organization-member__identity">
                             <div>
+                                <x-user-avatar :user='$membership->user' :size='40' />
                                 <h3>{{ $membership->user->name }}</h3>
                                 <p>{{ $membership->user->email }}</p>
                             </div>
@@ -153,6 +154,8 @@
             </div>
         </section>
     </div>
+
+    @include('organization-management.partials.staff-invitations')
 
     <style>
         .organization-member-list, .organization-group-grid { display:grid; gap:14px; }

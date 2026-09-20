@@ -21,6 +21,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DevelopmentSetupController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EstimateController;
+use App\Http\Controllers\InvitationOnboardingController;
+use App\Http\Controllers\OrganizationInvitationController;
 use App\Http\Controllers\OrganizationManagementController;
 use App\Http\Controllers\Project\AiChatController;
 use App\Http\Controllers\Project\AiProposalController;
@@ -47,6 +49,7 @@ use App\Http\Controllers\StandaloneAppController;
 use App\Http\Controllers\SystemAdmin\AuthenticatedSessionController as SystemAdminSessionController;
 use App\Http\Controllers\SystemAdmin\MemberController as SystemAdminMemberController;
 use App\Http\Controllers\SystemAdmin\WorkspaceController as SystemAdminWorkspaceController;
+use App\Http\Controllers\UserAvatarController;
 use App\Http\Controllers\Workspace\WorkspaceBusinessProfileController;
 use App\Http\Controllers\Workspace\WorkspaceController;
 use App\Http\Controllers\WorkspaceAiSettingController;
@@ -73,6 +76,15 @@ Route::get('/account/email/confirm/{requestId}', [AccountEmailController::class,
     ->middleware(['signed:relative', 'throttle:account-token'])
     ->name('account.email.confirm');
 
+Route::get('/invitations/{invitation}/claim', [InvitationOnboardingController::class, 'claim'])
+    ->middleware('throttle:account-token')
+    ->name('invitations.claim');
+Route::get('/invitation/onboarding', [InvitationOnboardingController::class, 'show'])
+    ->name('invitations.onboarding');
+Route::post('/invitation/onboarding/register', [InvitationOnboardingController::class, 'register'])
+    ->middleware('throttle:invitation')
+    ->name('invitations.register');
+
 Route::get('/system-admin/login', [SystemAdminSessionController::class, 'create'])->name('system-admin.login');
 Route::post('/system-admin/login', [SystemAdminSessionController::class, 'store'])->name('system-admin.login.store');
 
@@ -95,6 +107,14 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::get('/account', [ProfileController::class, 'show'])->name('account.profile');
     Route::patch('/account/profile', [ProfileController::class, 'update'])->name('account.profile.update');
+    Route::post('/account/avatar', [UserAvatarController::class, 'update'])->name('account.avatar.update');
+    Route::get('/users/{user}/avatar', [UserAvatarController::class, 'show'])->name('users.avatar');
+    Route::post('/invitation/onboarding/prepare', [InvitationOnboardingController::class, 'prepare'])
+        ->middleware('throttle:invitation')
+        ->name('invitations.prepare');
+    Route::post('/invitation/onboarding/accept', [InvitationOnboardingController::class, 'accept'])
+        ->middleware('throttle:invitation')
+        ->name('invitations.accept');
     Route::put('/account/password', [PasswordController::class, 'update'])->name('account.password.update');
     Route::post('/account/email/verify', [AccountEmailController::class, 'verifyCurrent'])->middleware('throttle:account-mail')->name('account.email.verify');
     Route::post('/account/email/change', [AccountEmailController::class, 'requestChange'])->middleware('throttle:account-mail')->name('account.email.change');
@@ -151,6 +171,10 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::get('/company/members', [CompanyMemberAccessController::class, 'index'])->name('company-members.index');
         Route::put('/company/members/{user}', [CompanyMemberAccessController::class, 'update'])->name('company-members.update');
         Route::get('/company/organization', [OrganizationManagementController::class, 'index'])->name('organization-management.index');
+        Route::post('/company/organization/standard-workspace', [OrganizationManagementController::class, 'initializeStandardWorkspace'])->name('organization-management.standard-workspace.store');
+        Route::post('/company/organization/invitations', [OrganizationInvitationController::class, 'store'])->middleware('throttle:invitation')->name('organization-management.invitations.store');
+        Route::post('/company/organization/invitations/{organizationInvitation}/resend', [OrganizationInvitationController::class, 'resend'])->middleware('throttle:invitation')->name('organization-management.invitations.resend');
+        Route::delete('/company/organization/invitations/{organizationInvitation}', [OrganizationInvitationController::class, 'revoke'])->middleware('throttle:invitation')->name('organization-management.invitations.revoke');
         Route::put('/company/organization/memberships/{organizationMembership}/role', [OrganizationManagementController::class, 'updateRole'])->name('organization-management.memberships.role');
         Route::put('/company/organization/memberships/{organizationMembership}/position', [OrganizationManagementController::class, 'updatePosition'])->name('organization-management.memberships.position');
         Route::post('/company/organization/groups', [OrganizationManagementController::class, 'storeGroup'])->name('organization-management.groups.store');

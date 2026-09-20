@@ -14,52 +14,68 @@ class SystemAdminMemberTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_system_admin_can_register_member_with_a_new_workspace(): void
+    public function test_system_admin_direct_staff_registration_is_retired_in_ui_and_http(): void
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
 
-        $response = $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->post(route('system-admin.members.store'), [
-            'name' => 'New Partner',
-            'email' => 'partner@example.com',
-            'password' => 'password-test',
-            'password_confirmation' => 'password-test',
-            'assignment_type' => 'new_workspace',
-            'organization_name' => 'Partner Company',
-            'workspace_name' => 'Partner Workspace',
-        ]);
-
-        $response->assertRedirect(route('system-admin.members.index'));
-        $user = User::where('email', 'partner@example.com')->firstOrFail();
-        $organization = Organization::where('name', 'Partner Company')->firstOrFail();
-        $workspace = Workspace::where('name', 'Partner Workspace')->firstOrFail();
-
-        $this->assertFalse($user->is_system_admin);
-        $this->assertSame($organization->id, $workspace->organization_id);
-        $this->assertDatabaseHas('organization_users', [
-            'organization_id' => $organization->id,
-            'user_id' => $user->id,
-            'role' => 'owner',
-            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
-            'membership_status' => OrganizationUser::STATUS_ACTIVE,
-        ]);
-        $this->assertDatabaseHas('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => 'owner']);
-    }
-
-    public function test_member_registration_only_exposes_fields_for_the_selected_assignment_type(): void
-    {
-        $admin = User::factory()->create(['is_system_admin' => true]);
+        $this->actingAs($admin)
+            ->withSession(['access_mode' => 'system_admin'])
+            ->get(route('system-admin.members.index'))
+            ->assertOk()
+            ->assertDontSee('action="'.route('system-admin.members.store').'"', false)
+            ->assertDontSee('name="password"', false);
 
         $response = $this->actingAs($admin)
             ->withSession(['access_mode' => 'system_admin'])
-            ->get(route('system-admin.members.index'));
+            ->post(route('system-admin.members.store'), [
+                'name' => 'New Partner',
+                'email' => 'partner@example.com',
+                'password' => 'password-test',
+                'password_confirmation' => 'password-test',
+                'assignment_type' => 'new_workspace',
+                'organization_name' => 'Partner Company',
+                'workspace_name' => 'Partner Workspace',
+            ]);
 
-        $response->assertOk()
-            ->assertSee('data-assignment-panel="new_workspace"', false)
-            ->assertSee('data-assignment-panel="existing_workspace"', false)
-            ->assertSee('updateAssignmentFields', false);
+        $response->assertGone();
+        $this->assertDatabaseMissing('users', ['email' => 'partner@example.com']);
+        $this->assertDatabaseCount('organizations', 0);
+        $this->assertDatabaseCount('workspaces', 0);
     }
 
-    public function test_system_admin_can_register_member_in_an_existing_workspace(): void
+    public function test_first_account_bootstrap_remains_available(): void
+    {
+        $this->get(route('register'))->assertOk();
+
+        $this->post(route('register'), [
+            'name' => 'Bootstrap Owner',
+            'email' => 'bootstrap@example.com',
+            'password' => 'password-test',
+            'password_confirmation' => 'password-test',
+            'organization_name' => 'Bootstrap Organization',
+            'workspace_name' => 'Bootstrap Workspace',
+        ])->assertRedirect(route('company.home'));
+
+        $user = User::where('email', 'bootstrap@example.com')->firstOrFail();
+        $organization = Organization::where('name', 'Bootstrap Organization')->firstOrFail();
+        $workspace = Workspace::where('name', 'Bootstrap Workspace')->firstOrFail();
+
+        $this->assertTrue($user->is_system_admin);
+        $this->assertDatabaseHas('organization_users', [
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'role' => OrganizationUser::ROLE_OWNER,
+            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+        ]);
+        $this->assertDatabaseHas('workspace_members', [
+            'workspace_id' => $workspace->id,
+            'user_id' => $user->id,
+            'role' => 'owner',
+        ]);
+    }
+
+    public function test_system_admin_cannot_create_a_new_account_in_an_existing_workspace(): void
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $organization = Organization::create(['name' => 'Rise Gate', 'slug' => 'rise-gate']);
@@ -75,16 +91,10 @@ class SystemAdminMemberTest extends TestCase
             'workspace_role' => 'member',
         ]);
 
-        $response->assertRedirect(route('system-admin.members.index'));
-        $user = User::where('email', 'staff@example.com')->firstOrFail();
-        $this->assertDatabaseHas('organization_users', [
-            'organization_id' => $organization->id,
-            'user_id' => $user->id,
-            'role' => 'member',
-            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_MEMBER,
-            'membership_status' => OrganizationUser::STATUS_ACTIVE,
-        ]);
-        $this->assertDatabaseHas('workspace_members', ['workspace_id' => $workspace->id, 'user_id' => $user->id, 'role' => 'member']);
+        $response->assertGone();
+        $this->assertDatabaseMissing('users', ['email' => 'staff@example.com']);
+        $this->assertDatabaseCount('organization_users', 0);
+        $this->assertDatabaseCount('workspace_members', 0);
         $this->assertDatabaseCount('workspaces', 1);
     }
 
@@ -96,16 +106,21 @@ class SystemAdminMemberTest extends TestCase
         $this->actingAs($user)->withSession(['access_mode' => 'system_admin'])->post(route('system-admin.members.store'), [])->assertForbidden();
     }
 
-    public function test_system_admin_can_update_member_account_and_password(): void
+    public function test_system_admin_can_update_member_account_without_changing_password(): void
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
-        $member = User::factory()->create(['is_active' => true]);
+        $member = User::factory()->create(['is_active' => true, 'password' => 'original-password']);
+        $originalPassword = $member->password;
+
+        $this->actingAs($admin)
+            ->withSession(['access_mode' => 'system_admin'])
+            ->get(route('system-admin.members.edit', $member))
+            ->assertOk()
+            ->assertDontSee('name="password"', false);
 
         $this->actingAs($admin)->withSession(['access_mode' => 'system_admin'])->put(route('system-admin.members.update', $member), [
             'name' => 'Updated Name',
             'email' => 'updated@example.com',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
             'is_system_admin' => '1',
             'is_active' => '1',
         ])->assertRedirect(route('system-admin.members.edit', $member));
@@ -114,9 +129,36 @@ class SystemAdminMemberTest extends TestCase
         $this->assertSame('Updated Name', $member->name);
         $this->assertSame('updated@example.com', $member->email);
         $this->assertTrue($member->is_system_admin);
-        $this->assertTrue(Hash::check('new-password', $member->password));
+        $this->assertSame($originalPassword, $member->password);
         $this->assertSame(2, $member->credential_generation);
         $this->assertNull($member->email_verified_at);
+    }
+
+    public function test_system_admin_cannot_assign_a_permanent_password(): void
+    {
+        $admin = User::factory()->create(['is_system_admin' => true]);
+        $member = User::factory()->create(['is_active' => true, 'password' => 'original-password']);
+        $originalPassword = $member->password;
+
+        $this->actingAs($admin)
+            ->withSession(['access_mode' => 'system_admin'])
+            ->from(route('system-admin.members.edit', $member))
+            ->put(route('system-admin.members.update', $member), [
+                'name' => 'Tampered Name',
+                'email' => $member->email,
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+                'is_system_admin' => '0',
+                'is_active' => '1',
+            ])
+            ->assertRedirect(route('system-admin.members.edit', $member))
+            ->assertSessionHasErrors(['password', 'password_confirmation']);
+
+        $member->refresh();
+        $this->assertSame($originalPassword, $member->password);
+        $this->assertNotSame('Tampered Name', $member->name);
+        $this->assertSame(1, $member->credential_generation);
+        $this->assertFalse(Hash::check('new-password', $member->password));
     }
 
     public function test_last_active_system_admin_cannot_be_demoted_or_suspended(): void
@@ -136,7 +178,7 @@ class SystemAdminMemberTest extends TestCase
         $this->assertTrue($admin->fresh()->is_active);
     }
 
-    public function test_system_admin_can_add_update_and_remove_workspace_membership(): void
+    public function test_existing_account_workspace_membership_management_remains_available_after_direct_creation_retirement(): void
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $member = User::factory()->create();
