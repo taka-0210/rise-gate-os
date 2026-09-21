@@ -124,6 +124,15 @@ try {
     const perspectiveButtons = page.locator('[data-context-tab]');
     assert(await perspectiveButtons.count() === 5, 'Five-perspective navigation is incomplete.');
     assert(await page.locator('.company-context-orbit-visual svg').isVisible(), 'Official ring visual is missing.');
+    assert(await page.locator('.company-context-perspectives').evaluate(element => {
+        const visual = element.querySelector('.company-context-perspectives__visual-column').getBoundingClientRect();
+        const panels = element.querySelector('.company-context-perspectives__panels').getBoundingClientRect();
+        return panels.width >= visual.width * 1.5;
+    }), 'Perspective reading column is still compressed beside the visual.');
+    assert(await page.locator('.company-context-orbit-visual__ring').evaluateAll(elements => elements.every(element => {
+        const style = getComputedStyle(element);
+        return style.strokeDasharray === 'none' && parseFloat(style.strokeWidth) <= 2;
+    })), 'Orbit rings are not rendered as simple solid lines.');
     assert(await page.locator('[data-context-orbit-node]').count() === 5, 'Five-axis ring nodes are incomplete.');
     assert(await page.locator('[data-context-panel]').count() === 5, 'Saved axis content is not present in the DOM.');
     const brandSymbol = page.locator('.company-context-hero__brand-visual img');

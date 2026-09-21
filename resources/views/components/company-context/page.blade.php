@@ -217,8 +217,8 @@
 .company-context-perspectives {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(320px, .86fr) minmax(0, 1.14fr);
-    gap: clamp(42px, 7vw, 92px);
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    gap: clamp(36px, 5vw, 64px);
     align-items: start;
 }
 .company-context-perspectives__visual-column {
@@ -250,9 +250,9 @@
 .company-context-orbit-visual svg { position: relative; z-index: 1; width: 100%; height: 100%; display: block; overflow: visible; }
 .company-context-orbit-visual__field { fill: rgba(246, 248, 250, .48); stroke: rgba(96, 113, 126, .14); stroke-width: 1; }
 .company-context-orbit-visual__ring { fill: none; vector-effect: non-scaling-stroke; }
-.company-context-orbit-visual__ring--outer { stroke: rgba(15, 85, 101, .25); stroke-width: 10; stroke-dasharray: 17 4 8 5 13 6 21 5; transform-origin: 280px 280px; animation: company-context-orbit-spin 120s linear infinite; }
-.company-context-orbit-visual__ring--middle { stroke: rgba(111, 156, 165, .46); stroke-width: 7; stroke-dasharray: 7 5 18 4 10 7 23 6; transform-origin: 280px 280px; animation: company-context-orbit-spin-reverse 88s linear infinite; }
-.company-context-orbit-visual__ring--inner { stroke: rgba(169, 214, 216, .72); stroke-width: 5; stroke-dasharray: 12 7 4 7; opacity: .9; }
+.company-context-orbit-visual__ring--outer { stroke: rgba(15, 85, 101, .25); stroke-width: 2; }
+.company-context-orbit-visual__ring--middle { stroke: rgba(111, 156, 165, .42); stroke-width: 1.5; }
+.company-context-orbit-visual__ring--inner { stroke: rgba(169, 214, 216, .78); stroke-width: 1.5; }
 .company-context-orbit-visual__focus {
     transform: rotate(-90deg);
     transform-origin: 280px 280px;
@@ -324,11 +324,12 @@
 .company-context-perspectives__tabs button[aria-current="true"] span { color: #a7e3db; }
 .company-context-perspectives__panels { display: grid; gap: 32px; }
 .company-context-perspective {
+    position: relative;
     min-height: clamp(400px, 54vh, 540px);
     display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
-    align-items: center;
-    gap: clamp(20px, 4vw, 50px);
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: 20px;
     padding: clamp(30px, 5vw, 58px);
     border: 1px solid rgba(13, 76, 87, .12);
     border-left: 2px solid rgba(12, 89, 98, .14);
@@ -350,7 +351,7 @@
     box-shadow: 0 24px 58px rgba(12, 53, 60, .09);
     transform: scale(1);
 }
-.company-context-perspective__number { color: rgba(11, 89, 98, .2); font-size: clamp(48px, 6vw, 72px); font-weight: 300; letter-spacing: -.08em; }
+.company-context-perspective__number { position: absolute; top: clamp(26px, 4vw, 42px); right: clamp(28px, 4vw, 46px); color: rgba(11, 89, 98, .14); font-size: clamp(42px, 5vw, 62px); font-weight: 300; letter-spacing: -.08em; }
 .company-context-perspective__copy { display: grid; gap: 12px; }
 .company-context-perspective__code { margin: 0; color: var(--context-teal); font-size: 11px; font-weight: 850; letter-spacing: .2em; }
 .company-context-perspective h3 { margin: 0; color: #617276; font-size: 15px; font-weight: 700; }
@@ -423,12 +424,6 @@
     from { opacity: .24; transform: translateY(38px) scale(.988); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes company-context-orbit-spin {
-    to { transform: rotate(360deg); }
-}
-@keyframes company-context-orbit-spin-reverse {
-    to { transform: rotate(-360deg); }
-}
 @media (prefers-reduced-motion: no-preference) {
     html { scroll-behavior: smooth; }
     .company-context-reveal-active { animation: company-context-reveal .82s cubic-bezier(.22,.75,.24,1) both; }
@@ -483,7 +478,7 @@
     .company-context-perspectives__panels { gap: 18px; }
     .company-context-perspectives__progress { display: none; }
     .company-context-perspective { min-height: 360px; grid-template-columns: 1fr; gap: 4px; padding: 28px 23px; border-radius: 18px; }
-    .company-context-perspective__number { font-size: 48px; }
+    .company-context-perspective__number { position: static; font-size: 48px; }
     .company-context-perspective__copy > p:last-child { font-size: 19px; line-height: 1.75; }
     .company-context-next { width: calc(100% - 12px); min-height: 620px; margin-block: 10px; padding: 38px 28px; border-radius: 22px; }
     .company-context-strength { width: 100vw; width: 100dvw; min-height: 500px; margin-block: 10px; padding: 72px 28px; border-radius: 0; }
