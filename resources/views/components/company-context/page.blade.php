@@ -89,23 +89,28 @@
 }
 .company-context-directory__hero {
     position: relative;
+    width: 100vw;
+    width: 100dvw;
+    max-width: none;
+    margin-left: calc((100% - 100vw) / 2);
+    margin-left: calc((100% - 100dvw) / 2);
     isolation: isolate;
     overflow: hidden;
     min-height: clamp(560px, 72vh, 720px);
     display: grid;
     align-content: center;
-    padding: clamp(64px, 8vw, 108px);
+    padding-block: clamp(64px, 8vw, 108px);
+    padding-inline: max(clamp(28px, 5vw, 68px), calc((100vw - 1240px) / 2 + 28px));
     background: #eef2f5;
 }
 .company-context-directory__visual {
     position: absolute;
     z-index: -1;
-    inset: 0 0 0 auto;
-    width: 60%;
+    inset: 0;
     overflow: hidden;
     opacity: .82;
-    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%, #000);
-    mask-image: linear-gradient(90deg, transparent 0%, #000 34%, #000);
+    -webkit-mask-image: linear-gradient(90deg, transparent 8%, #000 40%, #000);
+    mask-image: linear-gradient(90deg, transparent 8%, #000 40%, #000);
 }
 .company-context-directory__visual img {
     width: 100%;
@@ -113,16 +118,41 @@
     display: block;
     object-fit: cover;
     object-position: center;
-    transform: scale(.58);
-    transform-origin: 74% 50%;
+    transform: scale(.56);
+    transform-origin: 80% 50%;
+}
+.company-context-directory__hero .company-context-title > .company-context-print-hidden {
+    position: absolute;
+    top: max(clamp(28px, 5vw, 68px), calc((100vw - 1240px) / 2 + 28px));
+    right: max(clamp(28px, 5vw, 68px), calc((100vw - 1240px) / 2 + 28px));
+}
+.company-context-directory__hero .company-context-actions a {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    padding: 0 0 7px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 85, 101, .22);
+    border-radius: 50%;
+    color: transparent;
+    background: rgba(246,248,250,.72);
+    font-size: 0;
+}
+.company-context-directory__hero .company-context-actions a::before {
+    content: '•••';
+    color: var(--context-ink);
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: .12em;
 }
 .company-context-directory__hero .company-context-title {
-    position: relative;
-    z-index: 1;
+    position: static;
     width: min(620px, 58%);
     padding: 0;
     border: 0;
 }
+.company-context-directory__hero .company-context-title > div:first-child { position: relative; z-index: 1; }
 .company-context-directory__hero .company-context-title h1 {
     font-size: clamp(52px, 7vw, 82px);
     font-weight: 450;
@@ -536,6 +566,7 @@
     .company-context-actions .button { width: 100%; }
     .company-context-directory { width: calc(100vw - 20px); }
     .company-context-directory__hero { min-height: 650px; display: block; padding: 24px 22px 54px; }
+    .company-context-directory__hero .company-context-title > .company-context-print-hidden { top: 22px; right: 22px; }
     .company-context-directory__visual {
         inset: 0;
         width: 100%;
