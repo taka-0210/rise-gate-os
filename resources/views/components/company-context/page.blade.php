@@ -79,7 +79,29 @@
 .company-context-card__arrow { display: none; }
 .company-context-empty { display: grid; gap: 12px; padding: 38px; border: 1px solid #d8e0e6; background: #fff; }
 .company-context-empty p { margin: 0; }
-.shell:has(.company-context-directory) > .breadcrumbs { width: min(1240px, calc(100% - 40px)); }
+.shell:has(.company-context-directory) > .breadcrumbs {
+    width: auto;
+    max-width: none;
+    margin-right: clamp(20px, 5vw, 68px);
+    margin-left: clamp(20px, 5vw, 68px);
+    padding-left: max(0px, calc((100vw - 1240px) / 2 - clamp(20px, 5vw, 68px)));
+}
+.company-context-directory__breadcrumb-tools {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    margin-left: auto;
+    padding: 0 0 7px;
+    border: 1px solid rgba(15, 85, 101, .22);
+    border-radius: 50%;
+    color: var(--ink);
+    background: rgba(246,248,250,.72);
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: .12em;
+}
 .company-context-directory {
     position: relative;
     left: 50%;
@@ -123,9 +145,7 @@
     transform-origin: 80% 50%;
 }
 .company-context-directory__hero .company-context-title > .company-context-print-hidden {
-    position: absolute;
-    top: clamp(28px, 5vw, 68px);
-    right: clamp(28px, 5vw, 68px);
+    display: none;
 }
 .company-context-directory__hero .company-context-actions a {
     width: 42px;
@@ -567,7 +587,6 @@
     .company-context-actions .button { width: 100%; }
     .company-context-directory { width: calc(100vw - 20px); }
     .company-context-directory__hero { min-height: 650px; display: block; padding: 24px 22px 54px; }
-    .company-context-directory__hero .company-context-title > .company-context-print-hidden { top: 22px; right: 22px; }
     .company-context-directory__visual {
         inset: 0;
         width: 100%;

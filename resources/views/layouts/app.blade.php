@@ -399,6 +399,11 @@
                     <span aria-hidden="true">›</span>
                     <a href="{{ route('projects.show', $project) }}" aria-current="page">{{ $project->name }}</a>
                 @endisset
+                @if(request()->routeIs('business-domains.index') && ($canEdit ?? false))
+                    <a class=company-context-directory__breadcrumb-tools href={{route('business-domains.manage',request()->only(['status','q','per_page']))}} aria-label=&#31649;&#29702;&#12377;&#12427;>
+                        <span aria-hidden=true>&bull;&bull;&bull;</span>
+                    </a>
+                @endif
             </nav>
         @endif
     @endauth
