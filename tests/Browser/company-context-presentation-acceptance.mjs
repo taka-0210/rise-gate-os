@@ -5,6 +5,8 @@ const [baseUrl, desktopShot, mobileShot, printShot, printPdf] = process.argv.sli
 if (!baseUrl || !desktopShot || !mobileShot || !printShot || !printPdf) {
     throw new Error('Usage: company-context-presentation-acceptance.mjs <base-url> <desktop-shot> <mobile-shot> <print-shot> <print-pdf>');
 }
+const desktopOutlineShot = desktopShot.replace(/\.png$/i, '-outline.png');
+const mobileOutlineShot = mobileShot.replace(/\.png$/i, '-outline.png');
 
 const browser = await chromium.launch({
     executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -84,12 +86,34 @@ try {
     assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 80, 'Desktop hero title is too small.');
     assert(await page.locator('.company-context-key-message__text').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 45, 'Key message lacks visual hierarchy.');
     assert(await page.locator('.company-context-strength__statement').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 40, 'Strength statement lacks visual hierarchy.');
-    assert(await page.getByRole('tab').count() === 5, 'Five-perspective navigation is incomplete.');
-    await page.getByRole('tab', { name: /WHO/ }).click();
-    assert(await page.locator('[role="tabpanel"]:not([hidden])').getByText('地域で事業を営む中小企業と、その会社で働く人たち', { exact: true }).isVisible(), 'WHO perspective did not activate.');
-    await page.getByRole('tab', { name: /WHO/ }).focus();
+    const perspectiveButtons = page.locator('[data-context-tab]');
+    assert(await perspectiveButtons.count() === 5, 'Five-perspective navigation is incomplete.');
+    assert(await page.locator('.company-context-orbit-visual svg').isVisible(), 'Official ring visual is missing.');
+    assert(await page.locator('[data-context-orbit-node]').count() === 5, 'Five-axis ring nodes are incomplete.');
+    assert(await page.locator('[data-context-panel]').count() === 5, 'Saved axis content is not present in the DOM.');
+    const brandSymbol = page.locator('.company-context-hero__brand-visual img');
+    assert(await brandSymbol.isVisible(), 'Official Company OS brand symbol is missing from the hero.');
+    assert((await brandSymbol.getAttribute('src') || '').endsWith('/images/company-os-brand-symbol.svg'), 'Hero does not use the official SVG asset.');
+    assert(await brandSymbol.evaluate(element => element.complete && element.naturalWidth > 0), 'Official SVG asset did not load.');
+    assert(await page.locator('.company-context-story__body img').count() === 0, 'Company Context body unexpectedly depends on a photo.');
+    const orbitBackground = await page.locator('.company-context-orbit-visual').evaluate(element => getComputedStyle(element).backgroundColor);
+    assert(orbitBackground === 'rgb(238, 242, 245)', 'Official paper tone is not applied to the ring visual.');
+    const whoButton = perspectiveButtons.filter({ hasText: 'WHO' });
+    await whoButton.click();
+    await page.waitForTimeout(700);
+    assert(await page.locator('#context-panel-1').getByText('地域で事業を営む中小企業と、その会社で働く人たち', { exact: true }).isVisible(), 'WHO perspective is not readable.');
+    assert(await page.locator('#context-panel-1').evaluate(element => element.classList.contains('is-active')), 'WHO perspective did not focus.');
+    await whoButton.focus();
     await page.keyboard.press('ArrowRight');
-    assert(await page.getByRole('tab', { name: /VALUE/ }).getAttribute('aria-selected') === 'true', 'Arrow key did not move to VALUE perspective.');
+    await page.waitForTimeout(700);
+    const valueButton = perspectiveButtons.filter({ hasText: 'VALUE' });
+    assert(await valueButton.getAttribute('aria-current') === 'true', 'Arrow key did not move to VALUE perspective.');
+    assert(await page.locator('[data-context-orbit-node="2"]').evaluate(element => element.classList.contains('is-active')), 'Ring visual did not follow the focused axis.');
+    assert((await page.locator('[data-context-axis-progress]').getAttribute('style') || '').includes('0.6'), 'Story progress rail did not follow the focused axis.');
+    await page.locator('#context-panel-3').evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(900);
+    assert(await perspectiveButtons.filter({ hasText: 'WHERE' }).getAttribute('aria-current') === 'true', 'Scroll did not focus the corresponding ring axis.');
+    await page.screenshot({ path: desktopOutlineShot });
     const strengthTop = await page.locator('.company-context-strength').evaluate(element => element.offsetTop);
     const detailsTop = await page.locator('.company-context-story-section--details').evaluate(element => element.offsetTop);
     const directionTop = await page.locator('.company-context-next').evaluate(element => element.offsetTop);
@@ -110,9 +134,15 @@ try {
     await page.goto(showUrl);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), '390px Read overflows.');
     assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 48, '390px hero title is too small.');
-    assert(await page.getByRole('tab').count() === 5, '390px perspective tabs are unavailable.');
-    await page.getByRole('tab', { name: /WHERE/ }).click();
-    assert(await page.locator('[role="tabpanel"]:not([hidden])').getByText('日本国内 / 対面とオンライン', { exact: true }).isVisible(), '390px touch-style perspective selection failed.');
+    assert(await page.locator('[data-context-tab]').count() === 5, '390px perspective controls are unavailable.');
+    await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; });
+    await page.locator('.company-context-orbit-visual').evaluate(element => element.scrollIntoView({ behavior: 'auto', block: 'center' }));
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: mobileOutlineShot });
+    await page.locator('[data-context-tab]').filter({ hasText: 'WHERE' }).click();
+    await page.waitForTimeout(700);
+    assert(await page.locator('#context-panel-3').getByText('日本国内 / 対面とオンライン', { exact: true }).isVisible(), '390px touch-style perspective selection failed.');
+    assert(await page.locator('.company-context-orbit-visual').evaluate(element => element.getBoundingClientRect().width <= window.innerWidth), '390px ring visual overflows.');
     assert(await page.locator('.company-context-strength').evaluate(element => element.getBoundingClientRect().width <= window.innerWidth), '390px strength section overflows.');
     await page.screenshot({ path: mobileShot, fullPage: true });
 
@@ -170,14 +200,16 @@ try {
     console.log(JSON.stringify({
         status: 'passed',
         desktop: '1280x1000',
+        desktopOutline: desktopOutlineShot,
         mobile: '390x844',
+        mobileOutline: mobileOutlineShot,
         print: 'A4 PDF',
         pdfBytes: fs.statSync(printPdf).size,
         http5xx: http5xx.length,
         journeys: [
             'owner-login', 'read-index', 'read-detail', 'edit-save-read',
-            'immersive-hero', 'story-hierarchy', 'rotary-perspectives',
-            'desktop-motion', 'mobile-390', 'keyboard-tabs', 'reduced-motion',
+            'immersive-hero', 'story-hierarchy', 'official-ring-visual',
+            'scroll-linked-five-axes', 'desktop-motion', 'mobile-390', 'keyboard-controls', 'reduced-motion',
             'manage-history', 'archive-read', 'browser-print', 'reopen',
             'editor-revoke', 'permission-negative',
         ],

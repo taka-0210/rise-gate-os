@@ -739,6 +739,7 @@ class BusinessDomainTest extends TestCase
 
         $response->assertOk()
             ->assertSee('data-company-context-hero', false)
+            ->assertSee(asset('images/company-os-brand-symbol.svg'), false)
             ->assertSeeInOrder([
                 '地域共創事業',
                 '地域企業の次の一歩を支える事業です。',
@@ -754,16 +755,24 @@ class BusinessDomainTest extends TestCase
                 'WHERE WE GO NEXT',
                 '品質と再現性を高める。',
             ])
-            ->assertSee('role="tablist"', false)
             ->assertSee('aria-label="事業の5つの視点"', false)
-            ->assertSee('role="tabpanel"', false)
-            ->assertDontSee('role="tabpanel" hidden', false)
+            ->assertSee('<svg viewBox="0 0 560 560"', false)
+            ->assertSee('company-context-orbit-visual__ring--outer', false)
+            ->assertSee('data-context-orbit-node="0"', false)
+            ->assertSee('data-context-angle="-90"', false)
+            ->assertSee('data-context-axis-progress', false)
+            ->assertSee('data-context-panel', false)
+            ->assertDontSee('role="tabpanel"', false)
             ->assertSee('company-context-tools', false)
             ->assertSee('prefers-reduced-motion: reduce', false)
             ->assertSee('IntersectionObserver', false)
             ->assertDontSee('name="change_reason"', false)
             ->assertDontSee('Revision履歴');
 
+        $brandSymbol = file_get_contents(public_path('images/company-os-brand-symbol.svg'));
+        $this->assertIsString($brandSymbol);
+        $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $brandSymbol);
+        $this->assertStringNotContainsString('<script', $brandSymbol);
         $this->assertSame('地域企業の次の一歩を支える事業です。', $domain->fresh()->description);
         $this->assertDatabaseCount('business_domain_revisions', 1);
     }

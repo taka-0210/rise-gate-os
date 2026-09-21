@@ -8,6 +8,9 @@
 ])
 
 <header {{ $attributes->class(['company-context-hero']) }} data-company-context-hero data-context-reveal>
+    <div class="company-context-hero__brand-visual" aria-hidden="true">
+        <img src="{{ asset('images/company-os-brand-symbol.svg') }}" alt="" width="2880" height="1620" fetchpriority="high">
+    </div>
     <div class="company-context-hero__atmosphere" aria-hidden="true">
         <span></span><span></span><span></span>
     </div>

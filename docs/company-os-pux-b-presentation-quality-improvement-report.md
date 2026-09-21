@@ -1,5 +1,7 @@
 # Company OS｜PUX-B Presentation Quality Improvement Report
 
+> 2026-09-21の公式Company OS Design Language整合後のCurrent Evidenceは、`docs/company-os-pux-b-official-design-language-alignment-report.md`を参照。本Reportはその直前のPresentation Quality改善Commit時点を記録する。
+
 ## 1. Close判定
 
 - Status: **Complete / Code Close**
