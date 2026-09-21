@@ -123,7 +123,7 @@
 }
 .company-context-directory__hero .company-context-title > .company-context-print-hidden {
     position: absolute;
-    top: max(clamp(28px, 5vw, 68px), calc((100vw - 1240px) / 2 + 28px));
+    top: clamp(28px, 5vw, 68px);
     right: max(clamp(28px, 5vw, 68px), calc((100vw - 1240px) / 2 + 28px));
 }
 .company-context-directory__hero .company-context-actions a {
