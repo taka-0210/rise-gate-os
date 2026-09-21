@@ -4,7 +4,7 @@
 
 対象: PUX-B｜Company Context Presentation
 
-状態: **Code Close**
+状態: **Formal Close**
 
 ## 1. Close summary
 
@@ -22,7 +22,7 @@
 - Scope 8: **未着手**
 - 未解決の実装重大問題: **0**
 
-Code CloseはProduct有効化、Production Release、高見による実利用受入を意味しない。PUX-RG01〜04は後述のRelease Gateとして分離する。
+本Formal Closeは高見による通常local実利用確認を含むが、Product有効化またはProduction Releaseを意味しない。PUX-RG01 / RG02 / RG04は後述のRelease Gateとして分離する。
 
 ## 2. できるようになったこと
 
@@ -233,7 +233,7 @@ PUX-B開始前の通常local論理fingerprintは取得していないため、PU
 - Vision / Philosophy / Strategy等へのCompany Context展開
 - SWOT、分析、数値目標
 - Product有効化、本番相当DB競合、本番Deploy
-- 高見による実Data・実利用の最終受入
+- Production環境での最終Release確認
 
 ## 9. Release Gate / Pending
 
@@ -241,12 +241,11 @@ PUX-B開始前の通常local論理fingerprintは取得していないため、PU
 | --- | --- | --- |
 | PUX-RG01 実Data互換棚卸し | 未実施 | PUX-A Release Gateとして維持 |
 | PUX-RG02 本番相当DB競合 | 未実施 | PUX-A Release Gateとして維持 |
-| PUX-RG03 Context UI実利用受入 | 未達 | 実装担当Browser Evidenceは完了。高見の実利用受入は別工程 |
+| PUX-RG03 Context UI実利用受入 | 達成 | 通常local実Dataでの実利用確認とPresentation調整を完了し、Formal Close判断を取得。 |
 | PUX-RG04 既存Release条件 | 継続 | Mail / 法務 / Production DB / S7本番DB競合 / Hardeningを維持 |
 
 非Blocker Pending:
 
-- 高見による実DataでのRead / Edit / Manage / 390px / Print受入
 - Browser / OS / printer差によるPrint最終確認
 - 将来、同じCompany Context Patternを理念等へ展開するかのProduct判断
 
@@ -302,6 +301,50 @@ Final: **Done 20 / Conditional 0 / Not Done 0**
 
 Business Domainは、既存の厳密な正本・Permission・Writerを維持したまま、通常Staffが会社の事業を「次世代の経営指針書」として読むCompany Context Presentationへ移行した。
 
-Read / Edit / Manageの責務を分離し、通常Readを軽く保ちながら、管理機能・History・Revision・Auditを失っていない。PUX-AおよびS1〜S7のClosed Contractは維持され、PUX-BはCode Closeできる。
+Read / Edit / Manageの責務を分離し、通常Readを軽く保ちながら、管理機能・History・Revision・Auditを失っていない。PUX-AおよびS1〜S7のClosed Contractは維持され、PUX-BはFormal Closeできる。
 
-次工程は高見のPUX-RG03実利用受入または別途指示されたRelease工程であり、この作業ではProductionおよびScope 8へ進まない。
+次工程は別途指示される差分またはRelease工程であり、この作業ではProductionおよびScope 8へ進まない。
+
+## 13. Formal Close追補
+
+実施日: 2026-09-22 JST
+
+判定: **PUX-B Formal Close / Done 20 / Conditional 0 / Not Done 0**
+
+### 13.1 Final state
+
+- Formal Close前の最終実装HEAD: `b6e8dcbdf307754e09a8fa3c22bb32a638cd849c`
+- View First / Edit Second、Read / Edit / Manage分離、既存Business Domain正本再利用を維持した。
+- 詳細はHero / Business Outline / Strength / Detail / Directionを一つのStoryとして読むPresentationとした。
+- 一覧は会社の事業構成を俯瞰し、読みたい事業へ入る入口として整理した。
+- 公式Company OS WebサイトのDesign Language、Desktop / Mobile、Progressive Disclosureを維持した。
+- Product / Data / Permission / Tenant / Writer / Revision Contract変更はない。
+- 新規Migration、Data変換、Data削除はない。
+
+### 13.2 Reused evidence
+
+- 本ReportのPUX-B-DC-01〜20、Full Test 475 tests / 3,941 assertions、Build、Desktop / 390px / Print、Permission負例。
+- `company-os-pux-b-presentation-quality-improvement-report.md`の476 tests / 3,955 assertions、Build、Browser、reduced-motion、Print Evidence。
+- `company-os-pux-b-official-design-language-alignment-report.md`の476 tests / 3,963 assertions、公式SVG provenance、Desktop / 390px / Print、Permission負例。
+- Hero Full-BleedおよびPresentation Balance follow-upのFocused / Full / Browser Evidence。
+- 2026-09-22までの通常local実利用確認とPresentation調整結果。
+
+### 13.3 Final delta and verification
+
+- 最新包括Evidence Commit `ba35275` 以降から `b6e8dcb` までの差分はBusiness Domain View、Company Context component、Layout、関連Feature / Browser Testのみ。
+- `app`、`routes`、`database`、`config`、Composer / Node dependency、Migration差分は0。
+- `artisan view:cache`: success。
+- BusinessDomainTest + CompanyNavigationTest: **31 tests / 330 assertions / failures 0**。
+- `company.home`: `GET /company`へのRoute接続を確認。
+- Final diff check: errorなし。
+
+Full Test、Frontend Build、新規Browser Journey、隔離DB、Print再確認は追加実施していない。直近の包括Evidence後にBusiness Logic、compiled frontend asset、Print Contract、Permission、Tenant、Data境界の変更がなく、今回のRiskは現在BladeのCompile、Business Domain Contract、Navigation接続のFocused Verificationで十分に確認できるためである。
+
+### 13.4 Close後へ分離
+
+- HOW｜どう届けるか: Business Domainの正式Product / Data仕様変更として別差分で扱う。
+- 高見Accountのライズアップ／ライズゲート2社所属を2 Accountへ分離する作業: PUX-B外で扱う。
+- Scope 8: 未着手。
+- Production Migration / Deploy: 未実施・未接続。
+
+PUX-Bは本追補をもって正式Closeし、以後の変更は新しい差分または別Scopeとして扱う。
