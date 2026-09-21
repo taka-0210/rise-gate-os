@@ -43,6 +43,8 @@ try {
     await page.getByText('地域共創事業', { exact: true }).click();
     assert(await page.locator('.company-context-read form').count() === 0, 'Read detail contains a management form.');
     assert(await page.getByText('Revision履歴').count() === 0, 'Read detail contains history.');
+    assert(await page.locator('.company-context-tools:not([open])').count() === 1, 'Secondary actions are open by default.');
+    await page.locator('.company-context-tools summary').click();
     const editHref = await page.getByRole('link', { name: '内容を編集', exact: true }).getAttribute('href');
     const showUrl = page.url();
     await page.goto(editHref);
@@ -78,7 +80,20 @@ try {
     assert(await page.getByText('強化・深化', { exact: true }).isVisible(), 'Direction is missing.');
     assert(await page.getByText('Company OS伴走支援', { exact: true }).isVisible(), 'Item is missing.');
     assert(await page.locator('.company-context-read form').count() === 0, 'Read contains management form after save.');
-    assert(await page.locator('.company-context-title h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 50, 'Desktop editorial title is too small.');
+    assert(await page.locator('[data-company-context-hero]').evaluate(element => element.getBoundingClientRect().height) >= 600, 'Desktop hero lacks immersive vertical space.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 80, 'Desktop hero title is too small.');
+    assert(await page.locator('.company-context-key-message__text').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 45, 'Key message lacks visual hierarchy.');
+    assert(await page.locator('.company-context-strength__statement').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 40, 'Strength statement lacks visual hierarchy.');
+    assert(await page.getByRole('tab').count() === 5, 'Five-perspective navigation is incomplete.');
+    await page.getByRole('tab', { name: /WHO/ }).click();
+    assert(await page.locator('[role="tabpanel"]:not([hidden])').getByText('地域で事業を営む中小企業と、その会社で働く人たち', { exact: true }).isVisible(), 'WHO perspective did not activate.');
+    await page.getByRole('tab', { name: /WHO/ }).focus();
+    await page.keyboard.press('ArrowRight');
+    assert(await page.getByRole('tab', { name: /VALUE/ }).getAttribute('aria-selected') === 'true', 'Arrow key did not move to VALUE perspective.');
+    const strengthTop = await page.locator('.company-context-strength').evaluate(element => element.offsetTop);
+    const detailsTop = await page.locator('.company-context-story-section--details').evaluate(element => element.offsetTop);
+    const directionTop = await page.locator('.company-context-next').evaluate(element => element.offsetTop);
+    assert(strengthTop < detailsTop && detailsTop < directionTop, 'Story order is not Strength → Details → Direction.');
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Desktop Read overflows.');
 
     let keyboardReachedContext = false;
@@ -94,12 +109,17 @@ try {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(showUrl);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), '390px Read overflows.');
-    assert(await page.locator('.company-context-axis-grid').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length === 1), '390px outline is not one column.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 48, '390px hero title is too small.');
+    assert(await page.getByRole('tab').count() === 5, '390px perspective tabs are unavailable.');
+    await page.getByRole('tab', { name: /WHERE/ }).click();
+    assert(await page.locator('[role="tabpanel"]:not([hidden])').getByText('日本国内 / 対面とオンライン', { exact: true }).isVisible(), '390px touch-style perspective selection failed.');
+    assert(await page.locator('.company-context-strength').evaluate(element => element.getBoundingClientRect().width <= window.innerWidth), '390px strength section overflows.');
     await page.screenshot({ path: mobileShot, fullPage: true });
 
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto(showUrl);
-    await page.getByRole('link', { name: '管理', exact: true }).click();
+    await page.locator('.company-context-tools summary').click();
+    await page.getByRole('link', { name: '管理・履歴', exact: true }).click();
     assert(await page.getByText('Revision履歴', { exact: true }).isVisible(), 'Manage detail has no history.');
     assert(await page.locator('#state-reason').isVisible(), 'Manage detail has no state form.');
     await page.locator('#state-reason').fill('Browser Printで保管表示を確認');
@@ -122,7 +142,14 @@ try {
     assert(fs.statSync(printPdf).size > 5000, 'Generated print PDF is unexpectedly small.');
     await page.emulateMedia({ media: 'screen' });
 
-    await page.getByRole('link', { name: '管理', exact: true }).click();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(showUrl);
+    assert(await page.locator('.company-context-hero__atmosphere span').nth(1).evaluate(element => getComputedStyle(element).animationName === 'none'), 'Reduced motion does not disable ambient motion.');
+    assert(await page.locator('.company-context-key-message__text').isVisible(), 'Reduced motion hides story content.');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+    await page.locator('.company-context-tools summary').click();
+    await page.getByRole('link', { name: '管理・履歴', exact: true }).click();
     await page.locator('#state-reason').fill('Browser確認後に再開');
     await Promise.all([
         page.waitForURL('**/company/business-domains/manage/*'),
@@ -149,7 +176,8 @@ try {
         http5xx: http5xx.length,
         journeys: [
             'owner-login', 'read-index', 'read-detail', 'edit-save-read',
-            'desktop-editorial', 'mobile-one-column', 'keyboard-focus',
+            'immersive-hero', 'story-hierarchy', 'rotary-perspectives',
+            'desktop-motion', 'mobile-390', 'keyboard-tabs', 'reduced-motion',
             'manage-history', 'archive-read', 'browser-print', 'reopen',
             'editor-revoke', 'permission-negative',
         ],

@@ -82,6 +82,7 @@ try {
     await page.screenshot({ path: mobileShot, fullPage: true });
 
     const showUrl = page.url();
+    await page.locator('.company-context-tools summary').click();
     const editHref = await page.getByRole('link', { name: '内容を編集', exact: true }).getAttribute('href');
     await page.goto(`${baseUrl}/company/business-domains`);
     await page.getByRole('link', { name: '管理する', exact: true }).click();
@@ -101,7 +102,8 @@ try {
     await stalePage.close();
 
     await page.goto(showUrl);
-    await page.getByRole('link', { name: '管理', exact: true }).click();
+    await page.locator('.company-context-tools summary').click();
+    await page.getByRole('link', { name: '管理・履歴', exact: true }).click();
     await page.locator('#state-reason').fill('ブラウザ保管確認');
     await Promise.all([page.waitForURL('**/company/business-domains/*'), page.getByRole('button', { name: '保管する' }).click()]);
     await page.getByRole('link', { name: '読む画面へ', exact: true }).click();
@@ -110,12 +112,14 @@ try {
     await page.getByRole('link', { name: /保管済み 1/ }).click();
     assert(await page.getByText('ブラウザ受入事業', { exact: true }).isVisible(), 'Archived tab does not show the archived domain.');
     await page.goto(showUrl);
-    await page.getByRole('link', { name: '管理', exact: true }).click();
+    await page.locator('.company-context-tools summary').click();
+    await page.getByRole('link', { name: '管理・履歴', exact: true }).click();
     const historyLink = page.locator('a[href*="/revisions/"]').first();
     await historyLink.click();
     assert(await page.getByText('読み取り専用Snapshot').isVisible(), 'Immutable revision view is not visible.');
     await page.goto(showUrl);
-    await page.getByRole('link', { name: '管理', exact: true }).click();
+    await page.locator('.company-context-tools summary').click();
+    await page.getByRole('link', { name: '管理・履歴', exact: true }).click();
     await page.locator('#state-reason').fill('ブラウザ再開確認');
     await Promise.all([page.waitForURL('**/company/business-domains/*'), page.getByRole('button', { name: '利用中へ戻す' }).click()]);
 

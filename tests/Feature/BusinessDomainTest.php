@@ -702,7 +702,7 @@ class BusinessDomainTest extends TestCase
         $this->asCompany($owner, $organization)->get(route('business-domains.show', $full))
             ->assertOk()
             ->assertSee('&lt;事業&amp;名称&gt;', false)
-            ->assertSee('WHO / 誰に届けるか')
+            ->assertSeeInOrder(['WHO', '誰に届けるか', '地域の中小企業'])
             ->assertSee('終了予定')
             ->assertSee('段階的な統合を検討する')
             ->assertSee('顧客層')
@@ -712,6 +712,60 @@ class BusinessDomainTest extends TestCase
         $this->assertSame('原文の概要', $full->fresh()->description);
         $this->assertDatabaseCount('business_domains', 2);
         $this->assertDatabaseCount('business_domain_revisions', 2);
+    }
+
+    public function test_pux_b_presentation_story_uses_saved_content_with_accessible_progressive_disclosure(): void
+    {
+        $organization = $this->organization('pux-b-story');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $domain = $this->createDomain($owner, $organization, [
+            'name' => '地域共創事業',
+            'description' => '地域企業の次の一歩を支える事業です。',
+            'what_summary' => '経営と実行をつなぐ支援',
+            'who_summary' => '地域で働く人たち',
+            'value_proposition' => '判断を続けられる行動へ変える',
+            'geographic_scope_summary' => '日本国内',
+            'market_position_summary' => '実装まで並走する経営パートナー',
+            'self_recognized_strengths' => '経営とシステムを同時に理解する力',
+            'direction' => BusinessDomain::DIRECTION_STRENGTHEN,
+            'direction_memo' => '品質と再現性を高める。',
+            'items' => [
+                ['kind' => 'service', 'name' => '伴走支援', 'attributes' => []],
+                ['kind' => 'brand', 'name' => 'Company OS', 'attributes' => []],
+            ],
+        ]);
+
+        $response = $this->asCompany($owner, $organization)->get(route('business-domains.show', $domain));
+
+        $response->assertOk()
+            ->assertSee('data-company-context-hero', false)
+            ->assertSeeInOrder([
+                '地域共創事業',
+                '地域企業の次の一歩を支える事業です。',
+                'THE VALUE WE CREATE',
+                '判断を続けられる行動へ変える',
+                'BUSINESS OUTLINE',
+                '事業の輪郭',
+                'SELF-RECOGNIZED STRENGTHS',
+                '経営とシステムを同時に理解する力',
+                'THE BUSINESS, IN PRACTICE',
+                '伴走支援',
+                'Company OS',
+                'WHERE WE GO NEXT',
+                '品質と再現性を高める。',
+            ])
+            ->assertSee('role="tablist"', false)
+            ->assertSee('aria-label="事業の5つの視点"', false)
+            ->assertSee('role="tabpanel"', false)
+            ->assertDontSee('role="tabpanel" hidden', false)
+            ->assertSee('company-context-tools', false)
+            ->assertSee('prefers-reduced-motion: reduce', false)
+            ->assertSee('IntersectionObserver', false)
+            ->assertDontSee('name="change_reason"', false)
+            ->assertDontSee('Revision履歴');
+
+        $this->assertSame('地域企業の次の一歩を支える事業です。', $domain->fresh()->description);
+        $this->assertDatabaseCount('business_domain_revisions', 1);
     }
 
     public function test_pux_b_read_and_printable_gets_do_not_mutate_domain_history_or_audit(): void
