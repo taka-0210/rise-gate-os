@@ -11,7 +11,7 @@
             --ink: #17202a;
             --muted: #60717e;
             --line: #d8e0e6;
-            --paper: #f6f8fa;
+            --paper: #eef2f5;
             --accent: #1f7a8c;
             --accent-dark: #0f4c5c;
             --danger: #a33a3a;
@@ -105,6 +105,8 @@
         }
         .button.secondary, button.secondary { background: #fff; color: var(--accent-dark); border: 1px solid var(--line); }
         .button.danger, button.danger { background: var(--danger); color: #fff; }
+        .button.danger-outline, button.danger-outline { background: #fff; color: var(--danger); border: 1px solid #d9a5a5; }
+        .button.danger-outline:hover, button.danger-outline:hover { background: #fff7f7; border-color: var(--danger); }
         .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .page-header { margin-bottom: 24px; }
         .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }

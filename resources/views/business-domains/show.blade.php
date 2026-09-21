@@ -23,6 +23,11 @@
         @endforeach
     </div>
     <div class="panel stack"><div class="meta">SELF-RECOGNIZED STRENGTHS</div><h2>自社認識の強み</h2><p>{{ $domain->self_recognized_strengths ?: '未登録' }}</p></div>
+    <div class="panel stack domain-direction-summary">
+        <div><div class="meta">DIRECTION</div><h2>今後の方向性</h2></div>
+        <div><span class="badge">{{ \App\Models\BusinessDomain::directionLabel($domain->direction) }}</span></div>
+        @if ($domain->direction_memo)<p>{{ $domain->direction_memo }}</p>@else<p class="meta">方向性メモは未登録です。</p>@endif
+    </div>
 
     <div class="panel stack">
         <div><div class="meta">ITEMS</div><h2>明細</h2></div>
@@ -54,6 +59,6 @@
     @endif
 </section>
 <style>
-.business-domain-screen{min-width:0}.domain-axis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.domain-axis-grid p{white-space:pre-wrap;overflow-wrap:anywhere}.domain-attributes{display:grid;gap:10px;margin:0}.domain-attributes div{border-top:1px solid var(--line);padding-top:10px}.domain-attributes dt{font-weight:800}.domain-attributes dd{margin:5px 0 0;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}.domain-revision{display:grid;grid-template-columns:130px 180px 150px minmax(0,1fr);gap:10px}.domain-revision span{overflow-wrap:anywhere}@media(max-width:700px){.domain-axis-grid{grid-template-columns:1fr}.domain-revision{grid-template-columns:1fr}.page-header.actions{align-items:stretch!important}}
+.business-domain-screen{min-width:0}.domain-axis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.domain-axis-grid p,.domain-direction-summary p{white-space:pre-wrap;overflow-wrap:anywhere}.domain-direction-summary p{margin:0}.domain-attributes{display:grid;gap:10px;margin:0}.domain-attributes div{border-top:1px solid var(--line);padding-top:10px}.domain-attributes dt{font-weight:800}.domain-attributes dd{margin:5px 0 0;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}.domain-revision{display:grid;grid-template-columns:130px 180px 150px minmax(0,1fr);gap:10px}.domain-revision span{overflow-wrap:anywhere}@media(max-width:700px){.domain-axis-grid{grid-template-columns:1fr}.domain-revision{grid-template-columns:1fr}.page-header.actions{align-items:stretch!important}}
 </style>
 @endsection

@@ -10,6 +10,8 @@
         @foreach(['description' => '概要', 'what' => 'WHAT', 'who' => 'WHO', 'value' => 'VALUE', 'where' => 'WHERE', 'position' => 'POSITION', 'self_recognized_strengths' => '自社認識の強み'] as $key => $label)
             <div><div class="meta">{{ $label }}</div><p style="white-space:pre-wrap;overflow-wrap:anywhere;">{{ $snapshot[$key] ?? '未登録' }}</p></div>
         @endforeach
+        <div><div class="meta">今後の方向性</div><p>{{ \App\Models\BusinessDomain::directionLabel($snapshot['direction'] ?? null) }}</p></div>
+        <div><div class="meta">方向性メモ</div><p style="white-space:pre-wrap;overflow-wrap:anywhere;">{{ $snapshot['direction_memo'] ?? '未登録' }}</p></div>
     </div>
     <div class="panel stack"><h2>明細</h2>@forelse(($snapshot['items'] ?? []) as $item)<article class="card stack"><div><span class="badge">{{ $item['kind'] }}</span><h3>{{ $item['name'] }}</h3><p>{{ $item['description'] ?? '' }}</p></div>@foreach(($item['attributes'] ?? []) as $attribute)<div><strong>{{ strtoupper($attribute['axis']) }} / {{ $attribute['label'] }}</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere;">{{ $attribute['value'] }}</p></div>@endforeach</article>@empty<p class="meta">明細なし</p>@endforelse</div>
     <div><a class="button secondary" href="{{ route('business-domains.show', $domain) }}">現在値へ戻る</a></div>

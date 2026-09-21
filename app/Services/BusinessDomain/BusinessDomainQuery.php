@@ -36,6 +36,7 @@ class BusinessDomainQuery
                         ->orWhere('geographic_scope_summary', 'like', $term)
                         ->orWhere('market_position_summary', 'like', $term)
                         ->orWhere('self_recognized_strengths', 'like', $term)
+                        ->orWhere('direction_memo', 'like', $term)
                         ->orWhereHas('items', fn ($items) => $items
                             ->where('name', 'like', $term)
                             ->orWhereHas('attributes', fn ($attributes) => $attributes
@@ -44,9 +45,25 @@ class BusinessDomainQuery
                 });
             })
             ->withCount(['items' => fn ($query) => $query->where('status', 'active')])
-            ->orderBy('name')
+            ->orderBy('display_order')
             ->orderBy('id')
             ->paginate($perPage)
             ->withQueryString();
+    }
+
+    public function statusCounts(User $actor, Organization $organization): array
+    {
+        $this->access->authorizeView($actor, $organization);
+        $counts = BusinessDomain::query()
+            ->where('organization_id', $organization->id)
+            ->whereIn('status', [BusinessDomain::STATUS_ACTIVE, BusinessDomain::STATUS_ARCHIVED])
+            ->selectRaw('status, COUNT(*) AS aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        return [
+            BusinessDomain::STATUS_ACTIVE => (int) ($counts[BusinessDomain::STATUS_ACTIVE] ?? 0),
+            BusinessDomain::STATUS_ARCHIVED => (int) ($counts[BusinessDomain::STATUS_ARCHIVED] ?? 0),
+        ];
     }
 }

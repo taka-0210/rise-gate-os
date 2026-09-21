@@ -155,6 +155,7 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::get('/company/business-domains/{businessDomain}', [BusinessDomainController::class, 'show'])->name('business-domains.show');
         Route::get('/company/business-domains/{businessDomain}/edit', [BusinessDomainController::class, 'edit'])->name('business-domains.edit');
         Route::put('/company/business-domains/{businessDomain}', [BusinessDomainController::class, 'update'])->name('business-domains.update');
+        Route::post('/company/business-domains/{businessDomain}/move', [BusinessDomainController::class, 'move'])->name('business-domains.move');
         Route::post('/company/business-domains/{businessDomain}/archive', [BusinessDomainController::class, 'archive'])->name('business-domains.archive');
         Route::post('/company/business-domains/{businessDomain}/reopen', [BusinessDomainController::class, 'reopen'])->name('business-domains.reopen');
         Route::get('/company/business-domains/{businessDomain}/revisions/{revision}', [BusinessDomainController::class, 'revision'])->whereNumber('revision')->name('business-domains.revisions.show');

@@ -43,6 +43,7 @@ class BusinessDomainController extends Controller
             ),
             'status' => $validated['status'] ?? BusinessDomain::STATUS_ACTIVE,
             'search' => $validated['q'] ?? '',
+            'statusCounts' => $query->statusCounts($request->user(), $organization),
             'canEdit' => $access->canEdit($request->user(), $organization),
             'isOwner' => $this->isOwner($request, $access),
         ]);
@@ -59,6 +60,7 @@ class BusinessDomainController extends Controller
             'requestId' => (string) Str::uuid(),
             'itemKinds' => BusinessDomainItem::KINDS,
             'attributeAxes' => BusinessDomainItemAttribute::AXES,
+            'directions' => BusinessDomain::DIRECTIONS,
         ]);
     }
 
@@ -124,6 +126,7 @@ class BusinessDomainController extends Controller
             'requestId' => (string) Str::uuid(),
             'itemKinds' => BusinessDomainItem::KINDS,
             'attributeAxes' => BusinessDomainItemAttribute::AXES,
+            'directions' => BusinessDomain::DIRECTIONS,
         ]);
     }
 
@@ -181,6 +184,27 @@ class BusinessDomainController extends Controller
         );
 
         return redirect()->route('business-domains.show', $domain)->with('status', '事業領域を再開しました。');
+    }
+
+    public function move(
+        Request $request,
+        BusinessDomain $businessDomain,
+        BusinessDomainWriter $writer,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'request_id' => ['required', 'uuid'],
+            'direction' => ['required', Rule::in(['up', 'down'])],
+        ]);
+        $domain = $writer->move(
+            $request->user(),
+            $request->attributes->get('currentCompany'),
+            $businessDomain,
+            $validated['direction'],
+            $validated['request_id'],
+        );
+
+        return redirect()->route('business-domains.index', ['status' => $domain->status])
+            ->with('status', '表示順を変更しました。');
     }
 
     public function revision(
@@ -275,6 +299,8 @@ class BusinessDomainController extends Controller
             'geographic_scope_summary' => ['nullable', 'string', 'max:10000'],
             'market_position_summary' => ['nullable', 'string', 'max:10000'],
             'self_recognized_strengths' => ['nullable', 'string', 'max:10000'],
+            'direction' => ['nullable', Rule::in(array_keys(BusinessDomain::DIRECTIONS))],
+            'direction_memo' => ['nullable', 'string', 'max:10000'],
             'items' => ['nullable', 'array', 'max:100'],
             'items.*.public_id' => ['nullable', 'string', 'max:26'],
             'items.*.kind' => ['required', Rule::in(BusinessDomainItem::KINDS)],

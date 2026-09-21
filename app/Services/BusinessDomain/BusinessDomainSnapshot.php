@@ -8,7 +8,7 @@ use App\Models\BusinessDomainItemAttribute;
 
 class BusinessDomainSnapshot
 {
-    public const SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 2;
 
     public function make(BusinessDomain $domain): array
     {
@@ -30,6 +30,8 @@ class BusinessDomainSnapshot
                 'where' => $domain->geographic_scope_summary,
                 'position' => $domain->market_position_summary,
                 'self_recognized_strengths' => $domain->self_recognized_strengths,
+                'direction' => $domain->direction,
+                'direction_memo' => $domain->direction_memo,
                 'status' => $domain->status,
                 'version' => $domain->version,
                 'items' => $domain->items->map(fn (BusinessDomainItem $item): array => [

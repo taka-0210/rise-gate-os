@@ -21,6 +21,7 @@ class BusinessDomainWriter
     private const DOMAIN_FIELDS = [
         'name', 'description', 'what_summary', 'who_summary', 'value_proposition',
         'geographic_scope_summary', 'market_position_summary', 'self_recognized_strengths',
+        'direction', 'direction_memo',
     ];
 
     public function __construct(
@@ -51,6 +52,9 @@ class BusinessDomainWriter
                 [
                     'organization_id' => $organization->id,
                     'status' => BusinessDomain::STATUS_ACTIVE,
+                    'display_order' => ((int) BusinessDomain::query()
+                        ->where('organization_id', $organization->id)
+                        ->max('display_order')) + 10,
                     'version' => 1,
                     'created_by_user_id' => $actor->id,
                     'updated_by_user_id' => $actor->id,
@@ -154,6 +158,95 @@ class BusinessDomainWriter
             $reason,
             BusinessDomain::STATUS_ARCHIVED,
         );
+    }
+
+    public function move(
+        User $actor,
+        Organization $organization,
+        BusinessDomain $domain,
+        string $direction,
+        string $requestId,
+    ): BusinessDomain {
+        if (! in_array($direction, ['up', 'down'], true)) {
+            throw ValidationException::withMessages(['direction' => '表示順の操作が正しくありません。']);
+        }
+
+        return DB::transaction(function () use ($actor, $organization, $domain, $direction, $requestId): BusinessDomain {
+            $organization = Organization::query()->lockForUpdate()->findOrFail($organization->id);
+            $this->access->authorizeEdit($actor, $organization, true);
+            $payload = ['domain_public_id' => $domain->public_id, 'direction' => $direction];
+            $hash = $this->payloadHash('reorder', $payload);
+            if ($existing = $this->completedOperation($organization, $actor, $requestId, 'reorder', $hash)) {
+                return $this->domainFromOperation($existing, $organization, $actor);
+            }
+
+            $locked = BusinessDomain::query()->lockForUpdate()->find($domain->id);
+            if (! $locked || $locked->organization_id !== $organization->id) {
+                throw (new ModelNotFoundException)->setModel(BusinessDomain::class);
+            }
+
+            $ordered = BusinessDomain::query()
+                ->where('organization_id', $organization->id)
+                ->where('status', $locked->status)
+                ->orderBy('display_order')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->values();
+            $currentIndex = $ordered->search(fn (BusinessDomain $candidate): bool => $candidate->id === $locked->id);
+            $targetIndex = $direction === 'up' ? $currentIndex - 1 : $currentIndex + 1;
+            if ($currentIndex === false || ! $ordered->has($targetIndex)) {
+                throw ValidationException::withMessages(['direction' => 'これ以上移動できません。']);
+            }
+
+            $beforeOrder = $this->orderMetadata($ordered->all());
+            $domains = $ordered->all();
+            [$domains[$currentIndex], $domains[$targetIndex]] = [$domains[$targetIndex], $domains[$currentIndex]];
+            $operation = BusinessDomainOperation::create([
+                'organization_id' => $organization->id,
+                'actor_user_id' => $actor->id,
+                'request_id' => $requestId,
+                'payload_hash' => $hash,
+                'operation' => 'reorder',
+                'business_domain_id' => $locked->id,
+            ]);
+
+            foreach ($domains as $index => $orderedDomain) {
+                DB::table('business_domains')
+                    ->where('id', $orderedDomain->id)
+                    ->update(['display_order' => ($index + 1) * 10]);
+                $orderedDomain->display_order = ($index + 1) * 10;
+            }
+            $this->checkpoint('after_current_values');
+            $afterOrder = $this->orderMetadata($domains);
+            $operation->update([
+                'result_metadata' => [
+                    'domain_public_id' => $locked->public_id,
+                    'direction' => $direction,
+                    'before_order' => $beforeOrder,
+                    'after_order' => $afterOrder,
+                ],
+                'completed_at' => now(),
+            ]);
+            $this->checkpoint('after_operation');
+            $this->audit->record(
+                $organization,
+                $actor,
+                'business_domain.reorder',
+                OrganizationAuditEvent::OUTCOME_SUCCESS,
+                before: ['display_order' => $beforeOrder],
+                after: ['display_order' => $afterOrder],
+                metadata: [
+                    'domain_public_id' => $locked->public_id,
+                    'operation_id' => $operation->id,
+                    'request_id' => $operation->request_id,
+                    'direction' => $direction,
+                ],
+            );
+            $this->checkpoint('after_audit');
+
+            return $locked->fresh(['items.attributes', 'revisions']);
+        }, 5);
     }
 
     private function mutate(
@@ -325,6 +418,20 @@ class BusinessDomainWriter
             'change_reason' => $reason,
             'changed_at' => now(),
         ]);
+    }
+
+    /**
+     * @param  array<int, BusinessDomain>  $domains
+     */
+    private function orderMetadata(array $domains): array
+    {
+        return array_values(array_map(
+            fn (BusinessDomain $orderedDomain): array => [
+                'domain_public_id' => $orderedDomain->public_id,
+                'display_order' => (int) $orderedDomain->display_order,
+            ],
+            $domains,
+        ));
     }
 
     private function completeOperation(

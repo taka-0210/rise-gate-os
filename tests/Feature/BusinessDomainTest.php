@@ -20,6 +20,8 @@ use App\Services\Organization\OrganizationAudit;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -75,6 +77,171 @@ class BusinessDomainTest extends TestCase
             ->assertOk()
             ->assertSee('概要あり事業')
             ->assertSee($description);
+    }
+
+    public function test_direction_is_optional_validated_and_recorded_in_existing_revision_history(): void
+    {
+        $organization = $this->organization('direction');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $domain = $this->createDomain($owner, $organization, ['name' => '方向性確認事業']);
+
+        $this->assertTrue(Schema::hasColumns('business_domains', ['direction', 'direction_memo', 'display_order']));
+        $this->assertNull($domain->direction);
+        $this->assertNull($domain->direction_memo);
+        $this->assertSame(2, $domain->revisions()->firstOrFail()->snapshot_schema_version);
+        $this->assertNull($domain->revisions()->firstOrFail()->snapshot['domain']['direction']);
+
+        foreach (array_keys(BusinessDomain::DIRECTIONS) as $direction) {
+            $memo = $direction.' の判断メモ';
+            $this->asCompany($owner, $organization)->put(route('business-domains.update', $domain), [
+                'request_id' => (string) Str::uuid(),
+                'expected_version' => $domain->version,
+                'name' => $domain->name,
+                'direction' => $direction,
+                'direction_memo' => $memo,
+                'change_reason' => '今後の方向性を更新',
+            ])->assertRedirect(route('business-domains.show', $domain));
+            $domain->refresh();
+            $this->assertSame($direction, $domain->direction);
+            $this->assertSame($memo, $domain->direction_memo);
+        }
+
+        $this->assertSame(6, $domain->version);
+        $this->assertSame(BusinessDomain::DIRECTION_GROWTH, $domain->revisions()->where('revision_no', 2)->firstOrFail()->snapshot['domain']['direction']);
+        $this->assertSame(BusinessDomain::DIRECTION_EXIT_PLANNED, $domain->revisions()->where('revision_no', 6)->firstOrFail()->snapshot['domain']['direction']);
+        $this->asCompany($owner, $organization)->get(route('business-domains.revisions.show', [$domain, 2]))
+            ->assertOk()
+            ->assertSee('成長・拡大')
+            ->assertSee('growth の判断メモ');
+
+        $this->asCompany($owner, $organization)->put(route('business-domains.update', $domain), [
+            'request_id' => (string) Str::uuid(),
+            'expected_version' => $domain->version,
+            'name' => $domain->name,
+            'direction' => 'unsupported',
+            'change_reason' => '不正値',
+        ])->assertSessionHasErrors('direction');
+        $this->assertSame(6, $domain->fresh()->version);
+    }
+
+    public function test_index_uses_count_tabs_and_keeps_hidden_search_and_all_status_backend_contracts(): void
+    {
+        $organization = $this->organization('index-ux');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $active = $this->createDomain($owner, $organization, ['name' => '利用中の対象事業']);
+        $archived = $this->createDomain($owner, $organization, ['name' => '保管対象事業']);
+        $archived = app(BusinessDomainWriter::class)->archive(
+            $owner, $organization, $archived, 1, '一覧切替確認', (string) Str::uuid(),
+        );
+
+        $this->asCompany($owner, $organization)->get(route('business-domains.index'))
+            ->assertOk()
+            ->assertSeeInOrder(['利用中', '1', '保管済み', '1'])
+            ->assertSee($active->name)
+            ->assertDontSee($archived->name)
+            ->assertDontSee('domain-q')
+            ->assertDontSee('絞り込む')
+            ->assertDontSee('value="all"', false)
+            ->assertDontSee('Revision 1');
+        $this->asCompany($owner, $organization)->get(route('business-domains.index', ['status' => 'archived']))
+            ->assertOk()->assertSee($archived->name)->assertDontSee($active->name);
+        $this->asCompany($owner, $organization)->get(route('business-domains.index', ['status' => 'all']))
+            ->assertOk()->assertSee($active->name)->assertSee($archived->name);
+        $this->asCompany($owner, $organization)->get(route('business-domains.index', ['status' => 'all', 'q' => '利用中の対象']))
+            ->assertOk()->assertSee($active->name)->assertDontSee($archived->name);
+    }
+
+    public function test_reorder_is_atomic_idempotent_audited_and_does_not_create_content_revision(): void
+    {
+        $organization = $this->organization('reorder');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        [$admin, $adminMembership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_ADMIN);
+        [$member] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_MEMBER);
+        $first = $this->createDomain($owner, $organization, ['name' => '第一事業']);
+        $second = $this->createDomain($owner, $organization, ['name' => '第二事業']);
+        $third = $this->createDomain($owner, $organization, ['name' => '第三事業']);
+        $requestId = (string) Str::uuid();
+        $revisionCount = BusinessDomainRevision::count();
+
+        $this->asCompany($member, $organization)->post(route('business-domains.move', $third), [
+            'request_id' => (string) Str::uuid(), 'direction' => 'up',
+        ])->assertForbidden();
+        $other = $this->organization('reorder-other');
+        [$otherOwner] = $this->member($other, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $this->asCompany($otherOwner, $other)->post(route('business-domains.move', $third), [
+            'request_id' => (string) Str::uuid(), 'direction' => 'up',
+        ])->assertNotFound();
+        $payload = ['request_id' => $requestId, 'direction' => 'up'];
+        $this->asCompany($owner, $organization)->post(route('business-domains.move', $third), $payload)->assertRedirect();
+        $this->asCompany($owner, $organization)->post(route('business-domains.move', $third), $payload)->assertRedirect();
+
+        $ordered = BusinessDomain::query()->where('organization_id', $organization->id)
+            ->orderBy('display_order')->orderBy('id')->get();
+        $this->assertSame([$first->id, $third->id, $second->id], $ordered->pluck('id')->all());
+        $this->assertSame([10, 20, 30], $ordered->pluck('display_order')->all());
+        $this->assertSame($revisionCount, BusinessDomainRevision::count());
+        $this->assertSame(1, $third->fresh()->version);
+        $operation = DB::table('business_domain_operations')->where('operation', 'reorder')->sole();
+        $metadata = json_decode($operation->result_metadata, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($third->public_id, $metadata['domain_public_id']);
+        $this->assertCount(3, $metadata['before_order']);
+        $this->assertCount(3, $metadata['after_order']);
+        $this->assertDatabaseHas('organization_audit_events', [
+            'organization_id' => $organization->id,
+            'actor_user_id' => $owner->id,
+            'event' => 'business_domain.reorder',
+            'outcome' => OrganizationAuditEvent::OUTCOME_SUCCESS,
+        ]);
+        $this->asCompany($owner, $organization)->get(route('business-domains.index'))
+            ->assertOk()->assertSeeInOrder(['第一事業', '第三事業', '第二事業']);
+
+        $this->asCompany($owner, $organization)->post(route('business-domains.editors.grant', $adminMembership), [
+            'request_id' => (string) Str::uuid(),
+        ])->assertRedirect();
+        $this->asCompany($admin, $organization)->post(route('business-domains.move', $third), [
+            'request_id' => (string) Str::uuid(), 'direction' => 'down',
+        ])->assertRedirect();
+        $this->assertSame(
+            [$first->id, $second->id, $third->id],
+            BusinessDomain::query()->where('organization_id', $organization->id)
+                ->orderBy('display_order')->orderBy('id')->pluck('id')->all(),
+        );
+        $this->assertSame($revisionCount, BusinessDomainRevision::count());
+    }
+
+    public function test_reorder_transaction_rolls_back_order_operation_and_audit_on_fault(): void
+    {
+        $organization = $this->organization('reorder-atomic');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $first = $this->createDomain($owner, $organization, ['name' => '第一事業']);
+        $second = $this->createDomain($owner, $organization, ['name' => '第二事業']);
+        $operationCount = DB::table('business_domain_operations')->count();
+        $auditCount = OrganizationAuditEvent::count();
+        $writer = new class(app(BusinessDomainAccess::class), app(BusinessDomainSnapshot::class), app(OrganizationAudit::class)) extends BusinessDomainWriter
+        {
+            protected function checkpoint(string $name): void
+            {
+                if ($name === 'after_current_values') {
+                    throw new RuntimeException('reorder fault');
+                }
+            }
+        };
+
+        try {
+            $writer->move($owner, $organization, $second, 'up', (string) Str::uuid());
+            $this->fail('Reorder fault must abort the transaction.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('reorder fault', $exception->getMessage());
+        }
+
+        $this->assertSame(
+            [$first->id, $second->id],
+            BusinessDomain::query()->where('organization_id', $organization->id)
+                ->orderBy('display_order')->orderBy('id')->pluck('id')->all(),
+        );
+        $this->assertSame($operationCount, DB::table('business_domain_operations')->count());
+        $this->assertSame($auditCount, OrganizationAuditEvent::count());
+        $this->assertSame(2, BusinessDomainRevision::count());
     }
 
     public function test_active_staff_view_current_values_but_only_owner_or_granted_staff_can_edit_and_view_history(): void
