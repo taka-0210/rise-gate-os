@@ -1,5 +1,4 @@
 @props([
-    'company',
     'title',
     'description' => null,
     'value' => null,
@@ -15,7 +14,6 @@
         <span></span><span></span><span></span>
     </div>
     <div class="company-context-hero__topline">
-        <p class="company-context-hero__company">{{ $company }}</p>
         @isset($actions)
             <div class="company-context-print-hidden">{{ $actions }}</div>
         @endisset

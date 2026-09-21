@@ -133,7 +133,6 @@
 .company-context-hero__atmosphere span:nth-child(2) { width: 430px; height: 430px; right: -70px; top: -100px; border-style: dashed; animation: company-context-orbit 42s linear infinite; }
 .company-context-hero__atmosphere span:nth-child(3) { width: 260px; height: 260px; left: -120px; bottom: -90px; box-shadow: 0 0 100px rgba(64, 213, 203, .1); }
 .company-context-hero__topline { align-self: start; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
-.company-context-hero__company { margin: 0; color: #60717e; font-size: 12px; font-weight: 750; letter-spacing: .12em; }
 .company-context-hero__content { width: min(650px, 61%); align-self: center; padding: clamp(48px, 8vh, 96px) 0; }
 .company-context-hero__kicker { margin: 0 0 24px; color: var(--context-teal); font-size: 11px; font-weight: 800; letter-spacing: .22em; }
 .company-context-hero h1 {
@@ -529,7 +528,6 @@
     .company-context-hero::after,
     .company-context-hero__atmosphere,
     .company-context-hero__brand-visual { display: none; }
-    .company-context-hero__company,
     .company-context-hero__kicker,
     .company-context-hero__lead,
     .company-context-hero__position,

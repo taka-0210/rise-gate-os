@@ -31,7 +31,6 @@
     @if(session('status'))<div class="notice company-context-print-hidden">{{ session('status') }}</div>@endif
 
     <x-company-context.hero
-        :company="$organization->name"
         :title="$domain->name"
         :description="$domain->description"
         :value="$domain->value_proposition"

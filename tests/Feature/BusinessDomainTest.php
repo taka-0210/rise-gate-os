@@ -739,6 +739,7 @@ class BusinessDomainTest extends TestCase
 
         $response->assertOk()
             ->assertSee('data-company-context-hero', false)
+            ->assertDontSee('company-context-hero__company', false)
             ->assertSee(asset('images/company-os-brand-symbol.svg'), false)
             ->assertSeeInOrder([
                 '地域共創事業',
