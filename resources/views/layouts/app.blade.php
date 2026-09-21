@@ -42,7 +42,6 @@
         .brand { display:inline-flex; align-items:center; gap:12px; flex:0 0 auto; color:var(--ink); }
         .brand-mark { display:grid; gap:1px; line-height:1; }
         .brand-name { font-size:24px; font-weight:900; letter-spacing:-.04em; }
-        .brand-operator { color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; }
         .workspace-pill {
             display: inline-flex;
             align-items: center;
@@ -305,7 +304,6 @@
         <a class="brand" href="{{ auth()->check() && session('access_mode') !== 'system_admin' ? route('company.home') : route('welcome') }}" aria-label="Company OS トップへ">
             <span class="brand-mark">
                 <span class="brand-name">Company OS</span>
-                <span class="brand-operator">by RISE GATE</span>
             </span>
         </a>
         <nav class="nav">
