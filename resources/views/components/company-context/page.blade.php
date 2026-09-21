@@ -76,8 +76,102 @@
 .company-context-card__meta { display: flex; flex-wrap: wrap; gap: 10px; color: #60717e; font-size: 12px; }
 .company-context-card h2 { font-size: 24px; }
 .company-context-card p { margin: 0; color: #526673; line-height: 1.75; }
+.company-context-card__arrow { display: none; }
 .company-context-empty { display: grid; gap: 12px; padding: 38px; border: 1px solid #d8e0e6; background: #fff; }
 .company-context-empty p { margin: 0; }
+.company-context-directory {
+    position: relative;
+    left: 50%;
+    width: min(1240px, calc(100vw - 32px));
+    max-width: none;
+    gap: 0;
+    transform: translateX(-50%);
+}
+.company-context-directory__hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    min-height: clamp(560px, 72vh, 720px);
+    display: grid;
+    align-content: center;
+    padding: clamp(64px, 8vw, 108px);
+    background: #eef2f5;
+}
+.company-context-directory__visual {
+    position: absolute;
+    z-index: -1;
+    inset: 0 0 0 auto;
+    width: 60%;
+    overflow: hidden;
+    opacity: .82;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%, #000);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 34%, #000);
+}
+.company-context-directory__visual img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center;
+    transform: scale(.58);
+    transform-origin: 74% 50%;
+}
+.company-context-directory__hero .company-context-title {
+    position: relative;
+    z-index: 1;
+    width: min(620px, 58%);
+    padding: 0;
+    border: 0;
+}
+.company-context-directory__hero .company-context-title h1 {
+    font-size: clamp(52px, 7vw, 82px);
+    font-weight: 450;
+}
+.company-context-directory__hero .company-context-statement {
+    position: relative;
+    z-index: 1;
+    max-width: 610px;
+    margin-top: clamp(34px, 5vw, 58px);
+}
+.company-context-directory__hero .company-context-statement p {
+    color: #405866;
+    font-size: clamp(18px, 1.8vw, 23px);
+    line-height: 1.9;
+}
+.company-context-directory > .company-context-tabs {
+    width: min(1080px, calc(100% - 48px));
+    margin: clamp(58px, 8vw, 92px) auto 28px;
+}
+.company-context-directory > .company-context-list {
+    width: min(1080px, calc(100% - 48px));
+    margin: 0 auto clamp(70px, 10vw, 120px);
+    gap: 0;
+    border-top: 1px solid var(--context-line);
+}
+.company-context-directory .company-context-card {
+    position: relative;
+    grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr);
+    column-gap: clamp(42px, 7vw, 96px);
+    row-gap: 14px;
+    padding: clamp(42px, 6vw, 72px) 58px clamp(42px, 6vw, 72px) 4px;
+    border: 0;
+    border-bottom: 1px solid var(--context-line);
+    background: transparent;
+    transition: color .3s ease, padding-left .3s ease;
+}
+.company-context-directory .company-context-card:hover {
+    padding-left: 16px;
+    border-color: var(--context-line);
+    color: var(--context-teal);
+    transform: none;
+}
+.company-context-directory .company-context-card__meta { grid-column: 1; align-self: end; color: #718087; font-size: 11px; letter-spacing: .08em; }
+.company-context-directory .company-context-card h2 { grid-column: 1; margin: 0; font-size: clamp(30px, 4vw, 48px); font-weight: 470; line-height: 1.15; letter-spacing: -.045em; }
+.company-context-directory .company-context-card p { grid-column: 2; grid-row: 1 / span 2; align-self: center; max-width: 650px; color: #526673; font-size: clamp(16px, 1.6vw, 19px); line-height: 1.9; }
+.company-context-directory .company-context-card__arrow { position: absolute; right: 5px; top: 50%; display: block; color: #6f9ca5; font-size: 28px; font-weight: 300; transform: translateY(-50%); transition: transform .3s ease, color .3s ease; }
+.company-context-directory .company-context-card:hover .company-context-card__arrow { color: var(--context-progress); transform: translate(6px, -50%); }
+.company-context-directory .company-context-empty { width: min(760px, 100%); margin: 0 auto; padding: clamp(44px, 7vw, 76px) 0; border: 0; border-bottom: 1px solid var(--context-line); background: transparent; }
+.company-context-directory > .company-context-print-hidden:last-child { width: min(1080px, calc(100% - 48px)); margin: -74px auto 70px; }
 .company-context-archive-notice { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 14px 18px; border: 1px solid rgba(255, 178, 105, .55); background: #fff7ed; color: #75451d; }
 /* Immersive Company Context story */
 .company-context-story {
@@ -440,6 +534,32 @@
     .company-context-empty { padding: 26px 22px; }
     .company-context-actions { align-items: stretch; }
     .company-context-actions .button { width: 100%; }
+    .company-context-directory { width: calc(100vw - 20px); }
+    .company-context-directory__hero { min-height: 650px; display: block; padding: 24px 22px 54px; }
+    .company-context-directory__visual {
+        inset: 0;
+        width: 100%;
+        height: 58%;
+        opacity: .68;
+        -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.76) 50%, transparent 92%);
+        mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.76) 50%, transparent 92%);
+    }
+    .company-context-directory__visual img { width: 150%; max-width: none; transform: translateX(-17%) scale(.58); transform-origin: 55% 35%; }
+    .company-context-directory__hero .company-context-title { width: 100%; padding-top: 330px; }
+    .company-context-directory__hero .company-context-title h1 { font-size: clamp(46px, 15vw, 62px); }
+    .company-context-directory__hero .company-context-statement { margin-top: 30px; }
+    .company-context-directory__hero .company-context-statement p { font-size: 17px; line-height: 1.8; }
+    .company-context-directory > .company-context-tabs { width: calc(100% - 24px); margin-top: 54px; }
+    .company-context-directory > .company-context-list { width: calc(100% - 24px); margin-bottom: 72px; }
+    .company-context-directory .company-context-card { grid-template-columns: 1fr; gap: 14px; padding: 42px 42px 42px 0; }
+    .company-context-directory .company-context-card:hover { padding-left: 0; }
+    .company-context-directory .company-context-card__meta,
+    .company-context-directory .company-context-card h2,
+    .company-context-directory .company-context-card p { grid-column: 1; grid-row: auto; }
+    .company-context-directory .company-context-card h2 { font-size: 31px; }
+    .company-context-directory .company-context-card p { font-size: 16px; line-height: 1.8; }
+    .company-context-directory .company-context-card__arrow { right: 2px; font-size: 24px; }
+    .company-context-directory > .company-context-print-hidden:last-child { width: calc(100% - 24px); margin: -42px auto 54px; }
     .company-context-story { width: calc(100vw - 20px); }
     .company-context-hero {
         min-height: max(650px, calc(100svh - 120px));
@@ -506,6 +626,15 @@
     .company-context-read-page .shell { display: block; min-height: 0; }
     .company-context-read-page .main { width: auto; margin: 0; padding: 0; }
     .company-context-read { width: 100%; left: auto; transform: none; gap: 20px; color: #000; }
+    .company-context-directory { width: 100%; }
+    .company-context-directory__hero { min-height: auto; padding: 0 0 24px; background: #fff; }
+    .company-context-directory__visual { display: none; }
+    .company-context-directory__hero .company-context-title { width: 100%; }
+    .company-context-directory__hero .company-context-statement { max-width: none; margin-top: 16px; }
+    .company-context-directory > .company-context-list { width: 100%; margin: 0; }
+    .company-context-directory .company-context-card { display: block; padding: 20px 0; }
+    .company-context-directory .company-context-card p { margin-top: 10px; }
+    .company-context-directory .company-context-card__arrow { display: none; }
     .company-context-title { padding: 0 0 18px; }
     .company-context-title h1 { font-size: 32px; }
     .company-context-statement p { font-size: 16px; }

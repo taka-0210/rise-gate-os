@@ -38,10 +38,17 @@ try {
     assert(await page.getByRole('link', { name: /利用中 1/ }).isVisible(), 'Active count tab is not visible.');
     assert(await page.getByRole('link', { name: /保管済み 0/ }).isVisible(), 'Archived count tab is not visible.');
     assert(await page.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(238, 242, 245)', 'Shared page background token is not applied.');
-    assert(await page.locator('.company-context-card').first().evaluate(element => getComputedStyle(element).backgroundColor) === 'rgb(255, 255, 255)', 'Domain card is not white.');
+    assert(await page.locator('.company-context-directory__visual img').isVisible(), 'Company Context visual is missing from the directory hero.');
+    assert(await page.locator('.company-context-card').first().evaluate(element => {
+        const style = getComputedStyle(element);
+        return style.backgroundColor === 'rgba(0, 0, 0, 0)' && style.borderRadius === '0px';
+    }), 'Domain index still looks like a stack of application cards.');
     await page.screenshot({ path: desktopShot, fullPage: true });
 
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${baseUrl}/company/business-domains`);
+    assert(await page.locator('.company-context-directory__hero').isVisible(), '390px directory hero is not visible.');
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Business Domain index overflows at 390px.');
     await page.goto(`${baseUrl}/company/business-domains/create`);
     const longText = '地域の中小企業と一緒に、現場で使い続けられる仕組みを育てます。'.repeat(12);
     await page.locator('#domain-name').fill('ブラウザ受入事業');
@@ -105,7 +112,7 @@ try {
     await page.locator('.company-context-tools summary').click();
     await page.getByRole('link', { name: '管理・履歴', exact: true }).click();
     await page.locator('#state-reason').fill('ブラウザ保管確認');
-    await Promise.all([page.waitForURL('**/company/business-domains/*'), page.getByRole('button', { name: '保管する' }).click()]);
+    await Promise.all([page.waitForURL('**/company/business-domains/manage/*'), page.getByRole('button', { name: '保管する' }).click()]);
     await page.getByRole('link', { name: '読む画面へ', exact: true }).click();
     assert(await page.getByText(/この事業領域は保管済みです。/).isVisible(), 'Archived state is not visible.');
     await page.goto(`${baseUrl}/company/business-domains`);
@@ -121,7 +128,7 @@ try {
     await page.locator('.company-context-tools summary').click();
     await page.getByRole('link', { name: '管理・履歴', exact: true }).click();
     await page.locator('#state-reason').fill('ブラウザ再開確認');
-    await Promise.all([page.waitForURL('**/company/business-domains/*'), page.getByRole('button', { name: '利用中へ戻す' }).click()]);
+    await Promise.all([page.waitForURL('**/company/business-domains/manage/*'), page.getByRole('button', { name: '利用中へ戻す' }).click()]);
 
     const editorResponse = await page.goto(`${baseUrl}/company/business-domains/editors`);
     assert(editorResponse.status() === 200, `Editor management returned ${editorResponse.status()}.`);

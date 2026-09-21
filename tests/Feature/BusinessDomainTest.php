@@ -136,6 +136,8 @@ class BusinessDomainTest extends TestCase
 
         $this->asCompany($owner, $organization)->get(route('business-domains.index'))
             ->assertOk()
+            ->assertSee('company-context-directory__hero', false)
+            ->assertSee(asset('images/company-os-brand-symbol.svg'), false)
             ->assertSeeInOrder(['利用中', '1', '保管済み', '1'])
             ->assertSee($active->name)
             ->assertDontSee($archived->name)
