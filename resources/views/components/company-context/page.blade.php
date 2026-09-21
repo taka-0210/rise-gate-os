@@ -378,7 +378,7 @@
 .company-context-strength::after { content: "“"; position: absolute; z-index: -1; right: 5%; top: -22%; color: rgba(15,85,101,.045); font-family: Georgia, serif; font-size: min(48vw, 520px); line-height: 1; }
 .company-context-strength .company-context-story__eyebrow { color: var(--context-teal); }
 .company-context-strength h2 { max-width: 660px; margin: 0; color: #60717e; font-size: clamp(17px, 1.8vw, 22px); font-weight: 550; }
-.company-context-strength__statement { max-width: 940px; margin: 0; color: var(--context-ink); font-size: clamp(28px, 4.1vw, 52px); font-weight: 560; line-height: 1.45; letter-spacing: -.035em; text-wrap: balance; }
+.company-context-strength__statement { max-width: 940px; margin: 0; color: #4f6068; font-size: clamp(28px, 4.1vw, 52px); font-weight: 560; line-height: 1.45; letter-spacing: -.035em; text-wrap: balance; }
 .company-context-items { display: grid; }
 .company-context-item {
     display: grid;
