@@ -146,3 +146,21 @@ Local artifact（gitignored）:
 Business Domain Readは、公式Company OSブランドシンボルを共有しながら、保存済み事業Dataを5軸で読むCompany Context固有のPresentationとなった。
 
 通常local DB、Production DB、Production server、公式サイトRepositoryへ変更は加えていない。Production Deployは実施していない。
+
+## 10. Hero Full-Bleed Follow-up
+
+実施日: 2026-09-22 JST
+
+実Browser確認後の追加改善として、Heroを角丸・Shadow付きCardからviewport幅のFull-Bleed Sectionへ変更した。公式SVGとPaper背景は画面端まで展開し、本文の読み幅は中央Content範囲へ維持している。Reveal Motionと位置決めが競合しないよう、Full-Bleed配置は`transform`ではなく計算Marginで行う。
+
+- Desktop / 390pxともHeroの左右端がviewportと一致
+- `border-radius: 0` / `box-shadow: none`
+- 横overflowなし
+- Printでは通常Document幅へ復帰
+- Product / Permission / Data / Writer / Revision Contract変更なし
+- Blade compile: 成功
+- Focused Test: **26 tests / 290 assertions / failures 0**
+- Full Test: **476 tests / 3,963 assertions / failures 0 / 311.13s**
+- Browser: Desktop 1280 × 1000 / Mobile 390 × 844 / A4 PDF 998,253 bytes / HTTP 5xx 0
+- Browser Journey: Motion / Keyboard / reduced-motion / Print / Permission負例 / archive / reopenを含め全件成功
+- DB: Guard付き一時SQLiteのみ使用。通常local DB / Production DBは未使用・未変更

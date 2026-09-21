@@ -84,6 +84,30 @@ try {
     assert(await page.locator('.company-context-read form').count() === 0, 'Read contains management form after save.');
     assert(await page.locator('[data-company-context-hero]').evaluate(element => element.getBoundingClientRect().height) >= 600, 'Desktop hero lacks immersive vertical space.');
     assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 80, 'Desktop hero title is too small.');
+    const heroPresentation = await page.locator('.company-context-hero').evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            viewport: document.documentElement.clientWidth,
+            layoutWidth: document.documentElement.scrollWidth,
+            borderRadius: style.borderRadius,
+            boxShadow: style.boxShadow,
+            scrollWidth: document.documentElement.scrollWidth,
+        };
+    });
+    assert(heroPresentation.width >= heroPresentation.layoutWidth - 2, 'Desktop hero is still constrained inside a card width: ' + JSON.stringify(heroPresentation));
+    assert(
+        heroPresentation.left <= 1
+            && heroPresentation.left >= -20
+            && heroPresentation.right >= heroPresentation.layoutWidth - 1
+            && heroPresentation.right <= heroPresentation.layoutWidth + 20,
+        'Desktop hero is not full bleed: ' + JSON.stringify(heroPresentation),
+    );
+    assert(heroPresentation.borderRadius === '0px' && heroPresentation.boxShadow === 'none', 'Desktop hero still has card styling.');
+    assert(heroPresentation.scrollWidth <= heroPresentation.viewport, 'Full-bleed hero causes horizontal overflow.');
     assert(await page.locator('.company-context-key-message__text').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 45, 'Key message lacks visual hierarchy.');
     assert(await page.locator('.company-context-strength__statement').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 40, 'Strength statement lacks visual hierarchy.');
     const perspectiveButtons = page.locator('[data-context-tab]');
@@ -132,7 +156,31 @@ try {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(showUrl);
+    await page.waitForTimeout(900);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), '390px Read overflows.');
+    const mobileHeroPresentation = await page.locator('.company-context-hero').evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            viewport: window.innerWidth,
+            layoutWidth: document.documentElement.scrollWidth,
+            borderRadius: style.borderRadius,
+            boxShadow: style.boxShadow,
+        };
+    });
+    assert(
+        mobileHeroPresentation.width >= mobileHeroPresentation.layoutWidth - 2
+            && mobileHeroPresentation.left <= 1
+            && mobileHeroPresentation.left >= -20
+            && mobileHeroPresentation.right >= mobileHeroPresentation.layoutWidth - 1
+            && mobileHeroPresentation.right <= mobileHeroPresentation.layoutWidth + 20
+            && mobileHeroPresentation.borderRadius === '0px'
+            && mobileHeroPresentation.boxShadow === 'none',
+        '390px hero is not a full-bleed section: ' + JSON.stringify(mobileHeroPresentation),
+    );
     assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 48, '390px hero title is too small.');
     assert(await page.locator('[data-context-tab]').count() === 5, '390px perspective controls are unavailable.');
     await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; });

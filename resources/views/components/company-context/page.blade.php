@@ -91,17 +91,23 @@
 }
 .company-context-hero {
     position: relative;
+    width: 100vw;
+    width: 100dvw;
+    max-width: none;
+    margin-left: calc((100% - 100vw) / 2);
+    margin-left: calc((100% - 100dvw) / 2);
     isolation: isolate;
     min-height: clamp(620px, 78vh, 850px);
     overflow: hidden;
     display: grid;
     grid-template-rows: auto 1fr auto;
     align-items: center;
-    padding: clamp(28px, 5vw, 68px);
-    border-radius: 30px;
+    padding-block: clamp(28px, 5vw, 68px);
+    padding-inline: max(clamp(28px, 5vw, 68px), calc((100vw - 1240px) / 2 + 28px));
+    border-radius: 0;
     color: var(--context-ink);
     background: #eef2f5;
-    box-shadow: 0 35px 80px rgba(15, 85, 101, .1);
+    box-shadow: none;
 }
 .company-context-hero::after {
     content: "";
@@ -439,7 +445,6 @@
     .company-context-hero {
         min-height: max(650px, calc(100svh - 120px));
         padding: 22px;
-        border-radius: 21px;
         grid-template-rows: auto 1fr auto;
     }
     .company-context-hero::after { background: linear-gradient(to bottom, rgba(238,242,245,.12), rgba(238,242,245,.46) 36%, #eef2f5 62%); }
@@ -506,6 +511,8 @@
     .company-context-title h1 { font-size: 32px; }
     .company-context-statement p { font-size: 16px; }
     .company-context-hero {
+        width: 100%;
+        margin-left: 0;
         min-height: auto;
         display: block;
         padding: 0 0 24px;
