@@ -8,14 +8,21 @@ use App\Models\OrganizationUser;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\ProductOrganization\ProductOrganizationAdmission;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class PromoteClientToCompanyAccount
 {
+    public function __construct(private readonly ProductOrganizationAdmission $productAdmission) {}
+
     public function promote(Client $client, User $owner, string $workspaceName): Workspace
     {
+        $this->productAdmission->rejectNewOrganization(
+            $owner,
+            ProductOrganizationAdmission::ENTRY_CLIENT_PROMOTION,
+        );
         if ($client->linked_organization_id) {
             throw new RuntimeException('このClientはすでに会社アカウントと関連付いています。');
         }

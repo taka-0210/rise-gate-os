@@ -71,19 +71,8 @@
                         経営Workspace: {{ $client->linkedOrganization->workspaces->pluck('name')->join('、') }}
                     @endif
                 </div>
-            @elseif ($canPromote)
-                @if ($errors->has('company_account'))<div class="error">{{ $errors->first('company_account') }}</div>@endif
-                <form class="actions" method="POST" action="{{ route('clients.company-account.store', $client) }}">
-                    @csrf
-                    <div class="field" style="min-width:260px;">
-                        <label for="workspace_name">最初のWorkspace名</label>
-                        <input id="workspace_name" name="workspace_name" value="{{ old('workspace_name', '経営WS') }}" required>
-                        @error('workspace_name')<div class="error">{{ $message }}</div>@enderror
-                    </div>
-                    <button type="submit">会社アカウントへ昇格</button>
-                </form>
             @else
-                <p class="meta">会社アカウントの作成には、現在のWorkspaceでOwnerまたはAdmin権限が必要です。</p>
+                <p class="meta">新しい会社アカウントへの昇格は停止されています。既存の関連情報はそのまま保持されます。</p>
             @endif
         </div>
 

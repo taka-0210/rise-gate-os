@@ -9,6 +9,7 @@ use App\Services\AccountLoginLimiter;
 use App\Services\Organization\OrganizationInvitationClaim;
 use App\Services\Organization\OrganizationSessionContext;
 use App\Services\Organization\OwnerOnboardingClaim;
+use App\Services\ProductOrganization\ProductOrganizationResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,7 @@ class AuthenticatedSessionController extends Controller
         AccountLoginLimiter $limiter,
         AccountAudit $audit,
         OrganizationSessionContext $sessionContext,
+        ProductOrganizationResolver $productOrganizations,
     ): RedirectResponse {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
@@ -58,13 +60,10 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('invitations.onboarding');
         }
 
-        $companies = $request->user()->organizations()
-            ->wherePivot('membership_status', OrganizationUser::STATUS_ACTIVE)
-            ->orderBy('organizations.name')
-            ->get();
-        if ($companies->count() === 1) {
-            $membership = OrganizationUser::query()
-                ->where('organization_id', $companies->first()->id)
+        $resolved = $productOrganizations->resolve($request->user());
+        if ($resolved['state'] === 'ready') {
+            $membership = $resolved['membership'] ?? OrganizationUser::query()
+                ->where('organization_id', $resolved['organization']->id)
                 ->where('user_id', $request->user()->id)
                 ->firstOrFail();
             $sessionContext->select($request, $membership);

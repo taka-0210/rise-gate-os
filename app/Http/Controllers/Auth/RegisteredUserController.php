@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use App\Services\Organization\OrganizationSessionContext;
+use App\Services\ProductOrganization\ProductOrganizationAdmission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,8 +26,11 @@ class RegisteredUserController extends Controller
         return view('auth.register');
     }
 
-    public function store(Request $request, OrganizationSessionContext $sessionContext): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        OrganizationSessionContext $sessionContext,
+        ProductOrganizationAdmission $productAdmission,
+    ): RedirectResponse {
         abort_if(User::query()->exists(), 404);
 
         $validated = $request->validate([
@@ -37,7 +41,7 @@ class RegisteredUserController extends Controller
             'workspace_name' => ['required', 'string', 'max:255'],
         ]);
 
-        [$user, $workspace] = DB::transaction(function () use ($validated): array {
+        [$user, $workspace] = DB::transaction(function () use ($validated, $productAdmission): array {
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -70,6 +74,7 @@ class RegisteredUserController extends Controller
                 'role' => WorkspaceMember::ROLE_OWNER,
                 'joined_at' => now(),
             ]);
+            $productAdmission->registerSingle($user, $organization, 'provenance:bootstrap');
 
             return [$user, $workspace];
         });

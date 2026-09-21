@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Organization\OrganizationInvitationAcceptance;
 use App\Services\Organization\OrganizationInvitationClaim;
 use App\Services\Organization\OrganizationSessionContext;
+use App\Services\ProductOrganization\ProductOrganizationAdmission;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,6 +60,7 @@ class InvitationOnboardingController extends Controller
         Request $request,
         OrganizationInvitationClaim $claim,
         OrganizationInvitationAcceptance $acceptance,
+        ProductOrganizationAdmission $productAdmission,
     ): RedirectResponse {
         abort_if(Auth::check(), 404);
         $invitation = $claim->current($request);
@@ -71,7 +73,7 @@ class InvitationOnboardingController extends Controller
         ]);
 
         try {
-            $user = DB::transaction(function () use ($request, $invitation, $validated, $acceptance): User {
+            $user = DB::transaction(function () use ($request, $invitation, $validated, $acceptance, $productAdmission): User {
                 $user = User::create([
                     'name' => $validated['name'],
                     'email' => $invitation->normalized_email,
@@ -79,6 +81,7 @@ class InvitationOnboardingController extends Controller
                     'is_system_admin' => false,
                     'is_active' => true,
                 ]);
+                $productAdmission->registerUnstarted($user, 'provenance:staff_invitation');
                 $acceptance->prepare($request, $user);
 
                 return $user;

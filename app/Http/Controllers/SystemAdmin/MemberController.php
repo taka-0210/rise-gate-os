@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use App\Services\AccountCredentialService;
+use App\Services\ProductOrganization\ProductOrganizationAdmission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -131,38 +132,48 @@ class MemberController extends Controller
         return redirect()->route('system-admin.members.edit', $user)->with('status', 'メンバー情報を更新しました。');
     }
 
-    public function storeWorkspace(Request $request, User $user): RedirectResponse
-    {
+    public function storeWorkspace(
+        Request $request,
+        User $user,
+        ProductOrganizationAdmission $productAdmission,
+    ): RedirectResponse {
         $validated = $this->validateWorkspaceMembership($request, $user);
         $workspace = Workspace::query()->with('organization')->findOrFail($validated['workspace_id']);
 
-        DB::transaction(function () use ($user, $workspace, $validated): void {
-            Organization::query()->whereKey($workspace->organization_id)->lockForUpdate()->firstOrFail();
-            if (! $user->is_active) {
-                throw ValidationException::withMessages(['workspace_id' => '停止中のAccountはWorkspaceへ追加できません。']);
-            }
-            $organizationMembership = OrganizationUser::query()->lockForUpdate()->firstOrCreate(
-                [
-                    'organization_id' => $workspace->organization_id,
-                    'user_id' => $user->id,
-                ],
-                [
-                    'role' => OrganizationUser::ROLE_MEMBER,
-                    'organization_role' => OrganizationUser::ORGANIZATION_ROLE_MEMBER,
-                    'membership_status' => OrganizationUser::STATUS_ACTIVE,
-                    'joined_at' => now(),
-                ],
-            );
-            if ($organizationMembership->membership_status !== OrganizationUser::STATUS_ACTIVE) {
-                throw ValidationException::withMessages([
-                    'workspace_id' => '停止・退職中のOrganization所属へWorkspaceを追加できません。',
-                ]);
-            }
-            $workspace->users()->attach($user->id, [
-                'role' => $validated['workspace_role'],
-                'joined_at' => now(),
-            ]);
-        });
+        $productAdmission->admitExistingOrganization(
+            $user,
+            $workspace->organization,
+            ProductOrganizationAdmission::ENTRY_SYSTEM_ADMIN_WORKSPACE,
+            function () use ($user, $workspace, $validated): void {
+                DB::transaction(function () use ($user, $workspace, $validated): void {
+                    Organization::query()->whereKey($workspace->organization_id)->lockForUpdate()->firstOrFail();
+                    if (! $user->is_active) {
+                        throw ValidationException::withMessages(['workspace_id' => '停止中のAccountはWorkspaceへ追加できません。']);
+                    }
+                    $organizationMembership = OrganizationUser::query()->lockForUpdate()->firstOrCreate(
+                        [
+                            'organization_id' => $workspace->organization_id,
+                            'user_id' => $user->id,
+                        ],
+                        [
+                            'role' => OrganizationUser::ROLE_MEMBER,
+                            'organization_role' => OrganizationUser::ORGANIZATION_ROLE_MEMBER,
+                            'membership_status' => OrganizationUser::STATUS_ACTIVE,
+                            'joined_at' => now(),
+                        ],
+                    );
+                    if ($organizationMembership->membership_status !== OrganizationUser::STATUS_ACTIVE) {
+                        throw ValidationException::withMessages([
+                            'workspace_id' => '停止・退職中のOrganization所属へWorkspaceを追加できません。',
+                        ]);
+                    }
+                    $workspace->users()->attach($user->id, [
+                        'role' => $validated['workspace_role'],
+                        'joined_at' => now(),
+                    ]);
+                });
+            },
+        );
 
         return back()->with('status', 'Workspaceへ追加しました。');
     }

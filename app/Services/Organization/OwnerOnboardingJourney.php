@@ -8,6 +8,7 @@ use App\Models\OrganizationUser;
 use App\Models\OwnerOnboarding;
 use App\Models\User;
 use App\Services\AccountAudit;
+use App\Services\ProductOrganization\ProductOrganizationAdmission;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class OwnerOnboardingJourney
         private readonly OrganizationAudit $organizationAudit,
         private readonly StandardWorkspaceService $standardWorkspace,
         private readonly AccountAudit $accountAudit,
+        private readonly ProductOrganizationAdmission $productAdmission,
     ) {}
 
     public function register(Request $request, string $name, string $password): User
@@ -46,6 +48,7 @@ class OwnerOnboardingJourney
                     'is_system_admin' => false,
                     'is_active' => true,
                 ]);
+                $this->productAdmission->registerUnstarted($user, 'provenance:owner_onboarding');
                 $this->legal->record($user, $onboarding);
                 $onboarding->forceFill(['claimed_user_id' => $user->id])->save();
                 $this->audit->record($onboarding, $user, 'owner_onboarding.account_created', 'success', $user, [
@@ -69,6 +72,10 @@ class OwnerOnboardingJourney
     {
         $this->legal->assertReady();
         $snapshot = $this->claim->current($request);
+        $this->productAdmission->assertMayStartNewOrganization(
+            $user,
+            ProductOrganizationAdmission::ENTRY_OWNER_PREPARE,
+        );
 
         return DB::transaction(function () use ($snapshot, $user): OwnerOnboarding {
             $onboarding = OwnerOnboarding::query()->lockForUpdate()->findOrFail($snapshot->id);
@@ -90,67 +97,88 @@ class OwnerOnboardingJourney
         $this->legal->assertReady();
         $snapshot = $this->claim->current($request, false, true);
 
-        return DB::transaction(function () use ($snapshot, $user): OwnerOnboarding {
-            $onboarding = OwnerOnboarding::query()->lockForUpdate()->findOrFail($snapshot->id);
-            if ($onboarding->status === OwnerOnboarding::STATUS_COMPLETED) {
-                return $this->completedResult($onboarding, $user);
-            }
-            $this->assertSnapshot($snapshot, $onboarding);
-            $this->assertIssuer($onboarding);
-            $this->assertIdentity($onboarding, $user, true);
-            if (! $this->legal->hasCurrentConsent($user, $onboarding)) {
-                throw ValidationException::withMessages(['consent' => '現行の利用規約とPrivacyへの同意を確認してください。']);
-            }
+        return $this->productAdmission->admitNewOrganization(
+            $user,
+            ProductOrganizationAdmission::ENTRY_OWNER_COMPLETE,
+            function () use ($snapshot, $user): array {
+                $result = DB::transaction(function () use ($snapshot, $user): OwnerOnboarding {
+                    $onboarding = OwnerOnboarding::query()->lockForUpdate()->findOrFail($snapshot->id);
+                    if ($onboarding->status === OwnerOnboarding::STATUS_COMPLETED) {
+                        return $this->completedResult($onboarding, $user);
+                    }
+                    $this->assertSnapshot($snapshot, $onboarding);
+                    $this->assertIssuer($onboarding);
+                    $this->assertIdentity($onboarding, $user, true);
+                    if (! $this->legal->hasCurrentConsent($user, $onboarding)) {
+                        throw ValidationException::withMessages(['consent' => '現行の利用規約とPrivacyへの同意を確認してください。']);
+                    }
 
-            $payloadHash = $this->completionPayloadHash($onboarding, $user);
-            $organization = Organization::query()->create([
-                'name' => $onboarding->organization_name,
-                'slug' => $this->uniqueOrganizationSlug($onboarding->organization_name),
-                'personal_workspace_creation_enabled' => false,
-            ]);
-            $this->failpoint('organization');
+                    $payloadHash = $this->completionPayloadHash($onboarding, $user);
+                    $organization = Organization::query()->create([
+                        'name' => $onboarding->organization_name,
+                        'slug' => $this->uniqueOrganizationSlug($onboarding->organization_name),
+                        'personal_workspace_creation_enabled' => false,
+                    ]);
+                    $this->failpoint('organization');
 
-            $membership = OrganizationUser::query()->create([
-                'organization_id' => $organization->id,
-                'user_id' => $user->id,
-                'role' => OrganizationUser::ROLE_MEMBER,
-                'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
-                'membership_status' => OrganizationUser::STATUS_ACTIVE,
-                'company_role' => OrganizationUser::COMPANY_ROLE_MEMBER,
-                'permissions' => [],
-                'joined_at' => now(),
-            ]);
-            $this->failpoint('membership');
+                    $membership = OrganizationUser::query()->create([
+                        'organization_id' => $organization->id,
+                        'user_id' => $user->id,
+                        'role' => OrganizationUser::ROLE_MEMBER,
+                        'organization_role' => OrganizationUser::ORGANIZATION_ROLE_OWNER,
+                        'membership_status' => OrganizationUser::STATUS_ACTIVE,
+                        'company_role' => OrganizationUser::COMPANY_ROLE_MEMBER,
+                        'permissions' => [],
+                        'joined_at' => now(),
+                    ]);
+                    $this->failpoint('membership');
 
-            $workspace = $this->standardWorkspace->initialize($user, $organization);
-            $this->failpoint('workspace');
+                    $workspace = $this->standardWorkspace->initialize($user, $organization);
+                    $this->failpoint('workspace');
 
-            $onboarding->forceFill([
-                'status' => OwnerOnboarding::STATUS_COMPLETED,
-                'completed_organization_id' => $organization->id,
-                'completed_payload_hash' => $payloadHash,
-                'completed_at' => now(),
-                'pending_case_key' => null,
-            ])->save();
-            $this->failpoint('result');
+                    $onboarding->forceFill([
+                        'status' => OwnerOnboarding::STATUS_COMPLETED,
+                        'completed_organization_id' => $organization->id,
+                        'completed_payload_hash' => $payloadHash,
+                        'completed_at' => now(),
+                        'pending_case_key' => null,
+                    ])->save();
+                    $this->failpoint('result');
 
-            $this->audit->record($onboarding, $user, 'owner_onboarding.completed', 'success', $user, [
-                'organization_public_id' => $organization->public_id,
-                'workspace_public_id' => $workspace->public_id,
-                'membership_id' => $membership->id,
-            ]);
-            $this->organizationAudit->record(
-                $organization,
-                $user,
-                'organization.owner_onboarding.completed',
-                OrganizationAuditEvent::OUTCOME_SUCCESS,
-                $user,
-                metadata: ['onboarding_case_public_id' => $onboarding->public_id],
-            );
-            $this->failpoint('audit');
+                    $this->audit->record($onboarding, $user, 'owner_onboarding.completed', 'success', $user, [
+                        'organization_public_id' => $organization->public_id,
+                        'workspace_public_id' => $workspace->public_id,
+                        'membership_id' => $membership->id,
+                    ]);
+                    $this->organizationAudit->record(
+                        $organization,
+                        $user,
+                        'organization.owner_onboarding.completed',
+                        OrganizationAuditEvent::OUTCOME_SUCCESS,
+                        $user,
+                        metadata: ['onboarding_case_public_id' => $onboarding->public_id],
+                    );
+                    $this->failpoint('audit');
 
-            return $onboarding->refresh();
-        }, 3);
+                    return $onboarding->refresh();
+                }, 3);
+
+                return [
+                    'result' => $result,
+                    'organization' => Organization::query()->findOrFail($result->completed_organization_id),
+                ];
+            },
+            function () use ($snapshot, $user): ?Organization {
+                $onboarding = OwnerOnboarding::query()->lockForUpdate()->findOrFail($snapshot->id);
+                if ($onboarding->status !== OwnerOnboarding::STATUS_COMPLETED) {
+                    return null;
+                }
+
+                $this->completedResult($onboarding, $user);
+
+                return Organization::query()->findOrFail($onboarding->completed_organization_id);
+            },
+        );
     }
 
     private function completedResult(OwnerOnboarding $onboarding, User $user): OwnerOnboarding

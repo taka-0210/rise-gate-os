@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\SystemAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Workspace;
+use App\Models\OrganizationUser;
 use App\Services\AccountAudit;
 use App\Services\AccountLoginLimiter;
+use App\Services\Organization\OrganizationSessionContext;
+use App\Services\ProductOrganization\ProductOrganizationResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -46,22 +48,36 @@ class AuthenticatedSessionController extends Controller
         return redirect()->intended(route('system-admin.members.index'));
     }
 
-    public function exit(Request $request): RedirectResponse
-    {
+    public function exit(
+        Request $request,
+        ProductOrganizationResolver $productOrganizations,
+        OrganizationSessionContext $sessionContext,
+    ): RedirectResponse {
         $request->session()->put('access_mode', 'workspace');
-        $workspace = $request->user()->workspaces()
-            ->where('workspaces.status', Workspace::STATUS_ACTIVE)
-            ->orderBy('workspaces.name')
-            ->first();
+        $resolved = $productOrganizations->resolve($request->user());
+        if ($resolved['state'] === 'ready') {
+            $membership = $resolved['membership'] ?? OrganizationUser::query()
+                ->where('user_id', $request->user()->id)
+                ->where('organization_id', $resolved['organization']->id)
+                ->where('membership_status', OrganizationUser::STATUS_ACTIVE)
+                ->firstOrFail();
+            $sessionContext->select($request, $membership);
 
-        if (! $workspace) {
-            $request->session()->forget('current_workspace_id');
-
-            return redirect()->route('workspaces.index');
+            return redirect()->route('company.home');
         }
+        if ($resolved['state'] === 'selection') {
+            $currentCompanyId = (int) $request->session()->get(OrganizationSessionContext::COMPANY_ID);
+            $membership = $currentCompanyId > 0
+                ? $productOrganizations->activeMembershipFor($request->user(), $currentCompanyId)
+                : null;
+            if ($membership) {
+                $sessionContext->select($request, $membership);
 
-        $request->session()->put('current_workspace_id', $workspace->id);
+                return redirect()->route('company.home');
+            }
+        }
+        $sessionContext->clear($request);
 
-        return redirect()->route('dashboard');
+        return redirect()->route('companies.index');
     }
 }

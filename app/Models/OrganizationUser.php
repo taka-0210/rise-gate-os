@@ -199,4 +199,9 @@ class OrganizationUser extends Model
     {
         return $this->hasOne(BusinessDomainEditorGrant::class);
     }
+
+    public function productOrganizationCompatibility(): HasOne
+    {
+        return $this->hasOne(ProductOrganizationCompatibility::class);
+    }
 }

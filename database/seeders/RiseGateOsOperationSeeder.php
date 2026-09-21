@@ -6,17 +6,25 @@ use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Organization;
 use App\Models\OrganizationUser;
+use App\Models\ProductAccountEligibility;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class RiseGateOsOperationSeeder extends Seeder
 {
     public function run(): void
     {
+        if (config('app.env') !== 'testing' && ! config('product_ux.operation_fixture_seeding_enabled')) {
+            throw new \RuntimeException(
+                'RiseGateOsOperationSeeder is fixture-only. Explicitly enable PRODUCT_UX_OPERATION_FIXTURE_SEED_ENABLED for an isolated fixture database.',
+            );
+        }
+
         $user = User::firstOrCreate(
             ['email' => 'takami@rise-gate.local'],
             ['name' => 'Takami Masaya', 'password' => Hash::make('password')]
@@ -34,6 +42,18 @@ class RiseGateOsOperationSeeder extends Seeder
             'membership_status' => OrganizationUser::STATUS_ACTIVE,
             'joined_at' => now(),
         ]]);
+        if (Schema::hasTable('product_account_eligibilities')) {
+            ProductAccountEligibility::query()->firstOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'mode' => ProductAccountEligibility::MODE_SINGLE,
+                    'product_organization_id' => $organization->id,
+                    'classification_version' => config('product_ux.classification_version'),
+                    'classified_at' => now(),
+                    'evidence_ref' => 'fixture:rise-gate-os-operation-seeder',
+                ],
+            );
+        }
         $workspace->users()->syncWithoutDetaching([$user->id => ['role' => 'owner', 'joined_at' => now()]]);
 
         $riseGateClient = Client::firstOrCreate(

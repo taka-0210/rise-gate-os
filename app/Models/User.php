@@ -6,6 +6,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
@@ -106,6 +107,11 @@ class User extends Authenticatable
     public function ownerOnboardings(): HasMany
     {
         return $this->hasMany(OwnerOnboarding::class, 'claimed_user_id');
+    }
+
+    public function productAccountEligibility(): HasOne
+    {
+        return $this->hasOne(ProductAccountEligibility::class);
     }
 
     public function canAccessWorkspace(int $workspaceId): bool
