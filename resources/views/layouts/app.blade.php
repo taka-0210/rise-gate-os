@@ -296,7 +296,10 @@
         }
     </style>
 </head>
-<body @class(['company-finance-screen' => request()->routeIs('company-finance.*')])>
+<body @class([
+    'company-finance-screen' => request()->routeIs('company-finance.*'),
+    'company-context-read-page' => request()->routeIs('business-domains.index', 'business-domains.show'),
+])>
 <div class="shell">
     <header class="topbar">
         <a class="brand" href="{{ auth()->check() && session('access_mode') !== 'system_admin' ? route('company.home') : route('welcome') }}" aria-label="Company OS トップへ">

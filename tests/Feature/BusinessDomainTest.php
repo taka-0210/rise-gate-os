@@ -606,6 +606,194 @@ class BusinessDomainTest extends TestCase
         $this->assertSame(['project_metadata', 'roadmaps', 'improvements', 'tasks'], AiProjectContextGuard::SCOPE_ONE_CATEGORIES);
     }
 
+    public function test_pux_b_read_is_editorial_and_does_not_load_or_render_management_history(): void
+    {
+        $organization = $this->organization('pux-b-read');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $domain = $this->createDomain($owner, $organization, [
+            'name' => '地域伴走事業',
+            'description' => '地域企業の意思決定を支える事業です。',
+            'what_summary' => '経営支援',
+        ]);
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        $response = $this->asCompany($owner, $organization)->get(route('business-domains.show', $domain));
+
+        $response->assertOk()
+            ->assertSee('地域伴走事業')
+            ->assertSee('地域企業の意思決定を支える事業です。')
+            ->assertSee('事業の輪郭')
+            ->assertSee(route('business-domains.manage.show', $domain), false)
+            ->assertDontSee('Revision履歴')
+            ->assertDontSee('name="change_reason"', false)
+            ->assertDontSee('name="expected_version"', false)
+            ->assertDontSee(route('business-domains.archive', $domain), false);
+        $this->assertFalse(
+            collect($queries)->contains(fn (string $sql): bool => str_contains($sql, 'business_domain_revisions')),
+            'Normal Read must not query business_domain_revisions.',
+        );
+    }
+
+    public function test_pux_b_manage_routes_are_static_authorized_and_hold_management_controls(): void
+    {
+        $organization = $this->organization('pux-b-manage');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        [$admin, $adminMembership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_ADMIN);
+        [$member] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_MEMBER);
+        $domain = $this->createDomain($owner, $organization, ['name' => '管理対象事業']);
+
+        $this->asCompany($owner, $organization)->get('/company/business-domains/manage')
+            ->assertOk()
+            ->assertSee('事業領域の管理')
+            ->assertSee('管理対象事業');
+        $this->asCompany($owner, $organization)->get(route('business-domains.manage.show', $domain))
+            ->assertOk()
+            ->assertSee('Revision履歴')
+            ->assertSee('name="change_reason"', false)
+            ->assertSee(route('business-domains.archive', $domain), false);
+
+        $this->asCompany($member, $organization)->get(route('business-domains.manage'))->assertForbidden();
+        $this->asCompany($member, $organization)->get(route('business-domains.manage.show', $domain))->assertForbidden();
+
+        $this->asCompany($owner, $organization)->post(route('business-domains.editors.grant', $adminMembership), [
+            'request_id' => (string) Str::uuid(),
+        ])->assertRedirect();
+        $this->asCompany($admin, $organization)->get(route('business-domains.manage'))->assertOk();
+        $this->asCompany($admin, $organization)->get(route('business-domains.manage.show', $domain))->assertOk();
+        $this->asCompany($admin, $organization)->get(route('business-domains.editors'))->assertForbidden();
+    }
+
+    public function test_pux_b_read_omits_empty_sections_and_presents_existing_content_without_copying_it(): void
+    {
+        $organization = $this->organization('pux-b-content');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $nameOnly = $this->createDomain($owner, $organization, ['name' => '名称だけの事業']);
+        $full = $this->createDomain($owner, $organization, [
+            'name' => '<事業&名称>',
+            'description' => '原文の概要',
+            'who_summary' => '地域の中小企業',
+            'self_recognized_strengths' => '現場に入り込む力',
+            'direction' => BusinessDomain::DIRECTION_EXIT_PLANNED,
+            'direction_memo' => '段階的な統合を検討する',
+            'items' => [[
+                'kind' => 'customer_segment',
+                'name' => '長期顧客',
+                'description' => '既存の顧客層',
+                'attributes' => [[
+                    'axis' => 'value',
+                    'label' => '提供価値',
+                    'value_text' => '<script>alert(1)</script>',
+                ]],
+            ]],
+        ]);
+
+        $this->asCompany($owner, $organization)->get(route('business-domains.show', $nameOnly))
+            ->assertOk()
+            ->assertSee('名称だけの事業')
+            ->assertDontSee('事業の輪郭')
+            ->assertDontSee('自社認識の強み')
+            ->assertDontSee('今後の方向性')
+            ->assertDontSee('この事業を形づくるもの')
+            ->assertDontSee('未登録');
+
+        $this->asCompany($owner, $organization)->get(route('business-domains.show', $full))
+            ->assertOk()
+            ->assertSee('&lt;事業&amp;名称&gt;', false)
+            ->assertSee('WHO / 誰に届けるか')
+            ->assertSee('終了予定')
+            ->assertSee('段階的な統合を検討する')
+            ->assertSee('顧客層')
+            ->assertSee('VALUE / 提供価値')
+            ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false);
+
+        $this->assertSame('原文の概要', $full->fresh()->description);
+        $this->assertDatabaseCount('business_domains', 2);
+        $this->assertDatabaseCount('business_domain_revisions', 2);
+    }
+
+    public function test_pux_b_read_and_printable_gets_do_not_mutate_domain_history_or_audit(): void
+    {
+        $organization = $this->organization('pux-b-no-write');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $domain = $this->createDomain($owner, $organization, ['name' => '読取専用事業']);
+        $beforeDomain = $domain->fresh();
+        $before = [
+            'domain' => [
+                'version' => $beforeDomain->version,
+                'display_order' => $beforeDomain->display_order,
+                'status' => $beforeDomain->status,
+                'updated_at' => $beforeDomain->updated_at?->toISOString(),
+            ],
+            'revisions' => BusinessDomainRevision::count(),
+            'operations' => DB::table('business_domain_operations')->count(),
+            'audits' => OrganizationAuditEvent::count(),
+        ];
+
+        $this->asCompany($owner, $organization)->get(route('business-domains.index'))->assertOk();
+        $this->asCompany($owner, $organization)->get(route('business-domains.show', $domain))->assertOk();
+
+        $afterDomain = $domain->fresh();
+        $this->assertSame($before['domain'], [
+            'version' => $afterDomain->version,
+            'display_order' => $afterDomain->display_order,
+            'status' => $afterDomain->status,
+            'updated_at' => $afterDomain->updated_at?->toISOString(),
+        ]);
+        $this->assertSame($before['revisions'], BusinessDomainRevision::count());
+        $this->assertSame($before['operations'], DB::table('business_domain_operations')->count());
+        $this->assertSame($before['audits'], OrganizationAuditEvent::count());
+    }
+
+    public function test_pux_b_management_operations_return_to_manage_without_changing_writer_contract(): void
+    {
+        $organization = $this->organization('pux-b-redirect');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $first = $this->createDomain($owner, $organization, ['name' => '第一事業']);
+        $second = $this->createDomain($owner, $organization, ['name' => '第二事業']);
+
+        $this->asCompany($owner, $organization)->post(route('business-domains.move', $second), [
+            'request_id' => (string) Str::uuid(),
+            'direction' => 'up',
+        ])->assertRedirect(route('business-domains.manage', ['status' => 'active']));
+
+        $this->asCompany($owner, $organization)->post(route('business-domains.archive', $first), [
+            'request_id' => (string) Str::uuid(),
+            'expected_version' => $first->version,
+            'change_reason' => '管理画面から保管',
+        ])->assertRedirect(route('business-domains.manage.show', $first));
+
+        $first->refresh();
+        $this->asCompany($owner, $organization)->get(route('business-domains.show', $first))
+            ->assertOk()
+            ->assertSee('保管時点の現在値');
+        $this->asCompany($owner, $organization)->get(route('business-domains.edit', $first))->assertStatus(409);
+
+        $this->asCompany($owner, $organization)->post(route('business-domains.reopen', $first), [
+            'request_id' => (string) Str::uuid(),
+            'expected_version' => $first->version,
+            'change_reason' => '管理画面から再開',
+        ])->assertRedirect(route('business-domains.manage.show', $first));
+    }
+
+    public function test_pux_b_tenant_boundary_hides_read_manage_and_history_for_other_organization(): void
+    {
+        $organization = $this->organization('pux-b-tenant');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $domain = $this->createDomain($owner, $organization, ['name' => '境界内事業']);
+        $other = $this->organization('pux-b-other');
+        [$otherOwner] = $this->member($other, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+
+        $this->asCompany($otherOwner, $other)->get(route('business-domains.show', $domain))
+            ->assertNotFound()->assertDontSee('境界内事業');
+        $this->asCompany($otherOwner, $other)->get(route('business-domains.manage.show', $domain))
+            ->assertNotFound()->assertDontSee('境界内事業');
+        $this->asCompany($otherOwner, $other)->get(route('business-domains.revisions.show', [$domain, 1]))
+            ->assertNotFound()->assertDontSee('境界内事業');
+    }
+
     public function test_validation_limits_reject_oversized_nested_payload_without_partial_write(): void
     {
         $organization = $this->organization('limits');

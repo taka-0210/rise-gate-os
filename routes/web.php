@@ -1,13 +1,13 @@
 <?php
 
 use App\Http\Controllers\AiConnectionController;
-use App\Http\Controllers\BusinessDomainController;
 use App\Http\Controllers\Auth\AccountEmailController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\BusinessDomainController;
 use App\Http\Controllers\Client\ClientCompanyAccountController;
 use App\Http\Controllers\Client\ClientController;
 use App\Http\Controllers\CompanyAnnualPlanController;
@@ -152,6 +152,8 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::get('/company/business-domains/editors', [BusinessDomainController::class, 'editors'])->name('business-domains.editors');
         Route::post('/company/business-domains/editors/{organizationMembership}', [BusinessDomainController::class, 'grantEditor'])->name('business-domains.editors.grant');
         Route::delete('/company/business-domains/editors/{organizationMembership}', [BusinessDomainController::class, 'revokeEditor'])->name('business-domains.editors.revoke');
+        Route::get('/company/business-domains/manage', [BusinessDomainController::class, 'manage'])->name('business-domains.manage');
+        Route::get('/company/business-domains/manage/{businessDomain}', [BusinessDomainController::class, 'manageShow'])->name('business-domains.manage.show');
         Route::get('/company/business-domains/{businessDomain}', [BusinessDomainController::class, 'show'])->name('business-domains.show');
         Route::get('/company/business-domains/{businessDomain}/edit', [BusinessDomainController::class, 'edit'])->name('business-domains.edit');
         Route::put('/company/business-domains/{businessDomain}', [BusinessDomainController::class, 'update'])->name('business-domains.update');

@@ -14,6 +14,6 @@
         <div><div class="meta">方向性メモ</div><p style="white-space:pre-wrap;overflow-wrap:anywhere;">{{ $snapshot['direction_memo'] ?? '未登録' }}</p></div>
     </div>
     <div class="panel stack"><h2>明細</h2>@forelse(($snapshot['items'] ?? []) as $item)<article class="card stack"><div><span class="badge">{{ $item['kind'] }}</span><h3>{{ $item['name'] }}</h3><p>{{ $item['description'] ?? '' }}</p></div>@foreach(($item['attributes'] ?? []) as $attribute)<div><strong>{{ strtoupper($attribute['axis']) }} / {{ $attribute['label'] }}</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere;">{{ $attribute['value'] }}</p></div>@endforeach</article>@empty<p class="meta">明細なし</p>@endforelse</div>
-    <div><a class="button secondary" href="{{ route('business-domains.show', $domain) }}">現在値へ戻る</a></div>
+    <div class="actions"><a class="button secondary" href="{{ route('business-domains.manage.show', $domain) }}">管理画面へ戻る</a><a class="button secondary" href="{{ route('business-domains.show', $domain) }}">現在値を読む</a></div>
 </section>
 @endsection

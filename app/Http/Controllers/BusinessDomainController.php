@@ -64,6 +64,35 @@ class BusinessDomainController extends Controller
         ]);
     }
 
+    public function manage(
+        Request $request,
+        BusinessDomainAccess $access,
+        BusinessDomainQuery $query,
+    ): View {
+        $validated = $request->validate([
+            'status' => ['nullable', Rule::in(['active', 'archived', 'all'])],
+            'q' => ['nullable', 'string', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+        $organization = $request->attributes->get('currentCompany');
+        $access->authorizeEdit($request->user(), $organization);
+
+        return view('business-domains.manage', [
+            'organization' => $organization,
+            'domains' => $query->paginate(
+                $request->user(),
+                $organization,
+                $validated['status'] ?? BusinessDomain::STATUS_ACTIVE,
+                isset($validated['q']) ? trim($validated['q']) : null,
+                (int) ($validated['per_page'] ?? 20),
+            ),
+            'status' => $validated['status'] ?? BusinessDomain::STATUS_ACTIVE,
+            'search' => $validated['q'] ?? '',
+            'statusCounts' => $query->statusCounts($request->user(), $organization),
+            'isOwner' => $this->isOwner($request, $access),
+        ]);
+    }
+
     public function store(Request $request, BusinessDomainWriter $writer): RedirectResponse
     {
         $validated = $request->validate($this->domainRules(false));
@@ -90,15 +119,28 @@ class BusinessDomainController extends Controller
             'items' => fn ($query) => $query->where('status', BusinessDomainItem::STATUS_ACTIVE),
             'items.attributes' => fn ($query) => $query->where('status', BusinessDomainItemAttribute::STATUS_ACTIVE),
         ]);
-        $canEdit = $access->canEdit($request->user(), $organization);
 
         return view('business-domains.show', [
             'organization' => $organization,
             'domain' => $businessDomain,
-            'canEdit' => $canEdit,
-            'revisions' => $canEdit
-                ? $businessDomain->revisions()->with('actor')->paginate(20)
-                : null,
+            'canEdit' => $access->canEdit($request->user(), $organization),
+        ]);
+    }
+
+    public function manageShow(
+        Request $request,
+        BusinessDomain $businessDomain,
+        BusinessDomainAccess $access,
+    ): View {
+        $organization = $request->attributes->get('currentCompany');
+        $access->authorizeEdit($request->user(), $organization);
+        $access->authorizeHistory($request->user(), $organization);
+        $this->assertOrganization($businessDomain, $organization->id);
+
+        return view('business-domains.manage-show', [
+            'organization' => $organization,
+            'domain' => $businessDomain,
+            'revisions' => $businessDomain->revisions()->with('actor')->paginate(20),
             'archiveRequestId' => (string) Str::uuid(),
             'reopenRequestId' => (string) Str::uuid(),
         ]);
@@ -165,7 +207,7 @@ class BusinessDomainController extends Controller
             $validated['request_id'],
         );
 
-        return redirect()->route('business-domains.show', $domain)->with('status', '事業領域を保管しました。');
+        return redirect()->route('business-domains.manage.show', $domain)->with('status', '事業領域を保管しました。');
     }
 
     public function reopen(
@@ -183,7 +225,7 @@ class BusinessDomainController extends Controller
             $validated['request_id'],
         );
 
-        return redirect()->route('business-domains.show', $domain)->with('status', '事業領域を再開しました。');
+        return redirect()->route('business-domains.manage.show', $domain)->with('status', '事業領域を再開しました。');
     }
 
     public function move(
@@ -203,7 +245,7 @@ class BusinessDomainController extends Controller
             $validated['request_id'],
         );
 
-        return redirect()->route('business-domains.index', ['status' => $domain->status])
+        return redirect()->route('business-domains.manage', ['status' => $domain->status])
             ->with('status', '表示順を変更しました。');
     }
 

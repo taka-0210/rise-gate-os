@@ -22,7 +22,7 @@
             </article>
         @empty<div class="panel"><p>指定可能なAdmin / Memberはいません。</p></div>@endforelse
     </div>
-    <div><a class="button secondary" href="{{ route('business-domains.index') }}">事業領域へ戻る</a></div>
+    <div><a class="button secondary" href="{{ route('business-domains.manage') }}">事業領域の管理へ戻る</a></div>
 </section>
 <style>.editor-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px}@media(max-width:600px){.editor-row{grid-template-columns:1fr}.editor-row form button{width:100%}}</style>
 @endsection

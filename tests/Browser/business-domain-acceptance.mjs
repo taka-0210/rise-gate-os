@@ -38,7 +38,7 @@ try {
     assert(await page.getByRole('link', { name: /利用中 1/ }).isVisible(), 'Active count tab is not visible.');
     assert(await page.getByRole('link', { name: /保管済み 0/ }).isVisible(), 'Archived count tab is not visible.');
     assert(await page.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(238, 242, 245)', 'Shared page background token is not applied.');
-    assert(await page.locator('.domain-card').first().evaluate(element => getComputedStyle(element).backgroundColor) === 'rgb(255, 255, 255)', 'Domain card is not white.');
+    assert(await page.locator('.company-context-card').first().evaluate(element => getComputedStyle(element).backgroundColor) === 'rgb(255, 255, 255)', 'Domain card is not white.');
     await page.screenshot({ path: desktopShot, fullPage: true });
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -82,8 +82,9 @@ try {
     await page.screenshot({ path: mobileShot, fullPage: true });
 
     const showUrl = page.url();
-    const editHref = await page.getByRole('link', { name: '編集', exact: true }).getAttribute('href');
+    const editHref = await page.getByRole('link', { name: '内容を編集', exact: true }).getAttribute('href');
     await page.goto(`${baseUrl}/company/business-domains`);
+    await page.getByRole('link', { name: '管理する', exact: true }).click();
     await page.getByRole('button', { name: 'ブラウザ受入事業を上へ' }).click();
     const orderedNames = await page.locator('.domain-card h2').allTextContents();
     assert(orderedNames[0] === 'ブラウザ受入事業', `Display order was not persisted: ${JSON.stringify(orderedNames)}`);
@@ -100,17 +101,21 @@ try {
     await stalePage.close();
 
     await page.goto(showUrl);
+    await page.getByRole('link', { name: '管理', exact: true }).click();
     await page.locator('#state-reason').fill('ブラウザ保管確認');
     await Promise.all([page.waitForURL('**/company/business-domains/*'), page.getByRole('button', { name: '保管する' }).click()]);
-    assert(await page.getByText('この事業領域は保管済みです。').isVisible(), 'Archived state is not visible.');
+    await page.getByRole('link', { name: '読む画面へ', exact: true }).click();
+    assert(await page.getByText(/この事業領域は保管済みです。/).isVisible(), 'Archived state is not visible.');
     await page.goto(`${baseUrl}/company/business-domains`);
     await page.getByRole('link', { name: /保管済み 1/ }).click();
     assert(await page.getByText('ブラウザ受入事業', { exact: true }).isVisible(), 'Archived tab does not show the archived domain.');
     await page.goto(showUrl);
+    await page.getByRole('link', { name: '管理', exact: true }).click();
     const historyLink = page.locator('a[href*="/revisions/"]').first();
     await historyLink.click();
     assert(await page.getByText('読み取り専用Snapshot').isVisible(), 'Immutable revision view is not visible.');
     await page.goto(showUrl);
+    await page.getByRole('link', { name: '管理', exact: true }).click();
     await page.locator('#state-reason').fill('ブラウザ再開確認');
     await Promise.all([page.waitForURL('**/company/business-domains/*'), page.getByRole('button', { name: '利用中へ戻す' }).click()]);
 
