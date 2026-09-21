@@ -84,6 +84,7 @@ try {
     assert(await page.locator('.company-context-read form').count() === 0, 'Read contains management form after save.');
     assert(await page.locator('[data-company-context-hero]').evaluate(element => element.getBoundingClientRect().height) >= 600, 'Desktop hero lacks immersive vertical space.');
     assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 80, 'Desktop hero title is too small.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) <= 96, 'Desktop hero typography is oversized.');
     const heroPresentation = await page.locator('.company-context-hero').evaluate(element => {
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
@@ -98,18 +99,28 @@ try {
             scrollWidth: document.documentElement.scrollWidth,
         };
     });
-    assert(heroPresentation.width >= heroPresentation.layoutWidth - 2, 'Desktop hero is still constrained inside a card width: ' + JSON.stringify(heroPresentation));
+    assert(heroPresentation.width >= heroPresentation.viewport - 20, 'Desktop hero is still constrained inside a card width: ' + JSON.stringify(heroPresentation));
     assert(
         heroPresentation.left <= 1
             && heroPresentation.left >= -20
-            && heroPresentation.right >= heroPresentation.layoutWidth - 1
-            && heroPresentation.right <= heroPresentation.layoutWidth + 20,
+            && heroPresentation.right >= heroPresentation.viewport - 20
+            && heroPresentation.right <= heroPresentation.viewport + 20,
         'Desktop hero is not full bleed: ' + JSON.stringify(heroPresentation),
     );
     assert(heroPresentation.borderRadius === '0px' && heroPresentation.boxShadow === 'none', 'Desktop hero still has card styling.');
     assert(heroPresentation.scrollWidth <= heroPresentation.viewport, 'Full-bleed hero causes horizontal overflow.');
-    assert(await page.locator('.company-context-key-message__text').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 45, 'Key message lacks visual hierarchy.');
-    assert(await page.locator('.company-context-strength__statement').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 40, 'Strength statement lacks visual hierarchy.');
+    assert(await page.locator('.company-context-key-message__text').evaluate(element => {
+        const size = parseFloat(getComputedStyle(element).fontSize);
+        return size >= 45 && size <= 60;
+    }), 'Key message typography is outside the intended hierarchy.');
+    assert(await page.locator('.company-context-strength__statement').evaluate(element => {
+        const size = parseFloat(getComputedStyle(element).fontSize);
+        return size >= 36 && size <= 52;
+    }), 'Strength statement typography is outside the intended hierarchy.');
+    assert(await page.locator('.company-context-strength').evaluate(element => {
+        const style = getComputedStyle(element);
+        return style.backgroundColor === 'rgb(255, 255, 255)' && style.borderRadius === '0px';
+    }), 'Strength section still looks like a dark rounded card.');
     const perspectiveButtons = page.locator('[data-context-tab]');
     assert(await perspectiveButtons.count() === 5, 'Five-perspective navigation is incomplete.');
     assert(await page.locator('.company-context-orbit-visual svg').isVisible(), 'Official ring visual is missing.');
@@ -119,6 +130,7 @@ try {
     assert(await brandSymbol.isVisible(), 'Official Company OS brand symbol is missing from the hero.');
     assert((await brandSymbol.getAttribute('src') || '').endsWith('/images/company-os-brand-symbol.svg'), 'Hero does not use the official SVG asset.');
     assert(await brandSymbol.evaluate(element => element.complete && element.naturalWidth > 0), 'Official SVG asset did not load.');
+    assert(await brandSymbol.evaluate(element => getComputedStyle(element).transform !== 'none' && Math.abs(element.getBoundingClientRect().width / element.offsetWidth - .7) < .03), 'Official circular visual is not rendered at 70 percent scale.');
     assert(await page.locator('.company-context-story__body img').count() === 0, 'Company Context body unexpectedly depends on a photo.');
     const orbitBackground = await page.locator('.company-context-orbit-visual').evaluate(element => getComputedStyle(element).backgroundColor);
     assert(orbitBackground === 'rgb(238, 242, 245)', 'Official paper tone is not applied to the ring visual.');
@@ -172,16 +184,17 @@ try {
         };
     });
     assert(
-        mobileHeroPresentation.width >= mobileHeroPresentation.layoutWidth - 2
+        mobileHeroPresentation.width >= mobileHeroPresentation.viewport - 20
             && mobileHeroPresentation.left <= 1
             && mobileHeroPresentation.left >= -20
-            && mobileHeroPresentation.right >= mobileHeroPresentation.layoutWidth - 1
-            && mobileHeroPresentation.right <= mobileHeroPresentation.layoutWidth + 20
+            && mobileHeroPresentation.right >= mobileHeroPresentation.viewport - 20
+            && mobileHeroPresentation.right <= mobileHeroPresentation.viewport + 20
             && mobileHeroPresentation.borderRadius === '0px'
             && mobileHeroPresentation.boxShadow === 'none',
         '390px hero is not a full-bleed section: ' + JSON.stringify(mobileHeroPresentation),
     );
     assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 48, '390px hero title is too small.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) <= 58, '390px hero title is oversized.');
     assert(await page.locator('[data-context-tab]').count() === 5, '390px perspective controls are unavailable.');
     await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; });
     await page.locator('.company-context-orbit-visual').evaluate(element => element.scrollIntoView({ behavior: 'auto', block: 'center' }));

@@ -164,3 +164,18 @@ Business Domain Readは、公式Company OSブランドシンボルを共有し�
 - Browser: Desktop 1280 × 1000 / Mobile 390 × 844 / A4 PDF 998,253 bytes / HTTP 5xx 0
 - Browser Journey: Motion / Keyboard / reduced-motion / Print / Permission負例 / archive / reopenを含め全件成功
 - DB: Guard付き一時SQLiteのみ使用。通常local DB / Production DBは未使用・未変更
+
+## 11. Presentation Balance Follow-up
+
+実施日: 2026-09-22 JST
+
+公式円弧Visualを70%へ縮小し、暗い角丸Cardだった「自社認識の強み」を白背景のFull-Bleed Sectionへ変更した。Hero、Key Message、Section heading、5軸本文、Strength、Item、DirectionのTypographyを一段抑え、余白による階層は維持した。
+
+- 写真・保存Data・Permission・Writer・Revision変更なし
+- Blade compile: 成功
+- Focused Test: **26 tests / 290 assertions / failures 0**
+- Full Test: **476 tests / 3,963 assertions / failures 0 / 239.25s**
+- Browser: Desktop 1280 × 1000 / Mobile 390 × 844 / A4 PDF 969,111 bytes / HTTP 5xx 0
+- Browser computed style: Visual scale 0.7 / Strength `#fff` / Strength radius 0 / Typography上限内
+- Browser Journey: Motion / Keyboard / reduced-motion / Print / Permission負例 / archive / reopenを含め全件成功
+- DB: Guard付き一時SQLiteのみ使用。通常local DB / Production DBは未使用・未変更
