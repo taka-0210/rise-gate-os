@@ -79,6 +79,7 @@
 .company-context-card__arrow { display: none; }
 .company-context-empty { display: grid; gap: 12px; padding: 38px; border: 1px solid #d8e0e6; background: #fff; }
 .company-context-empty p { margin: 0; }
+.shell:has(.company-context-directory) > .breadcrumbs { width: min(1240px, calc(100% - 40px)); }
 .company-context-directory {
     position: relative;
     left: 50%;
@@ -124,7 +125,7 @@
 .company-context-directory__hero .company-context-title > .company-context-print-hidden {
     position: absolute;
     top: clamp(28px, 5vw, 68px);
-    right: max(clamp(28px, 5vw, 68px), calc((100vw - 1240px) / 2 + 28px));
+    right: clamp(28px, 5vw, 68px);
 }
 .company-context-directory__hero .company-context-actions a {
     width: 42px;
