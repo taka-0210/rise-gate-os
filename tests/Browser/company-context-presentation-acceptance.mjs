@@ -83,8 +83,8 @@ try {
     assert(await page.getByText('Company OS伴走支援', { exact: true }).isVisible(), 'Item is missing.');
     assert(await page.locator('.company-context-read form').count() === 0, 'Read contains management form after save.');
     assert(await page.locator('[data-company-context-hero]').evaluate(element => element.getBoundingClientRect().height) >= 600, 'Desktop hero lacks immersive vertical space.');
-    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 80, 'Desktop hero title is too small.');
-    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) <= 96, 'Desktop hero typography is oversized.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 72, 'Desktop hero title is too small.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) <= 80, 'Desktop hero typography is oversized.');
     const heroPresentation = await page.locator('.company-context-hero').evaluate(element => {
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
@@ -139,7 +139,7 @@ try {
     assert(await brandSymbol.isVisible(), 'Official Company OS brand symbol is missing from the hero.');
     assert((await brandSymbol.getAttribute('src') || '').endsWith('/images/company-os-brand-symbol.svg'), 'Hero does not use the official SVG asset.');
     assert(await brandSymbol.evaluate(element => element.complete && element.naturalWidth > 0), 'Official SVG asset did not load.');
-    assert(await brandSymbol.evaluate(element => getComputedStyle(element).transform !== 'none' && Math.abs(element.getBoundingClientRect().width / element.offsetWidth - .7) < .03), 'Official circular visual is not rendered at 70 percent scale.');
+    assert(await brandSymbol.evaluate(element => getComputedStyle(element).transform !== 'none' && Math.abs(element.getBoundingClientRect().width / element.offsetWidth - .56) < .03), 'Official circular visual is not rendered at 80 percent of its previous scale.');
     assert(await page.locator('.company-context-story__body img').count() === 0, 'Company Context body unexpectedly depends on a photo.');
     const orbitBackground = await page.locator('.company-context-orbit-visual').evaluate(element => getComputedStyle(element).backgroundColor);
     assert(orbitBackground === 'rgb(238, 242, 245)', 'Official paper tone is not applied to the ring visual.');
@@ -202,8 +202,8 @@ try {
             && mobileHeroPresentation.boxShadow === 'none',
         '390px hero is not a full-bleed section: ' + JSON.stringify(mobileHeroPresentation),
     );
-    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 48, '390px hero title is too small.');
-    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) <= 58, '390px hero title is oversized.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) >= 40, '390px hero title is too small.');
+    assert(await page.locator('.company-context-hero h1').evaluate(element => parseFloat(getComputedStyle(element).fontSize)) <= 50, '390px hero title is oversized.');
     assert(await page.locator('[data-context-tab]').count() === 5, '390px perspective controls are unavailable.');
     await page.evaluate(() => { document.documentElement.style.scrollBehavior = 'auto'; });
     await page.locator('.company-context-orbit-visual').evaluate(element => element.scrollIntoView({ behavior: 'auto', block: 'center' }));

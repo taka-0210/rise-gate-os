@@ -126,7 +126,7 @@
     -webkit-mask-image: linear-gradient(90deg, transparent 8%, #000 40%, #000);
     mask-image: linear-gradient(90deg, transparent 8%, #000 40%, #000);
 }
-.company-context-hero__brand-visual img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; transform: scale(.7); transform-origin: 80% 50%; }
+.company-context-hero__brand-visual img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; transform: scale(.56); transform-origin: 80% 50%; }
 .company-context-hero__atmosphere { display: none; }
 .company-context-hero__atmosphere span { position: absolute; border: 1px solid rgba(149, 237, 225, .18); border-radius: 50%; }
 .company-context-hero__atmosphere span:nth-child(1) { width: 660px; height: 660px; right: -250px; top: -290px; }
@@ -139,7 +139,7 @@
     max-width: 1030px;
     margin: 0;
     color: var(--context-ink);
-    font-size: clamp(46px, 7.2vw, 96px);
+    font-size: clamp(42px, 6vw, 78px);
     font-weight: 450;
     line-height: .98;
     letter-spacing: -.065em;
@@ -451,9 +451,9 @@
         -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.82) 47%, transparent 76%);
         mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.82) 47%, transparent 76%);
     }
-    .company-context-hero__brand-visual img { width: 165%; max-width: none; object-position: 62% center; transform: translateX(-18%) scale(.7); transform-origin: 58% 34%; }
+    .company-context-hero__brand-visual img { width: 165%; max-width: none; object-position: 62% center; transform: translateX(-18%) scale(.56); transform-origin: 58% 34%; }
     .company-context-hero__content { width: 100%; align-self: end; padding: 270px 0 120px; }
-    .company-context-hero h1 { font-size: clamp(44px, 12.5vw, 58px); line-height: 1.06; }
+    .company-context-hero h1 { font-size: clamp(38px, 10.8vw, 50px); line-height: 1.06; }
     .company-context-hero__lead { margin-top: 26px; font-size: 17px; line-height: 1.8; }
     .company-context-hero__position { left: 22px; right: 80px; bottom: 76px; width: auto; font-size: 11px; }
     .company-context-hero__continue { position: absolute; left: 22px; bottom: 23px; }
