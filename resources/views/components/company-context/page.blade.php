@@ -147,8 +147,8 @@
 }
 .company-context-hero__lead { max-width: 660px; margin: clamp(30px, 4vw, 48px) 0 0; color: #405866; font-size: clamp(18px, 1.8vw, 24px); line-height: 1.85; }
 .company-context-hero__status { display: inline-flex; margin-top: 22px; padding: 7px 12px; border: 1px solid rgba(255, 203, 154, .45); border-radius: 999px; color: #ffd4ad; font-size: 12px; font-weight: 800; }
-.company-context-hero__position { position: absolute; right: clamp(28px, 5vw, 68px); bottom: clamp(28px, 5vw, 64px); width: min(340px, 38%); margin: 0; color: #526673; font-size: 13px; line-height: 1.75; }
-.company-context-hero__position span { display: block; margin-bottom: 8px; color: var(--context-progress); font-size: 9px; font-weight: 850; letter-spacing: .2em; }
+.company-context-hero__position { position: absolute; right: clamp(28px, 5vw, 68px); bottom: clamp(28px, 5vw, 64px); width: min(420px, 42%); margin: 0; color: #405866; font-size: clamp(15px, 1.25vw, 18px); font-weight: 500; line-height: 1.75; }
+.company-context-hero__position span { display: block; margin-bottom: 10px; color: var(--context-progress); font-size: 10px; font-weight: 850; letter-spacing: .2em; }
 .company-context-hero__continue { align-self: end; width: fit-content; display: inline-flex; align-items: center; gap: 18px; color: var(--context-ink); font-size: 12px; font-weight: 750; letter-spacing: .08em; }
 .company-context-hero__continue span:last-child { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid rgba(15, 85, 101, .35); border-radius: 50%; color: var(--context-teal); }
 .company-context-tools { position: relative; z-index: 5; }
@@ -455,7 +455,7 @@
     .company-context-hero__content { width: 100%; align-self: end; padding: 270px 0 120px; }
     .company-context-hero h1 { font-size: clamp(38px, 10.8vw, 50px); line-height: 1.06; }
     .company-context-hero__lead { margin-top: 26px; font-size: 17px; line-height: 1.8; }
-    .company-context-hero__position { left: 22px; right: 80px; bottom: 76px; width: auto; font-size: 11px; }
+    .company-context-hero__position { left: 22px; right: 80px; bottom: 76px; width: auto; font-size: 13px; }
     .company-context-hero__continue { position: absolute; left: 22px; bottom: 23px; }
     .company-context-key-message { width: calc(100% - 32px); min-height: 560px; padding: 100px 0; }
     .company-context-key-message__text { font-size: clamp(30px, 8.5vw, 40px); line-height: 1.45; }
