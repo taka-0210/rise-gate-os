@@ -71,9 +71,11 @@ return new class extends Migration
         if (! Schema::hasTable('organization_invitation_groups')) {
             Schema::create('organization_invitation_groups', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('organization_invitation_id')->constrained('organization_invitations')->cascadeOnDelete();
+                $table->foreignId('organization_invitation_id');
                 $table->foreignId('organization_group_id')->constrained('organization_groups')->cascadeOnDelete();
                 $table->timestamps();
+                $table->foreign('organization_invitation_id', 'invitation_groups_invitation_fk')
+                    ->references('id')->on('organization_invitations')->cascadeOnDelete();
 
                 $table->unique(
                     ['organization_invitation_id', 'organization_group_id'],
@@ -87,12 +89,14 @@ return new class extends Migration
             Schema::create('organization_invitation_operations', function (Blueprint $table): void {
                 $table->id();
                 $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('organization_invitation_id')->nullable()->constrained('organization_invitations')->nullOnDelete();
+                $table->foreignId('organization_invitation_id')->nullable();
                 $table->foreignId('actor_user_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->string('operation', 20);
                 $table->string('request_id', 64);
                 $table->char('payload_hash', 64);
                 $table->timestamps();
+                $table->foreign('organization_invitation_id', 'invitation_operations_invitation_fk')
+                    ->references('id')->on('organization_invitations')->nullOnDelete();
 
                 $table->unique(
                     ['organization_id', 'operation', 'request_id'],

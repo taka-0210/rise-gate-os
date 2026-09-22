@@ -53,7 +53,7 @@ return new class extends Migration
             $table->dateTime('recorded_at');
             $table->timestamps();
             $table->index(['project_id', 'actual_completed_at']);
-            $table->index(['related_entity_type', 'related_entity_public_id']);
+            $table->index(['related_entity_type', 'related_entity_public_id'], 'project_actuals_related_entity_idx');
         });
     }
 

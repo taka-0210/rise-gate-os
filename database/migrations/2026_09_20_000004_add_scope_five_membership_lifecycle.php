@@ -33,9 +33,9 @@ return new class extends Migration
         if (! Schema::hasTable('organization_membership_lifecycle_operations')) {
             Schema::create('organization_membership_lifecycle_operations', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('organization_user_id')->constrained('organization_users')->cascadeOnDelete();
-                $table->foreignId('actor_user_id')->nullable()->constrained('users')->nullOnDelete();
+                $table->foreignId('organization_id');
+                $table->foreignId('organization_user_id');
+                $table->foreignId('actor_user_id')->nullable();
                 $table->string('command', 20);
                 $table->string('request_id', 64);
                 $table->char('payload_hash', 64);
@@ -46,6 +46,12 @@ return new class extends Migration
                 $table->unsignedInteger('revoked_ai_key_count')->default(0);
                 $table->unsignedInteger('revoked_invitation_count')->default(0);
                 $table->timestamps();
+                $table->foreign('organization_id', 'membership_lifecycle_org_fk')
+                    ->references('id')->on('organizations')->cascadeOnDelete();
+                $table->foreign('organization_user_id', 'membership_lifecycle_membership_fk')
+                    ->references('id')->on('organization_users')->cascadeOnDelete();
+                $table->foreign('actor_user_id', 'membership_lifecycle_actor_fk')
+                    ->references('id')->on('users')->nullOnDelete();
 
                 $table->unique(
                     ['organization_id', 'request_id'],

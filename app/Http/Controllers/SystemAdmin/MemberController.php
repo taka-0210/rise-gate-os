@@ -167,10 +167,10 @@ class MemberController extends Controller
                             'workspace_id' => '停止・退職中のOrganization所属へWorkspaceを追加できません。',
                         ]);
                     }
-                    $workspace->users()->attach($user->id, [
-                        'role' => $validated['workspace_role'],
-                        'joined_at' => now(),
-                    ]);
+                    WorkspaceMember::query()->firstOrCreate(
+                        ['workspace_id' => $workspace->id, 'user_id' => $user->id],
+                        ['role' => $validated['workspace_role'], 'joined_at' => now()],
+                    );
                 });
             },
         );

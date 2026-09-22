@@ -61,13 +61,15 @@ return new class extends Migration
         if (! Schema::hasTable('product_organization_compatibilities')) {
             Schema::create('product_organization_compatibilities', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('product_account_eligibility_id')
-                    ->constrained('product_account_eligibilities')
-                    ->restrictOnDelete();
-                $table->foreignId('organization_user_id')->constrained('organization_users')->restrictOnDelete();
+                $table->foreignId('product_account_eligibility_id');
+                $table->foreignId('organization_user_id');
                 $table->timestamp('cutoff_at');
                 $table->string('evidence_ref', 255);
                 $table->timestamps();
+                $table->foreign('product_account_eligibility_id', 'product_compatibility_eligibility_fk')
+                    ->references('id')->on('product_account_eligibilities')->restrictOnDelete();
+                $table->foreign('organization_user_id', 'product_compatibility_membership_fk')
+                    ->references('id')->on('organization_users')->restrictOnDelete();
 
                 $table->unique(
                     ['product_account_eligibility_id', 'organization_user_id'],

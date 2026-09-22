@@ -20,7 +20,7 @@ return new class extends Migration
                 $table->foreignId('recorded_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->timestamps();
                 $table->unique(['company_loan_id', 'balance_as_of'], 'company_loan_balance_date_unique');
-                $table->index(['organization_id', 'balance_as_of']);
+                $table->index(['organization_id', 'balance_as_of'], 'loan_balance_org_date_idx');
             });
         }
     }

@@ -35,13 +35,15 @@ return new class extends Migration
         if (! Schema::hasTable('company_financial_period_revisions')) {
             Schema::create('company_financial_period_revisions', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('company_financial_period_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('company_financial_period_id');
                 $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
                 $table->foreignId('changed_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->string('action', 20);
                 $table->json('before_data')->nullable();
                 $table->json('after_data');
                 $table->timestamp('created_at')->useCurrent();
+                $table->foreign('company_financial_period_id', 'cfpr_period_fk')
+                    ->references('id')->on('company_financial_periods')->cascadeOnDelete();
             });
         }
     }
