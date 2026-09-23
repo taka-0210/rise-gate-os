@@ -2,7 +2,7 @@
 
 版：AS-G04通常local実Cutover反映版｜2026-09-23 JST
 
-状態：**Phase A〜C完了 / Phase D本人Acceptance待ち / Phase E実行禁止**
+状態：**Phase A〜C完了 / Phase D通常local Acceptance完了 / Phase E別承認待ち・実行禁止**
 
 ## 1. 目的と固定対象
 
@@ -89,10 +89,12 @@
 
 ### Phase D｜suspended受入確認
 
+Environment Gate：新旧Accountとも、承認済み通常local http://localhost/rise-gate-os/public を別Browser Profileで使用する。各確認でbase URL、Login User ID、current Organization IDをEvidenceに含める。os.rise-gate.comその他Production URLを検出した場合は、その時点でAcceptanceを停止し、異なる環境間のData件数を比較しない。
+
 1. 新Accountを別Browser ProfileでLoginし、株式会社ライズアップCompany Homeへ直接進める。
 2. 新AccountでWorkspace 5、Business Domain、FinancialのOwner権限を確認する。
 3. 旧AccountでRise GateへLoginでき、Project / Task / Improvement等の既存利用が維持されることを確認する。
-4. 旧AccountからOrg 4 Company / Workspace / Business Domain / Financialへの直URL・POSTが拒否されることを確認する。
+4. 新AccountからOrg 1、旧AccountからOrg 4 Company / Workspace / Business Domain / Financialへの直URL・POSTが拒否されることを確認する。
 5. Organization / Workspace / Project / Business Domain / FinancialのID・件数、History actor fingerprintに許可外差分がないことを確認する。
 6. 同じcase再実行がNOOP、異なるpayloadが拒否されることを確認する。
 
@@ -165,4 +167,13 @@
 - Phase C後DB SHA-256：`65eec5790ec749945135eb44f32f2ce41fe35fb09da0b8dde51c5f5463130934`。
 - Production未接続・未変更。Deploy未実施。
 
-Phase Dで高見本人が新旧Accountを実利用確認する。Acceptance不合格でも自動compensateしない。Phase EはPhase D受入OKの別承認まで実行禁止。
+### Phase D通常local Acceptance Evidence
+
+- Environment：全操作のbase URLはhttp://localhost/rise-gate-os/public。Apache access log、Account Security Event、DB Sessionを相互照合し、Production URLをAcceptance対象から除外した。
+- 新Account：User ID 5、current Organization ID 4。Login成功、Company Home、Workspace 5、Business Domain一覧・詳細をHTTP 200で確認。Resolverはsingle Org 4、Org 1 active access=false。
+- 旧Account：User ID 1、current Organization ID 1。Login成功、Company Home、Workspace 1 / 2、Project一覧をHTTP 200で確認。Resolverはsingle Org 1、Org 4 active access=false。
+- Permission：User 5はOrg 4 Financial view / Business Domain edit=true。User 1は同権限=false。User 1のWorkspace 5 membership行はHistoryとして保持するが、親Org 4 Membershipがsuspendedのため実効Accessは拒否される。
+- 通常local Data：Financial 21件。Business Domainはactive 2件＋archived 1件の計3件、Domain明細21件。借入0件、Workspace 5はProject 0件 / 改善0件で、Productionとの件数一致はAcceptance条件外。
+- Data保全：Phase A前Backupと現在DBでFinancial、Business Domain / items / attributes / revisions / operations、Project / Project Member / Task / Improvement / Roadmap / Clientの件数・内容hashが一致。History actor参照はUser 1のまま保持。
+
+Phase D通常local Acceptanceは完了。自動compensateは行っていない。Phase Eは高見の別承認まで実行禁止。
