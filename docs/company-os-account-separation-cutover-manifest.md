@@ -2,7 +2,7 @@
 
 版：AS-G04通常local実Cutover反映版｜2026-09-23 JST
 
-状態：**Phase A〜C完了 / Phase D通常local Acceptance完了 / Phase E別承認待ち・実行禁止**
+状態：**Phase A〜E完了 / 通常local Account分離 Formal Closed**
 
 ## 1. 目的と固定対象
 
@@ -176,4 +176,19 @@ Environment Gate：新旧Accountとも、承認済み通常local http://localhos
 - 通常local Data：Financial 21件。Business Domainはactive 2件＋archived 1件の計3件、Domain明細21件。借入0件、Workspace 5はProject 0件 / 改善0件で、Productionとの件数一致はAcceptance条件外。
 - Data保全：Phase A前Backupと現在DBでFinancial、Business Domain / items / attributes / revisions / operations、Project / Project Member / Task / Improvement / Roadmap / Clientの件数・内容hashが一致。History actor参照はUser 1のまま保持。
 
-Phase D通常local Acceptanceは完了。自動compensateは行っていない。Phase Eは高見の別承認まで実行禁止。
+Phase D通常local Acceptanceは完了。自動compensateは行っていない。Phase Eは高見の別承認により実行した。
+
+### Phase E所属終了finalize Evidence
+
+- Human Gate：高見 昌也がPhase D本人Acceptanceを正式承認し、Membership ID 5の`suspended → left`を明示承認。
+- Environment / Repository：通常local SQLite、HEAD `657ae6aaaca53c0adf4866ea0e325757976332bf`、clean worktree、pending Migration 0、DB integrity `ok`。
+- Finalize前固定値：DB SHA-256 `85f285d6188d193bcb51b41c5dc0ebcb029984738ad3ef475c5816d7098ecb41`、inventory hash `2d446456aa87a515945a979c7ccde2ca2a85759737c2d5da997883171bca05dc`。
+- 実行：Phase E専用flagと本人Acceptance確認文をプロセス内だけ有効化し、S5正式Lifecycle経路でMembership ID 5を`left`へ更新。自動resume / compensateなし。
+- Receipt：Lifecycle operation ID `2`、command `end`、request ID `a3959b84-7243-4f43-8e32-92500b4d82ea`、result `left`、version `3`、access epoch `3`。Organization Audit event ID `14`、event `organization.membership.end`、outcome `success`。
+- Final Account：User 1はglobal active / System Admin=true / Org 1 active Owner / Org 4 left / eligibility ID 1 single Org 1。User 5はactive / verified / System Admin=false / Org 4 active Owner / eligibility ID 4 single Org 4。
+- Workspace / Owner：Workspace 5はactive shared、owner User 5、Workspace Membership ID 6 owner。Org 1 / Org 4のactive Ownerはいずれも1名。
+- Business Data保全：Phase A前BackupとPhase E後でFinancial 21件、Business Domain 3件、Domain items 21件、attributes 3件、revisions 6件、operations 8件、Project 17件、Project Member 17件、Task 51件、Improvement 51件、Roadmap 36件、Client 9件の件数・全行hashが一致。過去History actor参照を含めallowlist外差分なし。
+- Final DB：SHA-256 `fb7ea49108fdcfaf8d863ec89b8c66c4fb368a23ac61bf7c47a6afacf4aac771`、inventory hash `c45ff8044adef56dba01a3394fa963aa22d1c615b5c4dd2e3a2f21a13e7910d8`、integrity `ok`。
+- Backup：`AS-G04-20260923-LOCAL-pre-cutover-20260923-225114.sqlite`、SHA-256 `a1c81bf4519aec64e91e705c77bb5952f2d2c91e598ee4e6b3f161775ae8b8cf`、integrity `ok`、2026-10-23 22:51:14 JSTまで保持。
+- Environment Gate：Phase D Evidenceのbase URL / Login User ID / current Organization ID記録を正式運用Evidenceとして維持。Production Dataはlocalへ複製していない。
+- Close判定：Account分離 Formal Close可。既存Product / Permission / Tenant / Data Contractの変更はなく、Master Update不要。Production接続・変更、Deploy、HOW、Scope 8はいずれも未実施。
