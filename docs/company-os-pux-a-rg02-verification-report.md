@@ -1,8 +1,10 @@
 # Company OS PUX-A RG02 Verification Report
 
-- Status: Done
+- Status: Formal Closed
 - Verified at: 2026-09-23 JST
+- Formal Close reviewed at: 2026-09-23 JST
 - Baseline HEAD: `e564b58670ecea9cfca0608e6deb17a9eb961e84`
+- Verified implementation commit: `11e0c71d3565fa2956d223ea5ae2fcdc277437b3`
 - Scope: MariaDB固有Deltaのみ。S1-S7 / PUX-A / PUX-BのClosed Contractは維持。
 
 ## P0 / Environment
@@ -39,7 +41,7 @@
 | D03 | PASS | 逆順row lockで実1213 deadlockを発生。application victimがbounded retryで回復し、成功Audit重複なし。 |
 | D04 | PASS | 部分DML後の実1205を発生。outer transaction全体がrollbackされ、有限retry後にmarker / binding / Audit各1件。 |
 
-論理Caseは16件すべてPASS。case bundleは隔離run内JSONLへ、secretを除外して保存した。既存SQLite Test件数をRG02実績へ流用していない。
+論理Caseは16件すべてPASS。case bundleは隔離run内JSONLへsecretを除外して生成・確認し、隔離環境とともにcleanupした。永続Evidenceは本Report、Commit済みの専用Harness、Git差分である。既存SQLite Test件数をRG02実績へ流用していない。
 
 ## Resolved MariaDB delta
 
@@ -78,3 +80,14 @@
 - 通常localはSQLite接続、Admissionは`false`のまま。Production未接続・未変更、Deployなし。
 - RG02 DoneはAdmission有効化の承認ではない。RG03 / RG04、Mail / 法務、監視、rollback手順等の別Release条件は未達のまま。
 - Account分離、HOW、Scope 8へは進んでいない。
+
+## Formal Close Review
+
+- 判定: **RG02 Formal Close可**。RG02-DC01〜10はすべてDoneで、未検証case、未説明のSQL例外、未解決のMariaDB固有不具合はない。
+- Done Review: C01〜C08で共通Admissionと同一社retry、I01〜I04でS4 / S6 / SA実経路、D01〜D04でMigration制約、row lock、1213 deadlock、1205 timeout、rollback、bounded retryを確認済み。原子性、idempotency、duplicate防止、Audit整合も対応caseで確認済み。
+- 変更分類: FK / index名短縮は列、参照先、制約、削除動作を変えないMariaDB互換修正。`WorkspaceMember::firstOrCreate`は同一User / Workspaceの同時追加を1行へ収束させ、既存roleを上書きしない冪等化。RG02 Test / Supportは隔離検証専用。いずれもPUX-A Closed ContractをMariaDB上で成立させる実装・Evidence修正であり、Product / Permission / Tenant / Security / Data Contractの変更ではない。
+- Environment limitation: Event Schedulerは検証対象のMigration、Admission、transaction、row lock、deadlock / timeout / retry経路から使用されない。10.11.19 engine / InnoDB / app schemaで対象Riskを実測済みのため、Event Scheduler disabledとsystem table templateの差はRG02 CloseのBlockerではない。Production完全一致Evidenceには扱わない。
+- Additional verification: 新たな実装差分やRiskを検出していないため、Full Test / Build / Browser / MariaDB再構築 / 16case再実行は行っていない。既存EvidenceとCommit `11e0c71d3565fa2956d223ea5ae2fcdc277437b3`のVerified Deltaを再利用した。
+- Cleanup review: Formal Close確認時にTEMP直下のRG02専用0-byte同期marker 25件の残存を検出し、対象prefix、解決済みabsolute path、TEMP直下、0 byteを確認して除去した。残存0件。Repository Data、通常local DB、Productionは変更していない。
+- Master Update: 不要。今回はProduction Architecture、Product Contract、正式仕様の変更ではなく、確定済みMariaDB 10.11.x構成に対する実証と互換修正である。
+- Release boundary: RG02 Formal CloseはAdmission有効化の承認ではない。RG03 / RG04、Mail / 法務、監視、rollback運用、対象環境の最終一致は別途のRelease判断とする。
