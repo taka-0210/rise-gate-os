@@ -2,7 +2,7 @@
 
 最終更新：2026-09-23 JST
 
-判定：**実Cutover直前準備 Done / 実行承認待ち**
+判定：**実Cutover準備Evidence（実行結果はCutover Manifest v2を参照）**
 
 ## 1. 今回の境界
 

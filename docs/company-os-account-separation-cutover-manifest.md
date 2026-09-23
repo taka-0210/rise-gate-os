@@ -1,8 +1,8 @@
-# Company OS｜Account分離 Cutover Manifest（AS-G04承認用）
+# Company OS｜Account分離 Cutover Manifest v2
 
-版：AS-G03 rehearsal反映版｜2026-09-23 JST
+版：AS-G04通常local実Cutover反映版｜2026-09-23 JST
 
-状態：**AS-G04 Decision承認済み / runner準備済み / 実Cutover実行承認待ち**
+状態：**Phase A〜C完了 / Phase D本人Acceptance待ち / Phase E実行禁止**
 
 ## 1. 目的と固定対象
 
@@ -20,7 +20,20 @@
 | 新資格の最終状態 | 株式会社ライズアップ（Org 4）`single` |
 | History / Personal | 移管・付替えなし |
 
-新User ID、Invitation ID、新Membership ID、新Eligibility IDは実作成後に確定する。AS-G03の仮ID `5 / 1 / 6 / 4`を実行値として使わない。
+### Manifest v2実行ID
+
+| 対象 | 実ID / 固定値 |
+| --- | --- |
+| Case | `AS-G04-20260923-LOCAL` |
+| Repository HEAD | `8095bd98a180d1f5bcfacd9fa12acad6ff35062c` |
+| 新User | ID `5` / `高見 昌也` / `takami@pro-chubo.com` |
+| Invitation | ID `1` / generation `2` / accepted |
+| 新Organization Membership | ID `6` / Org `4` |
+| 新Workspace Membership | ID `6` / Workspace `5` |
+| 新Eligibility | ID `4` / single Org `4` |
+| Phase C inventory hash | `882cab4908da3522a76d2de34efb89a6cb03247d60eea51cc570b447b24f36fc` |
+| Phase C payload hash | `859682d3cdc5f2214a2b640a2bc56d7f18f11e857f5e692bf00b65eb7e6b28d9` |
+| Lifecycle operation | ID `1` / suspend / result suspended |
 
 ## 2. 実行前Gate
 
@@ -129,7 +142,7 @@
 - 同一retryで重複0、変更payload拒否、receiptとAuditを保存。
 - Production未接続・未変更。
 
-## 7. AS-G04で高見が承認する事項
+## 7. AS-G04 Decisionと残承認
 
 1. このManifestの手順と変更allowlist。
 2. 実施対象が通常localであること。
@@ -137,7 +150,19 @@
 4. 実施日時・停止窓・操作者・本人受入者。
 5. Backup保持期間：30日（承認済み）。保管先はprivate storageのAccount分離専用directory。
 6. Phase Dの受入完了後にPhase E（left）へ進むこと。
-7. 実行直前inventoryから再生成するManifest v2の新User ID / Membership ID / Eligibility ID / Invitation ID / final payload hash。
+7. Manifest v2の実IDとhashは上記の値で確定済み。
 8. Cloneで検証した処理を、default dry-run・環境guard・allowlist・before hash必須の一回限り実Cutover runnerとして準備すること（完了）。AS-G03 supportは通常local実行を拒否する状態を維持。
 
-次の実Cutover実行承認まで、Backup、Admission flag変更、Invitation、Account作成、Membership / eligibility / Workspace変更を行わない。Phase EはPhase Dの本人確認後の別承認まで実行しない。
+### Phase A〜C実行Evidence
+
+- Backup：`AS-G04-20260923-LOCAL-pre-cutover-20260923-225114.sqlite`、integrity `ok`、SHA-256 `a1c81bf4519aec64e91e705c77bb5952f2d2c91e598ee4e6b3f161775ae8b8cf`、保持期限 2026-10-23 22:51:14 JST。
+- Phase A：Org 4 Standard Workspaceを既存Workspace ID 5へ設定。Workspace新規作成なし。
+- Phase B：Invitation ID 1を正式Journeyで受諾。本人Password / Email Verification完了。新User ID 5を作成。
+- Phase C：同一Transactionで新legacy Owner・Workspace Ownerを設定し、旧Membership ID 5を`suspended`、旧Eligibility ID 1をsingle Org 1へ更新。
+- Phase C後：Org 4 active Owner 1名、Workspace 5 owner User 5、DB integrity `ok`、Audit / lifecycle receipt各1件。
+- Business Data非複製：Project総数17、新UserのProject Membership 0、旧UserのProject Membership 17を保持。
+- 旧Eligibility ID / classification version / compatibility Membership `1, 5`を保持。
+- Phase C後DB SHA-256：`65eec5790ec749945135eb44f32f2ce41fe35fb09da0b8dde51c5f5463130934`。
+- Production未接続・未変更。Deploy未実施。
+
+Phase Dで高見本人が新旧Accountを実利用確認する。Acceptance不合格でも自動compensateしない。Phase EはPhase D受入OKの別承認まで実行禁止。
