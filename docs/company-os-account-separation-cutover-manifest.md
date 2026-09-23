@@ -2,7 +2,7 @@
 
 版：AS-G03 rehearsal反映版｜2026-09-23 JST
 
-状態：**未承認・実行禁止**
+状態：**AS-G04 Decision承認済み / runner準備済み / 実Cutover実行承認待ち**
 
 ## 1. 目的と固定対象
 
@@ -26,7 +26,7 @@
 
 以下が1つでも不成立なら書込み前に停止する。
 
-1. AS-G04の高見承認、実施日時、操作者、本人受入者、停止窓が記録済み。
+1. AS-G04の高見承認済み。操作者はCodex、本人受入者は高見 昌也。実施日時・停止窓は実行承認時に記録する。
 2. Repository HEAD / schema / Migrationが承認時の値と一致。
 3. Productionではなく、承認された通常local環境である。
 4. 復元可能Backupを取得し、size / SHA-256 / JST / integrity /保管先を記録。
@@ -133,11 +133,11 @@
 
 1. このManifestの手順と変更allowlist。
 2. 実施対象が通常localであること。
-3. 新Accountの表示名（リハーサルは旧Userの表示名を仮使用）。
+3. 新Accountの表示名：`高見 昌也`（承認済み）。
 4. 実施日時・停止窓・操作者・本人受入者。
-5. Backupの保管先と保持期間。
+5. Backup保持期間：30日（承認済み）。保管先はprivate storageのAccount分離専用directory。
 6. Phase Dの受入完了後にPhase E（left）へ進むこと。
 7. 実行直前inventoryから再生成するManifest v2の新User ID / Membership ID / Eligibility ID / Invitation ID / final payload hash。
-8. Cloneで検証した処理を、default dry-run・環境guard・allowlist・before hash必須の一回限り実Cutover runnerとして準備すること。現在のAS-G03 supportは通常local実行を拒否するため、そのまま実適用には使用しない。
+8. Cloneで検証した処理を、default dry-run・環境guard・allowlist・before hash必須の一回限り実Cutover runnerとして準備すること（完了）。AS-G03 supportは通常local実行を拒否する状態を維持。
 
-承認されるまで、Admission flag変更、Invitation、Account作成、Membership / eligibility / Workspace変更を行わない。
+次の実Cutover実行承認まで、Backup、Admission flag変更、Invitation、Account作成、Membership / eligibility / Workspace変更を行わない。Phase EはPhase Dの本人確認後の別承認まで実行しない。
