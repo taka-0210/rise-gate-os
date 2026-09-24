@@ -1,12 +1,31 @@
 # Company OS Scope 8 Implementation Report
 
 - Date: 2026-09-25 JST
-- Status: **Formal Closed**
+- Status: **Corrective Delta complete / Re-Formal Close review ready**
 - Baseline HEAD: `797b87e12d0f632dd2df27c0a1c93aa57e3a274b`
 - Implementation HEAD: `a0312e98ba0162c5baf91862b5b5136b619b4b72`
 - Formal Close approval: human + ChatGPT review completed on 2026-09-25 JST.
 - Stop point: Scope 8 Formal Close completed. Normal-local Migration, Production, deploy, HOW, and Scope 9 remain outside this close.
 
+## Post-Formal-Close Corrective Delta — AI Proposal User Journey
+
+- Discovery: after the original Formal Close, normal-local real-use review found that the `project-action.v1` backend/contract existed but the Scope 8 Project UI did not expose the human Proposal journey. Classification: **B (UI journey not connected)** and **D (implementation/evidence mismatch)**.
+- Approved treatment: Scope 8 was limitedly reopened for **S8 Corrective Delta — AI Proposal User Journey**. No new Product decision or Contract expansion was introduced.
+- Corrective baseline: `7ca487323f8e13875c9fa73dc2beddd0aabf20ea`.
+- Connected the Scope 8 Project read/manage screens to a dedicated “AIと実行計画をつくる” journey. Purpose / Expected Outcome are included in each AI request.
+- Added Scope 8-specific request list, proposal Review, direct Action display, Roadmap / Action Theme / Action fields, Done Condition, Assignee, Reviewer, due date, revision request, separate Approval / Apply states, Apply result count/reason/retry state, and return to the Project.
+- MCP and REST Proposal responses now return the Scope 8 review URL only for `project-action.v1` Projects. Scope 1 continues to return its existing `project-plan.v1` review URL.
+- Permission boundary: active explicit Project membership is required to view the Scope 8 AI journey; creating an AI request requires an execution-capable member; Approval / Apply reuse `AiProposalAuthorization`, `AiProposalApprover`, and `AiProposalScopeOneApplier`.
+- Browser fixture no longer creates, approves, or applies a Proposal during setup. Real Chrome executed Project entry → AI request → MCP claim/generation → Review → revision request → revised Proposal → Approval → Apply → Result → Project return → reflected Roadmap/Theme/direct and nested Actions.
+- Browser negative paths: a post-approval Project edit produced a persisted `CONFLICTED / conflict` Apply result with no unsafe overwrite; a company reader without explicit Project membership had no entry and received 403 on the direct URL.
+- Desktop and 390px Browser journey passed on isolated SQLite. Desktop PNG SHA-256: `5BF224A34BFBE83FDADE3D6F4F2B813517378B723CDDF479AE1C203D69111D57`; 390px PNG SHA-256: `53A7964696227388F7DBC6A9FAB39ABDA2B5567D2A98A5D646432ED48FCE7AFD`.
+- Focused / related regression: **60 tests / 386 assertions / failures 0**, covering Scope 8, Scope 1 Proposal engine, acceptance boundaries, Foundation UI, and revision review.
+- Normal SQLite suite excluding the separately guarded RG02 MariaDB-only class: **492 tests / 4,081 assertions / failures 0**.
+- Scope 1 Contract evidence: `AiProposalContract::ALLOWED_ATTRIBUTES['task']` remains exactly `['title', 'description']`; the separate `project-action.v1` adapter remains unchanged.
+- DB / Migration: no schema or Migration change. All Browser writes were limited to a guarded temporary SQLite database. Normal-local and Production were not changed.
+- Evidence correction: the original Formal Close record remains below as historical fact. Its DC-24 Browser claim was incomplete because setup pre-executed Proposal/Approval/Apply. The corrective Browser evidence above supersedes that portion; it does not erase the original review history.
+- Corrective result: **S8-DC-17, S8-DC-18, and S8-DC-24 are now supported by the connected UI and real Browser journey. Scope 8 is ready for human + ChatGPT Re-Formal Close review.**
+- Master Update: not required; v141 / v037 Product and Architecture decisions are unchanged.
 ## Implemented outcome
 
 - Reused Project / Roadmap / Improvement / Task IDs and added an explicit `scope8.v1` execution contract.

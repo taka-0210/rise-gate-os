@@ -399,7 +399,7 @@ class AiMcpToolService
             'duplicate' => $duplicate,
             'valid_items_count' => $proposal->items()->where('validation_status', AiProposalValidator::STATUS_VALID)->count(),
             'invalid_items_count' => $proposal->items()->where('validation_status', AiProposalValidator::STATUS_INVALID)->count(),
-            'review_url' => route('projects.ai-proposals.show', [$proposal->project_id, $proposal]),
+            'review_url' => route($proposal->project?->usesScopeEight() ? 'project-execution.ai.proposals.show' : 'projects.ai-proposals.show', [$proposal->project_id, $proposal]),
         ];
     }
 

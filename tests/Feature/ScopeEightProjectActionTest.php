@@ -281,6 +281,92 @@ class ScopeEightProjectActionTest extends TestCase
         $this->actingAs($reader)->withSession($session)->get(route('project-execution.manage', $project))->assertForbidden();
     }
 
+    public function test_scope_eight_ai_user_journey_connects_request_review_approval_apply_and_result(): void
+    {
+        config(['product_ux.organization_admission_enabled' => false, 'app.url' => 'http://localhost']);
+        app('url')->forceRootUrl('http://localhost');
+        [$owner, $organization, $workspace] = $this->tenant('ai-journey-owner@example.com');
+        $writer = app(ProjectExecutionWriter::class);
+        $project = $writer->createProject($owner, $workspace, [
+            'name' => 'AI Journey', 'purpose' => 'Connect intent to action', 'expected_outcome' => 'A reviewed execution plan',
+        ]);
+        $session = ['access_mode' => 'workspace', 'current_company_id' => $organization->id, 'current_company_access_epoch' => 1, 'credential_generation' => 1];
+        $this->assertTrue($project->usesScopeEight());
+        $this->assertNotNull(app(ProjectExecutionAccess::class)->activeExplicitMember($owner, $project));
+
+        $this->actingAs($owner)->withSession($session)->get(route('project-execution.show', $project))
+            ->assertOk()->assertSee('AIと実行計画をつくる');
+        $this->actingAs($owner)->withSession($session)->post(route('project-execution.ai.requests.store', $project), [
+            'title' => 'Launch plan', 'instructions' => 'Create an accountable launch plan.',
+        ])->assertRedirect(route('project-execution.ai.index', $project));
+        $this->assertDatabaseHas('ai_requests', ['project_id' => $project->id, 'status' => 'pending']);
+        $this->assertStringContainsString('Project Purpose: Connect intent to action', $project->aiRequests()->latest()->value('instructions'));
+
+        $key = AiAccessKey::create([
+            'workspace_id' => $workspace->id, 'user_id' => $owner->id, 'name' => 'Journey key',
+            'token_hash' => hash('sha256', 'journey-key'),
+            'scopes' => [AiAccessKey::SCOPE_PROJECTS_READ, AiAccessKey::SCOPE_PROPOSALS_CREATE],
+            'expires_at' => now()->addHour(),
+        ]);
+        $proposal = app(AiProposalFactory::class)->create($key, $project->fresh(), [
+            'contract_version' => ProjectExecutionProposalContract::VERSION,
+            'expected_project_version' => $project->fresh()->plan_version,
+            'idempotency_key' => 'journey-proposal', 'title' => 'Accountable launch',
+            'items' => [[
+                'operation' => 'create', 'entity_type' => 'task', 'reference_key' => 'direct-launch',
+                'parent_reference' => $project->public_id, 'expected_version' => $project->fresh()->plan_version,
+                'attributes' => ['title' => 'Confirm launch readiness', 'description' => 'Review launch inputs.', 'done_condition' => 'Owner confirms readiness.', 'assigned_to' => $owner->id, 'reviewer_user_id' => null, 'due_date' => '2026-12-31'],
+            ]],
+        ]);
+        $proposal = app(AiProposalValidator::class)->validate($proposal);
+
+        $this->actingAs($owner)->withSession($session)->get(route('project-execution.ai.proposals.show', [$project, $proposal]))
+            ->assertOk()->assertSee('DIRECT ACTION')->assertSee('Done Condition')->assertSee('Assignee')->assertSee('Reviewer')->assertSee('2026-12-31');
+        $this->actingAs($owner)->withSession($session)->post(route('project-execution.ai.proposals.approve', [$project, $proposal]))
+            ->assertRedirect(route('project-execution.ai.proposals.show', [$project, $proposal]));
+        $this->assertDatabaseHas('ai_proposals', ['id' => $proposal->id, 'status' => 'approved']);
+        $this->actingAs($owner)->withSession($session)->post(route('project-execution.ai.proposals.apply', [$project, $proposal]))
+            ->assertRedirect(route('project-execution.ai.proposals.show', [$project, $proposal]));
+        $this->assertDatabaseHas('tasks', ['project_id' => $project->id, 'title' => 'Confirm launch readiness', 'improvement_id' => null]);
+        $this->actingAs($owner)->withSession($session)->get(route('project-execution.ai.proposals.show', [$project, $proposal]))
+            ->assertOk()->assertSee('APPLY RESULT')->assertSee('APPLIED')->assertSee('Scope 8 Projectへ戻る');
+
+        $revision = app(AiProposalFactory::class)->create($key, $project->fresh(), [
+            'contract_version' => ProjectExecutionProposalContract::VERSION,
+            'expected_project_version' => $project->fresh()->plan_version,
+            'idempotency_key' => 'journey-revision', 'title' => 'Needs revision',
+            'items' => [[
+                'operation' => 'create', 'entity_type' => 'task', 'reference_key' => 'revise-me',
+                'parent_reference' => $project->public_id, 'expected_version' => $project->fresh()->plan_version,
+                'attributes' => ['title' => 'Draft action', 'done_condition' => 'Reviewed', 'assigned_to' => $owner->id],
+            ]],
+        ]);
+        app(AiProposalValidator::class)->validate($revision);
+        $this->actingAs($owner)->withSession($session)->post(route('project-execution.ai.proposals.revision', [$project, $revision]), [
+            'overall_feedback' => 'Add a measurable deadline and reviewer.',
+        ])->assertRedirect(route('project-execution.ai.index', $project));
+        $this->assertDatabaseHas('ai_proposals', ['id' => $revision->id, 'status' => 'rejected']);
+        $this->assertDatabaseHas('ai_requests', ['project_id' => $project->id, 'status' => 'pending', 'title' => '「Needs revision」の修正依頼']);
+    }
+
+    public function test_scope_eight_ai_journey_denies_company_reader_without_explicit_project_membership(): void
+    {
+        config(['product_ux.organization_admission_enabled' => false, 'app.url' => 'http://localhost']);
+        app('url')->forceRootUrl('http://localhost');
+        [$owner, $organization, $workspace] = $this->tenant('ai-owner@example.com');
+        $reader = $this->join($organization, $workspace, 'ai-reader@example.com');
+        $project = app(ProjectExecutionWriter::class)->createProject($owner, $workspace, [
+            'name' => 'Guarded AI', 'purpose' => 'Protect plan', 'expected_outcome' => 'Explicit member only',
+        ]);
+        $session = ['access_mode' => 'workspace', 'current_company_id' => $organization->id, 'current_company_access_epoch' => 1, 'credential_generation' => 1];
+        $this->assertTrue($project->usesScopeEight());
+        $this->assertNotNull(app(ProjectExecutionAccess::class)->activeExplicitMember($owner, $project));
+
+        $this->actingAs($reader)->withSession($session)->get(route('project-execution.show', $project))
+            ->assertOk()->assertDontSee('AIと実行計画をつくる');
+        $this->actingAs($reader)->withSession($session)->get(route('project-execution.ai.index', $project))->assertForbidden();
+        $this->assertSame(['title', 'description'], AiProposalContract::ALLOWED_ATTRIBUTES['task']);
+    }
     private function tenant(string $email): array
     {
         $owner = User::factory()->create(['email' => $email]);

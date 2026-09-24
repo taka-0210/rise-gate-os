@@ -3,7 +3,7 @@
 @include('project-execution._styles')
 <main class="s8-shell">
     <header class="s8-hero">
-        <div class="s8-toolbar"><div><div class="s8-kicker">PROJECT / {{ strtoupper($project->status) }}</div><h1>{{ $project->name }}</h1></div>@if($isExplicitMember)<a class="s8-button" href="{{ route('project-execution.manage', $project) }}">実行を管理</a>@endif</div>
+        <div class="s8-toolbar"><div><div class="s8-kicker">PROJECT / {{ strtoupper($project->status) }}</div><h1>{{ $project->name }}</h1></div>@if($isExplicitMember)<div class="actions"><a class="s8-button" data-testid="ai-plan-entry" href="{{ route('project-execution.ai.index', $project) }}">AIと実行計画をつくる</a><a class="s8-button secondary" href="{{ route('project-execution.manage', $project) }}">実行を管理</a></div>@endif</div>
         <p class="s8-lead">{{ $project->purpose }}</p>
         <div class="s8-meta"><span>Owner {{ $project->owner?->name }}</span><span>{{ $project->due_date ? '期限 '.$project->due_date->format('Y.m.d') : '期限未設定' }}</span><span>{{ \App\Models\Project::visibilities()[$project->visibility] ?? $project->visibility }}</span></div>
     </header>

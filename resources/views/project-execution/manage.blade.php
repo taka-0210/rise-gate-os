@@ -2,7 +2,7 @@
 @section('content')
 @include('project-execution._styles')
 <main class="s8-shell">
-    <header class="s8-hero"><div class="s8-toolbar"><div><div class="s8-kicker">PROJECT / MANAGE</div><h1>{{ $project->name }}</h1></div><a href="{{ route('project-execution.show', $project) }}">Readへ戻る</a></div><p>Owner・Member・Assignee・Reviewerの責任を分けた実行画面です。</p></header>
+    <header class="s8-hero"><div class="s8-toolbar"><div><div class="s8-kicker">PROJECT / MANAGE</div><h1>{{ $project->name }}</h1></div><div class="actions"><a class="s8-button" href="{{ route('project-execution.ai.index', $project) }}">AIと実行計画をつくる</a><a href="{{ route('project-execution.show', $project) }}">Projectへ戻る</a></div></div><p>Owner・Member・Assignee・Reviewerの責任を分けた実行画面です。</p></header>
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="notice danger">{{ $errors->first() }}</div>@endif
 
