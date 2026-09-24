@@ -549,6 +549,7 @@ class ProjectController extends Controller
 
     public function update(Request $request, Project $project): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('view', $project);
         Gate::authorize('update', $project);
 
@@ -579,6 +580,7 @@ class ProjectController extends Controller
 
     public function move(Request $request, Project $project): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Scope 8 project workspace moves require a separate approved journey.');
         Gate::authorize('move', $project);
 
         $validated = $request->validate([
@@ -630,6 +632,7 @@ class ProjectController extends Controller
 
     public function destroy(Request $request, Project $project): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('delete', $project);
 
         $request->validate([

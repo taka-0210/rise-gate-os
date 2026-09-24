@@ -37,6 +37,8 @@ class Roadmap extends Model
         'status',
         'sort_order',
         'created_by',
+        'completion_check_version',
+        'completed_by_user_id',
     ];
 
     protected function casts(): array
@@ -48,6 +50,7 @@ class Roadmap extends Model
             'planned_start_day' => 'integer',
             'target_day' => 'integer',
             'reached_at' => 'date',
+            'completion_check_version' => 'integer',
         ];
     }
 

@@ -7,13 +7,15 @@ use App\Models\CompanyFinancialPeriod;
 use App\Models\CompanyLoan;
 use App\Models\CompanyObservation;
 use App\Models\Workspace;
+use App\Models\Project;
 use App\Services\BusinessDomain\BusinessDomainAccess;
+use App\Services\ProjectExecution\ProjectExecutionAccess;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CompanyHomeController extends Controller
 {
-    public function __invoke(Request $request, BusinessDomainAccess $businessDomainAccess): View
+    public function __invoke(Request $request, BusinessDomainAccess $businessDomainAccess, ProjectExecutionAccess $projectExecutionAccess): View
     {
         $company = $request->attributes->get('currentCompany');
         $workspaces = $request->user()
@@ -48,6 +50,10 @@ class CompanyHomeController extends Controller
                 ->where('organization_id', $company->id)
                 ->where('status', BusinessDomain::STATUS_ACTIVE)
                 ->count(),
+            'executionProjectCount' => Project::query()
+                ->where('organization_id', $company->id)
+                ->where('execution_contract_version', Project::EXECUTION_CONTRACT)
+                ->get()->filter(fn (Project $project) => $projectExecutionAccess->canRead($request->user(), $project))->count(),
             'canEditBusinessDomains' => $businessDomainAccess->canEdit($request->user(), $company),
         ]);
     }

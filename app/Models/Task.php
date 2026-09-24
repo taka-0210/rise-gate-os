@@ -12,6 +12,17 @@ class Task extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public static function executionStatuses(): array
+    {
+        return [
+            self::STATUS_TODO => 'Not started',
+            self::STATUS_IN_PROGRESS => 'In progress',
+            self::STATUS_REVIEW_PENDING => 'Review pending',
+            self::STATUS_DONE => 'Done',
+            self::STATUS_ARCHIVED => 'Archived',
+        ];
+    }
+
     public const STATUS_TODO = 'todo';
 
     public const STATUS_IN_PROGRESS = 'in_progress';
@@ -19,6 +30,16 @@ class Task extends Model
     public const STATUS_DONE = 'done';
 
     public const STATUS_ARCHIVED = 'archived';
+
+    public const STATUS_REVIEW_PENDING = 'review_pending';
+
+    public const REVIEW_NOT_REQUIRED = 'not_required';
+
+    public const REVIEW_PENDING = 'pending';
+
+    public const REVIEW_CONFIRMED = 'confirmed';
+
+    public const REVIEW_REJECTED = 'rejected';
 
     public const PRIORITY_LOW = 'low';
 
@@ -46,6 +67,17 @@ class Task extends Model
         'planned_start_day',
         'due_day',
         'completed_at',
+        'done_condition',
+        'reviewer_user_id',
+        'review_status',
+        'review_requested_by_user_id',
+        'review_requested_at',
+        'reviewed_by_user_id',
+        'reviewed_at',
+        'completed_by_user_id',
+        'reopened_by_user_id',
+        'reopened_at',
+        'last_change_reason',
     ];
 
     protected static function booted(): void
@@ -65,6 +97,9 @@ class Task extends Model
             'due_day' => 'integer',
             'sort_order' => 'integer',
             'completed_at' => 'datetime',
+            'review_requested_at' => 'datetime',
+            'reviewed_at' => 'datetime',
+            'reopened_at' => 'datetime',
         ];
     }
 
@@ -93,6 +128,11 @@ class Task extends Model
         return $this->belongsTo(User::class, 'assigned_to');
     }
 
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewer_user_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -103,6 +143,7 @@ class Task extends Model
         return [
             self::STATUS_TODO => '未着手',
             self::STATUS_IN_PROGRESS => '進行中',
+            self::STATUS_REVIEW_PENDING => '確認待ち',
             self::STATUS_DONE => '完了',
             self::STATUS_ARCHIVED => '保管済み',
         ];

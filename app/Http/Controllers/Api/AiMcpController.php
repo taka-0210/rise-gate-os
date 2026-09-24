@@ -9,6 +9,7 @@ use App\Models\AiProposal;
 use App\Models\Project;
 use App\Services\AiMcpToolService;
 use App\Services\AiProposalContract;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 use App\Support\AiTextIntegrity;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -157,7 +158,7 @@ class AiMcpController extends Controller
     {
         $validated = Validator::validate($arguments, [
             'project_public_id' => ['required', 'string'],
-            'contract_version' => ['required', Rule::in([AiProposalContract::VERSION])],
+            'contract_version' => ['required', Rule::in([AiProposalContract::VERSION, ProjectExecutionProposalContract::VERSION])],
             'expected_project_version' => ['required', 'integer', 'min:1'],
             'idempotency_key' => ['required', 'string', 'max:120'],
             'title' => ['required', 'string', 'max:255'],
@@ -247,7 +248,7 @@ class AiMcpController extends Controller
                     'type' => 'object',
                     'properties' => [
                         'project_public_id' => ['type' => 'string'],
-                        'contract_version' => ['type' => 'string', 'enum' => [AiProposalContract::VERSION]],
+                        'contract_version' => ['type' => 'string', 'enum' => [AiProposalContract::VERSION, ProjectExecutionProposalContract::VERSION]],
                         'expected_project_version' => ['type' => 'integer', 'minimum' => 1],
                         'idempotency_key' => ['type' => 'string'],
                         'title' => ['type' => 'string'],

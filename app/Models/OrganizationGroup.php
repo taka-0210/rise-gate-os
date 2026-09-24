@@ -45,6 +45,11 @@ class OrganizationGroup extends Model
         return $this->hasMany(OrganizationGroupMembership::class);
     }
 
+    public function projectAudiences(): HasMany
+    {
+        return $this->hasMany(ProjectGroupAudience::class);
+    }
+
     public function archivedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'archived_by');

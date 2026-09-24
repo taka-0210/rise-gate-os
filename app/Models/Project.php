@@ -26,6 +26,22 @@ class Project extends Model
 
     public const STATUS_ARCHIVED = 'archived';
 
+    public const EXECUTION_CONTRACT = 'scope8.v1';
+
+    public const VISIBILITY_COMPANY = 'company';
+
+    public const VISIBILITY_GROUP = 'group';
+
+    public const VISIBILITY_CONFIDENTIAL = 'confidential';
+
+    public const REVIEW_NOT_REQUIRED = 'not_required';
+
+    public const REVIEW_PENDING = 'pending';
+
+    public const REVIEW_CONFIRMED = 'confirmed';
+
+    public const REVIEW_REJECTED = 'rejected';
+
     public const PRIORITY_LOW = 'low';
 
     public const PRIORITY_NORMAL = 'normal';
@@ -44,8 +60,20 @@ class Project extends Model
         'name',
         'code',
         'summary',
+        'purpose',
+        'expected_outcome',
         'current_state',
         'desired_future_state',
+        'execution_contract_version',
+        'visibility',
+        'confidential_reason',
+        'reviewer_user_id',
+        'review_status',
+        'review_requested_by_user_id',
+        'review_requested_at',
+        'reviewed_by_user_id',
+        'reviewed_at',
+        'completion_check_version',
         'status',
         'priority',
         'start_date',
@@ -72,6 +100,9 @@ class Project extends Model
             'duration_days' => 'integer',
             'published_at' => 'datetime',
             'completed_at' => 'datetime',
+            'review_requested_at' => 'datetime',
+            'reviewed_at' => 'datetime',
+            'completion_check_version' => 'integer',
         ];
     }
 
@@ -100,9 +131,48 @@ class Project extends Model
         return $this->belongsTo(User::class, 'owner_user_id');
     }
 
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewer_user_id');
+    }
+
     public function members(): HasMany
     {
         return $this->hasMany(ProjectMember::class);
+    }
+
+    public function groupAudiences(): HasMany
+    {
+        return $this->hasMany(ProjectGroupAudience::class);
+    }
+
+    public function executionEvents(): HasMany
+    {
+        return $this->hasMany(ProjectExecutionEvent::class)->latest('id');
+    }
+
+    public function usesScopeEight(): bool
+    {
+        return $this->execution_contract_version === self::EXECUTION_CONTRACT;
+    }
+
+    public static function executionStatuses(): array
+    {
+        return [
+            self::STATUS_DRAFT => '計画中',
+            self::STATUS_ACTIVE => '進行中',
+            self::STATUS_ON_HOLD => '保留',
+            self::STATUS_COMPLETED => '完了',
+        ];
+    }
+
+    public static function visibilities(): array
+    {
+        return [
+            self::VISIBILITY_COMPANY => '会社',
+            self::VISIBILITY_GROUP => 'Group',
+            self::VISIBILITY_CONFIDENTIAL => '機密',
+        ];
     }
 
     public function improvements(): HasMany

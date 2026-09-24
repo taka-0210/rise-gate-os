@@ -68,6 +68,7 @@ class TaskController extends Controller
 
     public function store(Request $request, Project $project): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('view', $project);
         Gate::authorize('create', [Task::class, $project]);
 
@@ -85,6 +86,7 @@ class TaskController extends Controller
 
     public function update(Request $request, Project $project, Task $task): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectTask($project, $task);
 
         Gate::authorize('view', $project);
@@ -102,6 +104,7 @@ class TaskController extends Controller
 
     public function destroy(Project $project, Task $task): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectTask($project, $task);
         Gate::authorize('delete', $task);
         $task->delete();

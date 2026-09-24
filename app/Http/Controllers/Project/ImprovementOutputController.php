@@ -20,6 +20,7 @@ class ImprovementOutputController extends Controller
 {
     public function storeTask(Request $request, Project $project, Improvement $improvement): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectImprovement($project, $improvement);
         Gate::authorize('view', $project);
         Gate::authorize('create', [Task::class, $project]);
@@ -48,6 +49,7 @@ class ImprovementOutputController extends Controller
 
     public function storeProject(Request $request, Project $project, Improvement $improvement): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectImprovement($project, $improvement);
         Gate::authorize('view', $project);
         Gate::authorize('update', $improvement);

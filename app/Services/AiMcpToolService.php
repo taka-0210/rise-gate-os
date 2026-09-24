@@ -9,6 +9,7 @@ use App\Models\AiRequestAttachment;
 use App\Models\Project;
 use App\Models\ProjectHandoff;
 use App\Models\ProjectMember;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -69,6 +70,9 @@ class AiMcpToolService
             && in_array('tasks', $allowedCategories, true)) {
             $load[] = 'roadmaps.improvements.tasks';
         }
+        if ($project->usesScopeEight() && in_array('tasks', $allowedCategories, true)) {
+            $load[] = 'tasks';
+        }
         if ($load !== []) {
             $project->load($load);
         }
@@ -81,6 +85,9 @@ class AiMcpToolService
                 + ($roadmap->relationLoaded('improvements') ? $roadmap->improvements->sum(fn ($improvement): int => 1
                     + ($improvement->relationLoaded('tasks') ? $improvement->tasks->count() : 0)) : 0))
             : 0;
+        if ($project->usesScopeEight() && $project->relationLoaded('tasks')) {
+            $entityCount += $project->tasks->whereNull('improvement_id')->count();
+        }
         if ($entityCount > (int) config('services.ai.scope_one_context_max_entities', 500)) {
             throw ValidationException::withMessages(['ai_context' => 'Project計画がAI Contextの件数上限を超えています。対象を分けて確認してください。']);
         }
@@ -88,7 +95,9 @@ class AiMcpToolService
         $context = [
             'public_id' => $project->public_id,
             'plan_version' => $project->plan_version,
-            'proposal_contract_version' => AiProposalContract::VERSION,
+            'proposal_contract_version' => $project->usesScopeEight()
+                ? ProjectExecutionProposalContract::VERSION
+                : AiProposalContract::VERSION,
             'name' => $project->name,
             'summary' => $project->summary,
             'current_state' => $project->current_state,
@@ -116,17 +125,51 @@ class AiMcpToolService
                     'hypothesis' => $improvement->hypothesis,
                     'action' => $improvement->action,
                     'next_action' => $improvement->next_action,
-                    'tasks' => ! in_array('tasks', $allowedCategories, true) ? [] : $improvement->tasks->map(fn ($task) => [
-                        'public_id' => $task->public_id,
-                        'plan_version' => $task->plan_version,
-                        'title' => $task->title,
-                        'description' => $task->description,
-                    ])->values()->all(),
+                    'tasks' => ! in_array('tasks', $allowedCategories, true) ? [] : $improvement->tasks
+                        ->map(fn ($task) => $this->taskContext($task, $project->usesScopeEight()))
+                        ->values()->all(),
                 ])->values()->all(),
             ])->values()->all(),
         ];
+        if ($project->usesScopeEight()) {
+            $context['purpose'] = $project->purpose;
+            $context['expected_outcome'] = $project->expected_outcome;
+            $context['direct_actions'] = ! in_array('tasks', $allowedCategories, true) ? [] : $project->tasks
+                ->whereNull('improvement_id')->map(fn ($task) => [
+                    'public_id' => $task->public_id,
+                    'plan_version' => $task->plan_version,
+                    'title' => $task->title,
+                    'description' => $task->description,
+                    'done_condition' => $task->done_condition,
+                    'assigned_to' => $task->assigned_to,
+                    'reviewer_user_id' => $task->reviewer_user_id,
+                    'due_date' => $task->due_date?->format('Y-m-d'),
+                    'status' => $task->status,
+                ])->values()->all();
+        }
         if (strlen(json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) > (int) config('services.ai.scope_one_context_max_chars', 100000)) {
             throw ValidationException::withMessages(['ai_context' => 'Project計画がAI Contextの文字数上限を超えています。対象を分けて確認してください。']);
+        }
+
+        return $context;
+    }
+
+    private function taskContext($task, bool $scopeEight): array
+    {
+        $context = [
+            'public_id' => $task->public_id,
+            'plan_version' => $task->plan_version,
+            'title' => $task->title,
+            'description' => $task->description,
+        ];
+        if ($scopeEight) {
+            $context += [
+                'done_condition' => $task->done_condition,
+                'assigned_to' => $task->assigned_to,
+                'reviewer_user_id' => $task->reviewer_user_id,
+                'due_date' => $task->due_date?->format('Y-m-d'),
+                'status' => $task->status,
+            ];
         }
 
         return $context;

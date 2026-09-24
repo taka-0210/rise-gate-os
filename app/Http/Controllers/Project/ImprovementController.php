@@ -52,6 +52,7 @@ class ImprovementController extends Controller
 
     public function store(Request $request, Project $project): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('view', $project);
         Gate::authorize('create', [Improvement::class, $project]);
 
@@ -122,6 +123,7 @@ class ImprovementController extends Controller
 
     public function update(Request $request, Project $project, Improvement $improvement): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectImprovement($project, $improvement);
 
         Gate::authorize('view', $project);
@@ -138,6 +140,7 @@ class ImprovementController extends Controller
 
     public function destroy(Project $project, Improvement $improvement): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectImprovement($project, $improvement);
         Gate::authorize('delete', $improvement);
         if ($improvement->tasks()->exists()) {

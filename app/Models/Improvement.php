@@ -28,6 +28,14 @@ class Improvement extends Model
 
     public const STATUS_ARCHIVED = 'archived';
 
+    public const EXECUTION_STATUS_ACTIVE = 'active';
+
+    public const EXECUTION_STATUS_COMPLETED = 'completed';
+
+    public const EXECUTION_STATUS_PAUSED = 'paused';
+
+    public const EXECUTION_STATUS_CANCELLED = 'cancelled';
+
     public const VISIBILITY_INTERNAL = 'internal';
 
     public const VISIBILITY_PROJECT = 'project';
@@ -50,6 +58,10 @@ class Improvement extends Model
         'result',
         'impact',
         'next_action',
+        'theme_description',
+        'execution_status',
+        'completion_check_version',
+        'completed_by_user_id',
         'planned_effort_days',
         'planned_start_date',
         'target_date',
@@ -82,6 +94,7 @@ class Improvement extends Model
             'target_day' => 'integer',
             'completed_at' => 'date',
             'planned_effort_days' => 'decimal:2',
+            'completion_check_version' => 'integer',
         ];
     }
 
@@ -156,6 +169,16 @@ class Improvement extends Model
             self::VISIBILITY_INTERNAL => '社内のみ',
             self::VISIBILITY_PROJECT => 'Project参加者',
             self::VISIBILITY_CLIENT => 'お客様にも公開',
+        ];
+    }
+
+    public static function executionStatuses(): array
+    {
+        return [
+            self::EXECUTION_STATUS_ACTIVE => '進行中',
+            self::EXECUTION_STATUS_COMPLETED => '完了',
+            self::EXECUTION_STATUS_PAUSED => '保留',
+            self::EXECUTION_STATUS_CANCELLED => '中止',
         ];
     }
 }

@@ -49,7 +49,7 @@ class AiProposalUndoService
                 $restoreAttributes = [];
                 foreach ($locked->items->sortBy([['entity_type', 'asc'], ['applied_entity_public_id', 'asc'], ['id', 'asc']]) as $item) {
                     $model = $this->target($project, $item);
-                    $current = $model ? AiProposalContract::snapshot($model, $item->entity_type) : [];
+                    $current = $model ? AiProposalContract::snapshot($model, $item->entity_type, $locked->contract_version) : [];
                     $expectedCurrent = array_replace($item->before ?? [], $item->after ?? []);
                     if (! $model
                         || (int) $model->plan_version !== (int) $item->applied_version

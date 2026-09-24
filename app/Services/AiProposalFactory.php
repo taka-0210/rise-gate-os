@@ -7,12 +7,14 @@ use App\Models\AiProposal;
 use App\Models\Project;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 
 class AiProposalFactory
 {
     public function create(AiAccessKey $key, Project $project, array $input): AiProposal
     {
         return DB::transaction(function () use ($key, $project, $input): AiProposal {
+            $scopeEight = ($input['contract_version'] ?? null) === ProjectExecutionProposalContract::VERSION;
             $referenceKeys = collect($input['items'])->pluck('reference_key')->filter()->all();
             $proposal = AiProposal::create([
                 'organization_id' => $project->organization_id,
@@ -21,10 +23,10 @@ class AiProposalFactory
                 'source' => 'codex',
                 'mode' => AiProposal::MODE_DIFFERENTIAL,
                 'contract_version' => $input['contract_version'],
-                'capability' => AiProposalContract::CAPABILITY,
-                'risk_level' => AiProposalContract::RISK_LEVEL,
+                'capability' => $scopeEight ? ProjectExecutionProposalContract::CAPABILITY : AiProposalContract::CAPABILITY,
+                'risk_level' => $scopeEight ? ProjectExecutionProposalContract::RISK_LEVEL : AiProposalContract::RISK_LEVEL,
                 'expected_project_version' => $input['expected_project_version'],
-                'approval_policy' => AiProposalContract::APPROVAL_POLICY,
+                'approval_policy' => $scopeEight ? ProjectExecutionProposalContract::APPROVAL_POLICY : AiProposalContract::APPROVAL_POLICY,
                 'idempotency_key' => $input['idempotency_key'],
                 'title' => $input['title'],
                 'summary' => $input['summary'] ?? null,
@@ -35,7 +37,7 @@ class AiProposalFactory
 
             foreach ($input['items'] as $index => $data) {
                 $target = $this->target($project, $data['entity_type'], $data['target_public_id'] ?? null);
-                $before = $target ? AiProposalContract::snapshot($target, $data['entity_type']) : null;
+                $before = $target ? AiProposalContract::snapshot($target, $data['entity_type'], $input['contract_version']) : null;
                 $after = $data['attributes'];
                 $parentReference = $data['parent_reference'] ?? null;
                 $proposal->items()->create([

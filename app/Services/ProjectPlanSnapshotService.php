@@ -66,10 +66,15 @@ class ProjectPlanSnapshotService
         $tasks = $improvements->flatMap->tasks
             ->where('status', '!=', Task::STATUS_ARCHIVED)
             ->values();
+        $directActions = $project->tasks()->whereNull('improvement_id')
+            ->where('status', '!=', Task::STATUS_ARCHIVED)
+            ->orderBy('sort_order')->orderBy('id')->get();
+        $tasks = $tasks->concat($directActions)->values();
         $progress = EffortProgress::calculate($improvements);
         $actualEffortMinutes = (int) $project->actuals()->sum('effort_minutes');
 
         return [
+            'format_version' => 2,
             'captured_at' => now()->toIso8601String(),
             'timezone' => config('app.timezone'),
             'project' => $projectData,
@@ -101,7 +106,8 @@ class ProjectPlanSnapshotService
                     'planned_start_date' => $this->dateString($improvement->planned_start_date),
                     'target_date' => $this->dateString($improvement->target_date),
                     'tasks' => $improvement->tasks->map(fn ($task) => array_replace($task->only([
-                        'public_id', 'title', 'description', 'status', 'priority',
+                        'public_id', 'title', 'description', 'done_condition', 'assigned_to',
+                        'reviewer_user_id', 'review_status', 'status', 'priority',
                         'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
                         'completed_at', 'sort_order',
                     ]), [
@@ -120,7 +126,8 @@ class ProjectPlanSnapshotService
                 'planned_start_date' => $this->dateString($improvement->planned_start_date),
                 'target_date' => $this->dateString($improvement->target_date),
                 'tasks' => $improvement->tasks->map(fn ($task) => array_replace($task->only([
-                    'public_id', 'title', 'description', 'status', 'priority',
+                    'public_id', 'title', 'description', 'done_condition', 'assigned_to',
+                    'reviewer_user_id', 'review_status', 'status', 'priority',
                     'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
                     'completed_at', 'sort_order',
                 ]), [
@@ -128,6 +135,15 @@ class ProjectPlanSnapshotService
                     'due_date' => $this->dateString($task->due_date),
                 ]))->values()->all(),
             ])->values()->all(),
+            'direct_actions' => $directActions->map(fn ($task) => array_replace($task->only([
+                'public_id', 'title', 'description', 'done_condition', 'assigned_to',
+                'reviewer_user_id', 'review_status', 'status', 'priority',
+                'planned_start_date', 'due_date', 'planned_start_day', 'due_day',
+                'completed_at', 'sort_order',
+            ]), [
+                'planned_start_date' => $this->dateString($task->planned_start_date),
+                'due_date' => $this->dateString($task->due_date),
+            ]))->values()->all(),
         ];
     }
 

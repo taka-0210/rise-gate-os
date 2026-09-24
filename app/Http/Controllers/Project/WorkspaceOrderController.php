@@ -17,6 +17,7 @@ class WorkspaceOrderController extends Controller
 {
     public function preference(Request $request, Project $project): JsonResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('update', $project);
         $data = $request->validate([
             'workspace_reorder_mode' => ['required', Rule::in(['schedule', 'order_only'])],
@@ -28,6 +29,7 @@ class WorkspaceOrderController extends Controller
 
     public function update(Request $request, Project $project): JsonResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('view', $project);
         $data = $request->validate([
             'type' => ['required', Rule::in(['roadmap', 'improvement', 'task'])],

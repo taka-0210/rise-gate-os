@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectMember extends Model
 {
     use HasFactory;
 
     public const ROLE_OWNER = 'owner';
+    public const ROLE_MEMBER = 'member';
     public const ROLE_PROJECT_MANAGER = 'project_manager';
     public const ROLE_DESIGNER = 'designer';
     public const ROLE_CODER = 'coder';
@@ -27,6 +29,8 @@ class ProjectMember extends Model
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INVITED = 'invited';
 
+    public const STATUS_LEFT = 'left';
+
     protected $fillable = [
         'project_id',
         'user_id',
@@ -37,6 +41,9 @@ class ProjectMember extends Model
         'invited_at',
         'accepted_at',
         'status',
+        'left_at',
+        'left_by_user_id',
+        'status_reason',
     ];
 
     protected function casts(): array
@@ -44,6 +51,7 @@ class ProjectMember extends Model
         return [
             'invited_at' => 'datetime',
             'accepted_at' => 'datetime',
+            'left_at' => 'datetime',
         ];
     }
 
@@ -65,6 +73,23 @@ class ProjectMember extends Model
     public function invitedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by');
+    }
+
+    public function roleAssignments(): HasMany
+    {
+        return $this->hasMany(ProjectMemberRole::class);
+    }
+
+    public function activeRoleAssignments(): HasMany
+    {
+        return $this->roleAssignments()->whereNull('revoked_at');
+    }
+
+    public function hasExecutionRole(string $role): bool
+    {
+        return $this->relationLoaded('activeRoleAssignments')
+            ? $this->activeRoleAssignments->contains('role', $role)
+            : $this->activeRoleAssignments()->where('role', $role)->exists();
     }
 
     public static function roles(): array

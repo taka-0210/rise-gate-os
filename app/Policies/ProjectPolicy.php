@@ -6,9 +6,12 @@ use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\ProjectExecution\ProjectExecutionAccess;
 
 class ProjectPolicy
 {
+    public function __construct(private readonly ProjectExecutionAccess $executionAccess) {}
+
     public function create(User $user, Workspace $workspace): bool
     {
         if (! $user->canAccessWorkspace($workspace->id)) {
@@ -24,11 +27,18 @@ class ProjectPolicy
 
     public function view(User $user, Project $project): bool
     {
+        if ($project->usesScopeEight()) {
+            return $this->executionAccess->canRead($user, $project);
+        }
+
         return $this->activeProjectMembership($user, $project) !== null;
     }
 
     public function update(User $user, Project $project): bool
     {
+        if ($project->usesScopeEight()) {
+            return $this->executionAccess->canManageStructure($user, $project);
+        }
         $membership = $project->members()
             ->where('user_id', $user->id)
             ->where('status', ProjectMember::STATUS_ACTIVE)

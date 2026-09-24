@@ -26,6 +26,11 @@
         </div>
 
         <div class="grid">
+            <a class="card" href="{{ route('project-execution.index') }}">
+                <div class="meta">PROJECT / ACTION</div>
+                <h2>Project and Action</h2>
+                <p>{{ $executionProjectCount }} active execution Project(s)</p>
+            </a>
             <a class="card" href="{{ route('business-domains.index') }}">
                 <div class="meta">BUSINESS DOMAIN / OPTIONAL</div>
                 <h2>事業領域</h2>

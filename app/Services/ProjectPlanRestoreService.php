@@ -21,6 +21,7 @@ class ProjectPlanRestoreService
 
     public function preview(Project $project, ProjectPlanVersion $version): array
     {
+        $this->assertSnapshotCompatible($project, $version->timelineSnapshot());
         $target = $this->entities($version->timelineSnapshot());
         $current = $this->entities($this->snapshots->capture($project->fresh()));
 
@@ -34,6 +35,7 @@ class ProjectPlanRestoreService
     public function restore(Project $project, ProjectPlanVersion $version, User $actor): ProjectPlanVersion
     {
         $snapshot = $version->timelineSnapshot();
+        $this->assertSnapshotCompatible($project, $snapshot);
         $snapshotProjectId = (string) data_get($snapshot, 'project.public_id', '');
         if ($snapshotProjectId === '' || $snapshotProjectId !== $project->public_id) {
             throw new RuntimeException('この保存履歴は対象Projectのものではありません。');
@@ -118,7 +120,7 @@ class ProjectPlanRestoreService
                     'organization_id' => $project->organization_id,
                     'workspace_id' => $project->owning_workspace_id,
                     'project_id' => $project->id,
-                    'improvement_id' => $improvementModels[$improvementPublicId]->id,
+                    'improvement_id' => $improvementPublicId ? ($improvementModels[$improvementPublicId]->id ?? null) : null,
                     'created_by' => $actor->id,
                     ...$data['attributes'],
                 ],
@@ -180,6 +182,18 @@ class ProjectPlanRestoreService
             $this->appendImprovements($entities, (array) ($roadmap['improvements'] ?? []), $roadmapId);
         }
         $this->appendImprovements($entities, (array) ($snapshot['unclassified_improvements'] ?? []), null);
+        foreach ((array) ($snapshot['direct_actions'] ?? []) as $taskIndex => $task) {
+            $taskId = $this->publicId($task, 'task');
+            $entities['tasks'][$taskId] = [
+                'improvement_public_id' => null,
+                'attributes' => Arr::only($task, [
+                    'title', 'description', 'done_condition', 'assigned_to', 'reviewer_user_id',
+                    'review_status', 'priority', 'planned_start_date', 'due_date',
+                    'planned_start_day', 'due_day', 'sort_order',
+                ]) + ['sort_order' => $task['sort_order'] ?? $taskIndex + 1],
+                'status' => $task['status'] ?? null,
+            ];
+        }
 
         return $entities;
     }
@@ -203,7 +217,8 @@ class ProjectPlanRestoreService
                 $entities['tasks'][$taskId] = [
                     'improvement_public_id' => $improvementId,
                     'attributes' => Arr::only($task, [
-                        'title', 'description', 'priority', 'planned_start_date', 'due_date',
+                        'title', 'description', 'done_condition', 'assigned_to', 'reviewer_user_id',
+                        'review_status', 'priority', 'planned_start_date', 'due_date',
                         'planned_start_day', 'due_day', 'sort_order',
                     ]) + ['sort_order' => $task['sort_order'] ?? $taskIndex + 1],
                     'status' => $task['status'] ?? null,
@@ -220,6 +235,16 @@ class ProjectPlanRestoreService
         }
 
         return $publicId;
+    }
+
+    private function assertSnapshotCompatible(Project $project, array $snapshot): void
+    {
+        if ((int) ($snapshot['format_version'] ?? 1) >= 2) {
+            return;
+        }
+        if ($project->usesScopeEight() || $project->tasks()->whereNull('improvement_id')->exists()) {
+            throw new RuntimeException('A legacy snapshot cannot replace Scope 8 or direct-action data.');
+        }
     }
 
     private function diffCounts(array $current, array $target): array

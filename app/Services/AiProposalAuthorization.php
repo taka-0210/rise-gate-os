@@ -10,15 +10,29 @@ use App\Models\Workspace;
 use App\Services\Organization\OrganizationAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Services\ProjectExecution\ProjectExecutionAccess;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 
 class AiProposalAuthorization
 {
-    public function __construct(private readonly OrganizationAccess $organizationAccess) {}
+    public function __construct(
+        private readonly OrganizationAccess $organizationAccess,
+        private readonly ProjectExecutionAccess $executionAccess,
+    ) {}
 
     public function canReview(User $user, Project $project, ?AiProposal $proposal = null): bool
     {
         if (! $this->hasActiveTenantAccess($user, $project)) {
             return false;
+        }
+        if ($proposal?->contract_version === ProjectExecutionProposalContract::VERSION) {
+            if (! $project->usesScopeEight()) {
+                return false;
+            }
+
+            return $proposal->items->contains(fn ($item) => $item->entity_type !== 'task')
+                ? $this->executionAccess->canManageStructure($user, $project)
+                : $this->executionAccess->canCreateAction($user, $project);
         }
         $member = $project->members()->where('user_id', $user->id)->where('status', ProjectMember::STATUS_ACTIVE)->first();
         if (! $member
@@ -38,6 +52,10 @@ class AiProposalAuthorization
     {
         if (! $this->hasActiveTenantAccess($user, $project)) {
             return false;
+        }
+        if ($proposal?->contract_version === ProjectExecutionProposalContract::VERSION) {
+            return $project->usesScopeEight()
+                && $this->executionAccess->activeExplicitMember($user, $project) !== null;
         }
         $member = $project->members()->where('user_id', $user->id)->where('status', ProjectMember::STATUS_ACTIVE)->first();
         if (! $member) {

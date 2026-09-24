@@ -219,11 +219,11 @@ class AiProposalScopeOneApplier
 
     private function assertItemCurrent($project, AiProposalItem $item): void
     {
-        if (! AiProposalContract::supports($item)) {
+        if (! AiProposalContract::supports($item, $item->proposal?->contract_version)) {
             throw $this->failure('contract_mismatch', 'Scope 1で許可されていない変更です。');
         }
         if ($item->operation === AiProposalItem::OPERATION_CREATE) {
-            $parentType = AiProposalContract::parentType($item->entity_type);
+            $parentType = AiProposalContract::parentType($item->entity_type, $item->proposal?->contract_version, $item->parent_reference, $project->public_id);
             if ($parentType && ! $this->proposalReferenceExists($item->proposal, $item->parent_reference)) {
                 $parent = $this->target($project, $parentType, $item->parent_reference, true);
                 if (! $parent) {
@@ -238,7 +238,7 @@ class AiProposalScopeOneApplier
         if (! $model || (int) $model->plan_version !== (int) $item->expected_version) {
             throw $this->failure('conflict', '対象が提案後に変更されています。最新状態から再提案してください。');
         }
-        if (AiProposalContract::snapshot($model, $item->entity_type) !== ($item->before ?? [])) {
+        if (AiProposalContract::snapshot($model, $item->entity_type, $item->proposal?->contract_version) !== ($item->before ?? [])) {
             throw $this->failure('conflict', '変更前の内容が一致しません。最新状態から再提案してください。');
         }
     }
@@ -272,12 +272,16 @@ class AiProposalScopeOneApplier
                 'organization_id' => $proposal->organization_id,
                 'workspace_id' => $proposal->workspace_id,
                 'project_id' => $proposal->project_id,
-                'improvement_id' => $parent?->id,
+                'improvement_id' => $parent instanceof Improvement ? $parent->id : null,
                 'status' => Task::STATUS_TODO,
                 'priority' => Task::PRIORITY_NORMAL,
-                'sort_order' => ((int) $parent?->tasks()->max('sort_order')) + 1,
+                'sort_order' => $parent instanceof Improvement
+                    ? ((int) $parent->tasks()->max('sort_order')) + 1
+                    : ((int) $proposal->project->tasks()->whereNull('improvement_id')->max('sort_order')) + 1,
                 'created_by' => $actor->id,
-                'assigned_to' => null,
+                'assigned_to' => $attributes['assigned_to'] ?? null,
+                'review_status' => filled($attributes['reviewer_user_id'] ?? null)
+                    ? Task::REVIEW_PENDING : Task::REVIEW_NOT_REQUIRED,
             ]),
             default => throw $this->failure('contract_mismatch', '新規作成できない対象です。'),
         };
@@ -294,7 +298,7 @@ class AiProposalScopeOneApplier
 
     private function resolveParent(AiProposal $proposal, AiProposalItem $item, array $references): ?Model
     {
-        $parentType = AiProposalContract::parentType($item->entity_type);
+        $parentType = AiProposalContract::parentType($item->entity_type, $proposal->contract_version, $item->parent_reference, $proposal->project->public_id);
         if (! $parentType) {
             return null;
         }

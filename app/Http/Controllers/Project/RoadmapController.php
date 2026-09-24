@@ -26,6 +26,7 @@ class RoadmapController extends Controller
 
     public function store(Request $request, Project $project): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('view', $project);
         Gate::authorize('create', [Roadmap::class, $project]);
 
@@ -98,6 +99,7 @@ class RoadmapController extends Controller
 
     public function update(Request $request, Project $project, Roadmap $roadmap): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectRoadmap($project, $roadmap);
         Gate::authorize('view', $project);
         Gate::authorize('update', $roadmap);
@@ -121,6 +123,7 @@ class RoadmapController extends Controller
 
     public function destroy(Project $project, Roadmap $roadmap): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $this->authorizeProjectRoadmap($project, $roadmap);
         Gate::authorize('delete', $roadmap);
         if ($roadmap->improvements()->exists()) {

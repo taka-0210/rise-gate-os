@@ -5,15 +5,20 @@ namespace App\Services;
 use App\Models\AiProposal;
 use App\Models\AiProposalItem;
 use App\Models\Project;
+use App\Models\User;
 use App\Support\AiTextIntegrity;
+use App\Services\ProjectExecution\ProjectExecutionAccess;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 
 class AiProposalValidator
 {
     public const STATUS_VALID = 'valid';
 
     public const STATUS_INVALID = 'invalid';
+
+    public function __construct(private readonly ProjectExecutionAccess $executionAccess) {}
 
     public function validate(AiProposal $proposal): AiProposal
     {
@@ -36,16 +41,20 @@ class AiProposalValidator
     {
         $proposal->loadMissing(['project', 'items']);
         $errors = [];
-        if ($proposal->contract_version !== AiProposalContract::VERSION) {
+        $scopeEight = $proposal->contract_version === ProjectExecutionProposalContract::VERSION;
+        $expectedCapability = $scopeEight ? ProjectExecutionProposalContract::CAPABILITY : AiProposalContract::CAPABILITY;
+        $expectedRisk = $scopeEight ? ProjectExecutionProposalContract::RISK_LEVEL : AiProposalContract::RISK_LEVEL;
+        $expectedPolicy = $scopeEight ? ProjectExecutionProposalContract::APPROVAL_POLICY : AiProposalContract::APPROVAL_POLICY;
+        if (! in_array($proposal->contract_version, [AiProposalContract::VERSION, ProjectExecutionProposalContract::VERSION], true)) {
             $errors[] = 'この提案は旧形式または未対応形式です。最新状態から再提案してください。';
         }
-        if ($proposal->capability !== AiProposalContract::CAPABILITY) {
+        if ($proposal->capability !== $expectedCapability) {
             $errors[] = '未対応のAI変更Capabilityです。';
         }
-        if ($proposal->risk_level !== AiProposalContract::RISK_LEVEL) {
+        if ($proposal->risk_level !== $expectedRisk) {
             $errors[] = '未対応のRisk Levelです。';
         }
-        if ($proposal->approval_policy !== AiProposalContract::APPROVAL_POLICY) {
+        if ($proposal->approval_policy !== $expectedPolicy) {
             $errors[] = '未対応の承認Policyです。';
         }
         if ($proposal->mode !== AiProposal::MODE_DIFFERENTIAL) {
@@ -102,13 +111,13 @@ class AiProposalValidator
     {
         $project = $proposal->project;
         $attributes = $item->attributes ?? [];
-        $allowed = AiProposalContract::ALLOWED_ATTRIBUTES[$item->entity_type] ?? [];
+        $allowed = AiProposalContract::allowedAttributes($item->entity_type, $proposal->contract_version);
         $errors = [];
 
         if (! $item->public_id) {
             $errors[] = '安定したProposal Item IDがありません。';
         }
-        if (! AiProposalContract::supports($item)) {
+        if (! AiProposalContract::supports($item, $proposal->contract_version)) {
             $errors[] = 'Scope 1で許可されていない対象または操作です。';
         }
         if (! $item->expected_version) {
@@ -132,6 +141,11 @@ class AiProposalValidator
         $validator = Validator::make($attributes, $this->rules($item));
         if ($validator->fails()) {
             $errors = [...$errors, ...$validator->errors()->all()];
+        }
+
+        if ($proposal->contract_version === ProjectExecutionProposalContract::VERSION
+            && $item->entity_type === 'task') {
+            $errors = [...$errors, ...$this->executionMemberErrors($proposal, $attributes)];
         }
 
         if ($item->operation === AiProposalItem::OPERATION_CREATE) {
@@ -163,7 +177,7 @@ class AiProposalValidator
                 if ((int) $target->plan_version !== (int) $item->expected_version) {
                     $errors[] = '更新対象が提案後に変更されています。';
                 }
-                if (AiProposalContract::snapshot($target, $item->entity_type) !== ($item->before ?? [])) {
+                if (AiProposalContract::snapshot($target, $item->entity_type, $proposal->contract_version) !== ($item->before ?? [])) {
                     $errors[] = '変更前データが現在の対象と一致しません。';
                 }
             }
@@ -172,11 +186,48 @@ class AiProposalValidator
         return array_values(array_unique($errors));
     }
 
+    /** @return array<int, string> */
+    private function executionMemberErrors(AiProposal $proposal, array $attributes): array
+    {
+        $errors = [];
+        if (array_key_exists('assigned_to', $attributes) && is_numeric($attributes['assigned_to'])) {
+            $assignee = User::find((int) $attributes['assigned_to']);
+            if (! $assignee || ! $this->executionAccess->isExecutionMember($assignee, $proposal->project)) {
+                $errors[] = 'Action assignee must be an active explicit execution member of this Project.';
+            }
+        }
+        if (array_key_exists('reviewer_user_id', $attributes) && $attributes['reviewer_user_id'] !== null
+            && is_numeric($attributes['reviewer_user_id'])) {
+            $reviewer = User::find((int) $attributes['reviewer_user_id']);
+            if (! $reviewer || ! $this->executionAccess->canBeReviewer($reviewer, $proposal->project)) {
+                $errors[] = 'Action reviewer must be an active explicit reviewer-capable member of this Project.';
+            }
+        }
+
+        return $errors;
+    }
+
     private function rules(AiProposalItem $item): array
     {
         $title = $item->operation === AiProposalItem::OPERATION_CREATE
             ? ['required', 'string', 'max:255']
             : ['sometimes', 'string', 'max:255'];
+
+        if ($item->proposal?->contract_version === ProjectExecutionProposalContract::VERSION) {
+            return match ($item->entity_type) {
+                'project' => ['purpose' => ['sometimes', 'string', 'max:5000'], 'expected_outcome' => ['sometimes', 'string', 'max:5000'], 'current_state' => ['sometimes', 'nullable', 'string', 'max:5000']],
+                'roadmap' => ['title' => $title, 'purpose' => ['sometimes', 'nullable', 'string', 'max:10000']],
+                'improvement' => ['title' => $title, 'theme_description' => ['sometimes', 'nullable', 'string', 'max:10000']],
+                'task' => [
+                    'title' => $title, 'description' => ['sometimes', 'nullable', 'string', 'max:10000'],
+                    'done_condition' => [$item->operation === AiProposalItem::OPERATION_CREATE ? 'required' : 'sometimes', 'string', 'max:10000'],
+                    'assigned_to' => [$item->operation === AiProposalItem::OPERATION_CREATE ? 'required' : 'sometimes', 'integer'],
+                    'reviewer_user_id' => ['sometimes', 'nullable', 'integer', 'different:assigned_to'],
+                    'due_date' => ['sometimes', 'nullable', 'date'],
+                ],
+                default => [],
+            };
+        }
 
         return match ($item->entity_type) {
             'project' => [
@@ -201,7 +252,7 @@ class AiProposalValidator
 
     private function createRelationError(AiProposal $proposal, AiProposalItem $item): ?string
     {
-        $expectedParentType = AiProposalContract::parentType($item->entity_type);
+        $expectedParentType = AiProposalContract::parentType($item->entity_type, $proposal->contract_version, $item->parent_reference, $proposal->project->public_id);
         if (! $expectedParentType) {
             return $item->parent_reference ? 'この対象には親参照を指定できません。' : null;
         }

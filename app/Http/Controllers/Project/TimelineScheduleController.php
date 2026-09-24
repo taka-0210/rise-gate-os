@@ -21,6 +21,7 @@ class TimelineScheduleController extends Controller
 {
     public function update(Request $request, Project $project, string $type, int $entity): JsonResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         Gate::authorize('view', $project);
         abort_unless(in_array($type, ['project', 'roadmap', 'improvement', 'task'], true), 404);
 

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiProposal;
 use App\Models\AiProposalItem;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 
 class AiProposalContract
 {
@@ -30,8 +31,11 @@ class AiProposalContract
         'task' => 'tasks',
     ];
 
-    public static function supports(AiProposalItem $item): bool
+    public static function supports(AiProposalItem $item, ?string $contractVersion = null): bool
     {
+        if (($contractVersion ?? $item->proposal?->contract_version) === ProjectExecutionProposalContract::VERSION) {
+            return ProjectExecutionProposalContract::supports($item);
+        }
         return in_array($item->operation, [AiProposalItem::OPERATION_CREATE, AiProposalItem::OPERATION_UPDATE], true)
             && isset(self::ALLOWED_ATTRIBUTES[$item->entity_type])
             && ! ($item->entity_type === 'project' && $item->operation !== AiProposalItem::OPERATION_UPDATE);
@@ -66,8 +70,12 @@ class AiProposalContract
         return hash('sha256', json_encode(self::canonicalize($payload), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION));
     }
 
-    public static function parentType(string $entityType): ?string
+    public static function parentType(string $entityType, ?string $contractVersion = null, ?string $parentReference = null, ?string $projectPublicId = null): ?string
     {
+        if ($contractVersion === ProjectExecutionProposalContract::VERSION && $entityType === 'task') {
+            return $parentReference && $projectPublicId && hash_equals($projectPublicId, $parentReference)
+                ? 'project' : 'improvement';
+        }
         return match ($entityType) {
             'improvement' => 'roadmap',
             'task' => 'improvement',
@@ -75,14 +83,24 @@ class AiProposalContract
         };
     }
 
-    public static function snapshot(Model $model, string $entityType): array
+    public static function snapshot(Model $model, string $entityType, ?string $contractVersion = null): array
     {
+        if ($contractVersion === ProjectExecutionProposalContract::VERSION) {
+            return ProjectExecutionProposalContract::snapshot($model, $entityType);
+        }
         $result = [];
         foreach (self::ALLOWED_ATTRIBUTES[$entityType] ?? [] as $attribute) {
             $result[$attribute] = $model->getAttribute($attribute);
         }
 
         return $result;
+    }
+
+    public static function allowedAttributes(string $entityType, ?string $contractVersion = null): array
+    {
+        return $contractVersion === ProjectExecutionProposalContract::VERSION
+            ? (ProjectExecutionProposalContract::ALLOWED_ATTRIBUTES[$entityType] ?? [])
+            : (self::ALLOWED_ATTRIBUTES[$entityType] ?? []);
     }
 
     private static function canonicalize(mixed $value): mixed

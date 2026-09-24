@@ -15,6 +15,7 @@ class ProjectMemberController extends Controller
 {
     public function store(Request $request, Project $project): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $currentWorkspaceRole = $request->attributes->get('currentWorkspaceRole');
         Gate::authorize('manageMembers', [$project, $currentWorkspaceRole]);
 
@@ -56,6 +57,7 @@ class ProjectMemberController extends Controller
 
     public function destroy(Request $request, Project $project, ProjectMember $projectMember): RedirectResponse
     {
+        abort_if($project->usesScopeEight(), 409, 'Use the Project Action journey for Scope 8 projects.');
         $currentWorkspaceRole = $request->attributes->get('currentWorkspaceRole');
         Gate::authorize('manageMembers', [$project, $currentWorkspaceRole]);
 

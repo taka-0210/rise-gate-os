@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Services\AiProjectContextGuard;
 use App\Services\AiProposalContract;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 use App\Services\AiProposalFactory;
 use App\Services\AiProposalValidator;
 use App\Support\AiTextIntegrity;
@@ -28,7 +29,7 @@ class AiProposalController extends Controller
         $accessKey = $request->attributes->get('aiAccessKey');
         $validated = $request->validate([
             'project_public_id' => ['required', 'string'],
-            'contract_version' => ['required', Rule::in([AiProposalContract::VERSION])],
+            'contract_version' => ['required', Rule::in([AiProposalContract::VERSION, ProjectExecutionProposalContract::VERSION])],
             'expected_project_version' => ['required', 'integer', 'min:1'],
             'idempotency_key' => ['required', 'string', 'max:120'],
             'title' => ['required', 'string', 'max:255'],
