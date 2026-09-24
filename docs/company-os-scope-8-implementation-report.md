@@ -1,9 +1,11 @@
 # Company OS Scope 8 Implementation Report
 
-- Date: 2026-09-24 JST
-- Status: **Code Complete candidate / Formal Close review pending**
+- Date: 2026-09-25 JST
+- Status: **Formal Closed**
 - Baseline HEAD: `797b87e12d0f632dd2df27c0a1c93aa57e3a274b`
-- Stop point: human + ChatGPT Formal Close review before normal-local Migration or release.
+- Implementation HEAD: `a0312e98ba0162c5baf91862b5b5136b619b4b72`
+- Formal Close approval: human + ChatGPT review completed on 2026-09-25 JST.
+- Stop point: Scope 8 Formal Close completed. Normal-local Migration, Production, deploy, HOW, and Scope 9 remain outside this close.
 
 ## Implemented outcome
 
@@ -101,5 +103,17 @@ The normal-local SQLite file was copied to an isolated Clone. The additive migra
 | 23 | Done | SQLite apply/rollback and real MariaDB 10.11 DDL + focused writer tests; RG02 lock/retry reuse |
 | 24 | Done | Desktop/390 Browser evidence, permission denial, build, final report |
 
-Result: **Done 24 / Conditional 0 / Not Done 0**. Scope 8 is ready for Formal Close review. This report does not authorize normal-local Migration, Production Migration, deploy, HOW, or Scope 9.
+Result: **Done 24 / Conditional 0 / Not Done 0**.
+
+## Formal Close
+
+- Decision: **Scope 8 Formal Closed**.
+- Code Complete and S8-DC-01 through S8-DC-24 were approved by human + ChatGPT review.
+- S8-C01 / S8-C02: not detected.
+- Scope 1 through 7, PUX, and Account separation Closed Contracts remain unchanged.
+- Scope 1 AI Proposal Contract remains unchanged.
+- Business Data, IDs, relations, and actor references are preserved.
+- SQLite, MariaDB 10.11.x, Desktop, 390px, and Permission-negative evidence was accepted.
+- Master Update: not required. Master v141 / v037 remain authoritative.
+- This close does not authorize normal-local Migration, Production connection or Migration, deploy, HOW, or Scope 9.
 
