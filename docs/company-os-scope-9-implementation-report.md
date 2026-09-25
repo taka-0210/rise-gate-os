@@ -1,10 +1,21 @@
 # Company OS Scope 9 Implementation Report
 
-- Date: 2026-09-25 JST
-- Status: **Code Complete candidate / Human + ChatGPT Formal Close Review pending**
+- Date: 2026-09-26 JST
+- Status: **Formal Closed**
 - Baseline HEAD: `6db2702f651f8da63d6cb104d9ddcea2471d45e3`
 - Implementation Commit: `fa85391`
-- Stop point: S9-P5 completed. Normal-local Migration, Production, deploy, IR-1, HOW, and Scope 10 remain outside this candidate.
+- Code Complete Evidence Commit: `1135847`
+- Formal Close approval: human + ChatGPT review completed on 2026-09-26 JST.
+- Stop point: Scope 9 Formal Close completed. Normal-local Migration, Production, deploy, IR-1, HOW, and Scope 10 remain outside this close.
+
+## Formal Close approval
+
+- Code Complete and S9-DC-01〜26 were formally approved with Conditional 0 / Not Done 0.
+- S9-C01〜03 did not materialize. Scope 1〜8 Closed Contracts and the Action / ActionExecution responsibility boundary remain unchanged.
+- The approved four-field AI payload and provider-neutral Domain/Service boundary remain unchanged; OpenAI-specific behavior stays inside the existing provider adapter.
+- Data, IDs, relations and history are preserved. Focused, Scope 8 related regression, MariaDB 10.11.19 concurrency, and Desktop / 390px Browser evidence were accepted.
+- The raw wider-suite result of 342 PASS / 174 FAIL remains recorded below as an admission/test-environment limitation and is not represented as Scope 9 success evidence.
+- Master Update is not required. `CompanyOS_v142_scope9_today_continuous_decision.pptx` and `CompanyOS_Ver1_要件仕様書_v038_Scope9_TodayContinuous.xlsx` continue as the authoritative Masters.
 
 ## Implemented outcome
 
@@ -97,12 +108,11 @@ A raw full-suite run was not used as the Scope 9 acceptance signal: **342 passed
 | 25 | Done | Existing evidence reused; focused/related/Browser/MariaDB results and the wider-suite limitation are separately recorded. |
 | 26 | Done | DC review complete; remaining Release Gates and prohibited next scopes are explicitly retained below. |
 
-## Close candidate and remaining gates
+## Formal Close and remaining gates
 
-- **Scope 9 Code Complete candidate: Yes.** S9-C01〜03 did not materialize; Conditional 0, Not Done 0.
-- **Formal Close:** pending human + ChatGPT review. This report does not self-approve Formal Close.
-- **Master Update:** not required. Product and Architecture remain v142 / v038; implementation did not add a new Product decision.
+- **Scope 9 Code Complete: formally approved.** S9-C01〜03 none; Conditional 0, Not Done 0.
+- **Scope 9 Formal Close: completed on 2026-09-26 JST.**
+- **Master Update:** not required. Product and Architecture remain v142 / v038.
 - **Normal-local:** migration remains pending. Applying it requires a separate authorized persistent-data step with backup/restore evidence.
 - **Production / IR-1:** Production connection, migration, scheduler operating procedure, backup/restore, rollback, monitoring and deploy remain separate Release work.
 - **Out of scope:** no Production change, deploy, external send, IR-1, HOW, or Scope 10 implementation was performed.
-
