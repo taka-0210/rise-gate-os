@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\ActionDraftProvider;
 use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
@@ -14,6 +15,7 @@ use App\Policies\ImprovementPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\RoadmapPolicy;
 use App\Policies\TaskPolicy;
+use App\Services\ActionExecution\OpenAiActionDraftProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;

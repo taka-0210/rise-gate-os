@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActionExecutionController;
 use App\Http\Controllers\AiConnectionController;
 use App\Http\Controllers\Auth\AccountEmailController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -163,6 +164,16 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::post('/company/business-domains/{businessDomain}/archive', [BusinessDomainController::class, 'archive'])->name('business-domains.archive');
         Route::post('/company/business-domains/{businessDomain}/reopen', [BusinessDomainController::class, 'reopen'])->name('business-domains.reopen');
         Route::get('/company/business-domains/{businessDomain}/revisions/{revision}', [BusinessDomainController::class, 'revision'])->whereNumber('revision')->name('business-domains.revisions.show');
+        Route::get('/company/today', [ActionExecutionController::class, 'today'])->name('action-executions.today');
+        Route::post('/company/today/refresh', [ActionExecutionController::class, 'refresh'])->name('action-executions.refresh');
+        Route::get('/company/projects/{project}/actions/{action}/executions', [ActionExecutionController::class, 'show'])->name('action-executions.show');
+        Route::post('/company/projects/{project}/actions/{action}/executions/configure', [ActionExecutionController::class, 'configure'])->name('action-executions.configure');
+        Route::post('/company/projects/{project}/actions/{action}/executions/draft', [ActionExecutionController::class, 'suggestDraft'])->middleware('throttle:20,1')->name('action-executions.draft');
+        Route::post('/company/projects/{project}/actions/{action}/executions/pause', [ActionExecutionController::class, 'pause'])->name('action-executions.pause');
+        Route::post('/company/projects/{project}/actions/{action}/executions/resume', [ActionExecutionController::class, 'resume'])->name('action-executions.resume');
+        Route::post('/company/action-executions/{execution}/complete', [ActionExecutionController::class, 'complete'])->name('action-executions.complete');
+        Route::post('/company/action-executions/{execution}/skip', [ActionExecutionController::class, 'skip'])->name('action-executions.skip');
+        Route::post('/company/action-executions/{execution}/retry', [ActionExecutionController::class, 'retry'])->name('action-executions.retry');
         Route::get('/company/projects', [ProjectExecutionController::class, 'index'])->name('project-execution.index');
         Route::get('/company/projects/create', [ProjectExecutionController::class, 'create'])->name('project-execution.create');
         Route::post('/company/projects', [ProjectExecutionController::class, 'store'])->name('project-execution.store');

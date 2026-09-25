@@ -239,6 +239,9 @@ class ProjectPlanRestoreService
 
     private function assertSnapshotCompatible(Project $project, array $snapshot): void
     {
+        if ($project->tasks()->whereHas('runSetting')->exists()) {
+            throw new RuntimeException('A snapshot restore cannot replace a plan after Scope 9 execution history has started.');
+        }
         if ((int) ($snapshot['format_version'] ?? 1) >= 2) {
             return;
         }

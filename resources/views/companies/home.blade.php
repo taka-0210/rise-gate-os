@@ -26,6 +26,10 @@
         </div>
 
         <div class="grid">
+            <a class="card" href="{{ route('action-executions.today') }}">
+                <div class="meta">TODAY / CONTINUOUS EXECUTION</div><h2>今日のAction</h2>
+                <p>今日実施すること、期限、確認待ちを一つの流れで確認します。</p>
+            </a>
             <a class="card" href="{{ route('project-execution.index') }}">
                 <div class="meta">PROJECT / ACTION</div>
                 <h2>Project and Action</h2>
@@ -80,6 +84,10 @@
         <div class="panel stack">
             <div class="actions" style="justify-content:space-between;"><div><div class="meta">SHARED</div><h2>共有Workspace</h2></div><a href="{{ route('workspaces.index') }}">すべて表示</a></div>
             <div class="grid">
+            <a class="card" href="{{ route('action-executions.today') }}">
+                <div class="meta">TODAY / CONTINUOUS EXECUTION</div><h2>今日のAction</h2>
+                <p>今日実施すること、期限、確認待ちを一つの流れで確認します。</p>
+            </a>
                 @forelse ($sharedWorkspaces as $workspace)
                     <article class="card"><h3>{{ $workspace->name }}</h3><p>{{ $workspace->projects_count }} Project / {{ $workspace->improvements_count }} 改善</p><form method="POST" action="{{ route('workspaces.switch', $workspace) }}">@csrf<button type="submit">開く</button></form></article>
                 @empty
@@ -92,6 +100,10 @@
         <div class="panel stack">
             <div><div class="meta">PERSONAL</div><h2>個人Workspace</h2></div>
             <div class="grid">
+            <a class="card" href="{{ route('action-executions.today') }}">
+                <div class="meta">TODAY / CONTINUOUS EXECUTION</div><h2>今日のAction</h2>
+                <p>今日実施すること、期限、確認待ちを一つの流れで確認します。</p>
+            </a>
                 @forelse ($personalWorkspaces as $workspace)
                     <article class="card"><h3>{{ $workspace->name }}</h3><p>会社が所有する個人用の仕事場</p><form method="POST" action="{{ route('workspaces.switch', $workspace) }}">@csrf<button type="submit">開く</button></form></article>
                 @empty
