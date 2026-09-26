@@ -30,6 +30,7 @@ $database = getenv('S10_DEVICE_DATABASE') ?: '';
 $secretsPath = getenv('S10_DEVICE_SECRETS') ?: '';
 $accountEmail = strtolower(trim(getenv('S10_DEVICE_ACCOUNT_EMAIL') ?: ''));
 $emailRecipient = strtolower(trim(getenv('S10_DEVICE_EMAIL_RECIPIENT') ?: ''));
+$requestedPassword = getenv('S10_DEVICE_PASSWORD') ?: '';
 
 foreach ([$database, $secretsPath] as $path) {
     $parent = $path === '' ? false : realpath(dirname($path));
@@ -55,6 +56,15 @@ if (! is_file($secretsPath)) {
 }
 
 $secrets = json_decode((string) file_get_contents($secretsPath), true, flags: JSON_THROW_ON_ERROR);
+if ($requestedPassword !== '') {
+    if (mb_strlen($requestedPassword) < 8) {
+        scopeTenDeviceFail('Scope 10 device password must be at least 8 characters.');
+    }
+    $secrets['password'] = $requestedPassword;
+    if (file_put_contents($secretsPath, json_encode($secrets, JSON_THROW_ON_ERROR)) === false) {
+        scopeTenDeviceFail('Could not update the Scope 10 device secret file.', 65);
+    }
+}
 putenv('APP_KEY='.$secrets['app_key']);
 $_ENV['APP_KEY'] = $secrets['app_key'];
 $_SERVER['APP_KEY'] = $secrets['app_key'];
