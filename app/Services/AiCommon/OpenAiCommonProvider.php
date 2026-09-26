@@ -3,11 +3,13 @@
 namespace App\Services\AiCommon;
 
 use App\Contracts\AiCommonProvider;
-use Illuminate\Support\Facades\Http;
+use App\Contracts\AiProviderTransport;
 use RuntimeException;
 
 class OpenAiCommonProvider implements AiCommonProvider
 {
+    public function __construct(private readonly AiProviderTransport $transport) {}
+
     public function respond(array $messages, array $sources): array
     {
         $apiKey = (string) config('services.openai.api_key');
@@ -26,7 +28,7 @@ class OpenAiCommonProvider implements AiCommonProvider
             ],
             'response_format' => ['type' => 'json_object'],
         ];
-        $response = Http::withToken($apiKey)->timeout((int) config('services.ai_common.timeout_seconds', 30))
+        $response = $this->transport->request('business_common', (int) config('services.ai_common.timeout_seconds', 30))
             ->post('https://api.openai.com/v1/chat/completions', $payload);
         if (! $response->successful()) {
             throw new RuntimeException('provider_error');

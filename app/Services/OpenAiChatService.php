@@ -2,16 +2,18 @@
 
 namespace App\Services;
 
+use App\Contracts\AiProviderTransport;
 use App\Models\AiChatMessage;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class OpenAiChatService
 {
+    public function __construct(private readonly AiProviderTransport $transport) {}
+
     public function respond(Collection $messages, array $projectContext, int $userId, bool $generateImage = false): array
     {
         $apiKey = (string) config('services.openai.api_key');
@@ -22,9 +24,7 @@ class OpenAiChatService
         $projectContext['reference_images'] = $messages->filter(fn (AiChatMessage $message) => $message->image_path)
             ->map(fn (AiChatMessage $message): array => ['message_id' => $message->id, 'description' => $message->content, 'name' => $message->image_name, 'attachment_count' => count($message->attachedImages()), 'attachment_names' => array_column($message->attachedImages(), 'name')])->values()->all();
         try {
-            $response = Http::withToken($apiKey)
-                ->acceptJson()
-                ->timeout(300)
+            $response = $this->transport->request('project_chat', 300)
                 ->post('https://api.openai.com/v1/responses', [
                     'model' => config('services.openai.chat_model'),
                     'instructions' => $this->instructions($projectContext),

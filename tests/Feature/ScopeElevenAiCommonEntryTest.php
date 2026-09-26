@@ -430,6 +430,14 @@ class ScopeElevenAiCommonEntryTest extends TestCase
             $this->assertStringContainsString("'{$field}'", $provider);
         }
         $this->assertStringNotContainsString('AiCommonGateway', $provider);
+        $this->assertStringContainsString('AiProviderTransport', $provider);
+        foreach (['OpenAiChatService.php', 'OpenAiImageService.php', 'AiCommon/OpenAiCommonProvider.php'] as $path) {
+            $this->assertStringContainsString('AiProviderTransport', file_get_contents(app_path('Services/'.$path)));
+        }
+        $this->assertInstanceOf(
+            \App\Services\AiCommon\OpenAiProviderTransport::class,
+            app(\App\Contracts\AiProviderTransport::class),
+        );
     }
 
     private function proposal(User $actor, Organization $organization, AiCommonConversation $conversation, array $input)

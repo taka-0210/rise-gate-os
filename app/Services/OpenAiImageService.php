@@ -2,15 +2,17 @@
 
 namespace App\Services;
 
+use App\Contracts\AiProviderTransport;
 use App\Models\AiChatMessage;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class OpenAiImageService
 {
+    public function __construct(private readonly AiProviderTransport $transport) {}
+
     public function tool(): array
     {
         return [
@@ -38,7 +40,7 @@ class OpenAiImageService
             || ! in_array($args['size'] ?? null, ['auto', '1024x1024', '1536x1024', '1024x1536'], true)) {
             throw new RuntimeException('画像生成の指示を読み取れませんでした。もう一度お試しください。');
         }
-        $request = Http::withToken((string) config('services.openai.api_key'))->acceptJson()->timeout(300);
+        $request = $this->transport->request('project_image', 300);
         // Only reuse images already included in this same conversation request to OpenAI.
         $imageIndex = 0;
         foreach ($args['reference_message_ids'] as $id) {

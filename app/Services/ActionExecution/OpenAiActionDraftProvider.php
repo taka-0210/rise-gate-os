@@ -3,11 +3,13 @@
 namespace App\Services\ActionExecution;
 
 use App\Contracts\ActionDraftProvider;
-use Illuminate\Support\Facades\Http;
+use App\Contracts\AiProviderTransport;
 use RuntimeException;
 
 class OpenAiActionDraftProvider implements ActionDraftProvider
 {
+    public function __construct(private readonly AiProviderTransport $transport) {}
+
     public function suggest(array $payload): string
     {
         $key = config('services.openai.api_key');
@@ -20,7 +22,7 @@ class OpenAiActionDraftProvider implements ActionDraftProvider
             '文案指示: '.$payload['instruction'],
             '送信済み、外部予約済み、実施済みとは表現しないでください。',
         ]);
-        $response = Http::withToken($key)->timeout(30)->post('https://api.openai.com/v1/responses', [
+        $response = $this->transport->request('action_draft', 30)->post('https://api.openai.com/v1/responses', [
             'model' => config('services.openai.chat_model'), 'input' => $prompt,
         ]);
         if (! $response->successful()) throw new RuntimeException('AI文案生成に失敗しました。手入力で続行できます。');
