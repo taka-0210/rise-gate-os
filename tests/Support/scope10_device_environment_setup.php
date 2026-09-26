@@ -166,4 +166,3 @@ echo json_encode([
     'migration_count' => DB::table('migrations')->count(),
     'vapid_public_fingerprint' => hash('sha256', $secrets['vapid_public_key']),
 ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
-
