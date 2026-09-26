@@ -74,6 +74,7 @@ class WorkspaceAiSettingTest extends TestCase
         ]);
         $organization->users()->attach($user->id, ['role' => $role === 'owner' ? 'owner' : 'member', 'joined_at' => now()]);
         $user->workspaces()->attach($workspace->id, ['role' => $role, 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
         return [$user, $workspace];
     }
 }

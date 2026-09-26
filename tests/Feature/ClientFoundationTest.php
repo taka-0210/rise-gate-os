@@ -20,7 +20,7 @@ class ClientFoundationTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($user, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->post('/clients', [
                 'name' => 'Sample Company',
                 'kana' => '繧ｵ繝ｳ繝励Ν繧ｫ繝ｳ繝代ル繝ｼ',
@@ -119,7 +119,7 @@ class ClientFoundationTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($user, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->post('/projects', [
                 'client_id' => $client->id,
                 'name' => 'Client Project',
@@ -313,7 +313,7 @@ class ClientFoundationTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($user, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->post('/projects', [
                 'client_id' => $otherClient->id,
                 'name' => 'Invalid Client Project',
@@ -410,6 +410,7 @@ class ClientFoundationTest extends TestCase
             'role' => 'owner',
             'joined_at' => now(),
         ]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $workspace];
     }

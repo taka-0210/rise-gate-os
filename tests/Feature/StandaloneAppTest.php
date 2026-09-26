@@ -25,6 +25,7 @@ class StandaloneAppTest extends TestCase
         $workspace = Workspace::create(['organization_id' => $organization->id, 'owner_user_id' => $owner->id, 'name' => 'Apps', 'slug' => 'apps-'.uniqid(), 'status' => 'active']);
         $organization->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($owner, $organization);
         $project = Project::create(['organization_id' => $organization->id, 'owning_workspace_id' => $workspace->id, 'billing_workspace_id' => $workspace->id, 'owner_user_id' => $owner->id, 'name' => '独立TODO']);
         ProjectMember::create(['project_id' => $project->id, 'workspace_id' => $workspace->id, 'user_id' => $owner->id, 'project_role' => 'owner', 'permission_level' => 'admin', 'status' => 'active']);
 

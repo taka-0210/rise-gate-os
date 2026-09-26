@@ -127,6 +127,7 @@ class WorkspaceOwnershipTest extends TestCase
         ]);
         $organization->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($owner, $organization);
 
         return $workspace;
     }

@@ -254,6 +254,7 @@ class ScheduleIntegrityTest extends TestCase
         $workspace = Workspace::create(['organization_id' => $organization->id, 'name' => '社内WS', 'slug' => 'internal-'.uniqid()]);
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         $project = Project::create([
             'organization_id' => $organization->id,

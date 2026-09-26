@@ -487,6 +487,7 @@ class ProjectFoundationTest extends TestCase
             'role' => 'owner',
             'joined_at' => now(),
         ]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $workspace];
     }

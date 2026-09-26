@@ -517,6 +517,7 @@ class AiProposalScopeOneAcceptanceTest extends TestCase
         ]);
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $user->workspaces()->attach($workspace->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
         $project = Project::create([
             'organization_id' => $organization->id, 'owning_workspace_id' => $workspace->id,
             'billing_workspace_id' => $workspace->id, 'owner_user_id' => $user->id,

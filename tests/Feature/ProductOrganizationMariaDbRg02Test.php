@@ -301,7 +301,9 @@ class ProductOrganizationMariaDbRg02Test extends TestCase
     private function guardRg02(): void
     {
         $this->assertSame('testing', app()->environment());
-        $this->assertSame('1', getenv('RG02_ALLOW'));
+        if (getenv('RG02_ALLOW') !== '1') {
+            $this->markTestSkipped('MariaDB RG02 requires its approved isolated profile (RG02_ALLOW=1, dedicated database and datadir).');
+        }
         $this->assertSame('127.0.0.1', (string) config('database.connections.mariadb.host'));
         $this->assertStringStartsWith('co_rg02_', (string) config('database.connections.mariadb.database'));
         $identity = DB::selectOne('SELECT VERSION() version, DATABASE() db, @@datadir datadir');

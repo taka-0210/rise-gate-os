@@ -22,7 +22,7 @@ class ProjectMemberFoundationTest extends TestCase
 
         $response = $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $ownerWorkspace->id])
+            ->withSession($this->productOrganizationSession($owner, $ownerWorkspace->organization) + ['current_workspace_id' => $ownerWorkspace->id])
             ->post(route('projects.members.store', $project), [
                 'email' => $partner->email,
                 'project_role' => 'coder',
@@ -92,7 +92,7 @@ class ProjectMemberFoundationTest extends TestCase
 
         $response = $this
             ->actingAs($viewer)
-            ->withSession(['current_workspace_id' => $viewerWorkspace->id])
+            ->withSession($this->productOrganizationSession($viewer, $viewerWorkspace->organization) + ['current_workspace_id' => $viewerWorkspace->id])
             ->post(route('projects.members.store', $project), [
                 'email' => $candidate->email,
                 'project_role' => 'designer',
@@ -112,7 +112,7 @@ class ProjectMemberFoundationTest extends TestCase
 
         $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $ownerWorkspace->id])
+            ->withSession($this->productOrganizationSession($owner, $ownerWorkspace->organization) + ['current_workspace_id' => $ownerWorkspace->id])
             ->delete(route('projects.members.destroy', [$project, $partnerMember]))
             ->assertRedirect(route('projects.show', $project));
 
@@ -120,7 +120,7 @@ class ProjectMemberFoundationTest extends TestCase
 
         $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $ownerWorkspace->id])
+            ->withSession($this->productOrganizationSession($owner, $ownerWorkspace->organization) + ['current_workspace_id' => $ownerWorkspace->id])
             ->delete(route('projects.members.destroy', [$project, $ownerMember]))
             ->assertSessionHasErrors('member');
 
@@ -142,6 +142,7 @@ class ProjectMemberFoundationTest extends TestCase
 
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $workspace];
     }

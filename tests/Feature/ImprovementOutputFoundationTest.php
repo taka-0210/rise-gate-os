@@ -71,7 +71,7 @@ class ImprovementOutputFoundationTest extends TestCase
 
         $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($owner, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->get(route('projects.improvements.show', [$project, $improvement]))
             ->assertOk()
             ->assertSee('Write operation note')
@@ -140,7 +140,7 @@ class ImprovementOutputFoundationTest extends TestCase
 
         $this
             ->actingAs($viewer)
-            ->withSession(['current_workspace_id' => $viewerWorkspace->id])
+            ->withSession($this->productOrganizationSession($viewer, $viewerWorkspace->organization) + ['current_workspace_id' => $viewerWorkspace->id])
             ->post(route('projects.tasks.store', $project), [
                 'title' => 'Should not create task',
                 'status' => Task::STATUS_TODO,
@@ -167,7 +167,7 @@ class ImprovementOutputFoundationTest extends TestCase
 
         $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($owner, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->post(route('projects.improvements.outputs.projects.store', [$sourceProject, $improvement]), [
                 'name' => 'Derived Project From Improvement',
                 'status' => Project::STATUS_DRAFT,
@@ -204,7 +204,7 @@ class ImprovementOutputFoundationTest extends TestCase
 
         $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($owner, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->post(route('projects.improvements.outputs.projects.store', [$sourceProject, $improvement]), [
                 'name' => 'Shared Derived Project',
                 'status' => Project::STATUS_DRAFT,
@@ -216,7 +216,7 @@ class ImprovementOutputFoundationTest extends TestCase
 
         $this
             ->actingAs($viewer)
-            ->withSession(['current_workspace_id' => $viewerWorkspace->id])
+            ->withSession($this->productOrganizationSession($viewer, $viewerWorkspace->organization) + ['current_workspace_id' => $viewerWorkspace->id])
             ->get(route('projects.show', $derivedProject))
             ->assertOk()
             ->assertSee('改善から生まれたProject')
@@ -242,6 +242,7 @@ class ImprovementOutputFoundationTest extends TestCase
 
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $workspace];
     }

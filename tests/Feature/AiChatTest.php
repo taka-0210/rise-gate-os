@@ -971,6 +971,7 @@ class AiChatTest extends TestCase
         ]);
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $user->workspaces()->attach($workspace->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
         $client = Client::create([
             'organization_id' => $organization->id,
             'workspace_id' => $workspace->id,

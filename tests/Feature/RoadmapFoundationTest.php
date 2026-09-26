@@ -202,6 +202,7 @@ class RoadmapFoundationTest extends TestCase
 
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $workspace];
     }

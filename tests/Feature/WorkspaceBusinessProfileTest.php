@@ -139,6 +139,7 @@ class WorkspaceBusinessProfileTest extends TestCase
         $workspace = Workspace::create(['organization_id' => $organization->id, 'owner_user_id' => $role === 'owner' ? $user->id : null, 'name' => '発行元WS', 'slug' => 'issuer-'.uniqid(), 'status' => 'active']);
         $organization->users()->attach($user->id, ['role' => $role === 'owner' ? 'owner' : 'member', 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => $role, 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
         return [$user, $workspace];
     }
 }

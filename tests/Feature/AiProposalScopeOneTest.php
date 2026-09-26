@@ -189,6 +189,7 @@ class AiProposalScopeOneTest extends TestCase
         $workspace = Workspace::create(['organization_id' => $org->id, 'owner_user_id' => $user->id, 'name' => 'Scope One', 'slug' => 'scope-one-'.strtolower((string) Str::ulid())]);
         $org->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $user->workspaces()->attach($workspace->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $org);
         $project = Project::create(['organization_id' => $org->id, 'owning_workspace_id' => $workspace->id, 'billing_workspace_id' => $workspace->id, 'owner_user_id' => $user->id, 'name' => 'Scope One']);
         ProjectMember::create(['project_id' => $project->id, 'user_id' => $user->id, 'workspace_id' => $workspace->id, 'project_role' => ProjectMember::ROLE_OWNER, 'permission_level' => ProjectMember::PERMISSION_ADMIN, 'status' => ProjectMember::STATUS_ACTIVE]);
         WorkspaceAiSetting::create(['workspace_id' => $workspace->id, 'enabled' => true, 'provider' => 'test', 'allowed_data_categories' => WorkspaceAiSetting::DEFAULT_DATA_CATEGORIES, 'terms_version' => WorkspaceAiSetting::TERMS_VERSION, 'enabled_by' => $user->id, 'enabled_at' => now()]);

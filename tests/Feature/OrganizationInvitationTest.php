@@ -260,7 +260,7 @@ class OrganizationInvitationTest extends TestCase
         $this->assertSame(1, OrganizationAuditEvent::query()->where('event', 'organization.invitation.accepted')->count());
     }
 
-    public function test_existing_user_login_preserves_profile_password_other_org_and_existing_active_role(): void
+    public function test_existing_single_user_is_rejected_from_a_second_company_without_mutating_identity_or_membership(): void
     {
         Mail::fake();
         $organization = $this->organization('existing');
@@ -269,6 +269,7 @@ class OrganizationInvitationTest extends TestCase
         $user = User::factory()->create(['name' => 'Existing Name', 'email' => 'existing@example.test']);
         $other = $this->organization('other-membership');
         $this->member($other, OrganizationUser::ORGANIZATION_ROLE_MEMBER, $user);
+        $this->establishSingleProductOrganization($user, $other);
         $passwordBefore = $user->password;
 
         $invitation = $this->issue($owner, $organization, $user->email);
@@ -277,26 +278,14 @@ class OrganizationInvitationTest extends TestCase
         $this->get($url)->assertRedirect(route('invitations.onboarding'));
         $this->post(route('login'), ['email' => $user->email, 'password' => 'password'])
             ->assertRedirect(route('invitations.onboarding'));
-        $this->post(route('invitations.prepare'))->assertRedirect();
-        $this->post(route('invitations.accept'))->assertRedirect(route('company.home'));
+        $this->post(route('invitations.prepare'))->assertSessionHasErrors('product_organization');
+        $this->post(route('invitations.accept'))->assertSessionHasErrors('product_organization');
 
         $this->assertSame('Existing Name', $user->fresh()->name);
         $this->assertSame($passwordBefore, $user->fresh()->password);
         $this->assertDatabaseHas('organization_users', ['organization_id' => $other->id, 'user_id' => $user->id]);
-        $this->assertSame(OrganizationInvitation::STATUS_ACCEPTED, $invitation->fresh()->status);
-
-        $activeOrganization = $this->organization('already');
-        [$activeOwner] = $this->member($activeOrganization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
-        [, $activeMembership] = $this->member($activeOrganization, OrganizationUser::ORGANIZATION_ROLE_ADMIN, $user);
-        $second = $this->issue($activeOwner, $activeOrganization, $user->email, OrganizationUser::ORGANIZATION_ROLE_MEMBER);
-        $secondUrl = $this->latestInvitationUrl();
-        $this->post(route('logout'));
-        $this->get($secondUrl)->assertRedirect(route('invitations.onboarding'));
-        $this->post(route('login'), ['email' => $user->email, 'password' => 'password'])->assertRedirect(route('invitations.onboarding'));
-        $this->post(route('invitations.prepare'))->assertRedirect();
-        $this->post(route('invitations.accept'))->assertRedirect(route('company.home'));
-        $this->assertSame(OrganizationUser::ORGANIZATION_ROLE_ADMIN, $activeMembership->fresh()->organization_role);
-        $this->assertSame(OrganizationInvitation::STATUS_ACCEPTED, $second->fresh()->status);
+        $this->assertDatabaseMissing('organization_users', ['organization_id' => $organization->id, 'user_id' => $user->id]);
+        $this->assertSame(OrganizationInvitation::STATUS_PENDING, $invitation->fresh()->status);
     }
 
     public function test_request_idempotency_encrypted_queue_and_pending_owner_do_not_weaken_last_owner_guard(): void
@@ -348,6 +337,7 @@ class OrganizationInvitationTest extends TestCase
         $this->asCompany($owner, $organization)->post(route('organization-management.standard-workspace.store'))->assertRedirect();
         $workspace = $organization->fresh()->standardWorkspace;
         $user = User::factory()->create(['email' => 'atomic@example.test']);
+        $this->establishUnstartedProductAccount($user);
         $invitation = $this->issue($owner, $organization, $user->email, OrganizationUser::ORGANIZATION_ROLE_MEMBER, [$group->id]);
         $url = $this->latestInvitationUrl();
         $this->post(route('logout'));
@@ -469,6 +459,7 @@ class OrganizationInvitationTest extends TestCase
         [$keeper] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
         $this->asCompany($sponsor, $organization)->post(route('organization-management.standard-workspace.store'))->assertRedirect();
         $target = User::factory()->create(['email' => 'target@example.test']);
+        $this->establishUnstartedProductAccount($target);
         $invitation = $this->issue($sponsor, $organization, $target->email, OrganizationUser::ORGANIZATION_ROLE_OWNER);
         $url = $this->latestInvitationUrl();
 

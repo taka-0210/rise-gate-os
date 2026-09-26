@@ -23,7 +23,7 @@ class ImprovementFoundationTest extends TestCase
 
         $response = $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($owner, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->post(route('projects.improvements.store', $project), [
                 'roadmap_id' => $project->roadmaps()->firstOrFail()->id,
                 'title' => 'Improve onboarding flow',
@@ -143,7 +143,7 @@ class ImprovementFoundationTest extends TestCase
 
         $response = $this
             ->actingAs($owner)
-            ->withSession(['current_workspace_id' => $workspace->id])
+            ->withSession($this->productOrganizationSession($owner, $workspace->organization) + ['current_workspace_id' => $workspace->id])
             ->post(route('projects.improvements.store', $project), [
                 'roadmap_id' => $project->roadmaps()->firstOrFail()->id,
                 'title' => 'Invalid assignment',
@@ -262,6 +262,7 @@ class ImprovementFoundationTest extends TestCase
 
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $workspace];
     }

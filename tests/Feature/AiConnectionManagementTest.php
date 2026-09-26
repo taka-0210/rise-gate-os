@@ -92,6 +92,7 @@ class AiConnectionManagementTest extends TestCase
         ]);
         $organization->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
         $user->workspaces()->attach($workspace->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
         WorkspaceAiSetting::create([
             'workspace_id' => $workspace->id,
             'enabled' => true,

@@ -84,3 +84,59 @@ Therefore the full release suite is not green and G06 cannot close. Updating sha
 - cron, queue, workers, external writers, session and cache actual state
 - shared `.env`, storage, uploads, DB and backup ownership/location
 - approved release/maintenance window and rollback decision boundaries
+
+## G06 Full Suite Corrective Work (2026-09-26 JST)
+
+This section appends the corrective result without replacing the historical `342 PASS / 174 FAIL` or the Track B baseline `354 PASS / 172 FAIL` evidence above.
+
+### Classification of the 172 baseline failures
+
+| Classification | Count | Corrective disposition |
+|---|---:|---|
+| A - Fixture defect | 153 | Legacy feature fixtures now establish an explicit `single` or `unstarted` Product Account Eligibility only where that test's actor requires it. The `single` helper also supplies the real Organization membership access epoch, so write tests reach their intended validation/authorization boundary. Negative Admission and Permission fixtures were not granted eligibility automatically. |
+| B - Obsolete expectation | 3 | Two old journeys that expected an existing single-Organization Account to join/start another Organization now verify fail-closed rejection before Business Data write. One stale suspended-state UI copy assertion now verifies the current closed-state message. The tests were retained and assert identity, membership and data preservation. |
+| C - Environment-specific | 16 | MariaDB RG02 cases are explicitly skipped by the normal SQLite profile with a reason. Their existing host, database-name, MariaDB 10.11, and isolated-datadir guards remain mandatory when `RG02_ALLOW=1`. Skips are not counted as passes. |
+| D - Actual regression | 0 | No failure remained after the Contract-correct fixture, expectation and profile corrections. No Application, Permission, Tenant, Security, Migration or Data Contract change was required. |
+
+The classification is exhaustive: 153 + 3 + 16 + 0 = 172.
+
+### Fixture and obsolete-test changes
+
+- Added explicit test helpers for `single` and `unstarted` Product Account Eligibility. They fail if a fixture attempts to overwrite an existing Product Organization contract or if Admission is not enabled.
+- Updated only the legacy fixtures whose positive journey requires current Eligibility and Organization session context. No global seeding, middleware bypass, guard weakening or Admission-off override was added.
+- Multi-actor tests explicitly restore the acting user's Organization ID and membership `access_epoch`, preventing a later fixture from contaminating the request session.
+- Invitation and Owner Onboarding second-company cases now assert `product_organization` rejection, no new Organization/Membership, unchanged identity/permissions, and pending/issued lifecycle state.
+- New-account invitation, onboarding and first-workspace fixtures use explicit `unstarted`, then exercise the real Admission transition.
+
+### Corrective verification
+
+Normal isolated SQLite full suite (`APP_ENV=testing`, root test `APP_URL`, in-memory SQLite, Admission enabled):
+
+- PASS: 510
+- FAIL: 0
+- SKIPPED: 16 (MariaDB RG02 profile only)
+- Assertions: 4,162
+- Duration: 276.31 seconds
+
+The normal suite result does not count the 16 skipped MariaDB cases as PASS.
+
+MariaDB RG02:
+
+- Current corrective run: not re-executed because the approved disposable MariaDB database/datadir profile is not currently provisioned; the prior P5 cleanup intentionally removed it.
+- Reused formal Evidence: 16 cases PASS on MariaDB 10.11.19 / InnoDB in the RG02 Formal Close report.
+- Normal-profile behavior verified: 16 reasoned SKIPs; `RG02_ALLOW=1` plus dedicated database and datadir remain required, and all engine/profile guards still fail closed.
+
+Focused Release Hardening / Product Organization / Scope 8 / Scope 9 regression:
+
+- 62 passed
+- 370 assertions
+- 0 failed / 0 skipped
+- Includes RH-01-07 framework checks, Client Promotion with Admission enabled, Product Organization Foundation/Journey/Operational, Scope 8 Project/Action including AI corrective journey, and Scope 9 Action Execution.
+
+`git diff --check` passed. Production, Track A, R0, Deploy, Migration, Backup and Account Separation were not accessed or executed.
+
+### G06 re-evaluation
+
+- **G06 - Test / Evidence: PASS.** The normal suite is meaningful against the current Closed Contracts, the only skips are clearly separated MariaDB-profile tests with existing formal PASS Evidence, and there are no unexplained failures or Actual Regressions.
+- **G05 - Release / Rollback Rehearsal: CONDITIONAL** (unchanged).
+- **G12 / Production Release: NOT READY / NO-GO** (unchanged).

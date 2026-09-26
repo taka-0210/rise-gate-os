@@ -420,6 +420,7 @@ class CompanyLoanManagementTest extends TestCase
         ]);
         $organization->users()->attach($user->id, ['role' => $role, 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => $role, 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
         return [$user, $organization, ['access_mode' => 'workspace', 'current_workspace_id' => $workspace->id]];
     }
 }

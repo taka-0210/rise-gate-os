@@ -134,6 +134,7 @@ class CompanyFinanceAccessTest extends TestCase
         ]);
         $organization->users()->attach($user->id, ['role' => $role, 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => $role, 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $organization, $workspace];
     }

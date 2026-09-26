@@ -1135,6 +1135,7 @@ class TaskManagementTest extends TestCase
         ]);
         $organization->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
         $workspace->users()->attach($owner->id, ['role' => 'owner', 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($owner, $organization);
         $project = $this->createProject($owner, $workspace, 'Task Project');
 
         return [$owner, $workspace, $project];

@@ -132,7 +132,7 @@ class OwnerOnboardingTest extends TestCase
         $this->get(route('company.home'))->assertOk()->assertSee('Staffを迎える')->assertSee('Staff Invitationへ');
     }
 
-    public function test_existing_user_can_start_second_company_without_mutating_other_identity_or_membership(): void
+    public function test_existing_single_user_cannot_start_second_company_and_keeps_identity_and_membership(): void
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $user = User::factory()->create(['email' => 'existing@example.test', 'password' => 'original-password']);
@@ -142,26 +142,34 @@ class OwnerOnboardingTest extends TestCase
             'organization_role' => 'member', 'membership_status' => 'active',
             'company_role' => 'accounting', 'permissions' => [OrganizationUser::PERMISSION_FINANCE_VIEW_PL], 'joined_at' => now(),
         ]);
+        $this->establishSingleProductOrganization($user, $first);
         $password = $user->password;
+        $organizationCount = Organization::query()->count();
         [$onboarding, $url] = $this->issue($admin, $user->email, 'Second');
 
         $this->get($url)->assertRedirect(route('owner-onboarding.show'));
         $this->post(route('login'), ['email' => $user->email, 'password' => 'original-password'])
             ->assertRedirect(route('owner-onboarding.show'));
-        $this->post(route('owner-onboarding.prepare'), ['accept_terms' => '1', 'accept_privacy' => '1'])->assertRedirect();
-        $this->post(route('owner-onboarding.complete'), ['confirm_owner_responsibility' => '1'])->assertRedirect(route('company.home'));
+        $this->post(route('owner-onboarding.prepare'), ['accept_terms' => '1', 'accept_privacy' => '1'])
+            ->assertSessionHasErrors('product_organization');
+        $this->post(route('owner-onboarding.complete'), ['confirm_owner_responsibility' => '1'])
+            ->assertSessionHasErrors('product_organization');
 
         $this->assertSame($password, $user->fresh()->password);
         $this->assertSame('accounting', $firstMembership->fresh()->company_role);
         $this->assertSame([OrganizationUser::PERMISSION_FINANCE_VIEW_PL], $firstMembership->fresh()->permissions);
-        $this->assertSame(2, $user->organizations()->count());
-        $this->assertSame($user->id, $onboarding->fresh()->claimed_user_id);
+        $this->assertSame(1, $user->organizations()->count());
+        $this->assertSame($organizationCount, Organization::query()->count());
+        $this->assertDatabaseMissing('organizations', ['name' => 'Second']);
+        $this->assertSame(OwnerOnboarding::STATUS_ISSUED, $onboarding->fresh()->status);
+        $this->assertNull($onboarding->fresh()->claimed_user_id);
     }
 
     public function test_completion_is_idempotent_and_cannot_revive_suspended_membership(): void
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $user = User::factory()->create(['email' => 'retry@example.test']);
+        $this->establishUnstartedProductAccount($user);
         [$onboarding, $url] = $this->issue($admin, $user->email, 'Retry Company');
         $this->get($url);
         $this->actingAs($user)->withSession(['access_mode' => 'workspace', 'credential_generation' => $user->credential_generation]);
@@ -189,6 +197,7 @@ class OwnerOnboardingTest extends TestCase
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $user = User::factory()->create(['email' => 'lifecycle@example.test']);
+        $this->establishUnstartedProductAccount($user);
         [$onboarding, $oldUrl] = $this->issue($admin, $user->email, 'Lifecycle');
         $this->travel(61)->seconds();
         $this->asSystemAdmin($admin)->post(route('system-admin.owner-onboardings.resend', $onboarding), ['request_id' => (string) Str::uuid()])->assertRedirect();
@@ -211,6 +220,7 @@ class OwnerOnboardingTest extends TestCase
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $user = User::factory()->create(['email' => 'legal@example.test']);
+        $this->establishUnstartedProductAccount($user);
         [$onboarding, $url] = $this->issue($admin, $user->email, 'Legal');
         $this->get($url);
         $this->actingAs($user)->withSession(['access_mode' => 'workspace', 'credential_generation' => $user->credential_generation]);
@@ -238,6 +248,7 @@ class OwnerOnboardingTest extends TestCase
         foreach (['organization', 'membership', 'workspace', 'result', 'audit'] as $step) {
             $admin = User::factory()->create(['is_system_admin' => true]);
             $user = User::factory()->create(['email' => $step.'@example.test']);
+            $this->establishUnstartedProductAccount($user);
             [$onboarding, $url] = $this->issue($admin, $user->email, 'Failure '.$step);
             $this->get($url);
             $this->actingAs($user)->withSession(['access_mode' => 'workspace', 'credential_generation' => $user->credential_generation]);
@@ -251,6 +262,7 @@ class OwnerOnboardingTest extends TestCase
 
         $admin = User::factory()->create(['is_system_admin' => true]);
         $user = User::factory()->create(['email' => 'personal-off@example.test']);
+        $this->establishUnstartedProductAccount($user);
         [$onboarding, $url] = $this->issue($admin, $user->email, 'Personal Off');
         $this->get($url);
         $this->actingAs($user)->withSession(['access_mode' => 'workspace', 'credential_generation' => $user->credential_generation]);
@@ -367,6 +379,7 @@ class OwnerOnboardingTest extends TestCase
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $target = User::factory()->create(['email' => 'target@example.test']);
+        $this->establishUnstartedProductAccount($target);
         $wrong = User::factory()->create(['email' => 'wrong@example.test']);
         [$onboarding, $url] = $this->issue($admin, $target->email, 'Identity Check');
 

@@ -64,11 +64,11 @@ class WorkspaceNameManagementTest extends TestCase
 
     public function test_owner_cannot_rename_workspace_they_do_not_belong_to(): void
     {
-        [$user] = $this->createWorkspace('owner');
+        [$user, $workspace] = $this->createWorkspace('owner');
         [, $otherWorkspace] = $this->createWorkspace('owner', 'Other Org', 'Other Workspace');
 
         $this->actingAs($user)
-            ->withSession(['access_mode' => 'workspace'])
+            ->withSession($this->productOrganizationSession($user, $workspace->organization) + ['access_mode' => 'workspace'])
             ->put(route('workspaces.update', $otherWorkspace), ['name' => 'Unauthorized Name'])
             ->assertForbidden();
 
@@ -92,6 +92,7 @@ class WorkspaceNameManagementTest extends TestCase
         ]);
         $organization->users()->attach($user->id, ['role' => $role, 'joined_at' => now()]);
         $workspace->users()->attach($user->id, ['role' => $role, 'joined_at' => now()]);
+        $this->establishSingleProductOrganization($user, $organization);
 
         return [$user, $workspace];
     }

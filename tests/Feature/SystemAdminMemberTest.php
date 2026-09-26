@@ -182,6 +182,7 @@ class SystemAdminMemberTest extends TestCase
     {
         $admin = User::factory()->create(['is_system_admin' => true]);
         $member = User::factory()->create();
+        $this->establishUnstartedProductAccount($member);
         $organization = Organization::create(['name' => 'Rise Gate', 'slug' => 'rise-gate']);
         $workspace = Workspace::create(['organization_id' => $organization->id, 'name' => 'Main', 'slug' => 'main']);
 

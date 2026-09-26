@@ -705,6 +705,7 @@ class OrganizationMembershipLifecycleTest extends TestCase
         $organization = $this->organization('relations');
         [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
         [$target, $membership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_MEMBER);
+        $this->establishSingleProductOrganization($target, $organization);
         $workspace = $this->workspace($organization, $owner, 'relations');
         $workspace->users()->attach($target->id, ['role' => 'member', 'joined_at' => now()]);
         $group = OrganizationGroup::create(['organization_id' => $organization->id, 'name' => 'Relations Group']);
@@ -909,6 +910,7 @@ class OrganizationMembershipLifecycleTest extends TestCase
         $organization = $this->organization('orgless');
         [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
         [$target, $membership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_MEMBER);
+        $this->establishSingleProductOrganization($target, $organization);
         $this->lifecycle($owner, $organization, $membership, 'suspend', 1, 'orgless-stop');
 
         $this->post(route('login'), [
@@ -917,7 +919,7 @@ class OrganizationMembershipLifecycleTest extends TestCase
         ])->assertRedirect(route('companies.index'));
         $this->get(route('companies.index'))
             ->assertOk()
-            ->assertSee('Accountと所属履歴を確認する');
+            ->assertSee('会社の利用が一時停止されています');
         $this->get(route('account.profile'))
             ->assertOk()
             ->assertSee('一時停止中');
