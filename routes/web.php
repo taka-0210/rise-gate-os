@@ -26,6 +26,9 @@ use App\Http\Controllers\EstimateController;
 use App\Http\Controllers\InvitationOnboardingController;
 use App\Http\Controllers\OrganizationInvitationController;
 use App\Http\Controllers\OrganizationManagementController;
+use App\Http\Controllers\NotificationCenterController;
+use App\Http\Controllers\OrganizationNotificationPolicyController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\OwnerOnboardingController;
 use App\Http\Controllers\Project\AiChatController;
 use App\Http\Controllers\Project\AiProposalController;
@@ -149,6 +152,14 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
 
     Route::middleware(['workspace-mode', 'company'])->group(function (): void {
         Route::get('/company', CompanyHomeController::class)->name('company.home');
+        Route::get('/company/notifications', [NotificationCenterController::class, 'index'])->name('notifications.index');
+        Route::post('/company/notifications/preferences', [NotificationCenterController::class, 'preferences'])->name('notifications.preferences');
+        Route::post('/company/notifications/{notification}/read', [NotificationCenterController::class, 'read'])->name('notifications.read');
+        Route::get('/company/notifications/{notification}/open', [NotificationCenterController::class, 'open'])->name('notifications.open');
+        Route::get('/company/settings/notifications', [OrganizationNotificationPolicyController::class, 'edit'])->name('notifications.policy.edit');
+        Route::put('/company/settings/notifications', [OrganizationNotificationPolicyController::class, 'update'])->name('notifications.policy.update');
+        Route::post('/company/push-subscriptions', [PushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
+        Route::delete('/company/push-subscriptions', [PushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
         Route::get('/company/business-domains', [BusinessDomainController::class, 'index'])->name('business-domains.index');
         Route::get('/company/business-domains/create', [BusinessDomainController::class, 'create'])->name('business-domains.create');
         Route::post('/company/business-domains', [BusinessDomainController::class, 'store'])->name('business-domains.store');

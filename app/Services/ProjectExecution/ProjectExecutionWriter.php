@@ -13,6 +13,7 @@ use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Notification\NotificationSourceWriter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -24,6 +25,7 @@ class ProjectExecutionWriter
     public function __construct(
         private readonly ProjectExecutionAccess $access,
         private readonly ProjectExecutionHistory $history,
+        private readonly NotificationSourceWriter $notifications,
     ) {}
 
     public function createProject(User $actor, Workspace $workspace, array $attributes): Project
@@ -354,6 +356,7 @@ class ProjectExecutionWriter
             $this->history->record($locked, $action, $actor, 'action.created', after: $action->only([
                 'title', 'done_condition', 'assigned_to', 'reviewer_user_id', 'due_date', 'improvement_id',
             ]));
+            $this->notifications->actionAssigned($actor, $action, $attributes['notification_timing'] ?? 'now', $attributes['notification_at'] ?? null);
 
             return $action;
         }, 3);
@@ -411,6 +414,17 @@ class ProjectExecutionWriter
             $action->update($changes);
             $this->history->record($project, $action, $actor, 'action.'.$command, $before,
                 $action->only(array_keys($changes)), $reason);
+            if ($command === 'complete') {
+                $this->notifications->markActionDone($action, $actor, \App\Models\CompanyNotification::TYPE_ACTION_ASSIGNED);
+                $this->notifications->markActionDone($action, $actor, \App\Models\CompanyNotification::TYPE_ACTION_RETURNED);
+            } elseif (in_array($command, ['confirm', 'reject'], true)) {
+                $this->notifications->markActionDone($action, $actor, \App\Models\CompanyNotification::TYPE_REVIEW_ATTENTION);
+            }
+            if ($command === 'complete' && $action->status === Task::STATUS_REVIEW_PENDING) {
+                $this->notifications->reviewAttention($actor, $action);
+            } elseif ($command === 'reject') {
+                $this->notifications->actionReturned($actor, $action);
+            }
 
             return $action->fresh();
         }, 3);

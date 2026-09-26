@@ -29,7 +29,9 @@
         <div><label>配置</label><select name="improvement_id"><option value="">Project直下</option>@foreach($project->roadmaps as $roadmap)@foreach($roadmap->improvements as $theme)<option value="{{ $theme->id }}">{{ $roadmap->title }} / {{ $theme->title }}</option>@endforeach @endforeach</select></div>
         <div><label>Action名</label><input name="title" required></div><div><label>Done Condition</label><textarea name="done_condition" required></textarea></div>
         <div class="s8-form-row"><div><label>主担当</label><select name="assigned_to" required>@foreach($eligibleUsers as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div><div><label>Reviewer（任意）</label><select name="reviewer_user_id"><option value="">なし</option>@foreach($eligibleUsers as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div></div>
-        <div><label>期限（任意）</label><input type="date" name="due_date"></div><button class="s8-button">Actionを追加</button>
+        <div><label>期限（任意）</label><input type="date" name="due_date"></div>
+        <div class='s8-form-row'><div><label>通知タイミング</label><select name='notification_timing'><option value='now'>今（quiet hoursは尊重）</option><option value='next_window'>次の通知時間帯</option><option value='specified'>日時指定</option></select></div><div><label>通知日時（日時指定時）</label><input type='datetime-local' name='notification_at'></div></div>
+        <button class="s8-button">Actionを追加</button>
     </form></section>
     @endif
 

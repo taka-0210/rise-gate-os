@@ -135,6 +135,8 @@ class ProjectExecutionController extends Controller
             'title' => ['required', 'string', 'max:200'], 'description' => ['nullable', 'string', 'max:3000'],
             'done_condition' => ['required', 'string', 'max:3000'], 'assigned_to' => ['required', 'integer'],
             'reviewer_user_id' => ['nullable', 'integer', 'different:assigned_to'], 'due_date' => ['nullable', 'date'],
+            'notification_timing' => ['nullable', Rule::in(['now', 'specified', 'next_window'])],
+            'notification_at' => ['nullable', 'date', 'required_if:notification_timing,specified'],
         ]);
         $writer->createAction($request->user(), $project, $data, (int) $data['project_version']);
         return back()->with('status', 'Actionを追加しました。');

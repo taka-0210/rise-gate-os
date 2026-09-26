@@ -12,6 +12,7 @@ use App\Models\Improvement;
 use App\Models\Roadmap;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Notification\NotificationSourceWriter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -25,12 +26,16 @@ class AiProposalScopeOneApplier
     private const MAX_ATTEMPTS = 3;
 
     private const PROCESSING_TIMEOUT_MINUTES = 5;
+    private readonly NotificationSourceWriter $notifications;
 
     public function __construct(
         private readonly AiProposalAuthorization $authorization,
         private readonly AiProposalValidator $validator,
         private readonly ProjectPlanSnapshotService $snapshots,
-    ) {}
+        ?NotificationSourceWriter $notifications = null,
+    ) {
+        $this->notifications = $notifications ?? app(NotificationSourceWriter::class);
+    }
 
     public function apply(AiProposal $proposal, User $actor): AiProposal
     {
@@ -96,6 +101,9 @@ class AiProposalScopeOneApplier
                         $references[$item->reference_key] = $model;
                     }
                     $model->refresh();
+                    if ($model instanceof Task) {
+                        $this->notifications->actionAssigned($actor, $model);
+                    }
                     $item->update(['applied_entity_public_id' => $model->public_id]);
                     $completed[$item->id] = $model->public_id;
                     $currentItemId = null;

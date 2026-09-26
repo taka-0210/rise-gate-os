@@ -101,7 +101,7 @@ class ReleaseHardeningTest extends TestCase
 
         $this->assertSame('read-only', $result['audit_mode']);
         $this->assertSame('sqlite', $result['database']['driver']);
-        $this->assertSame(94, $result['migrations']['repository_count']);
+        $this->assertSame(95, $result['migrations']['repository_count']);
         $this->assertSame([], $result['migrations']['pending']);
         $this->assertArrayHasKey('organizations', $result['business_counts']);
         $this->assertStringNotContainsString('APP_KEY', $json);

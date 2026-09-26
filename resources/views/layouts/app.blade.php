@@ -6,6 +6,13 @@
     <title>{{ $title ?? 'Company OS' }}</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('favicon.png') }}">
+    <link rel='manifest' href='{{ asset('manifest.webmanifest') }}'>
+    <meta name='theme-color' content='#0f4c5c'>
+    <meta name='company-os-base' content='{{ rtrim(url('/'), '/') }}'>
+    <meta name='csrf-token' content='{{ csrf_token() }}'>
+    @if(config('company_notifications.vapid.public_key'))
+        <meta name='company-os-vapid-public-key' content='{{ config('company_notifications.vapid.public_key') }}'>
+    @endif
     <style>
         :root {
             --ink: #17202a;
@@ -321,6 +328,18 @@
                     </form>
                 @else
                     @isset($currentCompany)
+                        @php
+                            $notificationUnreadCount = \Illuminate\Support\Facades\Schema::hasTable('company_notifications')
+                                ? \App\Models\CompanyNotification::query()
+                                    ->where('organization_id', $currentCompany->id)
+                                    ->where('recipient_user_id', auth()->id())
+                                    ->where('content_visible_at_utc', '<=', now('UTC'))
+                                    ->whereNull('read_at_utc')
+                                    ->whereNull('cancelled_at_utc')
+                                    ->count()
+                                : 0;
+                        @endphp
+                        <a href='{{ route('notifications.index') }}'>通知@if($notificationUnreadCount > 0) <span class='badge' aria-label='未読 {{ $notificationUnreadCount }}件'>{{ $notificationUnreadCount }}</span>@endif</a>
                         <a class="workspace-pill" href="{{ route('company.home') }}">{{ $currentCompany->name }}</a>
                         @if (($availableCompanyCount ?? 0) > 1)
                             <a href="{{ route('companies.index') }}">会社切替</a>
@@ -452,6 +471,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 @endif
+<script defer src='{{ asset('js/company-os-pwa.js') }}'></script>
 </body>
 </html>
-

@@ -1,0 +1,10 @@
+{
+  "name": "Company OS",
+  "short_name": "Company OS",
+  "start_url": "./company/today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2f5",
+  "theme_color": "#0f4c5c",
+  "icons": [{"src":"favicon.png","sizes":"any","type":"image/png"}]
+}
