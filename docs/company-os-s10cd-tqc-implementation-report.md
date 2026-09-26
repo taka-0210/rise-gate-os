@@ -200,3 +200,61 @@ Test削除、skip追加、Admission/Permission bypass、期待値弱体化は行
 - Scope 11：未開始
 
 結論：**S10 Companion Delta Capture Unit / Text Quick CaptureはCode Complete / Formal Close候補**。Formal Closeは実施せず、人＋ChatGPT Final Review待ちとする。
+
+
+## 13. Formal Close Decision（2026-09-27 JST）
+
+Implementation Reportを人＋ChatGPTでFinal Reviewし、S10 Companion Delta｜Capture Unit / Text Quick CaptureのFormal Closeを承認した。
+
+### 正式状態
+
+- Capture Unit / Text Quick Capture：**Formal Closed**
+- CD-TQC-DC01〜22：**Done**
+- Conditional：**0**
+- Not Done：**0**
+- Product判断Blocker：**0**
+- CD-TQC-C01：**Resolved**
+- CD-TQC-C02 / C03：発生なし
+- CD-TQC-G01：**OPEN / 通過済み**
+- S10-CD-G01｜Scope 11開始Gate：**OPEN**
+
+これにより、Scope 10｜通知・PWAからS10 Companion Delta｜Capture Unit / Text Quick CaptureまでのVer.1 Must工程は完了した。Scope 11は開始可能な状態とするが、このFormal Closeでは設計・実装を開始しない。
+
+### Formal Close Evidence
+
+次の既取得Evidenceを維持する。
+
+- Corrective Delta：MariaDB同時create回収、timeout結果照会、current epoch pagination / post-conversion authorization、本文4000文字Domain境界
+- SQLite：Repository全96 migration適用、Capture additive 3 table、通常local DB不使用
+- MariaDB 10.11.19：全96 migration、FK / unique / index、rollback / reapply、既存logical count不変
+- Concurrency：2 worker同時createでCapture / event / notification各1件、2 worker同時promotionでTask / relation / converted event各1件
+- Browser / 390px：innerWidth 390 / scrollWidth 390、Quick Capture / Inbox、Project / Done Conditionなし、localStorage 0、offline非queue
+- Cleanup：専用DB / process / port / datadir / Browser fixtureを削除済み
+- IR-1 / master / Production / Deploy / 通常local DB：非変更
+- Master v145 / v041：確定Product Contract内の実装であり更新不要
+
+### Full Suite既知FAILのFinal Review分類
+
+Full isolated SQLite Suiteの5 FAILは、PASSへの変更、SKIP追加、期待値弱体化を行わず、次のとおり固定する。
+
+1. Scope 9日付依存fixture 3件
+   未変更Scope 10 branchでも同一原因・同一件数であり、既存Test Debt。
+2. `CompanyNavigationTest` 1件
+   未変更Scope 10 branchでも同一再現する既存baseline。
+3. `ReleaseHardeningTest` 1件
+   固定済みIR-1 R0がrepository migration数95を期待する一方、Formal Close対象のCapture additive migration追加によりProduct Development lineの現在値が96となった差。Capture migration不良ではなく、固定済みIR-1 Release Candidateと、その後のProduct Developmentとの差として扱う。
+
+IR-1のTest / Manifest / RC / Artifactは96へ更新せず、固定Evidenceとして非変更を維持する。
+
+### Release Verification Open Evidence
+
+次の2件は未確認の履歴を保持し、Companion Formal CloseによってPASSへ変更しない。
+
+1. 実SMTP ProviderによるEmail実受信
+2. Android Chrome実機でのPWA Install / Push / Deep Link
+
+いずれもScope 10 Release Ready前に、Scope 10専用Staging / Release Verification環境で取得する必須Evidenceとして継続する。
+
+### 停止地点
+
+Formal Close Evidenceの確定のみを行う。Scope 11、Production、Deploy、IR-1更新、master更新、通常local Migrationには進まない。
