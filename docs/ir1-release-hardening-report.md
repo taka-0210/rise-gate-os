@@ -48,7 +48,7 @@ Therefore the full release suite is not green and G06 cannot close. Updating sha
 
 ## Verification performed
 
-- Release Hardening / Client Promotion / Product Organization focused regression: 15 passed, 70 assertions
+- Release Hardening / Client Promotion / Product Organization focused regression: 15 passed, 73 assertions
 - New PHP files: syntax PASS
 - Deployment shell files: `bash -n` PASS
 - GitHub Actions workflows: Symfony YAML parse PASS
