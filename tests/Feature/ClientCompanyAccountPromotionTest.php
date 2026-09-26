@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\OrganizationUser;
+use App\Models\ProductAccountEligibility;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +17,7 @@ class ClientCompanyAccountPromotionTest extends TestCase
 
     public function test_workspace_owner_can_promote_client_without_moving_existing_projects(): void
     {
+        config(['product_ux.organization_admission_enabled' => false]);
         $user = User::factory()->create(['is_system_admin' => true]);
         $provider = Organization::create(['name' => 'Provider', 'slug' => 'provider']);
         $workspace = Workspace::create([
@@ -55,6 +57,7 @@ class ClientCompanyAccountPromotionTest extends TestCase
 
     public function test_client_cannot_be_promoted_twice(): void
     {
+        config(['product_ux.organization_admission_enabled' => false]);
         $user = User::factory()->create(['is_system_admin' => true]);
         $provider = Organization::create(['name' => 'Provider', 'slug' => 'provider']);
         $workspace = Workspace::create([
@@ -86,5 +89,46 @@ class ClientCompanyAccountPromotionTest extends TestCase
             ->assertSessionHasErrors('company_account');
 
         $this->assertSame(1, Organization::query()->where('name', 'Client Company')->count());
+    }
+
+    public function test_admission_enabled_rejects_legacy_client_promotion_without_business_write(): void
+    {
+        config(['product_ux.organization_admission_enabled' => true]);
+        $user = User::factory()->create(['is_system_admin' => true]);
+        $provider = Organization::create(['name' => 'Provider', 'slug' => 'provider']);
+        $workspace = Workspace::create([
+            'organization_id' => $provider->id,
+            'owner_user_id' => $user->id,
+            'name' => 'Client Workspace',
+            'slug' => 'client-workspace',
+            'status' => Workspace::STATUS_ACTIVE,
+        ]);
+        $provider->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        $workspace->users()->attach($user->id, ['role' => 'owner', 'joined_at' => now()]);
+        ProductAccountEligibility::query()->create([
+            'user_id' => $user->id,
+            'mode' => ProductAccountEligibility::MODE_SINGLE,
+            'product_organization_id' => $provider->id,
+            'classification_version' => 'release-hardening-test',
+            'classified_at' => now(),
+            'evidence_ref' => 'test:release-hardening',
+        ]);
+        $client = Client::create([
+            'organization_id' => $provider->id,
+            'workspace_id' => $workspace->id,
+            'name' => 'Blocked Client Company',
+        ]);
+
+        $this->actingAs($user)
+            ->withSession([
+                'access_mode' => 'workspace',
+                'current_company_id' => $provider->id,
+                'current_workspace_id' => $workspace->id,
+            ])
+            ->post(route('clients.company-account.store', $client), ['workspace_name' => '経営WS'])
+            ->assertSessionHasErrors('product_organization');
+
+        $this->assertDatabaseMissing('organizations', ['name' => 'Blocked Client Company']);
+        $this->assertNull($client->fresh()->linked_organization_id);
     }
 }

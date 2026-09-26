@@ -1,0 +1,105 @@
+name: Release Candidateを構築
+
+on:
+  workflow_dispatch:
+    inputs:
+      rc_sha:
+        description: '構築する40桁のCommit SHA'
+        required: true
+        type: string
+      release_case:
+        description: '承認対象のRelease case ID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rise-gate-os-rc-${{ inputs.rc_sha }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 固定RCを検証してartifact化
+    runs-on: ubuntu-latest
+    steps:
+      - name: 入力形式を検証
+        env:
+          RC_SHA: ${{ inputs.rc_sha }}
+          RELEASE_CASE: ${{ inputs.release_case }}
+        run: |
+          [[ "$RC_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_CASE" =~ ^[A-Za-z0-9._-]+$ ]]
+
+      - name: 固定SHAを取得
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.rc_sha }}
+          fetch-depth: 1
+
+      - name: Checkoutを照合
+        env:
+          RC_SHA: ${{ inputs.rc_sha }}
+        run: test "$(git rev-parse HEAD)" = "$RC_SHA"
+
+      - name: PHP 8.3を準備
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3, zip
+          coverage: none
+
+      - name: Node.js 22を準備
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: lock fileから依存関係を取得
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+
+      - name: 隔離Test環境を準備
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Release対象Test
+        run: php artisan test
+
+      - name: Production frontend assetsを構築
+        run: |
+          npm run build
+          test -s public/build/manifest.json
+          test -n "$(find public/build/assets -type f -print -quit)"
+
+      - name: Production PHP dependenciesへ固定
+        run: composer install --no-dev --classmap-authoritative --no-interaction --prefer-dist --no-progress
+
+      - name: immutable artifactを作成
+        env:
+          RC_SHA: ${{ inputs.rc_sha }}
+        run: bash deployment/build-release-artifact.sh "$RC_SHA" "$RUNNER_TEMP/release"
+
+      - name: RC Evidence
+        env:
+          RC_SHA: ${{ inputs.rc_sha }}
+          RELEASE_CASE: ${{ inputs.release_case }}
+        run: |
+          artifact="$RUNNER_TEMP/release/rise-gate-os-${RC_SHA}.tar.gz"
+          echo "Release case: $RELEASE_CASE" >> "$GITHUB_STEP_SUMMARY"
+          echo "RC SHA: $RC_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Artifact SHA-256: $(sha256sum "$artifact" | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 同一artifactを保管
+        uses: actions/upload-artifact@v4
+        with:
+          name: rise-gate-os-${{ inputs.rc_sha }}
+          path: |
+            ${{ runner.temp }}/release/rise-gate-os-${{ inputs.rc_sha }}.tar.gz
+            ${{ runner.temp }}/release/rise-gate-os-${{ inputs.rc_sha }}.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30

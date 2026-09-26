@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "release_case": "IR1-R0-EVIDENCE-REQUIRED",
+  "rc_sha": "0000000000000000000000000000000000000000",
+  "repository_migrations_sha256": "R0_AND_RC_BUILD_REQUIRED",
+  "allowed_pending": [],
+  "migration_sha256": {},
+  "approval": {
+    "status": "pending",
+    "approved_by": "",
+    "approved_at_jst": ""
+  }
+}

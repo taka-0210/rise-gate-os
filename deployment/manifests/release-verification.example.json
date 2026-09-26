@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "release_case": "IR1-R0-EVIDENCE-REQUIRED",
+  "rc_sha": "0000000000000000000000000000000000000000",
+  "environment_label": "staging-synthetic",
+  "required_routes": ["login", "company.home", "projects.index"],
+  "table_counts": {
+    "organizations": {"minimum": 1},
+    "workspaces": {"minimum": 1},
+    "projects": {"minimum": 1}
+  },
+  "required_records": [],
+  "relations": [],
+  "owner_minimums": {},
+  "asset_files": [
+    {"path": "public/build/manifest.json"}
+  ],
+  "http_checks": [
+    {"path": "/login", "status": 200},
+    {"path": "/up", "status": 200}
+  ]
+}
