@@ -7,16 +7,20 @@
 @if(session('status'))<div class="notice success">{{ session('status') }}</div>@endif
 <section class="card" style="margin-bottom:18px">
  <h2>自分の通知設定</h2><p class="muted">アプリ内通知は常に利用できます。PushとEmailは本人が明示的に選びます。</p>
- <form method="POST" action="{{ route('notifications.preferences') }}" class="form-grid">
+ <form method="POST" action="{{ route('notifications.preferences') }}" class="notification-preferences">
   @csrf
   <label><input type="checkbox" name="push_enabled" value="1" @checked($preference->push_enabled)> Push通知</label>
   <label><input type="checkbox" name="email_enabled" value="1" @checked($preference->email_enabled) @disabled(!auth()->user()->email_verified_at)> Email通知</label>
   <label><input type="checkbox" name="email_fallback_enabled" value="1" @checked($preference->email_fallback_enabled) @disabled(!auth()->user()->email_verified_at)> Email fallback</label>
   <label>個人Quiet開始（任意）<input type="time" name="quiet_starts_at" value="{{ $preference->quiet_starts_at }}"></label>
   <label>個人Quiet終了（任意）<input type="time" name="quiet_ends_at" value="{{ $preference->quiet_ends_at }}"></label>
-  <button type="submit">保存</button><button type="button" class="secondary" data-enable-push>この端末でPushを有効にする</button><span data-push-status aria-live="polite"></span>
+  <div class="notification-preferences__actions"><button type="submit">保存</button><button type="button" class="secondary" data-enable-push>この端末でPushを有効にする</button><span data-push-status aria-live="polite"></span></div>
  </form>
 </section>
+<style>
+.notification-preferences{display:grid;gap:12px}.notification-preferences label{margin:0}.notification-preferences__actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}.notification-preferences__actions button{max-width:100%;white-space:normal}.notification-preferences__actions [data-push-status]{flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
+@media(max-width:480px){.notification-preferences__actions button{width:100%}}
+</style>
 <div class="grid">
 @forelse($notifications as $notification)
  <article class="card" @if(!$notification->read_at_utc) style="border-left:4px solid var(--accent)" @endif>
