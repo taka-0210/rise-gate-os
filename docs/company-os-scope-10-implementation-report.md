@@ -62,6 +62,62 @@ Conditional項目をfake PASSへ置き換えない。Code CloseとReleaseは分�
 
 Text Quick Captureは本体へ混入していない。正式な次工程は **S10 Formal Close → S10-CD-TQC｜Text Quick Captureの設計・実装・検証 → Scope 11** とする。S10-PD-12を維持し、S10-CD-G01によりText Quick Capture完了Evidenceが揃うまでScope 11へ進まない。Voice / STT / AI構造化はさらに別差分である。
 
-## 7. Master / Environment
+## 7. Formal Close前 Close Verification（2026-09-26 JST）
+
+既存Evidenceを再利用し、未取得だったDC16 / DC17 / DC18 / DC19 / DC20 / DC23だけをSAFE LOOPで再評価した。Production、通常local DB、IR-1、Masterには接続・変更していない。
+
+### S10-DC16｜PASS
+
+- 実施環境: 公式MariaDB 10.11.19 Windows package、隔離TEMP datadir、127.0.0.1:13319、InnoDB、utf8mb4_unicode_ci、REPEATABLE READ。package SHA-256は 398ea30e5036010bbebe01d2b1804280424dcc2626e36d8e95155c04d25a0490。
+- 同一Eventを独立2 processで競合させ、commit待ちを含めてもNotification 1件 / Delivery intent 1件、duplicate key 0件へ収束した。
+- 2 worker同時claimの初回実測で、同一Deliveryを両workerが処理しAttemptが2件になるDefectを検出した。active lease判定をPHP時刻比較からMariaDB上のUTC predicate + row lockへ変更し、claim未取得をfailureへ誤計上しないtri-stateへ最小修正した。
+- 修正後はworker Aが processed 1 / delivered 1、worker Bが processed 0 / delivered 0 / failed 0。Delivery 1件 / Attempt 1件、duplicate Notification / Delivery intentとも0件。
+- active lease中はprocessed 0、lease期限後はprocessed 1 / delivered 1で回収。最終fixture全体はNotification 3件 / Delivery 3件 / delivered 3件 / Attempt 3件、duplicate 0件。
+- Corrective Delta: あり。Product / Tenant / Permission / Data Contract変更なし。
+
+### S10-DC23｜PASS
+
+- 同じ隔離MariaDB 10.11.19へRepository全95 Migrationを適用し、Scope 10の7 additive tableを確認した。
+- 7 tableはすべてInnoDB / utf8mb4_unicode_ci。12 FK、dedupe_key / public_id / notification+channel / operation_id / organization+date / organization / organization+user / endpoint_hashのunique、due / center / unread / recipient indexを実測した。
+- Migration再実行は Nothing to migrate。既存Migrationの推測変換、通常local Migration、Production Migrationは行っていない。
+- 隔離fixtureのUser 2 / Organization 1 / Workspace 1 / Project 1 / Action 3を維持したままScope 10処理を実行した。
+- Corrective Delta: なし。
+
+### S10-DC17｜CONDITIONAL
+
+- fakeによる既存Evidenceは維持。Test専用VAPID、Test Origin、Test Account、Test Push Subscription、本人承認済みTest Emailが現環境に揃っていないため、外部送信はfail-closedで未実施。
+- 実Push Provider受付、実端末受信、Email実受信、invalid subscription / unsubscribe / retry / accept後crashの外部境界は、本人が受信先と操作を確認した後に実施する。
+- Corrective Delta: なし。
+
+### S10-DC18｜CONDITIONAL
+
+- 既存Chrome E2Eのmanifest / Service Worker / Deep Link Evidenceは再利用。
+- Android Chrome、iOS Home Screen、Desktop EdgeのInstall / Push permission / 実受信 / tap / Login / Deep Linkは物理端末操作待ち。
+- Corrective Delta: なし。
+
+### S10-DC19｜CONDITIONAL
+
+- isolated localhost + 実Chromeで、期限切れLoginからNotification Deep Linkを開くとLogin後にCompany Homeへ失われるDefectを再現した。
+- Login時にurl.intendedを無条件破棄していた処理を、Organization context選択後にintendedへ復帰するよう最小修正した。Invitation / Owner Onboarding優先時とOrganization未確定時はintendedを破棄する既存安全境界を維持した。
+- 修正後の実Chromeで Push相当Deep Link → Login → 元Notification open → 正しいProjectへの復帰、Logout後のNotification Center拒否を確認した。
+- 実スマートフォンkeyboard / focus、Push Permission拒否・解除・再判定、実端末Account切替は本人操作待ち。
+- Corrective Delta: あり。Product / Tenant / Permission / Security Contract変更なし。
+
+### S10-DC20｜CONDITIONAL
+
+- isolated localhost + 実ChromeでService Worker controlling、offline時のBusiness navigation非提供、network復帰、registration.update時の編集中form保持、Logoutを確認した。
+- Cache Storageは company-os-shell-v1 の favicon.png / manifest.webmanifestだけ。IndexedDBは0件で、Business Data / session / CSRF / offline write queueが残らないことを実測した。
+- 実端末上の旧Service Workerから新Service Workerへのversion切替は本人操作待ち。Corrective Deltaなし。
+
+### Corrective Verification
+
+- Scope 10 / Product Organization / Invitation / Owner Onboarding focused regression: 54 tests / 542 assertions PASS。
+- Scope 10単体: 11 tests / 33 assertions PASS。active lease再claim負例を追加した。
+- focused Chrome Close Journey: expired Login復帰、SW control、Cache Storage / IndexedDB非保持、form保持、offline非queue、network復帰、Logout保護がPASS。
+- 現在の再判定: DC16 Done、DC23 Done、DC17〜20 Conditional。Conditionalは6件から4件へ減少し、Not Doneは0件。
+- Formal Close判定: 現時点ではConditional。本人実配信・実機Evidenceの反映後に再判定する。
+- Master Update: 現時点で不要。S10-CD-TQC / S10-CD-G01は維持し、Text Quick CaptureとScope 11へ進んでいない。
+
+## 8. Master / Environment
 
 現時点でProduct / Architecture Contractの変更はなく、Master v144 / v040更新は不要候補。通常local Migration、Production接続・Migration、Deploy、IR-1変更、HOW、Scope 11は未実施。

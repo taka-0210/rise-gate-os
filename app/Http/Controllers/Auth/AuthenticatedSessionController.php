@@ -50,13 +50,14 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         $request->session()->put('access_mode', 'workspace');
         $request->session()->put('credential_generation', (int) $request->user()->credential_generation);
-        $request->session()->forget('url.intended');
         $audit->record('account.login', 'success', $request->user(), $request->user());
 
         if ($request->session()->has(OwnerOnboardingClaim::SESSION_KEY)) {
+            $request->session()->forget('url.intended');
             return redirect()->route('owner-onboarding.show');
         }
         if ($request->session()->has(OrganizationInvitationClaim::SESSION_KEY)) {
+            $request->session()->forget('url.intended');
             return redirect()->route('invitations.onboarding');
         }
 
@@ -68,10 +69,11 @@ class AuthenticatedSessionController extends Controller
                 ->firstOrFail();
             $sessionContext->select($request, $membership);
 
-            return redirect()->route('company.home');
+            return redirect()->intended(route('company.home'));
         }
 
         $sessionContext->clear($request);
+        $request->session()->forget('url.intended');
 
         return redirect()->route('companies.index');
     }

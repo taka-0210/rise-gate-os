@@ -19,19 +19,26 @@ class NotificationDeliveryProcessor
         $ids=NotificationDelivery::query()->where('status','pending')->where('available_at_utc','<=',now('UTC'))
             ->where(fn($q)=>$q->whereNull('leased_until_utc')->orWhere('leased_until_utc','<',now('UTC')))->orderBy('id')->limit($limit)->pluck('id');
         $result=['processed'=>0,'delivered'=>0,'failed'=>0,'disabled'=>false];
-        foreach($ids as $id){$result['processed']++;$this->process((int)$id)?$result['delivered']++:$result['failed']++;}
+        foreach($ids as $id){
+            $outcome=$this->process((int)$id);
+            if($outcome===null)continue;
+            $result['processed']++;
+            $outcome?$result['delivered']++:$result['failed']++;
+        }
         return $result;
     }
-    private function process(int $id): bool
+    private function process(int $id): ?bool
     {
         $token=(string)Str::uuid();
         $delivery=DB::transaction(function()use($id,$token){
-            $row=NotificationDelivery::query()->lockForUpdate()->find($id);
-            if(!$row||$row->status!=='pending'||($row->leased_until_utc&&$row->leased_until_utc->isFuture()))return null;
+            $now=now('UTC');
+            $row=NotificationDelivery::query()->whereKey($id)->where('status','pending')->where('available_at_utc','<=',$now)
+                ->where(fn($q)=>$q->whereNull('leased_until_utc')->orWhere('leased_until_utc','<',$now))->lockForUpdate()->first();
+            if(!$row)return null;
             $row->update(['lease_token'=>$token,'leased_until_utc'=>now('UTC')->addMinutes(5),'attempt_count'=>$row->attempt_count+1]);
             return $row->fresh(['notification.recipient']);
         },3);
-        if(!$delivery)return false;
+        if(!$delivery)return null;
         $outcome='failed';$reason=null;$receipt=null;
         try{
             $notification=$delivery->notification;

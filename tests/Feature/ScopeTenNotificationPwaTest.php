@@ -91,6 +91,19 @@ class ScopeTenNotificationPwaTest extends TestCase
         config(['company_notifications.delivery_enabled'=>true]);app(NotificationDeliveryProcessor::class)->run(10);
         $this->assertSame('cancelled',$delivery->fresh()->status);$this->assertDatabaseHas('notification_delivery_attempts',['notification_delivery_id'=>$delivery->id,'reason_code'=>'authorization_revoked']);
     }
+    public function test_delivery_with_an_active_lease_is_not_claimed_again(): void
+    {
+        [$owner,$assignee,,,$project]=$this->fixture();
+        app(ProjectExecutionWriter::class)->createAction($owner,$project->fresh(),['title'=>'Leased work','done_condition'=>'Done','assigned_to'=>$assignee->id],$project->fresh()->plan_version);
+        $delivery=NotificationDelivery::firstOrFail();
+        $delivery->update(['lease_token'=>'existing-worker','leased_until_utc'=>now('UTC')->addMinutes(5)]);
+        config(['company_notifications.delivery_enabled'=>true]);
+
+        $this->assertSame(['processed'=>0,'delivered'=>0,'failed'=>0,'disabled'=>false],app(NotificationDeliveryProcessor::class)->run(10));
+        $this->assertSame('pending',$delivery->fresh()->status);
+        $this->assertSame(0,$delivery->fresh()->attempt_count);
+        $this->assertDatabaseCount('notification_delivery_attempts',0);
+    }
     public function test_read_seen_and_action_done_are_distinct_and_source_is_reauthorized(): void
     {
         [$owner,$assignee,,,$project]=$this->fixture();

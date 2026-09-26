@@ -71,6 +71,17 @@ class ProductOrganizationJourneyTest extends TestCase
         $this->post(route('companies.switch', $other))->assertForbidden();
     }
 
+    public function test_single_login_restores_the_intended_company_destination_after_context_selection(): void
+    {
+        [$user, $organization] = $this->singleUser('single-intended');
+
+        $this->withSession(['url.intended' => route('notifications.index')])
+            ->post(route('login'), ['email' => $user->email, 'password' => 'password'])
+            ->assertRedirect(route('notifications.index'))
+            ->assertSessionHas('current_company_id', $organization->id)
+            ->assertSessionMissing('url.intended');
+    }
+
     public function test_valid_onboarding_claim_keeps_priority_over_product_state_during_login(): void
     {
         $sponsor = User::factory()->create();
