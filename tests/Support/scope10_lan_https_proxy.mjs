@@ -30,7 +30,7 @@ const caServer = http.createServer((request, response) => {
     return response.end('Not Found');
   }
   response.writeHead(200, {
-    'Content-Type': 'application/pkix-cert',
+    'Content-Type': 'application/x-x509-ca-cert',
     'Content-Disposition': 'attachment; filename=company-os-scope10-test-ca.cer',
     'Cache-Control': 'no-store',
   });
