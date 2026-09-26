@@ -42,7 +42,7 @@ class AiCommonProposalFactory
         if ($idempotency === '' || mb_strlen($idempotency) > 100) {
             throw ValidationException::withMessages(['idempotency_key' => '操作IDを指定してください。']);
         }
-        $commonOperationKey = hash('sha256', implode('|', [
+        $commonOperationKey = AiCommonProposalContract::operationUuid(implode('|', [
             $organization->id, $actor->id, $conversation->id, $operation, $idempotency,
         ]));
 

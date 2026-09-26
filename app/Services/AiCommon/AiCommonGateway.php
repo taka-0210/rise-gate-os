@@ -12,29 +12,40 @@ use Throwable;
 class AiCommonGateway
 {
     public const PURPOSE = 'business_common';
+    private const MAX_ATTEMPTS = 2;
 
     public function __construct(private readonly AiCommonProvider $provider) {}
 
     public function respond(User $actor, AiCommonConversation $conversation, array $messages, array $sources, ?string $logicalRequestId = null): array
     {
         $requestId = $logicalRequestId ?: (string) Str::uuid();
-        $started = hrtime(true);
-        try {
-            $result = $this->provider->respond($messages, $sources);
-            $this->record($actor, $conversation, $requestId, $result, 'success', null, $started);
+        $lastError = null;
+        for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
+            $started = hrtime(true);
+            try {
+                $result = $this->provider->respond($messages, $sources);
+                $this->record($actor, $conversation, $requestId, $attempt, $result, 'success', null, $started);
 
-            return $result + ['logical_request_id' => $requestId];
-        } catch (Throwable $error) {
-            $code = in_array($error->getMessage(), ['provider_unavailable', 'provider_error', 'provider_invalid_response'], true)
-                ? $error->getMessage() : 'provider_failure';
-            $this->record($actor, $conversation, $requestId, [
-                'provider' => 'openai', 'model' => null, 'input_tokens' => null, 'output_tokens' => null,
-            ], 'failed', $code, $started);
-            throw new AiCommonGatewayException($code, previous: $error);
+                return $result + ['logical_request_id' => $requestId];
+            } catch (Throwable $error) {
+                $lastError = $error;
+                $code = in_array($error->getMessage(), ['provider_unavailable', 'provider_error', 'provider_invalid_response'], true)
+                    ? $error->getMessage() : 'provider_failure';
+                $this->record($actor, $conversation, $requestId, $attempt, [
+                    'provider' => 'openai', 'model' => null, 'input_tokens' => null, 'output_tokens' => null,
+                ], 'failed', $code, $started);
+                if ($code === 'provider_invalid_response') {
+                    break;
+                }
+            }
         }
+
+        $code = in_array($lastError?->getMessage(), ['provider_unavailable', 'provider_error', 'provider_invalid_response'], true)
+            ? $lastError->getMessage() : 'provider_failure';
+        throw new AiCommonGatewayException($code, previous: $lastError);
     }
 
-    private function record(User $actor, AiCommonConversation $conversation, string $requestId, array $result, string $status, ?string $error, int $started): void
+    private function record(User $actor, AiCommonConversation $conversation, string $requestId, int $attempt, array $result, string $status, ?string $error, int $started): void
     {
         $input = $result['input_tokens'] ?? null;
         $output = $result['output_tokens'] ?? null;
@@ -54,7 +65,7 @@ class AiCommonGateway
             'purpose' => self::PURPOSE,
             'provider' => $result['provider'] ?? 'openai',
             'model' => $result['model'] ?? null,
-            'attempt' => 1,
+            'attempt' => $attempt,
             'input_tokens' => $input,
             'output_tokens' => $output,
             'estimated_cost_microunits' => $cost,

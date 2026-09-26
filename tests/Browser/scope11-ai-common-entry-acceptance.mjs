@@ -1,0 +1,45 @@
+import { chromium } from 'playwright-core';
+const [baseUrl,desktopShot,mobileShot]=process.argv.slice(2);
+if(!baseUrl||!desktopShot||!mobileShot)throw new Error('usage');
+const assert=(value,message)=>{if(!value)throw new Error(message)};
+const browser=await chromium.launch({executablePath:'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',headless:true});
+const login=async(page,email)=>{
+ await page.goto(baseUrl+'/login');
+ await page.locator('#email').fill(email);
+ await page.locator('#password').fill('not-used');
+ await Promise.all([page.waitForURL('**/company'),page.locator('button[type=submit]').click()]);
+};
+try{
+ const ownerContext=await browser.newContext({viewport:{width:1440,height:1000}});
+ const owner=await ownerContext.newPage();
+ await login(owner,'scope10-owner@example.test');
+ await owner.goto(baseUrl+'/company/settings/ai-common');
+ assert(await owner.getByRole('heading',{name:'Organization AI Policy'}).isVisible(),'AI policy page missing');
+ await owner.getByLabel('Organization AIを有効にする').check();
+ for(const label of ['共通入口','Project','Action','Business Domain','Capture'])await owner.getByLabel(label,{exact:true}).check();
+ await Promise.all([owner.waitForLoadState('networkidle'),owner.getByRole('button',{name:'Policyを確認して保存'}).click()]);
+ await owner.goto(baseUrl+'/company/co');
+ assert(await owner.getByRole('heading',{name:'COに相談'}).isVisible(),'Common Entry missing');
+ const create=owner.getByRole('button',{name:'Conversationを始める'}).locator('..');
+ await create.locator('input[name=title]').fill('Scope 11 Browser Conversation');
+ await Promise.all([owner.waitForURL('**/company/co/conversations/**'),create.getByRole('button',{name:'Conversationを始める'}).click()]);
+ const conversationUrl=owner.url();
+ assert(await owner.getByText('本人用Private work history。',{exact:false}).isVisible(),'private provenance missing');
+ assert(await owner.getByRole('heading',{name:'Contextを明示選択'}).isVisible(),'context selection missing');
+ assert(await owner.getByText('1 Proposal = 1 Unit = 1 operationです。',{exact:false}).isVisible(),'proposal boundary missing');
+ await owner.screenshot({path:desktopShot,fullPage:true});
+ const memberContext=await browser.newContext({viewport:{width:1280,height:900}});
+ const member=await memberContext.newPage();await login(member,'scope10-assignee@example.test');
+ const denied=await member.goto(conversationUrl);
+ assert(denied.status()===403,'private conversation was exposed to another member');
+ const mobileContext=await browser.newContext({viewport:{width:390,height:844}});
+ const mobile=await mobileContext.newPage();await login(mobile,'scope10-owner@example.test');
+ await mobile.goto(conversationUrl);
+ assert(await mobile.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'390px overflow');
+ assert(await mobile.getByRole('button',{name:'許可済みContextだけで相談する'}).isVisible(),'mobile consultation action missing');
+ await mobile.locator('textarea[name=content]').focus();
+ assert(await mobile.locator('textarea[name=content]').evaluate(element=>document.activeElement===element),'mobile focus failed');
+ await mobile.screenshot({path:mobileShot,fullPage:true});
+ await ownerContext.close();await memberContext.close();await mobileContext.close();
+ console.log(JSON.stringify({desktop:true,mobile390:true,noOverflow:true,keyboardFocus:true,privateConversation403:true,policyOwner:true,externalProviderCalled:false}));
+}finally{await browser.close();}

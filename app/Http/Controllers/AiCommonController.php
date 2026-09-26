@@ -15,6 +15,7 @@ use App\Services\AiCommon\AiCommonProposalFactory;
 use App\Services\AiCommon\AiCommonSourceManifest;
 use App\Services\AiProposalApplier;
 use App\Services\AiProposalApprover;
+use App\Services\AiProposalUndoService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,13 +28,14 @@ class AiCommonController extends Controller
     public function index(Request $request, AiCommonAccess $access): View
     {
         $organization = $request->attributes->get('currentCompany');
-        $access->authorizeOrganization($request->user(), $organization);
+        $membership = $access->authorizeOrganization($request->user(), $organization);
 
         return view('ai-common.index', [
             'conversations' => AiCommonConversation::query()->where('organization_id', $organization->id)
                 ->where('user_id', $request->user()->id)->where('status', AiCommonConversation::STATUS_ACTIVE)
                 ->latest('last_message_at')->latest('id')->get(),
             'policy' => $access->policy($organization),
+            'canManageOrganization' => $membership->organization_role === 'owner',
         ]);
     }
 
@@ -59,7 +61,7 @@ class AiCommonController extends Controller
         $access->authorizeConversation($request->user(), $organization, $conversation);
 
         return view('ai-common.show', [
-            'conversation' => $conversation->load(['sources', 'proposals.items', 'proposals.applyAttempts']),
+            'conversation' => $conversation->load(['sources', 'proposals.items', 'proposals.applyAttempts', 'proposals.undos']),
             'messageRows' => $reader->visible($request->user(), $organization, $conversation),
         ]);
     }
@@ -166,5 +168,16 @@ class AiCommonController extends Controller
         $applier->apply($proposal, $request->user());
 
         return back()->with('status', 'Writerの成功を確認し、変更を適用しました。');
+    }
+
+    public function undo(Request $request, AiCommonConversation $conversation, AiProposal $proposal, AiCommonAccess $access, AiProposalUndoService $undo): RedirectResponse
+    {
+        $access->authorizeConversation($request->user(), $request->attributes->get('currentCompany'), $conversation);
+        if ($proposal->ai_common_conversation_id !== $conversation->id) {
+            abort(404);
+        }
+        $undo->undo($proposal, $request->user());
+
+        return back()->with('status', 'Writer経由で更新を元に戻しました。');
     }
 }

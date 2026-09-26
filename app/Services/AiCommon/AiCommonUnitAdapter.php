@@ -7,6 +7,7 @@ use App\Models\AiProposal;
 use App\Models\AiProposalApplyAttempt;
 use App\Models\AiProposalItem;
 use App\Models\AiProposalItemResult;
+use App\Models\AiProposalUndo;
 use App\Models\BusinessDomain;
 use App\Models\Capture;
 use App\Models\Organization;
@@ -21,6 +22,7 @@ use App\Services\Capture\CaptureWriter;
 use App\Services\ProjectExecution\ProjectExecutionAccess;
 use App\Services\ProjectExecution\ProjectExecutionWriter;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -76,10 +78,20 @@ class AiCommonUnitAdapter
             return $proposal->fresh(['items', 'applyAttempts.itemResults', 'commonHandoff']);
         }
         $attempt = $this->newAttempt($proposal, $actor);
+        if ($attempt->status === AiProposalApplyAttempt::STATUS_APPLIED) {
+            $current = $proposal->fresh(['items', 'commonConversation.organization']);
+            $this->authorizeAppliedResult($actor, $current);
+
+            return $current->load(['applyAttempts.itemResults', 'commonHandoff']);
+        }
         try {
             DB::transaction(function () use ($proposal, $actor, $attempt): void {
                 $locked = AiProposal::query()->with(['items', 'commonConversation.organization'])->lockForUpdate()->findOrFail($proposal->id);
                 $this->assertShape($locked);
+                if ($locked->status === AiProposal::STATUS_APPLIED
+                    && $attempt->fresh()->status === AiProposalApplyAttempt::STATUS_APPLIED) {
+                    return;
+                }
                 if ($locked->status !== AiProposal::STATUS_APPROVED) {
                     throw ValidationException::withMessages(['proposal' => '承認済みの提案だけを適用できます。']);
                 }
@@ -91,6 +103,7 @@ class AiCommonUnitAdapter
                 }
                 $item = $locked->items->sole();
                 $target = $this->applyItem($actor, $locked, $item);
+                $this->afterWriterApply($target);
                 $publicId = (string) $target->public_id;
                 $version = (int) ($target->version ?? $target->plan_version ?? 1);
                 $item->update(['applied_entity_public_id' => $publicId, 'applied_version' => $version]);
@@ -120,6 +133,127 @@ class AiCommonUnitAdapter
         }
 
         return $proposal->fresh(['items', 'applyAttempts.itemResults', 'commonHandoff']);
+    }
+
+    public function undo(AiProposal $proposal, User $actor): AiProposalUndo
+    {
+        $proposal->loadMissing(['items', 'commonConversation.organization']);
+        $this->assertShape($proposal);
+        if ($proposal->status !== AiProposal::STATUS_APPLIED) {
+            throw ValidationException::withMessages(['undo' => 'Only an applied proposal can be undone.']);
+        }
+        if ($proposal->items->sole()->operation === AiProposalItem::OPERATION_CREATE) {
+            throw ValidationException::withMessages(['undo' => 'Create operations are not undoable.']);
+        }
+        $this->common->authorizeConversation($actor, $proposal->commonConversation->organization, $proposal->commonConversation);
+        $this->authorizeOperation($actor, $proposal, true);
+        if ($applied = $proposal->undos()->where('status', AiProposalUndo::STATUS_APPLIED)->latest('id')->first()) {
+            return $applied;
+        }
+
+        $record = $proposal->undos()->create([
+            'actor_id' => $actor->id,
+            'status' => AiProposalUndo::STATUS_PROCESSING,
+        ]);
+        try {
+            DB::transaction(function () use ($proposal, $actor, $record): void {
+                $locked = AiProposal::query()
+                    ->with(['items', 'commonConversation.organization'])
+                    ->lockForUpdate()
+                    ->findOrFail($proposal->id);
+                $this->assertShape($locked);
+                if ($locked->status !== AiProposal::STATUS_APPLIED) {
+                    throw ValidationException::withMessages(['undo' => 'Only an applied proposal can be undone.']);
+                }
+                if ($locked->undos()->where('status', AiProposalUndo::STATUS_APPLIED)->whereKeyNot($record->id)->exists()) {
+                    throw ValidationException::withMessages(['undo' => 'This proposal was already undone.']);
+                }
+                $this->common->authorizeConversation($actor, $locked->commonConversation->organization, $locked->commonConversation);
+                $this->authorizeOperation($actor, $locked, true);
+                $item = $locked->items->sole();
+                $target = $this->undoItem($actor, $locked, $item);
+                $record->update([
+                    'status' => AiProposalUndo::STATUS_APPLIED,
+                    'result' => [
+                        'restored_items_count' => 1,
+                        'target_public_id' => (string) $target->public_id,
+                    ],
+                    'error_code' => null,
+                    'error_message' => null,
+                ]);
+            }, 3);
+        } catch (Throwable $error) {
+            $record->update([
+                'status' => AiProposalUndo::STATUS_FAILED,
+                'error_code' => $error instanceof AuthorizationException ? 'permission_denied' : 'conflict',
+                'error_message' => 'The proposal could not be safely undone in its current state.',
+            ]);
+            throw $error;
+        }
+
+        return $record->fresh();
+    }
+
+    private function undoItem(User $actor, AiProposal $proposal, AiProposalItem $item): object
+    {
+        if ($item->operation !== AiProposalItem::OPERATION_UPDATE) {
+            throw ValidationException::withMessages(['undo' => 'Only update operations are undoable.']);
+        }
+
+        return match ($item->entity_type) {
+            AiCommonProposalContract::ACTION_UPDATE => (function () use ($actor, $proposal, $item): Task {
+                $action = Task::query()->where('organization_id', $proposal->organization_id)
+                    ->where('public_id', $item->applied_entity_public_id)->firstOrFail();
+                if ((int) $action->plan_version !== (int) $item->applied_version) {
+                    throw ValidationException::withMessages(['undo' => 'The Action changed after apply.']);
+                }
+
+                return $this->projectWriter->updateAction(
+                    $actor,
+                    $action,
+                    Arr::only($item->before ?? [], ['title', 'description', 'done_condition', 'due_date']),
+                    (int) $action->project->plan_version,
+                    'AI Proposal Undo',
+                );
+            })(),
+            AiCommonProposalContract::PROJECT_UPDATE => (function () use ($actor, $proposal, $item): Project {
+                $project = Project::query()->where('organization_id', $proposal->organization_id)
+                    ->where('public_id', $item->applied_entity_public_id)->firstOrFail();
+                if ((int) $project->plan_version !== (int) $item->applied_version) {
+                    throw ValidationException::withMessages(['undo' => 'The Project changed after apply.']);
+                }
+
+                return $this->projectWriter->updateProject(
+                    $actor,
+                    $project,
+                    Arr::only($item->before ?? [], ['purpose', 'expected_outcome']),
+                    (int) $project->plan_version,
+                );
+            })(),
+            AiCommonProposalContract::DOMAIN_UPDATE => (function () use ($actor, $proposal, $item): BusinessDomain {
+                $organization = $proposal->commonConversation->organization;
+                $domain = BusinessDomain::query()->where('organization_id', $organization->id)
+                    ->where('public_id', $item->applied_entity_public_id)
+                    ->where('status', BusinessDomain::STATUS_ACTIVE)->firstOrFail();
+                if ((int) $domain->version !== (int) $item->applied_version) {
+                    throw ValidationException::withMessages(['undo' => 'The Business Domain changed after apply.']);
+                }
+
+                return $this->domainWriter->update(
+                    $actor,
+                    $organization,
+                    $domain,
+                    Arr::only($item->before ?? [], array_values(array_diff(
+                        AiCommonProposalContract::FIELD_MAP[AiCommonProposalContract::DOMAIN_UPDATE],
+                        ['reason', 'context_impact_confirmed'],
+                    ))),
+                    (int) $domain->version,
+                    'AI Proposal Undo',
+                    AiCommonProposalContract::operationUuid($proposal->common_operation_key.':undo'),
+                );
+            })(),
+            default => throw ValidationException::withMessages(['undo' => 'This operation is not undoable.']),
+        };
     }
 
     private function applyItem(User $actor, AiProposal $proposal, AiProposalItem $item)
@@ -217,9 +351,9 @@ class AiCommonUnitAdapter
         $this->common->authorizeCategory($actor, $org, $category);
         match ($item->entity_type) {
             AiCommonProposalContract::CAPTURE_CREATE => $this->captureAccess->canParticipate($actor, $org) ?: throw new AuthorizationException,
-            AiCommonProposalContract::ACTION_CREATE => $this->projectAccess->canCreateAction($actor, Project::query()->where('public_id', $proposal->target_public_id)->firstOrFail()) ?: throw new AuthorizationException,
-            AiCommonProposalContract::ACTION_UPDATE => $this->projectAccess->canEditAction($actor, Task::query()->where('public_id', $proposal->target_public_id)->firstOrFail()) ?: throw new AuthorizationException,
-            AiCommonProposalContract::PROJECT_UPDATE => $this->projectAccess->canManageStructure($actor, Project::query()->where('public_id', $proposal->target_public_id)->firstOrFail()) ?: throw new AuthorizationException,
+            AiCommonProposalContract::ACTION_CREATE => $this->projectAccess->canCreateAction($actor, Project::query()->where('organization_id', $proposal->organization_id)->where('public_id', $proposal->target_public_id)->firstOrFail()) ?: throw new AuthorizationException,
+            AiCommonProposalContract::ACTION_UPDATE => $this->projectAccess->canEditAction($actor, Task::query()->where('organization_id', $proposal->organization_id)->where('public_id', $proposal->target_public_id)->firstOrFail()) ?: throw new AuthorizationException,
+            AiCommonProposalContract::PROJECT_UPDATE => $this->projectAccess->canManageStructure($actor, Project::query()->where('organization_id', $proposal->organization_id)->where('public_id', $proposal->target_public_id)->firstOrFail()) ?: throw new AuthorizationException,
             AiCommonProposalContract::DOMAIN_UPDATE => $this->domainAccess->authorizeEdit($actor, $org),
         };
     }
@@ -228,9 +362,9 @@ class AiCommonUnitAdapter
     {
         $item = $proposal->items->sole();
         match ($item->entity_type) {
-            AiCommonProposalContract::CAPTURE_CREATE => $this->captureAccess->canRead($actor, Capture::query()->where('public_id', $item->applied_entity_public_id)->firstOrFail()) ?: throw new AuthorizationException,
-            AiCommonProposalContract::ACTION_CREATE, AiCommonProposalContract::ACTION_UPDATE => $this->projectAccess->canRead($actor, Task::query()->where('public_id', $item->applied_entity_public_id)->firstOrFail()->project) ?: throw new AuthorizationException,
-            AiCommonProposalContract::PROJECT_UPDATE => $this->projectAccess->canRead($actor, Project::query()->where('public_id', $item->applied_entity_public_id)->firstOrFail()) ?: throw new AuthorizationException,
+            AiCommonProposalContract::CAPTURE_CREATE => $this->captureAccess->canRead($actor, Capture::query()->where('organization_id', $proposal->organization_id)->where('public_id', $item->applied_entity_public_id)->firstOrFail()) ?: throw new AuthorizationException,
+            AiCommonProposalContract::ACTION_CREATE, AiCommonProposalContract::ACTION_UPDATE => $this->projectAccess->canRead($actor, Task::query()->where('organization_id', $proposal->organization_id)->where('public_id', $item->applied_entity_public_id)->firstOrFail()->project) ?: throw new AuthorizationException,
+            AiCommonProposalContract::PROJECT_UPDATE => $this->projectAccess->canRead($actor, Project::query()->where('organization_id', $proposal->organization_id)->where('public_id', $item->applied_entity_public_id)->firstOrFail()) ?: throw new AuthorizationException,
             AiCommonProposalContract::DOMAIN_UPDATE => $this->domainAccess->authorizeView($actor, $proposal->commonConversation->organization),
         };
     }
@@ -251,6 +385,12 @@ class AiCommonUnitAdapter
         }
     }
 
+    /** Test seam for proving that Writer side effects and proposal state share one transaction. */
+    protected function afterWriterApply(object $target): void
+    {
+        // Intentionally empty.
+    }
+
     private function newAttempt(AiProposal $proposal, User $actor): AiProposalApplyAttempt
     {
         return DB::transaction(function () use ($proposal, $actor): AiProposalApplyAttempt {
@@ -258,6 +398,9 @@ class AiCommonUnitAdapter
             $attempts = $locked->applyAttempts()->lockForUpdate()->orderBy('attempt_number')->get();
             if ($applied = $attempts->firstWhere('status', AiProposalApplyAttempt::STATUS_APPLIED)) {
                 return $applied;
+            }
+            if ($processing = $attempts->firstWhere('status', AiProposalApplyAttempt::STATUS_PROCESSING)) {
+                return $processing;
             }
             if ($locked->status !== AiProposal::STATUS_APPROVED) {
                 throw ValidationException::withMessages(['proposal' => '承認済みの提案だけを適用できます。']);

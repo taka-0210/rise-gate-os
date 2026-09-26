@@ -6,6 +6,8 @@ use App\Models\AiProposal;
 use App\Models\AiProposalItem;
 use App\Models\AiProposalUndo;
 use App\Models\User;
+use App\Services\AiCommon\AiCommonProposalContract;
+use App\Services\AiCommon\AiCommonUnitAdapter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -17,10 +19,16 @@ use Throwable;
 
 class AiProposalUndoService
 {
-    public function __construct(private readonly AiProposalAuthorization $authorization) {}
+    public function __construct(
+        private readonly AiProposalAuthorization $authorization,
+        private readonly AiCommonUnitAdapter $commonUnitAdapter,
+    ) {}
 
     public function undo(AiProposal $proposal, User $actor): AiProposalUndo
     {
+        if (AiCommonProposalContract::supports($proposal->contract_version)) {
+            return $this->commonUnitAdapter->undo($proposal, $actor);
+        }
         if ($proposal->status !== AiProposal::STATUS_APPLIED) {
             throw ValidationException::withMessages(['undo' => '適用済みの提案だけを元に戻せます。']);
         }

@@ -21,18 +21,22 @@ use App\Models\Workspace;
 use App\Models\WorkspaceAiSetting;
 use App\Services\AiCommon\AiCommonAccess;
 use App\Services\AiCommon\AiCommonConversationReader;
+use App\Services\AiCommon\AiCommonGateway;
 use App\Services\AiCommon\AiCommonPolicyWriter;
 use App\Services\AiCommon\AiCommonProposalContract;
 use App\Services\AiCommon\AiCommonProposalFactory;
 use App\Services\AiCommon\AiCommonSourceManifest;
+use App\Services\AiCommon\AiCommonUnitAdapter;
 use App\Services\AiProposalApplier;
 use App\Services\AiProposalApprover;
+use App\Services\AiProposalUndoService;
 use App\Services\BusinessDomain\BusinessDomainWriter;
 use App\Services\ProjectExecution\ProjectExecutionWriter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Tests\TestCase;
 
 class ScopeElevenAiCommonEntryTest extends TestCase
@@ -120,6 +124,39 @@ class ScopeElevenAiCommonEntryTest extends TestCase
         $this->assertSame([], app(AiCommonConversationReader::class)->providerHistory($owner, $organization, $conversation));
     }
 
+    public function test_source_reauthorization_fails_closed_after_epoch_credential_or_policy_change(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $this->resourceOn($organization, $owner, 'project', $project->public_id);
+        $manifest = app(AiCommonSourceManifest::class);
+        $source = $manifest->select($owner, $organization, $conversation, 'project', $project->public_id, 'Current permission evidence');
+
+        OrganizationUser::query()->where('organization_id', $organization->id)
+            ->where('user_id', $owner->id)->increment('access_epoch');
+        try {
+            $manifest->authorize($owner->fresh(), $organization, $source->fresh('conversation'));
+            $this->fail('A stale membership epoch was accepted.');
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+
+        $source = $manifest->select($owner->fresh(), $organization, $conversation, 'project', $project->public_id, 'Refresh epoch evidence');
+        $owner->increment('credential_generation');
+        try {
+            $manifest->authorize($owner->fresh(), $organization, $source->fresh('conversation'));
+            $this->fail('A stale credential generation was accepted.');
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+
+        $source = $manifest->select($owner->fresh(), $organization, $conversation, 'project', $project->public_id, 'Refresh credential evidence');
+        AiResourcePolicy::query()->where('organization_id', $organization->id)
+            ->where('resource_type', 'project')->where('resource_public_id', $project->public_id)->increment('version');
+        $this->expectException(ValidationException::class);
+        $manifest->authorize($owner->fresh(), $organization, $source->fresh('conversation'));
+    }
+
     public function test_gateway_uses_only_selected_projection_and_unknown_usage_stays_null(): void
     {
         [$owner, , , $organization, , $project] = $this->tenant(true);
@@ -139,6 +176,30 @@ class ScopeElevenAiCommonEntryTest extends TestCase
         $this->assertNull($ledger->output_tokens);
         $this->assertNull($ledger->estimated_cost_microunits);
         $this->assertDatabaseHas('ai_common_messages', ['role' => 'assistant', 'content' => 'Synthetic business answer']);
+    }
+
+    public function test_gateway_retries_once_with_a_separate_usage_attempt(): void
+    {
+        [$owner, , , $organization] = $this->tenant();
+        $conversation = $this->conversation($owner, $organization);
+        $this->provider->failuresRemaining = 1;
+
+        $result = app(AiCommonGateway::class)->respond(
+            $owner,
+            $conversation,
+            [['role' => 'user', 'content' => 'Synthetic request']],
+            [],
+            's11-retry-evidence',
+        );
+
+        $this->assertSame('Synthetic business answer', $result['answer']);
+        $this->assertDatabaseHas('ai_usage_ledgers', [
+            'logical_request_id' => 's11-retry-evidence', 'attempt' => 1,
+            'result' => 'failed', 'safe_error_code' => 'provider_unavailable',
+        ]);
+        $this->assertDatabaseHas('ai_usage_ledgers', [
+            'logical_request_id' => 's11-retry-evidence', 'attempt' => 2, 'result' => 'success',
+        ]);
     }
 
     public function test_provider_cannot_smuggle_an_unselected_citation(): void
@@ -176,6 +237,35 @@ class ScopeElevenAiCommonEntryTest extends TestCase
         $this->assertSame('2026-09-28 01:00:00', Capture::firstOrFail()->notify_at_utc->format('Y-m-d H:i:s'));
     }
 
+    public function test_writer_midway_failure_rolls_back_unit_history_notification_and_proposal_state(): void
+    {
+        [$owner, $member, , $organization] = $this->tenant();
+        $conversation = $this->conversation($owner, $organization);
+        $proposal = $this->proposal($owner, $organization, $conversation, [
+            'operation' => AiCommonProposalContract::CAPTURE_CREATE,
+            'attributes' => [
+                'type' => 'request', 'body' => 'Rollback evidence', 'recipient_user_id' => $member->id,
+                'notification_timing' => 'now', 'recipient_confirmed' => true,
+            ],
+        ]);
+        $failing = app(Scope11FailAfterWriterUnitAdapter::class);
+        $this->app->instance(AiCommonUnitAdapter::class, $failing);
+        app(AiProposalApprover::class)->approve($proposal, $owner);
+
+        try {
+            app(AiProposalApplier::class)->apply($proposal->fresh(), $owner);
+            $this->fail('The simulated post-Writer failure was ignored.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('scope11_simulated_writer_boundary_failure', $error->getMessage());
+        }
+
+        $this->assertDatabaseCount('captures', 0);
+        $this->assertDatabaseCount('capture_events', 0);
+        $this->assertDatabaseCount('company_notifications', 0);
+        $this->assertSame('approved', $proposal->fresh()->status);
+        $this->assertDatabaseHas('ai_proposal_apply_attempts', ['status' => 'failed', 'error_code' => 'writer_failed']);
+    }
+
     public function test_action_project_and_domain_adapters_use_existing_writers_and_whitelists(): void
     {
         [$owner, , , $organization, , $project] = $this->tenant(true);
@@ -210,6 +300,37 @@ class ScopeElevenAiCommonEntryTest extends TestCase
         app(AiProposalApplier::class)->apply($domainProposal->fresh(), $owner);
         $this->assertSame('Updated domain', $domain->fresh()->description);
         $this->assertDatabaseHas('business_domain_revisions', ['business_domain_id' => $domain->id, 'revision_no' => 2]);
+    }
+
+    public function test_action_l2_due_date_reason_and_review_return_use_existing_writer_contract(): void
+    {
+        [$owner, $member, , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $action = app(ProjectExecutionWriter::class)->createAction($owner, $project, [
+            'title' => 'Review action', 'done_condition' => 'Evidence accepted',
+            'assigned_to' => $owner->id, 'reviewer_user_id' => $member->id,
+            'due_date' => '2026-09-28',
+        ], $project->plan_version);
+        $action->update(['status' => Task::STATUS_REVIEW_PENDING, 'review_status' => Task::REVIEW_PENDING]);
+        $proposal = $this->proposal($owner, $organization, $conversation, [
+            'operation' => AiCommonProposalContract::ACTION_UPDATE,
+            'target_public_id' => $action->public_id,
+            'attributes' => [
+                'title' => 'Review action revised', 'done_condition' => 'Evidence accepted',
+                'due_date' => '2026-09-29', 'reason' => 'Dependency moved',
+            ],
+        ]);
+        app(AiProposalApprover::class)->approve($proposal, $owner);
+        app(AiProposalApplier::class)->apply($proposal->fresh(), $owner);
+
+        $action = $action->fresh();
+        $this->assertSame('2026-09-29', $action->due_date->format('Y-m-d'));
+        $this->assertSame(Task::STATUS_IN_PROGRESS, $action->status);
+        $this->assertSame(Task::REVIEW_REJECTED, $action->review_status);
+        $this->assertSame('Dependency moved', $action->last_change_reason);
+        $this->assertDatabaseHas('project_execution_events', [
+            'entity_type' => 'Task', 'entity_id' => $action->id, 'event' => 'action.updated',
+        ]);
     }
 
     public function test_field_smuggling_and_ambiguous_capture_confirmation_are_rejected(): void
@@ -251,6 +372,51 @@ class ScopeElevenAiCommonEntryTest extends TestCase
             $this->fail('A stale proposal was applied.');
         } catch (ValidationException) {
             $this->assertSame('Concurrent edit', $project->fresh()->purpose);
+            $this->assertDatabaseMissing('ai_proposal_item_results', ['status' => 'applied']);
+        }
+    }
+
+    public function test_update_only_undo_uses_the_existing_writer_and_is_idempotent(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $proposal = $this->proposal($owner, $organization, $conversation, [
+            'operation' => AiCommonProposalContract::PROJECT_UPDATE,
+            'target_public_id' => $project->public_id,
+            'attributes' => ['purpose' => 'Applied purpose', 'expected_outcome' => 'Applied outcome'],
+        ]);
+        app(AiProposalApprover::class)->approve($proposal, $owner);
+        app(AiProposalApplier::class)->apply($proposal->fresh(), $owner);
+        $first = app(AiProposalUndoService::class)->undo($proposal->fresh(), $owner);
+        $second = app(AiProposalUndoService::class)->undo($proposal->fresh(), $owner);
+
+        $this->assertSame('applied', $first->status);
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame('Synthetic', $project->fresh()->purpose);
+        $this->assertSame('Evidence', $project->fresh()->expected_outcome);
+        $this->assertDatabaseCount('ai_proposal_undos', 1);
+        $this->assertDatabaseHas('project_execution_events', [
+            'entity_type' => 'Project', 'entity_id' => $project->id, 'event' => 'project.updated',
+        ]);
+    }
+
+    public function test_current_permission_is_rechecked_before_handoff_apply(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $proposal = $this->proposal($owner, $organization, $conversation, [
+            'operation' => AiCommonProposalContract::PROJECT_UPDATE,
+            'target_public_id' => $project->public_id,
+            'attributes' => ['purpose' => 'Must not apply', 'expected_outcome' => 'Must not apply'],
+        ]);
+        app(AiProposalApprover::class)->approve($proposal, $owner);
+        $project->members()->where('user_id', $owner->id)->update(['status' => 'left']);
+
+        try {
+            app(AiProposalApplier::class)->apply($proposal->fresh(), $owner);
+            $this->fail('Lost current Project permission was ignored.');
+        } catch (AuthorizationException) {
+            $this->assertSame('Synthetic', $project->fresh()->purpose);
             $this->assertDatabaseMissing('ai_proposal_item_results', ['status' => 'applied']);
         }
     }
@@ -334,14 +500,27 @@ class ScopeElevenAiCommonEntryTest extends TestCase
     }
 }
 
+class Scope11FailAfterWriterUnitAdapter extends AiCommonUnitAdapter
+{
+    protected function afterWriterApply(object $target): void
+    {
+        throw new RuntimeException('scope11_simulated_writer_boundary_failure');
+    }
+}
+
 class Scope11FakeProvider implements AiCommonProvider
 {
     public array $calls = [];
     public array $citations = [];
+    public int $failuresRemaining = 0;
 
     public function respond(array $messages, array $sources): array
     {
         $this->calls[] = compact('messages', 'sources');
+        if ($this->failuresRemaining > 0) {
+            $this->failuresRemaining--;
+            throw new RuntimeException('provider_unavailable');
+        }
 
         return [
             'answer' => 'Synthetic business answer', 'citations' => $this->citations,

@@ -9,6 +9,7 @@ use App\Models\BusinessDomain;
 use App\Models\Capture;
 use App\Models\Organization;
 use App\Models\OrganizationAiPolicy;
+use App\Models\OrganizationUser;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -51,9 +52,9 @@ class AiCommonSourceManifest
             throw ValidationException::withMessages(['selection_reason' => '選択理由を160文字以内で入力してください。']);
         }
         [$resource, $category, $version, $projection] = $this->resolve($actor, $organization, $type, $publicId);
-        $this->authorizePolicy($actor, $organization, $category, $type, $publicId);
+        [$organizationPolicyVersion, $resourcePolicyVersion] = $this->authorizePolicy($actor, $organization, $category, $type, $publicId);
         $projection = $this->limitProjection($projection);
-        $fingerprint = $this->fingerprint($type, $publicId, $version, $projection);
+        $fingerprint = $this->fingerprint($actor, $organization, $type, $publicId, $version, $projection, $organizationPolicyVersion, $resourcePolicyVersion);
         $source = AiCommonSource::query()->updateOrCreate(
             [
                 'ai_common_conversation_id' => $conversation->id,
@@ -86,9 +87,24 @@ class AiCommonSourceManifest
             $source->resource_type,
             $source->resource_public_id,
         );
-        $this->authorizePolicy($actor, $organization, $category, $source->resource_type, $source->resource_public_id);
+        [$organizationPolicyVersion, $resourcePolicyVersion] = $this->authorizePolicy(
+            $actor,
+            $organization,
+            $category,
+            $source->resource_type,
+            $source->resource_public_id,
+        );
         $projection = $this->limitProjection($projection);
-        $fingerprint = $this->fingerprint($source->resource_type, $source->resource_public_id, $version, $projection);
+        $fingerprint = $this->fingerprint(
+            $actor,
+            $organization,
+            $source->resource_type,
+            $source->resource_public_id,
+            $version,
+            $projection,
+            $organizationPolicyVersion,
+            $resourcePolicyVersion,
+        );
         if (! hash_equals($source->freshness_fingerprint, $fingerprint)) {
             throw ValidationException::withMessages(['source' => '参照元が更新されています。Contextを選び直してください。']);
         }
@@ -181,9 +197,9 @@ class AiCommonSourceManifest
         ])];
     }
 
-    private function authorizePolicy(User $actor, Organization $organization, string $category, string $type, string $publicId): void
+    private function authorizePolicy(User $actor, Organization $organization, string $category, string $type, string $publicId): array
     {
-        $this->common->authorizeCategory($actor, $organization, OrganizationAiPolicy::CATEGORY_COMMON);
+        $organizationPolicy = $this->common->authorizeCategory($actor, $organization, OrganizationAiPolicy::CATEGORY_COMMON);
         $this->common->authorizeCategory($actor, $organization, $category);
         $resource = AiResourcePolicy::query()->where([
             'organization_id' => $organization->id,
@@ -194,6 +210,8 @@ class AiCommonSourceManifest
         if (! $resource) {
             throw new AuthorizationException;
         }
+
+        return [(int) $organizationPolicy->version, (int) $resource->version];
     }
 
     private function limitProjection(array $projection): array
@@ -206,10 +224,33 @@ class AiCommonSourceManifest
         return $projection;
     }
 
-    private function fingerprint(string $type, string $publicId, int|string $version, array $projection): string
+    private function fingerprint(
+        User $actor,
+        Organization $organization,
+        string $type,
+        string $publicId,
+        int|string $version,
+        array $projection,
+        int $organizationPolicyVersion,
+        int $resourcePolicyVersion,
+    ): string
     {
         ksort($projection);
+        $membership = OrganizationUser::query()
+            ->where('organization_id', $organization->id)
+            ->where('user_id', $actor->id)
+            ->where('membership_status', OrganizationUser::STATUS_ACTIVE)
+            ->firstOrFail();
 
-        return hash('sha256', json_encode([$type, $publicId, (string) $version, $projection], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return hash('sha256', json_encode([
+            $type,
+            $publicId,
+            (string) $version,
+            $projection,
+            'membership_access_epoch' => (int) $membership->access_epoch,
+            'credential_generation' => (int) $actor->fresh()->credential_generation,
+            'organization_policy_version' => $organizationPolicyVersion,
+            'resource_policy_version' => $resourcePolicyVersion,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 }

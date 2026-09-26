@@ -163,6 +163,7 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::post('/company/co/conversations/{conversation}/proposals', [AiCommonController::class, 'proposal'])->name('ai-common.proposals.store');
         Route::post('/company/co/conversations/{conversation}/proposals/{proposal}/approve', [AiCommonController::class, 'approve'])->name('ai-common.proposals.approve');
         Route::post('/company/co/conversations/{conversation}/proposals/{proposal}/apply', [AiCommonController::class, 'apply'])->name('ai-common.proposals.apply');
+        Route::post('/company/co/conversations/{conversation}/proposals/{proposal}/undo', [AiCommonController::class, 'undo'])->name('ai-common.proposals.undo');
         Route::get('/company/settings/ai-common', [AiCommonPolicyController::class, 'edit'])->name('ai-common.policy.edit');
         Route::put('/company/settings/ai-common', [AiCommonPolicyController::class, 'update'])->name('ai-common.policy.update');
         Route::put('/company/settings/ai-common/resource', [AiCommonPolicyController::class, 'resource'])->name('ai-common.resource-policy.update');

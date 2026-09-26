@@ -161,9 +161,12 @@ return new class extends Migration
 
         Schema::dropIfExists('ai_common_handoff_relations');
         Schema::table('ai_proposals', function (Blueprint $table): void {
+            // MariaDB may reuse the composite Scope 11 index for the pre-existing
+            // organization FK. Preserve an explicit supporting index first.
+            $table->index('organization_id', 'ai_proposals_organization_id_index');
+            $table->dropConstrainedForeignId('ai_common_conversation_id');
             $table->dropIndex('ai_proposal_common_scope_index');
             $table->dropUnique(['common_operation_key']);
-            $table->dropConstrainedForeignId('ai_common_conversation_id');
             $table->dropColumn(['scope_key', 'target_type', 'target_public_id', 'expected_target_version', 'common_operation_key']);
             $table->foreignId('workspace_id')->nullable(false)->change();
             $table->foreignId('project_id')->nullable(false)->change();

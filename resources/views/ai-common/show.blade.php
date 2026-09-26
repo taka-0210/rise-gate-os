@@ -41,6 +41,9 @@
 @foreach($conversation->proposals as $proposal)<article class="co-panel"><strong>{{ $proposal->title }}</strong><p>Level {{ $proposal->risk_level }} / {{ $proposal->status }} / {{ $proposal->items->first()?->entity_type }}</p><div class="co-actions">
 @if($proposal->status==='pending')<form method="post" action="{{ route('ai-common.proposals.approve',[$conversation,$proposal]) }}">@csrf<button>内容を確認して承認</button></form>@endif
 @if($proposal->status==='approved')<form method="post" action="{{ route('ai-common.proposals.apply',[$conversation,$proposal]) }}">@csrf<button>Writerで適用</button></form>@endif
+@if($proposal->status==='applied' and $proposal->items->first()?->operation==='update')
+@unless($proposal->undos->contains('status','applied'))<form method='post' action='{{ route('ai-common.proposals.undo',[$conversation,$proposal]) }}'>@csrf<button>更新を元に戻す</button></form>@endunless
+@endif
 </div><p>{{ $proposal->status==='applied' ? 'Apply成功確認済み' : 'Company OS正本には未反映' }}</p></article>@endforeach
 </div>
 @endsection
