@@ -8,10 +8,11 @@ use App\Models\UserNotificationPreference;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Carbon\CarbonImmutable;
 use Throwable;
 class NotificationDeliveryProcessor
 {
-    public function __construct(private readonly NotificationAuthorization $authorization,private readonly WebPushTransport $push){}
+    public function __construct(private readonly NotificationAuthorization $authorization,private readonly WebPushTransport $push,private readonly NotificationTiming $timing){}
     public function run(int $requestedLimit): array
     {
         if(!config('company_notifications.delivery_enabled'))return ['processed'=>0,'delivered'=>0,'failed'=>0,'disabled'=>true];
@@ -35,6 +36,17 @@ class NotificationDeliveryProcessor
             $row=NotificationDelivery::query()->whereKey($id)->where('status','pending')->where('available_at_utc','<=',$now)
                 ->where(fn($q)=>$q->whereNull('leased_until_utc')->orWhere('leased_until_utc','<',$now))->lockForUpdate()->first();
             if(!$row)return null;
+            $notification=$row->notification()->with('recipient')->firstOrFail();
+            if($this->authorization->allowed($notification)){
+                $earliest=CarbonImmutable::instance($notification->eligible_at_utc)->max(CarbonImmutable::now('UTC'));
+                $eligible=$this->timing->nextEligibleAt($notification->organization_id,$earliest,$notification->recipient_user_id);
+                if($eligible===null||$eligible->isFuture()){
+                    $recheckAt=$eligible??CarbonImmutable::now('UTC')->addMinutes(5);
+                    $row->update(['available_at_utc'=>$recheckAt,'lease_token'=>null,'leased_until_utc'=>null]);
+                    $notification->update(['content_visible_at_utc'=>$recheckAt]);
+                    return null;
+                }
+            }
             $row->update(['lease_token'=>$token,'leased_until_utc'=>now('UTC')->addMinutes(5),'attempt_count'=>$row->attempt_count+1]);
             return $row->fresh(['notification.recipient']);
         },3);
@@ -67,6 +79,9 @@ class NotificationDeliveryProcessor
         $status=$outcome==='delivered'?'delivered':($outcome==='cancelled'?'cancelled':($delivery->attempt_count>=$max?'failed':'pending'));
         $delivery->update(['status'=>$status,'delivered_at_utc'=>$outcome==='delivered'?now('UTC'):null,'last_error_code'=>$reason,
             'available_at_utc'=>$status==='pending'?now('UTC')->addMinutes(5*$delivery->attempt_count):$delivery->available_at_utc,'lease_token'=>null,'leased_until_utc'=>null]);
+        if($outcome==='cancelled'&&$reason==='authorization_revoked'){
+            $delivery->notification->update(['cancelled_at_utc'=>now('UTC'),'cancellation_reason'=>$reason]);
+        }
         if($delivery->channel==='push'&&$status==='failed'){
             $preference=UserNotificationPreference::query()->where('organization_id',$delivery->notification->organization_id)->where('user_id',$delivery->notification->recipient_user_id)->first();
             if($preference?->email_fallback_enabled&&$delivery->notification->recipient->email_verified_at){

@@ -2,30 +2,30 @@
 namespace App\Http\Controllers;
 use App\Models\CompanyNotification;
 use App\Models\UserNotificationPreference;
-use App\Services\Notification\NotificationAuthorization;
+use App\Services\Notification\NotificationVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 class NotificationCenterController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, NotificationVisibility $visibility): View
     {
         $company=$request->attributes->get('currentCompany');
-        $notifications=CompanyNotification::query()->where('organization_id',$company->id)->where('recipient_user_id',$request->user()->id)
-            ->whereNull('cancelled_at_utc')->where('content_visible_at_utc','<=',now('UTC'))->latest('id')->paginate(30);
+        $notifications=$visibility->paginate($company->id,$request->user()->id);
         $preference=UserNotificationPreference::query()->firstOrNew(['organization_id'=>$company->id,'user_id'=>$request->user()->id]);
         return view('notifications.index',compact('company','notifications','preference'));
     }
-    public function read(Request $request, CompanyNotification $notification): RedirectResponse
+    public function read(Request $request, CompanyNotification $notification, NotificationVisibility $visibility): RedirectResponse
     {
         $this->assertRecipient($request,$notification);
+        abort_unless($visibility->isVisible($notification),404);
         $notification->update(['read_at_utc'=>$notification->read_at_utc?:now('UTC')]);
         return back();
     }
-    public function open(Request $request, CompanyNotification $notification, NotificationAuthorization $authorization): RedirectResponse
+    public function open(Request $request, CompanyNotification $notification, NotificationVisibility $visibility): RedirectResponse
     {
         $this->assertRecipient($request,$notification);
-        abort_unless($authorization->allowed($notification),403);
+        abort_unless($visibility->isVisible($notification),404);
         $notification->update(['read_at_utc'=>$notification->read_at_utc?:now('UTC'),'source_seen_at_utc'=>$notification->source_seen_at_utc?:now('UTC')]);
         return redirect($notification->deep_link_path);
     }

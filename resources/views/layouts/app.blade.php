@@ -330,13 +330,8 @@
                     @isset($currentCompany)
                         @php
                             $notificationUnreadCount = \Illuminate\Support\Facades\Schema::hasTable('company_notifications')
-                                ? \App\Models\CompanyNotification::query()
-                                    ->where('organization_id', $currentCompany->id)
-                                    ->where('recipient_user_id', auth()->id())
-                                    ->where('content_visible_at_utc', '<=', now('UTC'))
-                                    ->whereNull('read_at_utc')
-                                    ->whereNull('cancelled_at_utc')
-                                    ->count()
+                                ? app(\App\Services\Notification\NotificationVisibility::class)
+                                    ->unreadCount($currentCompany->id, auth()->id())
                                 : 0;
                         @endphp
                         <a href='{{ route('notifications.index') }}'>通知@if($notificationUnreadCount > 0) <span class='badge' aria-label='未読 {{ $notificationUnreadCount }}件'>{{ $notificationUnreadCount }}</span>@endif</a>

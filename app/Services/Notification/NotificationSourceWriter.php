@@ -53,14 +53,18 @@ class NotificationSourceWriter
         $membership=OrganizationUser::query()->where('organization_id',$organizationId)->where('user_id',$recipientId)->where('membership_status',OrganizationUser::STATUS_ACTIVE)->first();
         if(!$recipient?->is_active||!$membership)return null;
         $eligible=$this->timing->eligibleAt($organizationId,$timing,$specifiedAt,$recipientId);
+        // The existing schema requires a timestamp. When a confirmed policy has
+        // no available window, this is only a recheck point; visibility and the
+        // processor still fail closed against the current policy.
+        $scheduledAt=$eligible??now('UTC')->addMinutes(5);
         $notification=CompanyNotification::query()->firstOrCreate(['dedupe_key'=>$dedupeKey],[
             'organization_id'=>$organizationId,'recipient_user_id'=>$recipientId,'actor_user_id'=>$actor?->id,'type'=>$type,'source_type'=>$sourceType,
             'source_id'=>$sourceId,'source_event'=>$event,'title'=>$title,'body'=>$body,'deep_link_path'=>$path,'timing'=>$timing,
-            'content_visible_at_utc'=>now('UTC'),'eligible_at_utc'=>$eligible,'membership_access_epoch'=>$membership->access_epoch,'credential_generation'=>$recipient->credential_generation]);
+            'content_visible_at_utc'=>$scheduledAt,'eligible_at_utc'=>$scheduledAt,'membership_access_epoch'=>$membership->access_epoch,'credential_generation'=>$recipient->credential_generation]);
         if(!$notification->wasRecentlyCreated)return $notification;
         $preference=UserNotificationPreference::query()->where('organization_id',$organizationId)->where('user_id',$recipientId)->first();
         $channels=['in_app'];if($preference?->push_enabled)$channels[]='push';if($preference?->email_enabled&&$recipient->email_verified_at)$channels[]='email';
-        foreach($channels as $channel)$notification->deliveries()->create(['channel'=>$channel,'status'=>'pending','available_at_utc'=>$eligible]);
+        foreach($channels as $channel)$notification->deliveries()->create(['channel'=>$channel,'status'=>'pending','available_at_utc'=>$scheduledAt]);
         return $notification;
     }
 }

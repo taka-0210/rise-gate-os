@@ -86,6 +86,12 @@ class ScopeTenNotificationPwaTest extends TestCase
     public function test_delivery_reauthorization_cancels_after_epoch_change(): void
     {
         [$owner,$assignee,,,$project]=$this->fixture();
+        OrganizationNotificationPolicy::create([
+            'organization_id'=>$project->organization_id,
+            'is_confirmed'=>true,
+            'timezone'=>'Asia/Tokyo',
+            'weekday_windows'=>[(string)now('Asia/Tokyo')->isoWeekday()=>['enabled'=>true,'start'=>'00:00','end'=>'23:59']],
+        ]);
         app(ProjectExecutionWriter::class)->createAction($owner,$project->fresh(),['title'=>'Epoch work','done_condition'=>'Done','assigned_to'=>$assignee->id],$project->fresh()->plan_version);
         $delivery=NotificationDelivery::firstOrFail();$assignee->organizationMemberships()->where('organization_id',$project->organization_id)->increment('access_epoch');
         config(['company_notifications.delivery_enabled'=>true]);app(NotificationDeliveryProcessor::class)->run(10);
