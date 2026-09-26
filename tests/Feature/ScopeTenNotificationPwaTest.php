@@ -124,6 +124,9 @@ class ScopeTenNotificationPwaTest extends TestCase
     {
         $worker=file_get_contents(public_path('service-worker.js'));
         $this->assertStringContainsString("event.request.mode === 'navigate'",$worker);
+        $this->assertStringContainsString("clients.matchAll({ type: 'window', includeUncontrolled: true })",$worker);
+        $this->assertStringContainsString('await existing.navigate(target)',$worker);
+        $this->assertStringContainsString('requested.origin === self.location.origin',$worker);
         $this->assertStringNotContainsString('/company/projects',$worker);$this->assertStringNotContainsString('session',$worker);$this->assertStringNotContainsString('csrf',$worker);
     }
     private function fixture(): array

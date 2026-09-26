@@ -10,6 +10,7 @@ const backendPort = Number(process.env.S10_BACKEND_PORT || 8774);
 const caPath = process.env.S10_CA_CERT;
 const keyPath = process.env.S10_SERVER_KEY;
 const certPath = process.env.S10_SERVER_CERT;
+const tracePath = process.env.S10_TRACE_PATH;
 
 if (!caPath || !keyPath || !certPath) throw new Error('Scope 10 TLS paths are required');
 
@@ -21,6 +22,20 @@ const allowed = request => {
 const reject = response => {
   response.writeHead(403, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
   response.end('Forbidden');
+};
+const sanitizeUrl = value => {
+  if (!value) return null;
+  const url = new URL(value, 'https://scope10.invalid');
+  const path = url.pathname.replace(/[0-9A-HJKMNP-TV-Z]{26}/gi, '{ulid}');
+  const keys = [...url.searchParams.keys()].sort();
+  return keys.length ? path + '?' + keys.join('&') : path;
+};
+const trace = record => {
+  if (!tracePath) return;
+  const atJst = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Tokyo', dateStyle: 'short', timeStyle: 'medium',
+  }).format(new Date());
+  fs.appendFileSync(tracePath, JSON.stringify({ at_jst: atJst, ...record }) + '\n');
 };
 
 const caServer = http.createServer((request, response) => {
@@ -56,6 +71,12 @@ const httpsServer = https.createServer({
   }, upstreamResponse => {
     const headers = { ...upstreamResponse.headers };
     if (headers.location) headers.location = headers.location.replace(/^http:/, 'https:');
+    trace({
+      method: request.method,
+      request: sanitizeUrl(request.url),
+      status: upstreamResponse.statusCode || 502,
+      location: sanitizeUrl(headers.location),
+    });
     response.writeHead(upstreamResponse.statusCode || 502, headers);
     upstreamResponse.pipe(response);
   });
