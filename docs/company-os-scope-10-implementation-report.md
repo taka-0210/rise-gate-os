@@ -121,3 +121,43 @@ Text Quick Captureは本体へ混入していない。正式な次工程は **S1
 ## 8. Master / Environment
 
 現時点でProduct / Architecture Contractの変更はなく、Master v144 / v040更新は不要候補。通常local Migration、Production接続・Migration、Deploy、IR-1変更、HOW、Scope 11は未実施。
+
+## 9. 本人実配信・実機Close Verification追補（2026-09-26 JST）
+
+前節までの履歴を維持し、Scope 10専用合成Dataを同一Private Network内の一時HTTPS Originで本人検証した。Production、通常local DB、IR-1のCredential・User・Data・設定は使用していない。
+
+### S10-DC17｜CONDITIONAL
+
+- Test専用VAPID / Origin / Account / iPhone Push Subscriptionだけを使用。外部payloadは汎用title / body / opaque linkに限定し、Business Dataを含めていない。
+- Apple Push Provider受付、iPhone実受信、tap、認証済み遷移、未Login時のLogin復帰、再認可後のNotification Center表示を本人確認した。Provider受付とreadは別状態で、duplicate送信はなかった。
+- 予約TLDのVAPID subjectに対する403を成功扱いしないことを確認し、本人承認済みの有効な連絡先形式でのみ実受信した。fakeによるinvalid subscription、unsubscribe、bounded retry、fallback opt-in、accept後crash / unknown、receipt Evidenceは維持する。
+- 隔離SMTPはexternal mailer / host / username / password / secretが未設定だった。通常local / Production Credentialは流用せず、本人Test Emailへの実送信はfail-closedで未実施。この1点によりConditionalを維持する。
+- Corrective Delta: Provider rejection状態記録（`55b295b`）。Product / Privacy / Channel Contract変更なし。
+
+### S10-DC18｜CONDITIONAL
+
+- iPhone SafariからHome Screenへ追加し、standalone表示、Login、Push permission、実Push受信、tap、Login復帰、Deep Linkを本人確認した。
+- Desktop EdgeでPWAをInstallして独立app windowで起動。Push permission拒否時は安全な拒否表示となった。
+- iPhone / EdgeはPASS。利用可能端末として提示されていないAndroid Chrome実機Evidenceは未取得のためConditionalを維持する。
+- Corrective Delta: iOS 390px overflow（`9eafbc1`）と、既存PWA windowを対象URLへnavigateしてfocusするnotification click（`4167ad9`）。Contract変更なし。
+
+### S10-DC19｜PASS
+
+- iPhoneでsoft keyboard / focus / overflow、Push許可・OS拒否・解除・再判定、Logout / Loginを確認した。
+- 別の合成Accountでは元Accountの通知を表示せず、元Accountへ戻してもTenant境界を維持した。
+- 認証済みPush tapと、Push tap → Login → intended notification open → Notification Centerの未Login復帰を確認した。
+- 匿名化traceで修正前のstart_url再利用と修正後のopaque open → 認可 → Notification Centerを実測した。Cookie、payload、Business Data、実IDは記録していない。generic Test NotificationにはBusiness sourceがないためNotification Centerが正しい遷移先である。
+
+### S10-DC20｜PASS
+
+- iPhoneのnetwork切断中はBusiness Dataを表示・更新・queueせず、復帰後は同じTest Accountで正常再開した。
+- `company-os-shell-v2` への更新は編集中画面を強制reloadせず、更新後のPush tapも正常だった。
+- EdgeのCache Storageはv2の `/favicon.png` と `/manifest.webmanifest` だけ。旧cache、Business Data、HTML、session、CSRF、offline queueはなく、IndexedDBも「なし」を本人確認した。
+
+### Verification / cleanup / 再判定
+
+- Focused regression: **27 tests / 175 assertions / 0 failures**。JavaScript syntax PASS。DB / Migration変更なし。
+- iPhone Test CA、Windows CurrentUser Root CA、Firewall規則8085/8443、listener 8085/8443/8774、TEMP内CA秘密鍵・VAPID/password secret・隔離SQLite・traceを削除し、すべて残件0を確認した。
+- Scope 1〜9 Closed Contract、IR-1、Master v144 / v040は変更なし。Master Update不要。
+- S10-DC01〜16、DC19〜25: Done。DC17: Conditional（実Email）。DC18: Conditional（Android）。**Conditional 2 / Not Done 0**。
+- Formal Close可否: **現時点では不可**。残Evidence取得後に人＋ChatGPT Final Reviewで再判定し、Codex単独ではFormal Closeしない。
