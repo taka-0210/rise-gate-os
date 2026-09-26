@@ -13,6 +13,9 @@ class CompanyNotification extends Model
     public const TYPE_REVIEW_ATTENTION = 'review_attention';
     public const TYPE_ACTION_RETURNED = 'action_returned';
     public const TYPE_TODAY_DIGEST = 'today_digest';
+    public const TYPE_CAPTURE_REMINDER = 'capture_reminder';
+    public const TYPE_CAPTURE_REQUEST = 'capture_request';
+    public const TYPE_CAPTURE_TELL_LATER = 'capture_tell_later';
 
     protected $guarded = [];
 

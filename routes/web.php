@@ -19,6 +19,7 @@ use App\Http\Controllers\CompanyLoanController;
 use App\Http\Controllers\CompanyMemberAccessController;
 use App\Http\Controllers\CompanyObservationController;
 use App\Http\Controllers\CompanyRepaymentCapacityController;
+use App\Http\Controllers\CaptureController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DevelopmentSetupController;
 use App\Http\Controllers\DocumentController;
@@ -152,6 +153,16 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
 
     Route::middleware(['workspace-mode', 'company'])->group(function (): void {
         Route::get('/company', CompanyHomeController::class)->name('company.home');
+        Route::get('/company/captures', [CaptureController::class, 'index'])->name('captures.index');
+        Route::get('/company/captures/create', [CaptureController::class, 'create'])->name('captures.create');
+        Route::post('/company/captures', [CaptureController::class, 'store'])->name('captures.store');
+        Route::get('/company/capture-operations/{operation}', [CaptureController::class, 'operation'])->name('captures.operations.show');
+        Route::get('/company/captures/{c}', [CaptureController::class, 'show'])->name('captures.show');
+        Route::post('/company/captures/{c}/acknowledge', [CaptureController::class, 'acknowledge'])->name('captures.acknowledge');
+        Route::post('/company/captures/{c}/close', [CaptureController::class, 'close'])->name('captures.close');
+        Route::post('/company/captures/{c}/cancel', [CaptureController::class, 'cancel'])->name('captures.cancel');
+        Route::get('/company/captures/{c}/promote', [CaptureController::class, 'promote'])->name('captures.promote');
+        Route::post('/company/captures/{c}/promote', [CaptureController::class, 'promoteStore'])->name('captures.promote.store');
         Route::get('/company/notifications', [NotificationCenterController::class, 'index'])->name('notifications.index');
         Route::post('/company/notifications/preferences', [NotificationCenterController::class, 'preferences'])->name('notifications.preferences');
         Route::post('/company/notifications/{notification}/read', [NotificationCenterController::class, 'read'])->name('notifications.read');

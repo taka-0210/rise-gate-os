@@ -1,0 +1,8 @@
+@extends('layouts.app')
+@section('title','Capture')
+@section('content')
+@if(session('status'))<div class="alert">{{ session('status') }}</div>@endif
+<article class="card"><p class="eyebrow">{{ $capture->type }} / {{ $capture->status }}</p><h1>Capture</h1><p style="white-space:pre-wrap">{{ $capture->body }}</p><p>{{ $capture->creator->name }} → {{ $capture->recipient->name }}</p>
+@if($capture->status==='open')<div class="actions">@if(auth()->id()===$capture->recipient_user_id)<form method="POST" action="{{ route('captures.acknowledge',$capture) }}">@csrf<input type="hidden" name="operation_id" value="{{ \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="version" value="{{ $capture->version }}"><button>受け取りました</button></form>@endif<form method="POST" action="{{ route('captures.close',$capture) }}">@csrf<input type="hidden" name="operation_id" value="{{ \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="version" value="{{ $capture->version }}"><button class="secondary">整理終了</button></form>@if(auth()->id()===$capture->creator_user_id)<form method="POST" action="{{ route('captures.cancel',$capture) }}">@csrf<input type="hidden" name="operation_id" value="{{ \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="version" value="{{ $capture->version }}"><button class="secondary">取消</button></form><a class="button" href="{{ route('captures.promote',$capture) }}">Actionへ昇格</a>@endif</div>@endif</article>
+<section class="card"><h2>History</h2><ul>@foreach($capture->events as $event)<li>{{ $event->event_type }} / {{ $event->occurred_at_utc->timezone('Asia/Tokyo')->format('Y-m-d H:i') }}</li>@endforeach</ul></section>
+@endsection

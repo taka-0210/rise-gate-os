@@ -1,6 +1,7 @@
 <?php
 namespace App\Services\Notification;
 use App\Models\CompanyNotification;
+use App\Models\Capture;
 use App\Models\OrganizationUser;
 use App\Models\Task;
 use App\Models\User;
@@ -40,6 +41,13 @@ class NotificationSourceWriter
         $body='確認する項目が'.$itemCount.'件あります。';
         $dedupe='today-digest:'.$organizationId.':'.$recipient->id.':'.$localDate;
         return $this->recordRaw($organizationId,$recipient->id,null,CompanyNotification::TYPE_TODAY_DIGEST,'今日のActionがあります',$body,'/company/today',$dedupe,'today.digest','next_window');
+    }
+    public function captureCreated(User $actor,Capture $capture): ?CompanyNotification
+    {
+        $type=match($capture->type){Capture::TYPE_SELF=>CompanyNotification::TYPE_CAPTURE_REMINDER,Capture::TYPE_REQUEST=>CompanyNotification::TYPE_CAPTURE_REQUEST,default=>CompanyNotification::TYPE_CAPTURE_TELL_LATER};
+        $title=$capture->type===Capture::TYPE_SELF?'預けた内容の確認時刻です':'新しいCaptureがあります';
+        $specified=$capture->notify_at_utc?->timezone(config('app.timezone'))->format('Y-m-d H:i');
+        return $this->recordRaw($capture->organization_id,$capture->recipient_user_id,$actor,$type,$title,'Company OSを開いて内容を確認してください。','/company/captures/'.$capture->public_id,'capture:'.$capture->id.':created','capture.created',$capture->notification_timing,'Capture',$capture->id,$specified);
     }
     private function record(Task $action,int $recipientId,User $actor,string $type,string $title,string $body,string $event,string $timing='now',?string $specifiedAt=null): ?CompanyNotification
     {

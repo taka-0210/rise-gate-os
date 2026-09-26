@@ -334,6 +334,8 @@
                                     ->unreadCount($currentCompany->id, auth()->id())
                                 : 0;
                         @endphp
+                        <a href='{{ route('captures.create') }}'>Quick Capture</a>
+                        <a href='{{ route('captures.index') }}'>Inbox</a>
                         <a href='{{ route('notifications.index') }}'>通知@if($notificationUnreadCount > 0) <span class='badge' aria-label='未読 {{ $notificationUnreadCount }}件'>{{ $notificationUnreadCount }}</span>@endif</a>
                         <a class="workspace-pill" href="{{ route('company.home') }}">{{ $currentCompany->name }}</a>
                         @if (($availableCompanyCount ?? 0) > 1)
