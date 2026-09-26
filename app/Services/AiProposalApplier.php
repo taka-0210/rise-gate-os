@@ -10,10 +10,17 @@ use App\Models\User;
  */
 class AiProposalApplier
 {
-    public function __construct(private readonly AiProposalScopeOneApplier $scopeOne) {}
+    public function __construct(
+        private readonly AiProposalScopeOneApplier $scopeOne,
+        private readonly \App\Services\AiCommon\AiCommonUnitAdapter $commonAdapter,
+    ) {}
 
     public function apply(AiProposal $proposal, User $actor): AiProposal
     {
+        if (\App\Services\AiCommon\AiCommonProposalContract::supports($proposal->contract_version)) {
+            return $this->commonAdapter->apply($proposal, $actor);
+        }
+
         return $this->scopeOne->apply($proposal, $actor);
     }
 }

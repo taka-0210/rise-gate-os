@@ -50,4 +50,9 @@ return [
         'scope_one_context_max_chars' => env('AI_SCOPE_ONE_CONTEXT_MAX_CHARS', 100000),
     ],
 
+    'ai_common' => [
+        'timeout_seconds' => env('AI_COMMON_TIMEOUT_SECONDS', 30),
+        'price_version' => env('AI_COMMON_PRICE_VERSION', 'configured-2026-09'),
+    ],
+
 ];

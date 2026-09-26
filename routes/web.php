@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ActionExecutionController;
 use App\Http\Controllers\AiConnectionController;
+use App\Http\Controllers\AiCommonController;
+use App\Http\Controllers\AiCommonPolicyController;
 use App\Http\Controllers\Auth\AccountEmailController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordController;
@@ -153,6 +155,17 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
 
     Route::middleware(['workspace-mode', 'company'])->group(function (): void {
         Route::get('/company', CompanyHomeController::class)->name('company.home');
+        Route::get('/company/co', [AiCommonController::class, 'index'])->name('ai-common.index');
+        Route::post('/company/co/conversations', [AiCommonController::class, 'store'])->name('ai-common.store');
+        Route::get('/company/co/conversations/{conversation}', [AiCommonController::class, 'show'])->name('ai-common.show');
+        Route::post('/company/co/conversations/{conversation}/messages', [AiCommonController::class, 'message'])->middleware('throttle:20,1')->name('ai-common.messages.store');
+        Route::post('/company/co/conversations/{conversation}/sources', [AiCommonController::class, 'source'])->name('ai-common.sources.store');
+        Route::post('/company/co/conversations/{conversation}/proposals', [AiCommonController::class, 'proposal'])->name('ai-common.proposals.store');
+        Route::post('/company/co/conversations/{conversation}/proposals/{proposal}/approve', [AiCommonController::class, 'approve'])->name('ai-common.proposals.approve');
+        Route::post('/company/co/conversations/{conversation}/proposals/{proposal}/apply', [AiCommonController::class, 'apply'])->name('ai-common.proposals.apply');
+        Route::get('/company/settings/ai-common', [AiCommonPolicyController::class, 'edit'])->name('ai-common.policy.edit');
+        Route::put('/company/settings/ai-common', [AiCommonPolicyController::class, 'update'])->name('ai-common.policy.update');
+        Route::put('/company/settings/ai-common/resource', [AiCommonPolicyController::class, 'resource'])->name('ai-common.resource-policy.update');
         Route::get('/company/captures', [CaptureController::class, 'index'])->name('captures.index');
         Route::get('/company/captures/create', [CaptureController::class, 'create'])->name('captures.create');
         Route::post('/company/captures', [CaptureController::class, 'store'])->name('captures.store');

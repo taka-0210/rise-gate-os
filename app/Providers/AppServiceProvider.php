@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\ActionDraftProvider;
+use App\Contracts\AiCommonProvider;
 use App\Models\Client;
 use App\Models\Improvement;
 use App\Models\Project;
@@ -16,6 +17,7 @@ use App\Policies\ProjectPolicy;
 use App\Policies\RoadmapPolicy;
 use App\Policies\TaskPolicy;
 use App\Services\ActionExecution\OpenAiActionDraftProvider;
+use App\Services\AiCommon\OpenAiCommonProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -27,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(AiCommonProvider::class, OpenAiCommonProvider::class);
     }
 
     public function boot(): void

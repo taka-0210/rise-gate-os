@@ -9,10 +9,17 @@ use Illuminate\Validation\ValidationException;
 
 class AiProposalApprover
 {
-    public function __construct(private readonly AiProposalValidator $validator, private readonly AiProposalAuthorization $authorization) {}
+    public function __construct(
+        private readonly AiProposalValidator $validator,
+        private readonly AiProposalAuthorization $authorization,
+        private readonly \App\Services\AiCommon\AiCommonUnitAdapter $commonAdapter,
+    ) {}
 
     public function approve(AiProposal $proposal, User $actor): AiProposal
     {
+        if (\App\Services\AiCommon\AiCommonProposalContract::supports($proposal->contract_version)) {
+            return $this->commonAdapter->approve($proposal, $actor);
+        }
         if ($proposal->items()->whereHas('review', fn ($query) => $query->whereNull('resolved_at'))->exists()) {
             throw ValidationException::withMessages(['reviews' => '未対応の確認事項があります。修正依頼を完了してから内容を確認してください。']);
         }

@@ -28,8 +28,9 @@ class AiProposal extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
-        'public_id', 'organization_id', 'workspace_id', 'project_id', 'source', 'mode',
-        'idempotency_key', 'title', 'summary', 'status', 'evidence',
+        'public_id', 'organization_id', 'workspace_id', 'project_id', 'ai_common_conversation_id',
+        'scope_key', 'target_type', 'target_public_id', 'expected_target_version', 'source', 'mode',
+        'idempotency_key', 'common_operation_key', 'title', 'summary', 'status', 'evidence',
         'requested_by', 'reviewed_by', 'reviewed_at', 'applied_at',
         'handed_off_by', 'handed_off_at', 'failure_reason',
         'applied_plan_version_id', 'contract_version', 'capability', 'risk_level',
@@ -47,6 +48,7 @@ class AiProposal extends Model
             'approved_at' => 'datetime',
             'expected_project_version' => 'integer',
             'approved_project_version' => 'integer',
+            'expected_target_version' => 'integer',
         ];
     }
 
@@ -70,6 +72,16 @@ class AiProposal extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function commonConversation(): BelongsTo
+    {
+        return $this->belongsTo(AiCommonConversation::class, 'ai_common_conversation_id');
+    }
+
+    public function commonHandoff()
+    {
+        return $this->hasOne(AiCommonHandoffRelation::class);
     }
 
     public function requester(): BelongsTo

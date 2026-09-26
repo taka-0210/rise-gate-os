@@ -336,6 +336,7 @@
                         @endphp
                         <a href='{{ route('captures.create') }}'>Quick Capture</a>
                         <a href='{{ route('captures.index') }}'>Inbox</a>
+                        <a href='{{ route('ai-common.index') }}'>COに相談</a>
                         <a href='{{ route('notifications.index') }}'>通知@if($notificationUnreadCount > 0) <span class='badge' aria-label='未読 {{ $notificationUnreadCount }}件'>{{ $notificationUnreadCount }}</span>@endif</a>
                         <a class="workspace-pill" href="{{ route('company.home') }}">{{ $currentCompany->name }}</a>
                         @if (($availableCompanyCount ?? 0) > 1)
@@ -391,6 +392,7 @@
             @php
                 $module = match (true) {
                     request()->routeIs('business-domains.*') => ['事業領域', route('business-domains.index')],
+                    request()->routeIs('ai-common.*') => ['COに相談', route('ai-common.index')],
                     request()->routeIs('company-finance.*') => ['経営数値', route('company-finance.index')],
                     request()->routeIs('company-loans.*') => ['借入管理', route('company-loans.index')],
                     request()->routeIs('company-members.*') => ['会社設定', route('company-members.index')],
