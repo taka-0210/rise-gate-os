@@ -4,7 +4,7 @@
 - 正本: Master v144 / v040、Scope 10 v002成果物3点
 - 実装base: 924af91188cc60d33ff87c91b94ecc1d539566e6
 - 開発線: scope10-notification-pwa
-- 状態: **Code Complete候補 / Formal Close Review待ち**
+- 状態: **Scope Development Done / Formal Close候補（最終承認待ち）**
 
 ## 1. P0 Audit
 
@@ -161,3 +161,35 @@ Text Quick Captureは本体へ混入していない。正式な次工程は **S1
 - Scope 1〜9 Closed Contract、IR-1、Master v144 / v040は変更なし。Master Update不要。
 - S10-DC01〜16、DC19〜25: Done。DC17: Conditional（実Email）。DC18: Conditional（Android）。**Conditional 2 / Not Done 0**。
 - Formal Close可否: **現時点では不可**。残Evidence取得後に人＋ChatGPT Final Reviewで再判定し、Codex単独ではFormal Closeしない。
+
+## 10. Formal Close Decision（2026-09-26 JST）
+
+人＋ChatGPT Final Reviewにより、前節で未取得として維持した実SMTP到達とAndroid Chrome実機Compatibilityを、Scope Developmentの完成条件ではなくScope 10 Release Ready前のRelease Verification責任として正式に線引きした。この判断は未確認EvidenceをPASSへ変更するものでも、fake Evidenceを実機Evidenceへ置き換えるものでもない。
+
+### DC17｜Scope Development Done / Release Verification Pending
+
+- Email Channel、本人Opt-in、verified Email再確認、外部payload最小化、Delivery / Attempt / retry、明示fallback、Channel境界、およびfakeによるfailure / retry / unknownはScope Development Evidenceを充足する。
+- Web PushはApple Push Provider受付からiPhone実受信、tap、Login復帰、再認可まで実機確認済みである。
+- 実SMTP ProviderによるEmail実受信sampleは未確認のまま保持し、**Release Verificationへ正式移管**する。Scope 10専用Staging / Release Verification環境でRelease Ready前に必ず確認し、Productionを初回確認環境にしない。
+
+### DC18｜Scope Development Done / Release Verification Pending
+
+- iPhoneはHome Screen追加、standalone起動、Login、Push permission、実Push受信、tap、Login復帰、Deep Linkを本人実機で確認した。
+- Desktop EdgeはPWA Install、standalone app window、Push permission拒否時の安全動作を確認した。
+- Android固有のProduct Contractは定義していない。Android Chrome実機Install / Push / Deep Linkは未確認のまま、**Cross-platform CompatibilityのRelease Verificationへ正式移管**する。Scope 10専用Staging / Release Verification環境でRelease Ready前に必ず確認する。
+
+### Scope Development最終判定
+
+- S10-DC01〜25: **Scope Development Done**。
+- Scope Development Conditional: **0件**。Not Done: **0件**。
+- Release Verification Open Evidence:
+  1. 実SMTP Providerを使用したEmail実受信
+  2. Android Chrome実機でのPWA Install / Push / Deep Link
+- Formal Close可否: **Scope 10 Formal Close可能**。ただし本Report更新ではFormal Close自体を実施せず、人＋ChatGPTの明示的なFormal Close承認を待つ。
+
+### Close根拠・引継ぎ
+
+- SQLite full suiteは519 PASS / 0 FAIL / 16 SKIP / 4,189 assertions。MariaDB 10.11 Migration / Concurrency、iPhone PWA / Push、Desktop Edge PWA、DC19 / DC20、offline非cache・非queue、限定Cache Storage、IndexedDB 0、Tenant / Account境界、cleanup完了のEvidenceを維持する。
+- Corrective Delta履歴は、2 worker同時claim、期限切れLogin後Deep Link、390px overflow、iOS PWA notification clickであり、いずれも確定Contract内の修正である。
+- Product Contract変更はなく、Master v144 / v040のUpdateは不要。Production、通常local DB、IR-1、Migration、Deployは変更していない。
+- `S10-CD-TQC` / `S10-CD-G01`を維持する。Formal Close後の次工程はScope 10 Companion Delta｜Text Quick Captureであり、Scope 11へ直接進まない。
