@@ -4,7 +4,7 @@
 - 正本: Master v144 / v040、Scope 10 v002成果物3点
 - 実装base: 924af91188cc60d33ff87c91b94ecc1d539566e6
 - 開発線: scope10-notification-pwa
-- 状態: **Scope Development Done / Formal Close候補（最終承認待ち）**
+- 状態: **Formal Closed**
 
 ## 1. P0 Audit
 
@@ -193,3 +193,22 @@ Text Quick Captureは本体へ混入していない。正式な次工程は **S1
 - Corrective Delta履歴は、2 worker同時claim、期限切れLogin後Deep Link、390px overflow、iOS PWA notification clickであり、いずれも確定Contract内の修正である。
 - Product Contract変更はなく、Master v144 / v040のUpdateは不要。Production、通常local DB、IR-1、Migration、Deployは変更していない。
 - `S10-CD-TQC` / `S10-CD-G01`を維持する。Formal Close後の次工程はScope 10 Companion Delta｜Text Quick Captureであり、Scope 11へ直接進まない。
+
+## 11. Scope 10 Formal Close確定（2026-09-26 JST）
+
+最終Evidenceの人＋ChatGPT Final Reviewおよび明示承認に基づき、Scope 10「通知・PWA」を **Formal Closed** とする。
+
+- Scope Development S10-DC01〜25: **Done**
+- Scope Development Conditional: **0件**
+- Product判断Blocker: **0件**
+- S10-C01〜03: **発生なし**
+- Master Update: **不要**。Master v144 / v040を継続正本とする。
+- Product / Architecture / Tenant / Permission / Security / Migration Contract変更: なし。
+- Production、通常local DB、IR-1、Migration、Deploy: 変更・実施なし。
+
+Release Verification Open Evidenceは次の2件を未確認のまま明示維持し、Scope Developmentを再Openせず、Scope 10 Release Ready前に専用Staging / Release Verification環境で必ず取得する。
+
+1. 実SMTP ProviderによるEmail実受信
+2. Android Chrome実機でのPWA Install / Push / Deep Link
+
+`S10-CD-TQC` / `S10-CD-G01`を維持する。次工程は **S10 Companion Delta｜Text Quick Capture** であり、本Closeでは実装せず、Scope 11へも進まない。
