@@ -145,6 +145,8 @@ class AiCommonAttachmentIngestor
                 'inspection_driver' => $result['driver'],
                 'inspection_version' => $result['version'],
                 'inspection_safe_code' => null,
+                'media_codec' => $result['codec'] ?? null,
+                'duration_ms' => $result['duration_ms'] ?? null,
                 'inspected_at_utc' => now('UTC'),
                 'ready_at_utc' => now('UTC'),
             ]);

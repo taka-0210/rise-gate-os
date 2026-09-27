@@ -165,6 +165,13 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::post('/company/co/conversations/{conversation}/attachments/reference', [AiCommonInputController::class, 'reference'])->middleware('throttle:20,1')->name('ai-common.attachments.reference');
         Route::get('/company/co/conversations/{conversation}/attachments/{attachment}', [AiCommonInputController::class, 'download'])->name('ai-common.attachments.download');
         Route::post('/company/co/conversations/{conversation}/attachments/{attachment}/revoke', [AiCommonInputController::class, 'revoke'])->name('ai-common.attachments.revoke');
+        Route::post('/company/co/conversations/{conversation}/attachments/{attachment}/extract', [AiCommonInputController::class, 'extract'])->middleware('throttle:20,1')->name('ai-common.attachments.extract');
+        Route::get('/company/co/conversations/{conversation}/attachments/{attachment}/derivatives/{derivative}', [AiCommonInputController::class, 'preview'])->name('ai-common.attachments.preview');
+        Route::get('/company/co/conversations/{conversation}/attachments/{attachment}/image-preview', [AiCommonInputController::class, 'imagePreview'])->name('ai-common.attachments.image-preview');
+        Route::get('/company/co/conversations/{conversation}/attachments/{attachment}/playback', [AiCommonInputController::class, 'playback'])->name('ai-common.attachments.playback');
+        Route::post('/company/co/conversations/{conversation}/attachments/{attachment}/ai-reference', [AiCommonInputController::class, 'aiReference'])->name('ai-common.attachments.ai-reference');
+        Route::post('/company/co/conversations/{conversation}/attachments/{attachment}/transcribe', [AiCommonInputController::class, 'attachmentTranscribe'])->middleware('throttle:10,1')->name('ai-common.attachments.transcribe');
+        Route::post('/company/co/conversations/{conversation}/attachments/{attachment}/transcripts/{revision}', [AiCommonInputController::class, 'transcriptRevise'])->name('ai-common.attachments.transcripts.revise');
         Route::post('/company/co/conversations/{conversation}/voice', [AiCommonInputController::class, 'voiceRecord'])->middleware('throttle:10,1')->name('ai-common.voice.store');
         Route::post('/company/co/conversations/{conversation}/voice/{audio}/transcribe', [AiCommonInputController::class, 'voiceTranscribe'])->middleware('throttle:10,1')->name('ai-common.voice.transcribe');
         Route::post('/company/co/conversations/{conversation}/voice/{audio}/post', [AiCommonInputController::class, 'voicePost'])->middleware('throttle:20,1')->name('ai-common.voice.post');

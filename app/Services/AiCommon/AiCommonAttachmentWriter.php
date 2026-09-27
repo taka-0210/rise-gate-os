@@ -20,12 +20,17 @@ class AiCommonAttachmentWriter
     private const MAX_BYTES = 10 * 1024 * 1024;
 
     private const UPLOAD_TYPES = [
-        'pdf' => 'application/pdf',
-        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'jpg' => 'image/jpeg',
-        'jpeg' => 'image/jpeg',
-        'png' => 'image/png',
+        'pdf' => ['application/pdf'],
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        'jpg' => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+        'png' => ['image/png'],
+        'mp3' => ['audio/mpeg'],
+        'm4a' => ['audio/mp4', 'audio/x-m4a'],
+        'mp4' => ['audio/mp4', 'video/mp4'],
+        'webm' => ['audio/webm', 'video/webm'],
+        'wav' => ['audio/wav', 'audio/x-wav'],
     ];
 
     public function __construct(private readonly AiCommonAttachmentAccess $access) {}
@@ -143,6 +148,44 @@ class AiCommonAttachmentWriter
         }, false);
     }
 
+    public function setAiReference(
+        User $actor,
+        Organization $organization,
+        AiCommonConversation $conversation,
+        AiCommonAttachment $attachment,
+        array $input,
+    ): AiCommonAttachment {
+        $this->access->authorizeAttachment($actor, $organization, $conversation, $attachment, true);
+        if ($attachment->uploaded_by_user_id !== $actor->id) {
+            throw new AuthorizationException;
+        }
+        $enabled = filter_var($input['enabled'] ?? false, FILTER_VALIDATE_BOOL);
+        $canonical = [
+            'operation_id' => $this->operationId($input),
+            'attachment_id' => $attachment->id,
+            'enabled' => $enabled,
+        ];
+
+        return $this->operateIdempotently(
+            $actor,
+            $organization,
+            $conversation,
+            'set_ai_reference',
+            $canonical,
+            function () use ($attachment, $enabled): AiCommonAttachment {
+                $locked = AiCommonAttachment::query()->lockForUpdate()->findOrFail($attachment->id);
+                if ((bool) $locked->allows_ai_reference !== $enabled) {
+                    $locked->update([
+                        'allows_ai_reference' => $enabled,
+                        'ai_reference_version' => $locked->ai_reference_version + 1,
+                    ]);
+                }
+
+                return $locked->fresh();
+            },
+        );
+    }
+
     private function createIdempotently(
         User $actor,
         Organization $organization,
@@ -248,7 +291,7 @@ class AiCommonAttachmentWriter
         if ($name === '' || mb_strlen($name) > 255 || preg_match('/[\x00-\x1F\x7F]/u', $name)) {
             throw ValidationException::withMessages(['display_name' => 'File名を確認してください。']);
         }
-        if (! isset(self::UPLOAD_TYPES[$extension]) || self::UPLOAD_TYPES[$extension] !== $mime) {
+        if (! isset(self::UPLOAD_TYPES[$extension]) || ! in_array($mime, self::UPLOAD_TYPES[$extension], true)) {
             throw ValidationException::withMessages(['mime_type' => '許可されたFile形式と実体種別の組合せではありません。']);
         }
         if ($size === false || $size < 1 || $size > self::MAX_BYTES) {

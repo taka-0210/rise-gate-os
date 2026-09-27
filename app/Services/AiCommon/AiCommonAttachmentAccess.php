@@ -95,6 +95,23 @@ class AiCommonAttachmentAccess
         return $origin;
     }
 
+    public function binary(
+        User $actor,
+        Organization $organization,
+        AiCommonConversation $conversation,
+        AiCommonAttachment $attachment,
+    ): string {
+        $this->authorizeAttachment($actor, $organization, $conversation, $attachment, true);
+        $binary = $attachment->variant === AiCommonAttachment::VARIANT_EXISTING
+            ? Storage::disk('local')->get($this->existingOrigin($attachment->origin_public_id)->stored_path)
+            : Storage::disk('ai_common_attachments')->get($attachment->storage_key);
+        if (! hash_equals((string) $attachment->sha256, hash('sha256', $binary))) {
+            throw ValidationException::withMessages(['attachments' => 'Attachment integrity verification failed.']);
+        }
+
+        return $binary;
+    }
+
     private function existingOrigin(?string $publicId): ProjectInternalNoteAttachment
     {
         if (! $publicId) {

@@ -11,7 +11,7 @@
     <input type="hidden" name="expected_version" value="{{ $policy?->version }}">
     <input type="hidden" name="is_enabled" value="0"><label><input type="checkbox" name="is_enabled" value="1" @checked($policy?->is_enabled)> Organization AIを有効にする</label>
     <input type="hidden" name="allows_transcription" value="0"><label><input type="checkbox" name="allows_transcription" value="1" @checked($policy?->allows_transcription)> Voice文字起こしを許可（default OFF）</label>
-    @foreach(['common_entry'=>'共通入口','project'=>'Project','action'=>'Action','business_domain'=>'Business Domain','capture'=>'Capture'] as $value=>$label)
+    @foreach(['common_entry'=>'共通入口','project'=>'Project','action'=>'Action','business_domain'=>'Business Domain','capture'=>'Capture','attachment'=>'Attachment / Transcript'] as $value=>$label)
         <label style="display:block"><input type="checkbox" name="allowed_categories[]" value="{{ $value }}" @checked(in_array($value,$policy?->allowed_categories ?? [],true))> {{ $label }}</label>
     @endforeach
     <button type="submit">Policyを確認して保存</button>

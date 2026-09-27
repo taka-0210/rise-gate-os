@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class AiCommonAttachment extends Model
@@ -32,6 +33,7 @@ class AiCommonAttachment extends Model
         'variant', 'state', 'version', 'display_name', 'mime_type', 'extension',
         'size_bytes', 'sha256', 'storage_key', 'inspection_status', 'inspection_driver',
         'inspection_version', 'inspection_safe_code', 'inspected_at_utc', 'origin_type', 'origin_public_id',
+        'media_codec', 'duration_ms',
         'origin_sha256', 'allows_ai_reference', 'ai_reference_version',
         'uploader_access_epoch', 'uploader_credential_generation', 'ready_at_utc',
         'revoked_at_utc', 'revoked_by_user_id', 'revoke_reason',
@@ -42,6 +44,7 @@ class AiCommonAttachment extends Model
         return [
             'version' => 'integer',
             'size_bytes' => 'integer',
+            'duration_ms' => 'integer',
             'allows_ai_reference' => 'boolean',
             'ai_reference_version' => 'integer',
             'uploader_access_epoch' => 'integer',
@@ -97,5 +100,15 @@ class AiCommonAttachment extends Model
             'ai_common_attachment_id',
             'ai_common_message_id',
         )->withPivot('attachment_version')->withTimestamps();
+    }
+
+    public function derivatives(): HasMany
+    {
+        return $this->hasMany(AiCommonAttachmentDerivative::class);
+    }
+
+    public function transcriptRevisions(): HasMany
+    {
+        return $this->hasMany(AiCommonTranscriptRevision::class);
     }
 }

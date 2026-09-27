@@ -28,7 +28,7 @@
 <section class="co-panel"><h2>Contextを明示選択</h2><p>全件探索はしません。Ownerでも他人のCaptureは選択できません。</p>
 @if($conversation->status === 'active')
 <form class="co-form-grid" method="post" action="{{ route('ai-common.sources.store',$conversation) }}">@csrf
-<label>Type<select name="resource_type"><option value="project">Project</option><option value="action">Action</option><option value="business_domain">Business Domain</option><option value="capture">Capture</option></select></label>
+<label>Type<select name="resource_type"><option value="project">Project</option><option value="action">Action</option><option value="business_domain">Business Domain</option><option value="capture">Capture</option><option value="attachment_extract">Attachment Extract</option><option value="attachment_transcript">Attachment Transcript</option></select></label>
 <label>Public ID<input name="resource_public_id" required></label><label class="wide">選択理由<input name="selection_reason" maxlength="160" required></label><button type="submit">Contextへ追加</button></form>@endif
 @foreach($conversation->sources as $source)<span class="co-source">{{ $source->resource_type }} / {{ $source->opaque_handle }}</span>@endforeach</section>
 @if($conversation->status === 'active')

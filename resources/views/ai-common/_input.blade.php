@@ -7,7 +7,7 @@
             @csrf
             <input type="hidden" name="operation_id" value="{{ old('operation_id', Str::uuid()) }}">
             <label class="wide">新しいFile（PDF / DOCX / XLSX / JPEG / PNG、10 MiBまで）
-                <input type="file" name="file" required accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png">
+                <input type="file" name="file" required accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.mp3,.m4a,.mp4,.webm,.wav">
             </label>
             <button type="submit">非公開quarantineへ追加</button>
         </form>
@@ -28,6 +28,47 @@
                 <div class="co-actions">
                     @if($attachment->isReadyForUse())
                         <a class="button secondary" href="{{ route('ai-common.attachments.download', [$conversation, $attachment]) }}">認証Download</a>
+                        @if(in_array($attachment->extension, ['jpg','jpeg','png'], true))
+                            <a class="button secondary" href="{{ route('ai-common.attachments.image-preview', [$conversation, $attachment]) }}">安全Image Preview</a>
+                        @elseif(in_array($attachment->extension, ['mp3','m4a','mp4','webm','wav'], true))
+                            <audio controls preload="none" src="{{ route('ai-common.attachments.playback', [$conversation, $attachment]) }}"></audio>
+                            <form method="post" action="{{ route('ai-common.attachments.transcribe', [$conversation, $attachment]) }}">@csrf
+                                <input type="hidden" name="operation_id" value="{{ Str::uuid() }}">
+                                <label><input type="checkbox" name="transcription_consent" value="1" required> Provider transcriptionに明示同意</label>
+                                <button type="submit">Transcript Revision作成</button>
+                            </form>
+                        @elseif(in_array($attachment->extension, ['pdf','docx','xlsx'], true))
+                            <form method="post" action="{{ route('ai-common.attachments.extract', [$conversation, $attachment]) }}">@csrf
+                                <input type="hidden" name="operation_id" value="{{ Str::uuid() }}">
+                                @if($attachment->extension === 'pdf')
+                                    <input type="number" min="1" name="page_from" value="1"><input type="number" min="1" name="page_to" value="1">
+                                @elseif($attachment->extension === 'docx')
+                                    <input type="number" min="1" name="paragraph_from" value="1"><input type="number" min="1" name="paragraph_to" value="1">
+                                @else
+                                    <input type="number" min="1" name="sheet_index" value="1"><input type="number" min="1" name="row_from" value="1"><input type="number" min="1" name="row_to" value="10">
+                                @endif
+                                <button type="submit">Bounded extraction</button>
+                            </form>
+                        @endif
+                        <form method="post" action="{{ route('ai-common.attachments.ai-reference', [$conversation, $attachment]) }}">@csrf
+                            <input type="hidden" name="operation_id" value="{{ Str::uuid() }}">
+                            <input type="hidden" name="enabled" value="{{ $attachment->allows_ai_reference ? 0 : 1 }}">
+                            <button type="submit">AI参照 {{ $attachment->allows_ai_reference ? 'OFF' : 'ON' }}</button>
+                        </form>
+                        @foreach($attachment->derivatives->where('state', 'ready') as $derivative)
+                            <a class="button secondary" href="{{ route('ai-common.attachments.preview', [$conversation, $attachment, $derivative]) }}">安全Preview</a>
+                            <small>Source: attachment_extract / {{ $derivative->public_id }}</small>
+                        @endforeach
+                        @foreach($attachment->transcriptRevisions as $revision)
+                            <small>Transcript Revision {{ $revision->revision_number }} / Source: attachment_transcript / {{ $revision->public_id }}</small>
+                            @if($conversation->status === 'active')
+                                <form method="post" action="{{ route('ai-common.attachments.transcripts.revise', [$conversation, $attachment, $revision]) }}">@csrf
+                                    <input type="hidden" name="operation_id" value="{{ Str::uuid() }}">
+                                    <textarea name="content" maxlength="4000" required>{{ $revision->content }}</textarea>
+                                    <button type="submit">Human Revision作成</button>
+                                </form>
+                            @endif
+                        @endforeach
                     @endif
                     @if($attachment->state !== 'revoked')
                         <form method="post" action="{{ route('ai-common.attachments.revoke', [$conversation, $attachment]) }}">

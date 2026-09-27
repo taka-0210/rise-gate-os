@@ -2,9 +2,11 @@
 
 namespace App\Services\AiCommon;
 
+use App\Models\AiCommonAttachmentDerivative;
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonSource;
 use App\Models\AiCommonSourceRevision;
+use App\Models\AiCommonTranscriptRevision;
 use App\Models\AiResourcePolicy;
 use App\Models\BusinessDomain;
 use App\Models\Capture;
@@ -44,6 +46,7 @@ class AiCommonSourceManifest
         private readonly ProjectExecutionAccess $projects,
         private readonly BusinessDomainAccess $domains,
         private readonly CaptureAccess $captures,
+        private readonly AiCommonAttachmentAccess $attachments,
     ) {}
 
     public function select(User $actor, Organization $organization, AiCommonConversation $conversation, string $type, string $publicId, string $reason): AiCommonSource
@@ -57,7 +60,7 @@ class AiCommonSourceManifest
             throw ValidationException::withMessages(['selection_reason' => 'Enter a selection reason within 160 characters.']);
         }
 
-        $snapshot = $this->snapshot($actor, $organization, $type, $publicId);
+        $snapshot = $this->snapshot($actor, $organization, $type, $publicId, $conversation->id);
 
         return DB::transaction(function () use ($actor, $conversation, $type, $publicId, $reason, $snapshot, $existing): AiCommonSource {
             $source = $existing
@@ -112,7 +115,7 @@ class AiCommonSourceManifest
             || $source->conversation->user_id !== $actor->id) {
             throw new AuthorizationException;
         }
-        $snapshot = $this->snapshot($actor, $organization, $source->resource_type, $source->resource_public_id);
+        $snapshot = $this->snapshot($actor, $organization, $source->resource_type, $source->resource_public_id, $source->ai_common_conversation_id);
         if (! hash_equals($source->freshness_fingerprint, $snapshot['access_fingerprint'])) {
             throw ValidationException::withMessages(['source' => 'The source changed. Reselect it before reuse.']);
         }
@@ -126,7 +129,7 @@ class AiCommonSourceManifest
             || $revision->conversation->user_id !== $actor->id) {
             throw new AuthorizationException;
         }
-        $snapshot = $this->snapshot($actor, $organization, $revision->resource_type, $revision->resource_public_id);
+        $snapshot = $this->snapshot($actor, $organization, $revision->resource_type, $revision->resource_public_id, $revision->ai_common_conversation_id);
         if (! hash_equals($revision->access_fingerprint, $snapshot['access_fingerprint'])
             || $revision->resource_version !== $snapshot['resource_version']
             || $revision->projection !== $snapshot['projection']) {
@@ -190,15 +193,17 @@ class AiCommonSourceManifest
         }
     }
 
-    private function snapshot(User $actor, Organization $organization, string $type, string $publicId): array
+    private function snapshot(User $actor, Organization $organization, string $type, string $publicId, ?int $conversationId = null): array
     {
-        [, $category, $version, $projection] = $this->resolve($actor, $organization, $type, $publicId);
+        $resolved = $this->resolve($actor, $organization, $type, $publicId, $conversationId);
+        [, $category, $version, $projection] = $resolved;
         [$organizationPolicyVersion, $resourcePolicyVersion] = $this->authorizePolicy(
             $actor,
             $organization,
             $category,
             $type,
             $publicId,
+            $resolved[4] ?? null,
         );
         $projection = $this->limitProjection($projection);
         $membership = OrganizationUser::query()
@@ -229,13 +234,15 @@ class AiCommonSourceManifest
         ];
     }
 
-    private function resolve(User $actor, Organization $organization, string $type, string $publicId): array
+    private function resolve(User $actor, Organization $organization, string $type, string $publicId, ?int $conversationId): array
     {
         return match ($type) {
             'project' => $this->project($actor, $organization, $publicId),
             'action' => $this->action($actor, $organization, $publicId),
             'business_domain' => $this->domain($actor, $organization, $publicId),
             'capture' => $this->capture($actor, $organization, $publicId),
+            'attachment_extract' => $this->attachmentExtract($actor, $organization, $publicId, $conversationId),
+            'attachment_transcript' => $this->attachmentTranscript($actor, $organization, $publicId, $conversationId),
             default => throw ValidationException::withMessages(['resource_type' => 'Unsupported AI source type.']),
         };
     }
@@ -289,10 +296,68 @@ class AiCommonSourceManifest
         ])];
     }
 
-    private function authorizePolicy(User $actor, Organization $organization, string $category, string $type, string $publicId): array
+    private function attachmentExtract(User $actor, Organization $organization, string $publicId, ?int $conversationId): array
+    {
+        $derivative = AiCommonAttachmentDerivative::query()->where('public_id', $publicId)
+            ->where('state', AiCommonAttachmentDerivative::STATE_READY)->firstOrFail();
+        $attachment = $derivative->attachment()->firstOrFail();
+        $conversation = $attachment->conversation()->firstOrFail();
+        if ($conversationId !== null && $conversation->id !== $conversationId) {
+            throw new AuthorizationException;
+        }
+        $this->attachments->authorizeAttachment($actor, $organization, $conversation, $attachment, true);
+        if ($attachment->uploaded_by_user_id !== $actor->id || ! $attachment->allows_ai_reference) {
+            throw new AuthorizationException;
+        }
+
+        return [$derivative, OrganizationAiPolicy::CATEGORY_ATTACHMENT,
+            hash('sha256', $derivative->content_sha256.'|'.$derivative->attachment_version),
+            [
+                'derivative_id' => $derivative->public_id,
+                'kind' => $derivative->kind,
+                'selector' => $derivative->selector,
+                'content' => $derivative->content,
+                'content_sha256' => $derivative->content_sha256,
+            ],
+            (int) $attachment->ai_reference_version,
+        ];
+    }
+
+    private function attachmentTranscript(User $actor, Organization $organization, string $publicId, ?int $conversationId): array
+    {
+        $revision = AiCommonTranscriptRevision::query()->where('public_id', $publicId)->firstOrFail();
+        $attachment = $revision->attachment()->firstOrFail();
+        $conversation = $attachment->conversation()->firstOrFail();
+        if ($conversationId !== null && $conversation->id !== $conversationId) {
+            throw new AuthorizationException;
+        }
+        $this->attachments->authorizeAttachment($actor, $organization, $conversation, $attachment, true);
+        if ($attachment->uploaded_by_user_id !== $actor->id || ! $attachment->allows_ai_reference) {
+            throw new AuthorizationException;
+        }
+
+        return [$revision, OrganizationAiPolicy::CATEGORY_ATTACHMENT,
+            hash('sha256', $revision->content_sha256.'|'.$revision->audio_sha256),
+            [
+                'transcript_revision_id' => $revision->public_id,
+                'revision_number' => $revision->revision_number,
+                'range_start_ms' => $revision->range_start_ms,
+                'range_end_ms' => $revision->range_end_ms,
+                'range_precision' => $revision->range_precision,
+                'content' => $revision->content,
+                'content_sha256' => $revision->content_sha256,
+            ],
+            (int) $attachment->ai_reference_version,
+        ];
+    }
+
+    private function authorizePolicy(User $actor, Organization $organization, string $category, string $type, string $publicId, ?int $embeddedPolicyVersion = null): array
     {
         $organizationPolicy = $this->common->authorizeCategory($actor, $organization, OrganizationAiPolicy::CATEGORY_COMMON);
         $this->common->authorizeCategory($actor, $organization, $category);
+        if ($embeddedPolicyVersion !== null) {
+            return [(int) $organizationPolicy->version, $embeddedPolicyVersion];
+        }
         $resource = AiResourcePolicy::query()->where([
             'organization_id' => $organization->id,
             'resource_type' => $type,

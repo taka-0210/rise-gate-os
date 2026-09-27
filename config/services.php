@@ -54,6 +54,7 @@ return [
     'ai_common' => [
         'timeout_seconds' => env('AI_COMMON_TIMEOUT_SECONDS', 30),
         'transcription_timeout_seconds' => env('AI_COMMON_TRANSCRIPTION_TIMEOUT_SECONDS', 60),
+        'pdftotext_binary' => env('AI_COMMON_PDFTOTEXT_BINARY', 'pdftotext'),
         'price_version' => env('AI_COMMON_PRICE_VERSION', 'configured-2026-09'),
     ],
 

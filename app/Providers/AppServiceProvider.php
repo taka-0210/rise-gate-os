@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\AiCommonAttachmentExtractor;
 use App\Contracts\AiCommonAttachmentInspector;
 use App\Contracts\AiCommonAudioInspector;
 use App\Contracts\AiCommonProvider;
@@ -19,6 +20,7 @@ use App\Policies\ImprovementPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\RoadmapPolicy;
 use App\Policies\TaskPolicy;
+use App\Services\AiCommon\BoundedAiCommonAttachmentExtractor;
 use App\Services\AiCommon\FailClosedAiCommonAttachmentInspector;
 use App\Services\AiCommon\FailClosedAiCommonAudioInspector;
 use App\Services\AiCommon\OpenAiCommonProvider;
@@ -37,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(AiCommonProvider::class, OpenAiCommonProvider::class);
         $this->app->bind(AiCommonAttachmentInspector::class, FailClosedAiCommonAttachmentInspector::class);
+        $this->app->bind(AiCommonAttachmentExtractor::class, BoundedAiCommonAttachmentExtractor::class);
         $this->app->bind(AiCommonAudioInspector::class, FailClosedAiCommonAudioInspector::class);
         $this->app->bind(AiCommonTranscriptionProvider::class, OpenAiCommonTranscriptionProvider::class);
         $this->app->bind(AiProviderTransport::class, OpenAiProviderTransport::class);

@@ -17,6 +17,8 @@ class OrganizationAiPolicy extends Model
 
     public const CATEGORY_CAPTURE = 'capture';
 
+    public const CATEGORY_ATTACHMENT = 'attachment';
+
     protected $fillable = [
         'organization_id', 'is_enabled', 'allows_transcription', 'allowed_categories', 'version',
         'managed_by_user_id', 'confirmed_at',

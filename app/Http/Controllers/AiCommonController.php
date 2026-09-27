@@ -73,7 +73,7 @@ class AiCommonController extends Controller
         $access->authorizeConversation($request->user(), $organization, $conversation);
         $messageRows = $reader->visible($request->user(), $organization, $conversation);
 
-        $conversation->load(['sources', 'attachments', 'temporaryAudios', 'proposals.items', 'proposals.applyAttempts', 'proposals.undos']);
+        $conversation->load(['sources', 'attachments.derivatives', 'attachments.transcriptRevisions', 'temporaryAudios', 'proposals.items', 'proposals.applyAttempts', 'proposals.undos']);
         $visibleProposals = $conversation->proposals->filter(function (AiProposal $proposal) use ($request, $proposalLineage): bool {
             try {
                 $proposalLineage->authorizeProposal($request->user(), $proposal);
