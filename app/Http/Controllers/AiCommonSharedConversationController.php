@@ -16,6 +16,8 @@ use App\Services\AiCommon\AiCommonSharedContext;
 use App\Services\AiCommon\AiCommonSharedConversationReader;
 use App\Services\AiCommon\AiCommonSharedConversationWriter;
 use App\Services\AiCommon\AiCommonSharedCoWriter;
+use App\Services\AiCommon\AiCommonSharedSessionReader;
+use App\Services\AiCommon\AiCommonSharedSessionWriter;
 use App\Services\AiProposalApplier;
 use App\Services\AiProposalApprover;
 use App\Services\AiProposalUndoService;
@@ -42,7 +44,7 @@ class AiCommonSharedConversationController extends Controller
         return redirect()->route('ai-common.shared.show', $conversation);
     }
 
-    public function show(Request $request, AiCommonConversation $conversation, AiCommonSharedAccess $access, AiCommonSharedConversationReader $reader, AiCommonProposalLineage $lineage): View
+    public function show(Request $request, AiCommonConversation $conversation, AiCommonSharedAccess $access, AiCommonSharedConversationReader $reader, AiCommonProposalLineage $lineage, AiCommonSharedSessionReader $sessionReader): View
     {
         $organization = $request->attributes->get('currentCompany');
         $participant = $access->authorizeParticipant($request->user(), $organization, $conversation);
@@ -78,6 +80,16 @@ class AiCommonSharedConversationController extends Controller
             ->orderBy('name')
             ->get();
 
+        $session = $shared->sessions()->latest('id')->first();
+        $transcriptRows = [];
+        if ($session) {
+            try {
+                $transcriptRows = $sessionReader->transcript($request->user(), $organization, $conversation, $session);
+            } catch (\Throwable) {
+                // A missing current consent or permission must hide the derived transcript.
+            }
+        }
+
         return view('ai-common.shared-show', [
             'conversation' => $conversation,
             'shared' => $shared,
@@ -85,6 +97,8 @@ class AiCommonSharedConversationController extends Controller
             'inviteCandidates' => $inviteCandidates,
             'messageRows' => $messageRows,
             'coState' => AiCommonSharedCoState::query()->where('ai_common_shared_conversation_id', $shared->id)->first(),
+            'session' => $session,
+            'transcriptRows' => $transcriptRows,
         ]);
     }
 
@@ -118,15 +132,17 @@ class AiCommonSharedConversationController extends Controller
         return back()->with('status', 'Participantを招待しました。承諾前は本文を閲覧できません。');
     }
 
-    public function accept(Request $request, AiCommonSharedParticipant $invitation, AiCommonSharedConversationWriter $writer): RedirectResponse
+    public function accept(Request $request, AiCommonSharedParticipant $invitation, AiCommonSharedConversationWriter $writer, AiCommonSharedSessionWriter $sessions): RedirectResponse
     {
         $participant = $writer->accept(
             $request->user(),
             $request->attributes->get('currentCompany'),
             $invitation,
         );
+        $conversation = $participant->sharedConversation->conversation;
+        $sessions->interruptForConversation($conversation, 'participant_audience_changed');
 
-        return redirect()->route('ai-common.shared.show', $participant->sharedConversation->conversation)
+        return redirect()->route('ai-common.shared.show', $conversation)
             ->with('status', 'Shared Conversationへの参加を承諾しました。');
     }
 
@@ -218,16 +234,18 @@ class AiCommonSharedConversationController extends Controller
         return back()->with('status', 'Shared Proposal undo completed.');
     }
 
-    public function remove(Request $request, AiCommonConversation $conversation, AiCommonSharedParticipant $participant, AiCommonSharedConversationWriter $writer): RedirectResponse
+    public function remove(Request $request, AiCommonConversation $conversation, AiCommonSharedParticipant $participant, AiCommonSharedConversationWriter $writer, AiCommonSharedSessionWriter $sessions): RedirectResponse
     {
         $writer->remove($request->user(), $request->attributes->get('currentCompany'), $conversation, $participant);
+        $sessions->interruptForConversation($conversation, 'participant_audience_changed');
 
         return back()->with('status', 'Participantを除外しました。');
     }
 
-    public function leave(Request $request, AiCommonConversation $conversation, AiCommonSharedConversationWriter $writer): RedirectResponse
+    public function leave(Request $request, AiCommonConversation $conversation, AiCommonSharedConversationWriter $writer, AiCommonSharedSessionWriter $sessions): RedirectResponse
     {
         $writer->leave($request->user(), $request->attributes->get('currentCompany'), $conversation);
+        $sessions->interruptForConversation($conversation, 'participant_audience_changed');
 
         return redirect()->route('ai-common.index')->with('status', 'Shared Conversationから退出しました。');
     }
@@ -251,9 +269,10 @@ class AiCommonSharedConversationController extends Controller
         return back()->with('status', 'Owner責任を承諾しました。');
     }
 
-    public function archive(Request $request, AiCommonConversation $conversation, AiCommonSharedConversationWriter $writer): RedirectResponse
+    public function archive(Request $request, AiCommonConversation $conversation, AiCommonSharedConversationWriter $writer, AiCommonSharedSessionWriter $sessions): RedirectResponse
     {
         $writer->archive($request->user(), $request->attributes->get('currentCompany'), $conversation);
+        $sessions->interruptForConversation($conversation, 'conversation_archived');
 
         return back()->with('status', 'Shared ConversationをArchiveしました。');
     }

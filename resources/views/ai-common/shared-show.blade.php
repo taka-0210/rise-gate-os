@@ -3,6 +3,7 @@
 @section('title', $conversation->title.' - Shared Conversation')
 
 @section('content')
+@include('ai-common._shared-session')
 <style>
 .shared-wrap{max-width:900px;margin:auto}.shared-card{background:#fff;border:1px solid #d7e1e5;border-radius:14px;padding:18px;margin:14px 0}.shared-row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}.shared-message{border-left:4px solid #24576a}.shared-muted{color:#64748b}.shared-card input,.shared-card textarea,.shared-card select{width:100%;box-sizing:border-box}@media(max-width:390px){.shared-card{padding:14px}.shared-row form,.shared-row button{width:100%}}
 </style>
@@ -81,4 +82,5 @@
 </section>
 @endif
 </div>
+<script defer src='{{ asset('js/ai-common-shared-session.js') }}'></script>
 @endsection

@@ -48,4 +48,9 @@ class AiCommonSharedConversation extends Model
     {
         return $this->hasMany(AiCommonSharedParticipant::class);
     }
+
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(AiCommonSharedSession::class);
+    }
 }
