@@ -25,6 +25,7 @@ class AiCommonAttachmentTranscriptWriter
         private readonly AiCommonAccess $common,
         private readonly AiCommonAttachmentAccess $access,
         private readonly AiCommonTranscriptionProvider $provider,
+        private readonly AiCommonTranscriptionEvidence $evidence,
     ) {}
 
     public function transcribe(
@@ -48,29 +49,46 @@ class AiCommonAttachmentTranscriptWriter
         }
         $binary = $this->access->binary($actor, $organization, $conversation, $attachment);
         $logicalRequestId = (string) Str::uuid();
-        DB::transaction(function () use ($actor, $organization, $conversation, $attachment, $operationId, $fingerprint, $logicalRequestId): void {
-            $locked = AiCommonAttachment::query()->lockForUpdate()->findOrFail($attachment->id);
-            $this->authorize($actor->fresh(), $organization, $conversation->fresh(), $locked);
-            AiCommonAttachmentTranscriptionOperation::query()->create([
-                'ai_common_attachment_id' => $locked->id,
-                'actor_user_id' => $actor->id,
-                'operation_id' => $operationId,
-                'payload_fingerprint' => $fingerprint,
-                'logical_request_id' => $logicalRequestId,
-                'result_status' => AiCommonAttachmentTranscriptionOperation::RESULT_PROCESSING,
-            ]);
-        }, 3);
+        try {
+            DB::transaction(function () use ($actor, $organization, $conversation, $attachment, $operationId, $fingerprint, $logicalRequestId): void {
+                $locked = AiCommonAttachment::query()->lockForUpdate()->findOrFail($attachment->id);
+                $this->authorize($actor->fresh(), $organization, $conversation->fresh(), $locked);
+                AiCommonAttachmentTranscriptionOperation::query()->create([
+                    'ai_common_attachment_id' => $locked->id,
+                    'actor_user_id' => $actor->id,
+                    'operation_id' => $operationId,
+                    'payload_fingerprint' => $fingerprint,
+                    'logical_request_id' => $logicalRequestId,
+                    'result_status' => AiCommonAttachmentTranscriptionOperation::RESULT_PROCESSING,
+                ]);
+            }, 3);
+        } catch (QueryException $error) {
+            $existing = $this->existing($attachment, $actor, $operationId, $fingerprint);
+            if (! $existing) {
+                throw $error;
+            }
+            if ($existing->result_status === AiCommonAttachmentTranscriptionOperation::RESULT_SUCCESS) {
+                return $existing->revision()->firstOrFail();
+            }
+
+            throw ValidationException::withMessages(['audio' => 'This transcription operation is already being processed or is final.']);
+        }
 
         $started = hrtime(true);
+        $providerAttempted = false;
         try {
             // The final check immediately before I/O deliberately occurs outside any DB transaction.
             $this->authorize($actor->fresh(), $organization, $conversation->fresh(), $attachment->fresh());
+            $providerAttempted = true;
             $result = $this->provider->transcribe($binary, $attachment->mime_type, $attachment->extension);
         } catch (AiCommonTranscriptionException $error) {
-            $this->fail($attachment, $actor, $operationId, $error->safeCode, $error->resultUnknown, $started);
+            $this->fail($organization, $conversation, $attachment, $actor, $operationId, $error->safeCode, $error->resultUnknown, $started, providerAttempted: $providerAttempted);
             throw ValidationException::withMessages(['audio' => $error->safeCode]);
+        } catch (AuthorizationException|ValidationException $error) {
+            $this->fail($organization, $conversation, $attachment, $actor, $operationId, 'transcription_authorization_changed', false, $started, providerAttempted: $providerAttempted);
+            throw $error;
         } catch (Throwable $error) {
-            $this->fail($attachment, $actor, $operationId, 'transcription_result_unknown', true, $started);
+            $this->fail($organization, $conversation, $attachment, $actor, $operationId, 'transcription_result_unknown', $providerAttempted, $started, providerAttempted: $providerAttempted);
             throw $error;
         }
 
@@ -103,25 +121,43 @@ class AiCommonAttachmentTranscriptWriter
                     'provider' => $result['provider'],
                     'model' => $result['model'] ?? null,
                 ]);
-                AiCommonAttachmentTranscriptionOperation::query()
+                $operation = AiCommonAttachmentTranscriptionOperation::query()
                     ->where('ai_common_attachment_id', $locked->id)
                     ->where('actor_user_id', $actor->id)
                     ->where('operation_id', $operationId)
-                    ->lockForUpdate()->firstOrFail()->update([
-                        'ai_common_transcript_revision_id' => $revision->id,
-                        'result_status' => AiCommonAttachmentTranscriptionOperation::RESULT_SUCCESS,
-                        'provider' => $result['provider'],
-                        'model' => $result['model'] ?? null,
-                        'latency_ms' => (int) round((hrtime(true) - $started) / 1_000_000),
-                    ]);
+                    ->lockForUpdate()->firstOrFail();
+                $latencyMs = (int) round((hrtime(true) - $started) / 1_000_000);
+                $operation->update([
+                    'ai_common_transcript_revision_id' => $revision->id,
+                    'result_status' => AiCommonAttachmentTranscriptionOperation::RESULT_SUCCESS,
+                    'provider' => $result['provider'],
+                    'model' => $result['model'] ?? null,
+                    'latency_ms' => $latencyMs,
+                ]);
+                $this->evidence->record(
+                    $organization,
+                    $conversation,
+                    $actor,
+                    $operationId,
+                    $operation->logical_request_id,
+                    'attachment',
+                    $locked->public_id,
+                    $result['provider'],
+                    $result['model'] ?? null,
+                    AiCommonAttachmentTranscriptionOperation::RESULT_SUCCESS,
+                    null,
+                    $latencyMs,
+                    $locked->duration_ms,
+                    $result['usage'] ?? [],
+                );
 
                 return $revision;
             }, 3);
         } catch (AuthorizationException|ValidationException $error) {
-            $this->fail($attachment, $actor, $operationId, 'transcription_authorization_changed', false, $started);
+            $this->fail($organization, $conversation, $attachment, $actor, $operationId, 'transcription_authorization_changed', false, $started, $result, true);
             throw $error;
         } catch (Throwable $error) {
-            $this->fail($attachment, $actor, $operationId, 'transcription_result_unknown', true, $started);
+            $this->fail($organization, $conversation, $attachment, $actor, $operationId, 'transcription_result_unknown', true, $started, $result);
             throw $error;
         }
     }
@@ -221,19 +257,62 @@ class AiCommonAttachmentTranscriptWriter
         return $existing;
     }
 
-    private function fail(AiCommonAttachment $attachment, User $actor, string $operationId, string $safeCode, bool $unknown, int $started): void
-    {
-        AiCommonAttachmentTranscriptionOperation::query()
-            ->where('ai_common_attachment_id', $attachment->id)
-            ->where('actor_user_id', $actor->id)
-            ->where('operation_id', $operationId)
-            ->where('result_status', AiCommonAttachmentTranscriptionOperation::RESULT_PROCESSING)
-            ->update([
-                'result_status' => $unknown
+    private function fail(
+        Organization $organization,
+        AiCommonConversation $conversation,
+        AiCommonAttachment $attachment,
+        User $actor,
+        string $operationId,
+        string $safeCode,
+        bool $unknown,
+        int $started,
+        ?array $providerResult = null,
+        bool $discarded = false,
+        bool $providerAttempted = true,
+    ): void {
+        DB::transaction(function () use ($organization, $conversation, $attachment, $actor, $operationId, $safeCode, $unknown, $started, $providerResult, $discarded, $providerAttempted): void {
+            $operation = AiCommonAttachmentTranscriptionOperation::query()
+                ->where('ai_common_attachment_id', $attachment->id)
+                ->where('actor_user_id', $actor->id)
+                ->where('operation_id', $operationId)
+                ->where('result_status', AiCommonAttachmentTranscriptionOperation::RESULT_PROCESSING)
+                ->lockForUpdate()
+                ->first();
+            if (! $operation) {
+                return;
+            }
+            $status = $discarded
+                ? AiCommonAttachmentTranscriptionOperation::RESULT_DISCARDED
+                : ($unknown
                     ? AiCommonAttachmentTranscriptionOperation::RESULT_UNKNOWN
-                    : AiCommonAttachmentTranscriptionOperation::RESULT_FAILED,
+                    : AiCommonAttachmentTranscriptionOperation::RESULT_FAILED);
+            $latencyMs = (int) round((hrtime(true) - $started) / 1_000_000);
+            $provider = $providerResult['provider'] ?? $operation->provider ?? 'unknown';
+            $model = $providerResult['model'] ?? $operation->model;
+            $operation->update([
+                'result_status' => $status,
                 'safe_error_code' => $safeCode,
-                'latency_ms' => (int) round((hrtime(true) - $started) / 1_000_000),
+                'provider' => $provider,
+                'model' => $model,
+                'latency_ms' => $latencyMs,
             ]);
+            $this->evidence->record(
+                $organization,
+                $conversation,
+                $actor,
+                $operationId,
+                $operation->logical_request_id,
+                'attachment',
+                $attachment->public_id,
+                $provider,
+                $model,
+                $status,
+                $safeCode,
+                $latencyMs,
+                $attachment->duration_ms,
+                $providerResult['usage'] ?? [],
+                $providerAttempted,
+            );
+        }, 3);
     }
 }

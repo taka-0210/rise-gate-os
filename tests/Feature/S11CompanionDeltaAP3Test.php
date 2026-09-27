@@ -242,7 +242,7 @@ class S11CompanionDeltaAP3Test extends TestCase
         } catch (AuthorizationException|ValidationException) {
             $this->assertDatabaseCount('ai_common_transcript_revisions', 0);
             $this->assertDatabaseHas('ai_common_attachment_transcription_operations', [
-                'result_status' => 'failed',
+                'result_status' => 'discarded',
                 'safe_error_code' => 'transcription_authorization_changed',
             ]);
         }

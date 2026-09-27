@@ -35,6 +35,7 @@ class AiCommonTemporaryAudioWriter
         private readonly AiCommonAudioInspector $inspector,
         private readonly AiCommonTranscriptionProvider $provider,
         private readonly AiCommonHumanMessageWriter $messages,
+        private readonly AiCommonTranscriptionEvidence $evidence,
     ) {}
 
     public function record(
@@ -191,26 +192,28 @@ class AiCommonTemporaryAudioWriter
             $encrypted = Storage::disk('ai_common_temporary_audio')->get($audio->storage_key);
             $binary = base64_decode(Crypt::decryptString($encrypted), true);
         } catch (Throwable) {
-            $this->failTranscription($audio, $operationId, 'temporary_audio_integrity_failed', false);
+            $this->failTranscription($organization, $conversation, $actor, $audio, $operationId, 'temporary_audio_integrity_failed', false, providerAttempted: false);
             throw ValidationException::withMessages(['voice' => 'Temporary Audioの同一性を確認できません。']);
         }
         if (! is_string($binary) || ! hash_equals($audio->sha256, hash('sha256', $binary))) {
-            $this->failTranscription($audio, $operationId, 'temporary_audio_integrity_failed', false);
+            $this->failTranscription($organization, $conversation, $actor, $audio, $operationId, 'temporary_audio_integrity_failed', false, providerAttempted: false);
             throw ValidationException::withMessages(['voice' => 'Temporary Audioの同一性を確認できません。']);
         }
 
         $started = hrtime(true);
+        $providerAttempted = false;
         try {
             $this->authorizeTranscription($actor->fresh(), $organization, $conversation->fresh(), $audio->fresh());
+            $providerAttempted = true;
             $result = $this->provider->transcribe($binary, $audio->mime_type, $audio->extension);
         } catch (AiCommonTranscriptionException $error) {
-            $this->failTranscription($audio, $operationId, $error->safeCode, $error->resultUnknown, $started);
+            $this->failTranscription($organization, $conversation, $actor, $audio, $operationId, $error->safeCode, $error->resultUnknown, $started, providerAttempted: $providerAttempted);
             throw ValidationException::withMessages(['voice' => $error->safeCode]);
         } catch (AuthorizationException|ValidationException $error) {
-            $this->failTranscription($audio, $operationId, 'transcription_authorization_changed', false, $started);
+            $this->failTranscription($organization, $conversation, $actor, $audio, $operationId, 'transcription_authorization_changed', false, $started, providerAttempted: $providerAttempted);
             throw $error;
         } catch (Throwable $error) {
-            $this->failTranscription($audio, $operationId, 'transcription_result_unknown', true, $started);
+            $this->failTranscription($organization, $conversation, $actor, $audio, $operationId, 'transcription_result_unknown', $providerAttempted, $started, providerAttempted: $providerAttempted);
             throw new AiCommonTranscriptionException('transcription_result_unknown', true, $error);
         }
 
@@ -236,11 +239,12 @@ class AiCommonTemporaryAudioWriter
                     ->where('actor_user_id', $freshActor->id)
                     ->where('operation_id', $operationId)
                     ->lockForUpdate()->firstOrFail();
+                $latencyMs = (int) round((hrtime(true) - $started) / 1_000_000);
                 $operation->update([
                     'provider' => $result['provider'],
                     'model' => $result['model'],
                     'result_status' => AiCommonTranscriptionOperation::RESULT_SUCCESS,
-                    'latency_ms' => (int) round((hrtime(true) - $started) / 1_000_000),
+                    'latency_ms' => $latencyMs,
                 ]);
                 $locked->update([
                     'state' => AiCommonTemporaryAudio::STATE_DRAFT,
@@ -248,14 +252,30 @@ class AiCommonTemporaryAudioWriter
                     'draft_text' => $result['text'],
                     'safe_error_code' => null,
                 ]);
+                $this->evidence->record(
+                    $organization,
+                    $conversation,
+                    $freshActor,
+                    $operationId,
+                    $operation->logical_request_id,
+                    'temporary_audio',
+                    $locked->public_id,
+                    $result['provider'],
+                    $result['model'] ?? null,
+                    AiCommonTranscriptionOperation::RESULT_SUCCESS,
+                    null,
+                    $latencyMs,
+                    $locked->duration_ms,
+                    $result['usage'] ?? [],
+                );
 
                 return $locked->fresh();
             }, 3);
         } catch (AuthorizationException|ValidationException $error) {
-            $this->failTranscription($audio, $operationId, 'transcription_authorization_changed', false, $started);
+            $this->failTranscription($organization, $conversation, $actor, $audio, $operationId, 'transcription_authorization_changed', false, $started, $result, true);
             throw $error;
         } catch (Throwable $error) {
-            $this->failTranscription($audio, $operationId, 'transcription_result_unknown', true, $started);
+            $this->failTranscription($organization, $conversation, $actor, $audio, $operationId, 'transcription_result_unknown', true, $started, $result);
             throw $error;
         }
     }
@@ -429,23 +449,40 @@ class AiCommonTemporaryAudioWriter
     }
 
     private function failTranscription(
+        Organization $organization,
+        AiCommonConversation $conversation,
+        User $actor,
         AiCommonTemporaryAudio $audio,
         string $operationId,
         string $safeCode,
         bool $unknown,
         ?int $started = null,
+        ?array $providerResult = null,
+        bool $discarded = false,
+        bool $providerAttempted = true,
     ): void {
-        DB::transaction(function () use ($audio, $operationId, $safeCode, $unknown, $started): void {
+        DB::transaction(function () use ($organization, $conversation, $actor, $audio, $operationId, $safeCode, $unknown, $started, $providerResult, $discarded, $providerAttempted): void {
             $locked = AiCommonTemporaryAudio::query()->lockForUpdate()->findOrFail($audio->id);
             $operation = AiCommonTranscriptionOperation::query()
                 ->where('ai_common_temporary_audio_id', $locked->id)
                 ->where('operation_id', $operationId)->lockForUpdate()->first();
-            $operation?->update([
-                'result_status' => $unknown
+            if (! $operation || $operation->result_status !== AiCommonTranscriptionOperation::RESULT_PROCESSING) {
+                return;
+            }
+            $status = $discarded
+                ? AiCommonTranscriptionOperation::RESULT_DISCARDED
+                : ($unknown
                     ? AiCommonTranscriptionOperation::RESULT_UNKNOWN
-                    : AiCommonTranscriptionOperation::RESULT_FAILED,
+                    : AiCommonTranscriptionOperation::RESULT_FAILED);
+            $latencyMs = $started === null ? null : (int) round((hrtime(true) - $started) / 1_000_000);
+            $provider = $providerResult['provider'] ?? $operation->provider ?? 'unknown';
+            $model = $providerResult['model'] ?? $operation->model;
+            $operation->update([
+                'result_status' => $status,
                 'safe_error_code' => $safeCode,
-                'latency_ms' => $started === null ? null : (int) round((hrtime(true) - $started) / 1_000_000),
+                'provider' => $provider,
+                'model' => $model,
+                'latency_ms' => $latencyMs,
             ]);
             if ($locked->state === AiCommonTemporaryAudio::STATE_TRANSCRIBING) {
                 $locked->update([
@@ -454,6 +491,23 @@ class AiCommonTemporaryAudioWriter
                     'safe_error_code' => $safeCode,
                 ]);
             }
+            $this->evidence->record(
+                $organization,
+                $conversation,
+                $actor,
+                $operationId,
+                $operation->logical_request_id,
+                'temporary_audio',
+                $locked->public_id,
+                $provider,
+                $model,
+                $status,
+                $safeCode,
+                $latencyMs,
+                $locked->duration_ms,
+                $providerResult['usage'] ?? [],
+                $providerAttempted,
+            );
         }, 3);
     }
 

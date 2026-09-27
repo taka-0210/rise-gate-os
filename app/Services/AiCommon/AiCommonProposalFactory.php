@@ -20,6 +20,7 @@ class AiCommonProposalFactory
     public function __construct(
         private readonly AiCommonAccess $access,
         private readonly AiCommonProposalLineage $lineage,
+        private readonly AiCommonAuditWriter $audit,
     ) {}
 
     public function create(User $actor, Organization $organization, AiCommonConversation $conversation, array $input): AiProposal
@@ -113,6 +114,25 @@ class AiCommonProposalFactory
                 'published_summary' => trim((string) ($input['published_summary'] ?? '')) ?: null,
             ]);
             $proposal->sourceRevisions()->sync($sourceRevisionIds);
+
+            if ($sourceRevisionIds !== []) {
+                $this->audit->record(
+                    $organization,
+                    $conversation,
+                    $actor,
+                    $commonOperationKey,
+                    'proposal.source_created',
+                    'proposal',
+                    $proposal->public_id,
+                    'success',
+                    metadata: [
+                        'source_revision_count' => count($sourceRevisionIds),
+                        'lineage_version' => AiCommonMessage::SOURCE_LINEAGE_V1,
+                        'proposal_operation' => $operation,
+                        'target_type' => $targetType,
+                    ],
+                );
+            }
 
             return $proposal->fresh(['items', 'sourceRevisions', 'commonHandoff']);
         }, 3);

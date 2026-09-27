@@ -15,6 +15,8 @@ class AiCommonAttachmentTranscriptionOperation extends Model
 
     public const RESULT_UNKNOWN = 'unknown';
 
+    public const RESULT_DISCARDED = 'discarded';
+
     protected $fillable = [
         'ai_common_attachment_id', 'actor_user_id', 'ai_common_transcript_revision_id',
         'operation_id', 'payload_fingerprint', 'logical_request_id', 'result_status',

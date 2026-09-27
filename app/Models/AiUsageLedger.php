@@ -9,8 +9,9 @@ class AiUsageLedger extends Model
 {
     protected $fillable = [
         'public_id', 'organization_id', 'user_id', 'ai_common_conversation_id',
-        'logical_request_id', 'purpose', 'provider', 'model', 'attempt',
-        'input_tokens', 'output_tokens', 'estimated_cost_microunits',
+        'logical_request_id', 'application_operation_id', 'purpose', 'provider', 'model', 'attempt',
+        'input_tokens', 'output_tokens', 'usage_unit', 'usage_quantity', 'media_duration_ms',
+        'estimated_cost_microunits',
         'price_version', 'currency', 'result', 'safe_error_code', 'latency_ms',
     ];
 
@@ -18,6 +19,7 @@ class AiUsageLedger extends Model
     {
         return [
             'attempt' => 'integer', 'input_tokens' => 'integer', 'output_tokens' => 'integer',
+            'usage_quantity' => 'decimal:6', 'media_duration_ms' => 'integer',
             'estimated_cost_microunits' => 'integer', 'latency_ms' => 'integer',
         ];
     }

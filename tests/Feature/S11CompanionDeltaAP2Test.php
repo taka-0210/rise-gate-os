@@ -286,7 +286,7 @@ class S11CompanionDeltaAP2Test extends TestCase
             $this->assertSame(AiCommonTemporaryAudio::STATE_FAILED, $audio->fresh()->state);
             $this->assertDatabaseHas('ai_common_transcription_operations', [
                 'ai_common_temporary_audio_id' => $audio->id,
-                'result_status' => 'failed',
+                'result_status' => 'discarded',
                 'safe_error_code' => 'transcription_authorization_changed',
             ]);
             $this->assertDatabaseCount('ai_common_messages', 0);

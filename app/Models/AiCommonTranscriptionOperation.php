@@ -15,6 +15,8 @@ class AiCommonTranscriptionOperation extends Model
 
     public const RESULT_UNKNOWN = 'unknown';
 
+    public const RESULT_DISCARDED = 'discarded';
+
     protected $fillable = [
         'ai_common_temporary_audio_id', 'actor_user_id', 'operation_id',
         'payload_fingerprint', 'logical_request_id', 'provider', 'model',
