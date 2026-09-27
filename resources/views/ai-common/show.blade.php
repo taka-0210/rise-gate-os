@@ -11,6 +11,11 @@
 <h1>{{ $conversation->title }}</h1><p class="co-private">本人用Private work history。AI回答・未適用Proposal・Apply済みの事実を区別して表示します。</p>
 @if(session('status'))<div class="status">{{ session('status') }}</div>@endif
 @if(session('error'))<div class="co-panel co-revoked">{{ session('error') }}</div>@endif
+@if($conversation->status === 'active')
+<form method="post" action="{{ route('ai-common.archive', $conversation) }}">@csrf<button type="submit">ConversationをArchive</button></form>
+@else
+<div class="co-panel"><strong>Archive済み</strong><p>履歴は本人だけが閲覧できます。新しい相談・提案・Apply・Undoはできません。</p></div>
+@endif
 @foreach($messageRows as $row)
     <article class="co-panel co-message {{ $row['message']->role === 'user' ? 'co-message--user' : '' }} {{ !$row['visible'] ? 'co-revoked' : '' }}">
         <strong>{{ $row['message']->role === 'user' ? 'あなた' : 'CO（AI回答）' }}</strong>
@@ -20,10 +25,12 @@
     </article>
 @endforeach
 <section class="co-panel"><h2>Contextを明示選択</h2><p>全件探索はしません。Ownerでも他人のCaptureは選択できません。</p>
+@if($conversation->status === 'active')
 <form class="co-form-grid" method="post" action="{{ route('ai-common.sources.store',$conversation) }}">@csrf
 <label>Type<select name="resource_type"><option value="project">Project</option><option value="action">Action</option><option value="business_domain">Business Domain</option><option value="capture">Capture</option></select></label>
-<label>Public ID<input name="resource_public_id" required></label><label class="wide">選択理由<input name="selection_reason" maxlength="160" required></label><button type="submit">Contextへ追加</button></form>
+<label>Public ID<input name="resource_public_id" required></label><label class="wide">選択理由<input name="selection_reason" maxlength="160" required></label><button type="submit">Contextへ追加</button></form>@endif
 @foreach($conversation->sources as $source)<span class="co-source">{{ $source->resource_type }} / {{ $source->opaque_handle }}</span>@endforeach</section>
+@if($conversation->status === 'active')
 <form class="co-panel" method="post" action="{{ route('ai-common.messages.store',$conversation) }}">@csrf
 <h2>COへ相談</h2><textarea name="content" maxlength="4000" rows="5" required>{{ old('content') }}</textarea>
 @foreach($conversation->sources as $source)<label style="display:block"><input type="checkbox" name="source_ids[]" value="{{ $source->id }}"> {{ $source->resource_type }} / {{ $source->selection_reason }}</label>@endforeach
@@ -38,10 +45,11 @@
 <label>title<input name="attributes[title]"></label><label>done condition<input name="attributes[done_condition]"></label><label>assigned user ID<input name="attributes[assigned_to]" inputmode="numeric"></label><label>reviewer user ID<input name="attributes[reviewer_user_id]" inputmode="numeric"></label><label>description / Domain description<input name="attributes[description]"></label><label>due date<input type="date" name="attributes[due_date]"></label>
 <label>Project purpose<input name="attributes[purpose]"></label><label>Project expected outcome<input name="attributes[expected_outcome]"></label><label>Domain what<input name="attributes[what_summary]"></label><label>Domain who<input name="attributes[who_summary]"></label><label>Domain value<input name="attributes[value_proposition]"></label><label>Domain geographic scope<input name="attributes[geographic_scope_summary]"></label><label>Domain market position<input name="attributes[market_position_summary]"></label><label>Domain strengths<input name="attributes[self_recognized_strengths]"></label><label class="wide">変更理由<input name="attributes[reason]"></label><input type="hidden" name="attributes[context_impact_confirmed]" value="1">
 <button type="submit">Proposalを作成（まだ適用しない）</button></form></section>
+@endif
 @foreach($conversation->proposals as $proposal)<article class="co-panel"><strong>{{ $proposal->title }}</strong><p>Level {{ $proposal->risk_level }} / {{ $proposal->status }} / {{ $proposal->items->first()?->entity_type }}</p><div class="co-actions">
-@if($proposal->status==='pending')<form method="post" action="{{ route('ai-common.proposals.approve',[$conversation,$proposal]) }}">@csrf<button>内容を確認して承認</button></form>@endif
-@if($proposal->status==='approved')<form method="post" action="{{ route('ai-common.proposals.apply',[$conversation,$proposal]) }}">@csrf<button>Writerで適用</button></form>@endif
-@if($proposal->status==='applied' and $proposal->items->first()?->operation==='update')
+@if($conversation->status==='active' and $proposal->status==='pending')<form method="post" action="{{ route('ai-common.proposals.approve',[$conversation,$proposal]) }}">@csrf<button>内容を確認して承認</button></form>@endif
+@if($conversation->status==='active' and $proposal->status==='approved')<form method="post" action="{{ route('ai-common.proposals.apply',[$conversation,$proposal]) }}">@csrf<button>Writerで適用</button></form>@endif
+@if($conversation->status==='active' and $proposal->status==='applied' and $proposal->items->first()?->operation==='update')
 @unless($proposal->undos->contains('status','applied'))<form method='post' action='{{ route('ai-common.proposals.undo',[$conversation,$proposal]) }}'>@csrf<button>更新を元に戻す</button></form>@endunless
 @endif
 </div><p>{{ $proposal->status==='applied' ? 'Apply成功確認済み' : 'Company OS正本には未反映' }}</p></article>@endforeach

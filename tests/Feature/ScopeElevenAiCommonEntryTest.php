@@ -84,6 +84,26 @@ class ScopeElevenAiCommonEntryTest extends TestCase
         app(AiCommonAccess::class)->authorizeConversation($member, $organization, $conversation);
     }
 
+    public function test_owner_can_archive_private_history_and_archived_conversation_is_read_only(): void
+    {
+        [$owner, $member, , $organization] = $this->tenant();
+        $conversation = $this->conversation($owner, $organization);
+        $memberSession = $this->productOrganizationSession($member, $organization) + ['access_mode' => 'workspace', 'credential_generation' => 1];
+        $this->actingAs($member)->withSession($memberSession)
+            ->post(route('ai-common.archive', $conversation))->assertForbidden();
+
+        $ownerSession = $this->productOrganizationSession($owner, $organization) + ['access_mode' => 'workspace', 'credential_generation' => 1];
+        $this->actingAs($owner)->withSession($ownerSession)
+            ->post(route('ai-common.archive', $conversation))->assertRedirect(route('ai-common.index'));
+        $conversation->refresh();
+        $this->assertSame(AiCommonConversation::STATUS_ARCHIVED, $conversation->status);
+        $this->assertSame('Asia/Tokyo', $conversation->archived_at->timezone->getName());
+        $this->get(route('ai-common.show', $conversation))->assertOk()->assertSee('Archive済み');
+        $this->post(route('ai-common.messages.store', $conversation), ['content' => 'Must not append'])
+            ->assertSessionHasErrors('conversation');
+        $this->assertDatabaseMissing('ai_common_messages', ['content' => 'Must not append']);
+    }
+
     public function test_context_requires_org_workspace_resource_and_current_permission_before_provider(): void
     {
         [$owner, , , $organization, $workspace, $project] = $this->tenant(true);

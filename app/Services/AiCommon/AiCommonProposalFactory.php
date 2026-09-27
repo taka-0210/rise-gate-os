@@ -21,7 +21,7 @@ class AiCommonProposalFactory
 
     public function create(User $actor, Organization $organization, AiCommonConversation $conversation, array $input): AiProposal
     {
-        $this->access->authorizeConversation($actor, $organization, $conversation);
+        $this->access->authorizeConversation($actor, $organization, $conversation, true);
         $operation = (string) ($input['operation'] ?? '');
         if (! array_key_exists($operation, AiCommonProposalContract::FIELD_MAP)) {
             throw ValidationException::withMessages(['operation' => 'この操作はAI Handoff対象外です。']);

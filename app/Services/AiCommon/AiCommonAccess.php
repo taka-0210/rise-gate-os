@@ -9,6 +9,7 @@ use App\Models\OrganizationUser;
 use App\Models\ProductAccountEligibility;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Validation\ValidationException;
 
 class AiCommonAccess
 {
@@ -32,11 +33,14 @@ class AiCommonAccess
         return $membership;
     }
 
-    public function authorizeConversation(User $user, Organization $organization, AiCommonConversation $conversation): void
+    public function authorizeConversation(User $user, Organization $organization, AiCommonConversation $conversation, bool $requireActive = false): void
     {
         $this->authorizeOrganization($user, $organization);
         if ($conversation->organization_id !== $organization->id || $conversation->user_id !== $user->id) {
             throw new AuthorizationException;
+        }
+        if ($requireActive && $conversation->status !== AiCommonConversation::STATUS_ACTIVE) {
+            throw ValidationException::withMessages(['conversation' => 'Archive済みConversationは変更できません。']);
         }
     }
 

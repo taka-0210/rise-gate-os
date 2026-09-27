@@ -44,7 +44,7 @@ class AiCommonSourceManifest
 
     public function select(User $actor, Organization $organization, AiCommonConversation $conversation, string $type, string $publicId, string $reason): AiCommonSource
     {
-        $this->common->authorizeConversation($actor, $organization, $conversation);
+        $this->common->authorizeConversation($actor, $organization, $conversation, true);
         if ($conversation->sources()->count() >= self::MAX_SOURCES) {
             throw ValidationException::withMessages(['sources' => 'Contextは20件まで選択できます。']);
         }

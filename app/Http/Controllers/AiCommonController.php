@@ -34,6 +34,9 @@ class AiCommonController extends Controller
             'conversations' => AiCommonConversation::query()->where('organization_id', $organization->id)
                 ->where('user_id', $request->user()->id)->where('status', AiCommonConversation::STATUS_ACTIVE)
                 ->latest('last_message_at')->latest('id')->get(),
+            'archivedConversations' => AiCommonConversation::query()->where('organization_id', $organization->id)
+                ->where('user_id', $request->user()->id)->where('status', AiCommonConversation::STATUS_ARCHIVED)
+                ->latest('archived_at')->latest('id')->get(),
             'policy' => $access->policy($organization),
             'canManageOrganization' => $membership->organization_role === 'owner',
         ]);
@@ -70,7 +73,7 @@ class AiCommonController extends Controller
     {
         $organization = $request->attributes->get('currentCompany');
         $access->authorizeCategory($request->user(), $organization, OrganizationAiPolicy::CATEGORY_COMMON);
-        $access->authorizeConversation($request->user(), $organization, $conversation);
+        $access->authorizeConversation($request->user(), $organization, $conversation, true);
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:4000'],
             'source_ids' => ['nullable', 'array', 'max:20'],
@@ -150,7 +153,7 @@ class AiCommonController extends Controller
 
     public function approve(Request $request, AiCommonConversation $conversation, AiProposal $proposal, AiCommonAccess $access, AiProposalApprover $approver): RedirectResponse
     {
-        $access->authorizeConversation($request->user(), $request->attributes->get('currentCompany'), $conversation);
+        $access->authorizeConversation($request->user(), $request->attributes->get('currentCompany'), $conversation, true);
         if ($proposal->ai_common_conversation_id !== $conversation->id) {
             abort(404);
         }
@@ -161,7 +164,7 @@ class AiCommonController extends Controller
 
     public function apply(Request $request, AiCommonConversation $conversation, AiProposal $proposal, AiCommonAccess $access, AiProposalApplier $applier): RedirectResponse
     {
-        $access->authorizeConversation($request->user(), $request->attributes->get('currentCompany'), $conversation);
+        $access->authorizeConversation($request->user(), $request->attributes->get('currentCompany'), $conversation, true);
         if ($proposal->ai_common_conversation_id !== $conversation->id) {
             abort(404);
         }
@@ -172,12 +175,28 @@ class AiCommonController extends Controller
 
     public function undo(Request $request, AiCommonConversation $conversation, AiProposal $proposal, AiCommonAccess $access, AiProposalUndoService $undo): RedirectResponse
     {
-        $access->authorizeConversation($request->user(), $request->attributes->get('currentCompany'), $conversation);
+        $access->authorizeConversation($request->user(), $request->attributes->get('currentCompany'), $conversation, true);
         if ($proposal->ai_common_conversation_id !== $conversation->id) {
             abort(404);
         }
         $undo->undo($proposal, $request->user());
 
         return back()->with('status', 'Writer経由で更新を元に戻しました。');
+    }
+
+    public function archive(Request $request, AiCommonConversation $conversation, AiCommonAccess $access): RedirectResponse
+    {
+        $organization = $request->attributes->get('currentCompany');
+        DB::transaction(function () use ($request, $organization, $conversation, $access): void {
+            $locked = AiCommonConversation::query()->lockForUpdate()->findOrFail($conversation->id);
+            $access->authorizeConversation($request->user(), $organization, $locked, true);
+            $locked->update([
+                'status' => AiCommonConversation::STATUS_ARCHIVED,
+                'archived_at' => now(),
+                'version' => $locked->version + 1,
+            ]);
+        }, 3);
+
+        return redirect()->route('ai-common.index')->with('status', 'ConversationをArchiveしました。');
     }
 }

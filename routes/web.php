@@ -158,6 +158,7 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::get('/company/co', [AiCommonController::class, 'index'])->name('ai-common.index');
         Route::post('/company/co/conversations', [AiCommonController::class, 'store'])->name('ai-common.store');
         Route::get('/company/co/conversations/{conversation}', [AiCommonController::class, 'show'])->name('ai-common.show');
+        Route::post('/company/co/conversations/{conversation}/archive', [AiCommonController::class, 'archive'])->name('ai-common.archive');
         Route::post('/company/co/conversations/{conversation}/messages', [AiCommonController::class, 'message'])->middleware('throttle:20,1')->name('ai-common.messages.store');
         Route::post('/company/co/conversations/{conversation}/sources', [AiCommonController::class, 'source'])->name('ai-common.sources.store');
         Route::post('/company/co/conversations/{conversation}/proposals', [AiCommonController::class, 'proposal'])->name('ai-common.proposals.store');

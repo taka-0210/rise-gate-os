@@ -30,6 +30,13 @@
             <section class="co-card">Conversationはまだありません。</section>
         @endforelse
     </div>
+    @if($archivedConversations->isNotEmpty())
+        <h2>Archive</h2><div class="co-grid">
+        @foreach($archivedConversations as $conversation)
+            <a class="co-card" href="{{ route('ai-common.show', $conversation) }}"><strong>{{ $conversation->title }}</strong><br><small>{{ $conversation->archived_at->timezone('Asia/Tokyo')->format('Y/m/d H:i') }} JST</small></a>
+        @endforeach
+        </div>
+    @endif
     @if(($canManageOrganization ?? false))<p><a href="{{ route('ai-common.policy.edit') }}">Organization AI Policyを管理</a></p>@endif
 </div>
 @endsection
