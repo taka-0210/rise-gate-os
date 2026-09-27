@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>S11-CD-A P5 cancel late event verification</title></head>
+<body>
+<form data-voice-recorder>
+    <input data-voice-file type="file" name="voice">
+    <button data-voice-start type="button">録音開始</button>
+    <button data-voice-stop type="button" disabled>録音停止</button>
+    <button data-voice-cancel type="button" disabled>録音取消</button>
+    <p data-voice-status></p>
+</form>
+<pre id="result">RUNNING</pre>
+<script>
+let trackStops = 0;
+let latestRecorder = null;
+class DelayedRecorder extends EventTarget {
+    static isTypeSupported(type) { return type === 'audio/webm;codecs=opus'; }
+    constructor(stream, options) {
+        super();
+        this.mimeType = options.mimeType;
+        this.state = 'inactive';
+        latestRecorder = this;
+    }
+    start() { this.state = 'recording'; }
+    stop() {
+        this.state = 'inactive';
+        setTimeout(() => {
+            this.dispatchEvent(new BlobEvent('dataavailable', {
+                data: new Blob(['late-audio'], { type: this.mimeType }),
+            }));
+            this.dispatchEvent(new Event('stop'));
+        }, 10);
+    }
+}
+Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: async () => ({ getTracks: () => [{ stop: () => { trackStops += 1; } }] }) },
+});
+window.MediaRecorder = DelayedRecorder;
+</script>
+<script src="/public/js/ai-common-input.js"></script>
+<script>
+window.addEventListener('load', async () => {
+    const file = document.querySelector('[data-voice-file]');
+    document.querySelector('[data-voice-start]').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    document.querySelector('[data-voice-cancel]').click();
+    const immediatelyAfterCancel = file.files.length;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const afterLateEvents = file.files.length;
+    const result = {
+        edgeUserAgent: navigator.userAgent,
+        recorderCreated: Boolean(latestRecorder),
+        trackStops,
+        immediatelyAfterCancel,
+        afterLateEvents,
+        status: document.querySelector('[data-voice-status]').textContent,
+        pass: immediatelyAfterCancel === 0 && afterLateEvents === 0,
+    };
+    document.querySelector('#result').textContent = JSON.stringify(result);
+    await fetch('/tests/Browser/s11cd-a-p5-cancel-late-event-result.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+    });
+});
+</script>
+</body>
+</html>
