@@ -67,4 +67,9 @@ class AiCommonConversation extends Model
     {
         return $this->hasMany(AiCommonAttachment::class);
     }
+
+    public function temporaryAudios(): HasMany
+    {
+        return $this->hasMany(AiCommonTemporaryAudio::class);
+    }
 }

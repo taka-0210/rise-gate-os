@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
-use App\Contracts\ActionDraftProvider;
+use App\Contracts\AiCommonAttachmentInspector;
+use App\Contracts\AiCommonAudioInspector;
 use App\Contracts\AiCommonProvider;
+use App\Contracts\AiCommonTranscriptionProvider;
 use App\Contracts\AiProviderTransport;
 use App\Models\Client;
 use App\Models\Improvement;
@@ -17,8 +19,10 @@ use App\Policies\ImprovementPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\RoadmapPolicy;
 use App\Policies\TaskPolicy;
-use App\Services\ActionExecution\OpenAiActionDraftProvider;
+use App\Services\AiCommon\FailClosedAiCommonAttachmentInspector;
+use App\Services\AiCommon\FailClosedAiCommonAudioInspector;
 use App\Services\AiCommon\OpenAiCommonProvider;
+use App\Services\AiCommon\OpenAiCommonTranscriptionProvider;
 use App\Services\AiCommon\OpenAiProviderTransport;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -32,6 +36,9 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AiCommonProvider::class, OpenAiCommonProvider::class);
+        $this->app->bind(AiCommonAttachmentInspector::class, FailClosedAiCommonAttachmentInspector::class);
+        $this->app->bind(AiCommonAudioInspector::class, FailClosedAiCommonAudioInspector::class);
+        $this->app->bind(AiCommonTranscriptionProvider::class, OpenAiCommonTranscriptionProvider::class);
         $this->app->bind(AiProviderTransport::class, OpenAiProviderTransport::class);
     }
 

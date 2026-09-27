@@ -8,13 +8,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class OrganizationAiPolicy extends Model
 {
     public const CATEGORY_COMMON = 'common_entry';
+
     public const CATEGORY_PROJECT = 'project';
+
     public const CATEGORY_ACTION = 'action';
+
     public const CATEGORY_DOMAIN = 'business_domain';
+
     public const CATEGORY_CAPTURE = 'capture';
 
     protected $fillable = [
-        'organization_id', 'is_enabled', 'allowed_categories', 'version',
+        'organization_id', 'is_enabled', 'allows_transcription', 'allowed_categories', 'version',
         'managed_by_user_id', 'confirmed_at',
     ];
 
@@ -22,6 +26,7 @@ class OrganizationAiPolicy extends Model
     {
         return [
             'is_enabled' => 'boolean',
+            'allows_transcription' => 'boolean',
             'allowed_categories' => 'array',
             'version' => 'integer',
             'confirmed_at' => 'datetime',

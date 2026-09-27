@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActionExecutionController;
 use App\Http\Controllers\AiCommonController;
+use App\Http\Controllers\AiCommonInputController;
 use App\Http\Controllers\AiCommonPolicyController;
 use App\Http\Controllers\AiConnectionController;
 use App\Http\Controllers\Auth\AccountEmailController;
@@ -160,6 +161,14 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::get('/company/co/conversations/{conversation}', [AiCommonController::class, 'show'])->name('ai-common.show');
         Route::post('/company/co/conversations/{conversation}/archive', [AiCommonController::class, 'archive'])->name('ai-common.archive');
         Route::post('/company/co/conversations/{conversation}/human-messages', [AiCommonController::class, 'humanMessage'])->middleware('throttle:30,1')->name('ai-common.human-messages.store');
+        Route::post('/company/co/conversations/{conversation}/attachments', [AiCommonInputController::class, 'upload'])->middleware('throttle:20,1')->name('ai-common.attachments.store');
+        Route::post('/company/co/conversations/{conversation}/attachments/reference', [AiCommonInputController::class, 'reference'])->middleware('throttle:20,1')->name('ai-common.attachments.reference');
+        Route::get('/company/co/conversations/{conversation}/attachments/{attachment}', [AiCommonInputController::class, 'download'])->name('ai-common.attachments.download');
+        Route::post('/company/co/conversations/{conversation}/attachments/{attachment}/revoke', [AiCommonInputController::class, 'revoke'])->name('ai-common.attachments.revoke');
+        Route::post('/company/co/conversations/{conversation}/voice', [AiCommonInputController::class, 'voiceRecord'])->middleware('throttle:10,1')->name('ai-common.voice.store');
+        Route::post('/company/co/conversations/{conversation}/voice/{audio}/transcribe', [AiCommonInputController::class, 'voiceTranscribe'])->middleware('throttle:10,1')->name('ai-common.voice.transcribe');
+        Route::post('/company/co/conversations/{conversation}/voice/{audio}/post', [AiCommonInputController::class, 'voicePost'])->middleware('throttle:20,1')->name('ai-common.voice.post');
+        Route::post('/company/co/conversations/{conversation}/voice/{audio}/cancel', [AiCommonInputController::class, 'voiceCancel'])->name('ai-common.voice.cancel');
         Route::post('/company/co/conversations/{conversation}/messages', [AiCommonController::class, 'message'])->middleware('throttle:20,1')->name('ai-common.messages.store');
         Route::post('/company/co/conversations/{conversation}/sources', [AiCommonController::class, 'source'])->name('ai-common.sources.store');
         Route::post('/company/co/conversations/{conversation}/proposals', [AiCommonController::class, 'proposal'])->name('ai-common.proposals.store');

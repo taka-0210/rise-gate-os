@@ -39,6 +39,7 @@ return [
         'api_key' => env('OPENAI_API_KEY'),
         'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-2'),
         'chat_model' => env('OPENAI_CHAT_MODEL', 'gpt-5.6-terra'),
+        'transcription_model' => env('OPENAI_TRANSCRIPTION_MODEL', 'gpt-4o-mini-transcribe'),
         'input_usd_per_million' => env('OPENAI_INPUT_USD_PER_MILLION', 2.50),
         'output_usd_per_million' => env('OPENAI_OUTPUT_USD_PER_MILLION', 15.00),
     ],
@@ -52,6 +53,7 @@ return [
 
     'ai_common' => [
         'timeout_seconds' => env('AI_COMMON_TIMEOUT_SECONDS', 30),
+        'transcription_timeout_seconds' => env('AI_COMMON_TRANSCRIPTION_TIMEOUT_SECONDS', 60),
         'price_version' => env('AI_COMMON_PRICE_VERSION', 'configured-2026-09'),
     ],
 

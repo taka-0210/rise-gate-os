@@ -10,7 +10,7 @@ use RuntimeException;
 
 class OpenAiProviderTransport implements AiProviderTransport
 {
-    private const PURPOSES = ['business_common', 'project_chat', 'project_image', 'action_draft'];
+    private const PURPOSES = ['business_common', 'project_chat', 'project_image', 'action_draft', 'transcription'];
 
     public function request(string $purpose, int $timeoutSeconds): PendingRequest
     {

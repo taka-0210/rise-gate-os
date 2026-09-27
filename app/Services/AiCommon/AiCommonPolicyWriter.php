@@ -35,6 +35,7 @@ class AiCommonPolicyWriter
             )));
             $policy->fill([
                 'is_enabled' => filter_var($input['is_enabled'] ?? false, FILTER_VALIDATE_BOOL),
+                'allows_transcription' => filter_var($input['allows_transcription'] ?? false, FILTER_VALIDATE_BOOL),
                 'allowed_categories' => $categories,
                 'version' => $policy->exists ? $policy->version + 1 : 1,
                 'managed_by_user_id' => $actor->id,

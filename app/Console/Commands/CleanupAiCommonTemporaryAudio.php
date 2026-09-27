@@ -1,0 +1,20 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Services\AiCommon\AiCommonTemporaryAudioWriter;
+use Illuminate\Console\Command;
+
+class CleanupAiCommonTemporaryAudio extends Command
+{
+    protected $signature = 'ai-common:cleanup-temporary-audio';
+
+    protected $description = 'Expire and physically clean up temporary AI Common voice input';
+
+    public function handle(AiCommonTemporaryAudioWriter $writer): int
+    {
+        $this->info('processed='.$writer->cleanupExpired());
+
+        return self::SUCCESS;
+    }
+}

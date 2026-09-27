@@ -24,6 +24,7 @@
         @else<p>参照元の現在権限・Policy・版を確認できないため、この回答本文と次turnへの再投入を停止しました。</p>@endif
     </article>
 @endforeach
+@include('ai-common._input')
 <section class="co-panel"><h2>Contextを明示選択</h2><p>全件探索はしません。Ownerでも他人のCaptureは選択できません。</p>
 @if($conversation->status === 'active')
 <form class="co-form-grid" method="post" action="{{ route('ai-common.sources.store',$conversation) }}">@csrf

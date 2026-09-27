@@ -43,7 +43,7 @@ class AiCommonAttachmentAccess
             || $attachment->state === AiCommonAttachment::STATE_REVOKED) {
             throw new AuthorizationException;
         }
-        if ($requireReady && $attachment->state !== AiCommonAttachment::STATE_READY) {
+        if ($requireReady && ! $attachment->isReadyForUse()) {
             throw ValidationException::withMessages(['attachments' => '利用可能になっていないAttachmentは投稿できません。']);
         }
         if ($attachment->variant === AiCommonAttachment::VARIANT_EXISTING) {
@@ -52,6 +52,15 @@ class AiCommonAttachmentAccess
                 $attachment->origin_public_id
             )->sha256)) {
                 throw ValidationException::withMessages(['attachments' => '参照元Fileの同一性を確認できません。']);
+            }
+        } elseif ($attachment->variant === AiCommonAttachment::VARIANT_UPLOAD) {
+            $disk = Storage::disk('ai_common_attachments');
+            if (! $attachment->storage_key || ! $disk->exists($attachment->storage_key)) {
+                throw ValidationException::withMessages(['attachments' => '保存済みFileを利用できません。']);
+            }
+            $actualHash = hash('sha256', $disk->get($attachment->storage_key));
+            if (! $attachment->sha256 || ! hash_equals($attachment->sha256, $actualHash)) {
+                throw ValidationException::withMessages(['attachments' => '保存済みFileの同一性を確認できません。']);
             }
         }
     }

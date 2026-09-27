@@ -30,7 +30,8 @@ class AiCommonAttachment extends Model
     protected $fillable = [
         'public_id', 'organization_id', 'ai_common_conversation_id', 'uploaded_by_user_id',
         'variant', 'state', 'version', 'display_name', 'mime_type', 'extension',
-        'size_bytes', 'sha256', 'storage_key', 'origin_type', 'origin_public_id',
+        'size_bytes', 'sha256', 'storage_key', 'inspection_status', 'inspection_driver',
+        'inspection_version', 'inspection_safe_code', 'inspected_at_utc', 'origin_type', 'origin_public_id',
         'origin_sha256', 'allows_ai_reference', 'ai_reference_version',
         'uploader_access_epoch', 'uploader_credential_generation', 'ready_at_utc',
         'revoked_at_utc', 'revoked_by_user_id', 'revoke_reason',
@@ -46,6 +47,7 @@ class AiCommonAttachment extends Model
             'uploader_access_epoch' => 'integer',
             'uploader_credential_generation' => 'integer',
             'ready_at_utc' => 'datetime',
+            'inspected_at_utc' => 'datetime',
             'revoked_at_utc' => 'datetime',
         ];
     }
@@ -53,6 +55,13 @@ class AiCommonAttachment extends Model
     protected static function booted(): void
     {
         static::creating(fn (self $attachment) => $attachment->public_id ??= (string) Str::ulid());
+    }
+
+    public function isReadyForUse(): bool
+    {
+        return $this->state === self::STATE_READY
+            && $this->inspection_status === 'passed'
+            && $this->ready_at_utc !== null;
     }
 
     public function getRouteKeyName(): string

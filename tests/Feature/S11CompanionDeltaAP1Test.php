@@ -179,9 +179,14 @@ class S11CompanionDeltaAP1Test extends TestCase
             'mime_type' => 'image/png',
             'size_bytes' => 100,
         ]);
+        Storage::disk('ai_common_attachments')->put($attachment->storage_key, 'verified-by-p2-boundary');
         $attachment->update([
             'state' => AiCommonAttachment::STATE_READY,
             'sha256' => hash('sha256', 'verified-by-p2-boundary'),
+            'inspection_status' => 'passed',
+            'inspection_driver' => 'p2-test',
+            'inspection_version' => '1',
+            'inspected_at_utc' => now('UTC'),
             'ready_at_utc' => now('UTC'),
         ]);
         $message = app(AiCommonHumanMessageWriter::class)->post($owner, $organization, $conversation, [

@@ -29,6 +29,7 @@ class AiCommonPolicyController extends Controller
         $organization = $request->attributes->get('currentCompany');
         $validated = $request->validate([
             'is_enabled' => ['nullable', 'boolean'],
+            'allows_transcription' => ['nullable', 'boolean'],
             'allowed_categories' => ['nullable', 'array'],
             'allowed_categories.*' => ['string'],
             'expected_version' => ['nullable', 'integer', 'min:1'],

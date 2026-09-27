@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('company-notifications:today-digests')->dailyAt('08:55')->timezone('Asia/Tokyo')->withoutOverlapping();
 Schedule::command('company-notifications:deliver --limit=100')->everyMinute()->withoutOverlapping();
+Schedule::command('ai-common:cleanup-temporary-audio')->everyFiveMinutes()->withoutOverlapping();
