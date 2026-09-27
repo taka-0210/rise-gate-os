@@ -213,4 +213,8 @@ P3、Delta B、Scope 12、Production、Deployへは進んでいない。
 - P3：未開始
 - IR-1 / master / Production / Deploy：非変更
 
-Git commit / HEAD / origin / working treeはP2 Evidence commit・push後に最終確定する。
+- Implementation commit：`66aa50929ab7b00c9fd2ec9fc02230662c1122fd`
+- Branch：`s11cd-a-conversation-input-attachment-p2`
+- Implementation commit push時点でHEAD / origin一致、tracked working tree clean
+- 未追跡Master v148 / v043の2点は保護し、変更・stage・commitしていない
+- 本Report最終化commitは同branchのGit履歴を正本とする
