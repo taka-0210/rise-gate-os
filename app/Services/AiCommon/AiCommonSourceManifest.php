@@ -193,6 +193,23 @@ class AiCommonSourceManifest
         }
     }
 
+    /** Internal Shared-Conversation seam. The same resolver/policy projection is
+     * deliberately reused so Shared cannot become a second context engine. */
+    public function sharedSnapshot(
+        User $actor,
+        Organization $organization,
+        string $type,
+        string $publicId,
+        int $conversationId,
+    ): array {
+        return $this->snapshot($actor, $organization, $type, $publicId, $conversationId);
+    }
+
+    public function sharedProviderSource(string $handle, string $type, array $snapshot): array
+    {
+        return $this->providerSource($handle, $type, $snapshot);
+    }
+
     private function snapshot(User $actor, Organization $organization, string $type, string $publicId, ?int $conversationId = null): array
     {
         $resolved = $this->resolve($actor, $organization, $type, $publicId, $conversationId);

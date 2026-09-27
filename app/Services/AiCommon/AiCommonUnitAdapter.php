@@ -2,6 +2,7 @@
 
 namespace App\Services\AiCommon;
 
+use App\Models\AiCommonConversation;
 use App\Models\AiCommonHandoffRelation;
 use App\Models\AiProposal;
 use App\Models\AiProposalApplyAttempt;
@@ -39,6 +40,7 @@ class AiCommonUnitAdapter
         private readonly BusinessDomainAccess $domainAccess,
         private readonly BusinessDomainWriter $domainWriter,
         private readonly AiCommonProposalLineage $lineage,
+        private readonly AiCommonSharedProposalGuard $sharedGuard,
     ) {}
 
     public function approve(AiProposal $proposal, User $actor): AiProposal
@@ -46,7 +48,7 @@ class AiCommonUnitAdapter
         return DB::transaction(function () use ($proposal, $actor): AiProposal {
             $locked = AiProposal::query()->with(['items', 'commonConversation.organization'])->lockForUpdate()->findOrFail($proposal->id);
             $this->assertShape($locked);
-            $this->common->authorizeConversation($actor, $locked->commonConversation->organization, $locked->commonConversation);
+            $this->authorizeConversation($actor, $locked, true);
             $this->authorizeOperation($actor, $locked, false);
             if ($locked->status !== AiProposal::STATUS_PENDING) {
                 throw ValidationException::withMessages(['proposal' => 'この提案は承認待ちではありません。']);
@@ -69,7 +71,7 @@ class AiCommonUnitAdapter
     public function apply(AiProposal $proposal, User $actor): AiProposal
     {
         $proposal->loadMissing(['items', 'commonConversation.organization']);
-        $this->common->authorizeConversation($actor, $proposal->commonConversation->organization, $proposal->commonConversation);
+        $this->authorizeConversation($actor, $proposal);
         $this->authorizeOperation($actor, $proposal, true);
 
         $appliedAttempt = $proposal->applyAttempts()->where('status', AiProposalApplyAttempt::STATUS_APPLIED)->first();
@@ -146,7 +148,7 @@ class AiCommonUnitAdapter
         if ($proposal->items->sole()->operation === AiProposalItem::OPERATION_CREATE) {
             throw ValidationException::withMessages(['undo' => 'Create operations are not undoable.']);
         }
-        $this->common->authorizeConversation($actor, $proposal->commonConversation->organization, $proposal->commonConversation);
+        $this->authorizeConversation($actor, $proposal);
         $this->authorizeOperation($actor, $proposal, true);
         if ($applied = $proposal->undos()->where('status', AiProposalUndo::STATUS_APPLIED)->latest('id')->first()) {
             return $applied;
@@ -169,7 +171,7 @@ class AiCommonUnitAdapter
                 if ($locked->undos()->where('status', AiProposalUndo::STATUS_APPLIED)->whereKeyNot($record->id)->exists()) {
                     throw ValidationException::withMessages(['undo' => 'This proposal was already undone.']);
                 }
-                $this->common->authorizeConversation($actor, $locked->commonConversation->organization, $locked->commonConversation);
+                $this->authorizeConversation($actor, $locked);
                 $this->authorizeOperation($actor, $locked, true);
                 $item = $locked->items->sole();
                 $target = $this->undoItem($actor, $locked, $item);
@@ -340,6 +342,9 @@ class AiCommonUnitAdapter
     private function authorizeOperation(User $actor, AiProposal $proposal, bool $apply): void
     {
         $org = $proposal->commonConversation->organization;
+        if ($proposal->commonConversation->conversation_kind === AiCommonConversation::KIND_SHARED) {
+            $this->sharedGuard->authorize($actor, $proposal);
+        }
         $this->lineage->authorizeProposal($actor, $proposal);
         $item = $proposal->items->sole();
         $category = match ($item->entity_type) {
@@ -358,6 +363,16 @@ class AiCommonUnitAdapter
             AiCommonProposalContract::PROJECT_UPDATE => $this->projectAccess->canManageStructure($actor, Project::query()->where('organization_id', $proposal->organization_id)->where('public_id', $proposal->target_public_id)->firstOrFail()) ?: throw new AuthorizationException,
             AiCommonProposalContract::DOMAIN_UPDATE => $this->domainAccess->authorizeEdit($actor, $org),
         };
+    }
+
+    private function authorizeConversation(User $actor, AiProposal $proposal, bool $approval = false): void
+    {
+        if ($proposal->commonConversation->conversation_kind === AiCommonConversation::KIND_SHARED) {
+            $this->sharedGuard->authorize($actor, $proposal, $approval);
+
+            return;
+        }
+        $this->common->authorizeConversation($actor, $proposal->commonConversation->organization, $proposal->commonConversation);
     }
 
     private function authorizeAppliedResult(User $actor, AiProposal $proposal): void

@@ -21,14 +21,27 @@ class AiCommonProposalFactory
         private readonly AiCommonAccess $access,
         private readonly AiCommonProposalLineage $lineage,
         private readonly AiCommonAuditWriter $audit,
+        private readonly AiCommonSharedProposalGuard $sharedGuard,
     ) {}
 
     public function create(User $actor, Organization $organization, AiCommonConversation $conversation, array $input): AiProposal
     {
-        $this->access->authorizeConversation($actor, $organization, $conversation, true);
         $operation = (string) ($input['operation'] ?? '');
         if (! array_key_exists($operation, AiCommonProposalContract::FIELD_MAP)) {
             throw ValidationException::withMessages(['operation' => 'この操作はAI Handoff対象外です。']);
+        }
+        $sharedContext = null;
+        if ($conversation->conversation_kind === AiCommonConversation::KIND_SHARED) {
+            $sharedContext = $this->sharedGuard->creationContext(
+                $actor,
+                $organization,
+                $conversation,
+                $operation,
+                filled($input['target_public_id'] ?? null) ? (string) $input['target_public_id'] : null,
+                (int) ($input['approval_recipient_user_id'] ?? $actor->id),
+            );
+        } else {
+            $this->access->authorizeConversation($actor, $organization, $conversation, true);
         }
         $rawAttributes = array_filter(
             $input['attributes'] ?? [],
@@ -57,7 +70,7 @@ class AiCommonProposalFactory
         );
         $sourceRevisionIds = $sourceMessage?->sourceRevisions->pluck('id')->all() ?? [];
 
-        return DB::transaction(function () use ($actor, $organization, $conversation, $input, $operation, $attributes, $targetType, $targetId, $targetVersion, $itemVersion, $before, $risk, $policy, $idempotency, $commonOperationKey, $sourceMessage, $sourceRevisionIds): AiProposal {
+        return DB::transaction(function () use ($actor, $organization, $conversation, $input, $operation, $attributes, $targetType, $targetId, $targetVersion, $itemVersion, $before, $risk, $policy, $idempotency, $commonOperationKey, $sourceMessage, $sourceRevisionIds, $sharedContext): AiProposal {
             $existing = AiProposal::query()->where('common_operation_key', $commonOperationKey)->first();
             if ($existing) {
                 $expected = AiCommonProposalContract::canonicalAttributes($operation, $existing->items()->firstOrFail()->after ?? []);
@@ -75,7 +88,9 @@ class AiCommonProposalFactory
                 'workspace_id' => null,
                 'project_id' => null,
                 'ai_common_conversation_id' => $conversation->id,
-                'scope_key' => 'organization:'.$organization->public_id.':user:'.$actor->id,
+                'scope_key' => $sharedContext
+                    ? 'organization:'.$organization->public_id.':shared:'.$conversation->public_id
+                    : 'organization:'.$organization->public_id.':user:'.$actor->id,
                 'target_type' => $targetType,
                 'target_public_id' => $targetId,
                 'expected_target_version' => $targetVersion,
@@ -86,7 +101,9 @@ class AiCommonProposalFactory
                 'title' => trim((string) ($input['title'] ?? 'COからの変更提案')),
                 'summary' => trim((string) ($input['summary'] ?? '')) ?: null,
                 'status' => AiProposal::STATUS_PENDING,
-                'evidence' => ['private_conversation_public_id' => $conversation->public_id],
+                'evidence' => $sharedContext
+                    ? ['shared_conversation_public_id' => $conversation->public_id]
+                    : ['private_conversation_public_id' => $conversation->public_id],
                 'requested_by' => $actor->id,
                 'contract_version' => AiCommonProposalContract::VERSION,
                 'capability' => AiCommonProposalContract::CAPABILITY,
@@ -114,6 +131,9 @@ class AiCommonProposalFactory
                 'published_summary' => trim((string) ($input['published_summary'] ?? '')) ?: null,
             ]);
             $proposal->sourceRevisions()->sync($sourceRevisionIds);
+            if ($sharedContext) {
+                $this->sharedGuard->record($proposal, $sharedContext);
+            }
 
             if ($sourceRevisionIds !== []) {
                 $this->audit->record(

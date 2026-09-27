@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\OrganizationUser;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class AiCommonSharedAccess
@@ -90,6 +91,68 @@ class AiCommonSharedAccess
         bool $lock = false,
     ): OrganizationUser {
         return $this->common->authorizeOrganization($user, $organization, $lock);
+    }
+
+    /**
+     * Return the complete active audience. A stale or ineligible participant blocks
+     * the whole Shared operation; callers must never silently narrow the audience.
+     */
+    public function activeAudience(
+        User $actor,
+        Organization $organization,
+        AiCommonConversation $conversation,
+        bool $requireConversationActive = true,
+    ): Collection {
+        $actorParticipant = $this->authorizeParticipant(
+            $actor,
+            $organization,
+            $conversation,
+            $requireConversationActive,
+        );
+        $shared = $actorParticipant->sharedConversation;
+        $participants = AiCommonSharedParticipant::query()
+            ->where('ai_common_shared_conversation_id', $shared->id)
+            ->where('status', AiCommonSharedParticipant::STATUS_ACTIVE)
+            ->with('user')
+            ->orderBy('id')
+            ->get();
+        if ($participants->isEmpty()) {
+            throw new AuthorizationException;
+        }
+        foreach ($participants as $participant) {
+            $user = $participant->user;
+            $membership = $this->common->authorizeOrganization($user, $organization);
+            if ((int) $participant->accepted_membership_epoch !== (int) $membership->access_epoch
+                || (int) $participant->accepted_credential_generation !== (int) $user->credential_generation) {
+                throw new AuthorizationException;
+            }
+        }
+
+        return $participants;
+    }
+
+    public function audienceSnapshot(
+        User $actor,
+        Organization $organization,
+        AiCommonConversation $conversation,
+    ): array {
+        $participants = $this->activeAudience($actor, $organization, $conversation);
+        $shared = $participants->first()->sharedConversation()->firstOrFail();
+        $rows = $participants->map(fn (AiCommonSharedParticipant $participant): array => [
+            'participant_id' => $participant->id,
+            'user_id' => $participant->user_id,
+            'audience_epoch' => (int) $participant->audience_epoch,
+            'membership_access_epoch' => (int) $participant->accepted_membership_epoch,
+            'credential_generation' => (int) $participant->accepted_credential_generation,
+        ])->values()->all();
+
+        return [
+            'shared' => $shared,
+            'participants' => $participants,
+            'participant_version' => (int) $shared->participant_version,
+            'snapshot' => $rows,
+            'fingerprint' => hash('sha256', json_encode($rows, JSON_THROW_ON_ERROR)),
+        ];
     }
 
     public function authorizeInvitation(

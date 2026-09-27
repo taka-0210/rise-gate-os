@@ -11,16 +11,20 @@
 <p class="eyebrow">SHARED CONVERSATION</p>
 <h1>{{ $conversation->title }}</h1>
 <p>{{ $shared->currentPurposeRevision->purpose }}</p>
+@if($coState)<p class=shared-muted>One Shared CO: {{ $coState->state }} / {{ $coState->phase }} / sequence {{ $coState->sequence }}</p>@endif
 <p class="shared-muted">Purpose Revision {{ $shared->currentPurposeRevision->revision_no }} / Owner {{ $shared->owner->name }} / Participant {{ $shared->participants->where('status','active')->count() }}名</p>
 @if(session('status'))<div class="status">{{ session('status') }}</div>@endif
 @if($conversation->status === 'archived')<section class="shared-card"><strong>Archive済み</strong><p>現在権限を満たすParticipantだけが履歴を閲覧できます。新規投稿・招待はできません。</p></section>@endif
 
-@foreach($conversation->messages as $message)
+@foreach($messageRows as $row)
+@php($message = $row['message'])
+@if($row['visible'])
 <article class="shared-card shared-message">
     <strong>{{ $message->sharedAuthor?->author?->name ?? 'Author未記録' }}</strong>
     <p style="white-space:pre-wrap">{{ $message->content }}</p>
     <small>{{ $message->created_at->timezone('Asia/Tokyo')->format('Y/m/d H:i') }} JST</small>
 </article>
+@endif
 @endforeach
 
 @if($conversation->status === 'active')

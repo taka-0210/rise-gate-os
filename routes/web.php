@@ -189,6 +189,12 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::post('/company/co/shared-conversations/{conversation}/invitations', [AiCommonSharedConversationController::class, 'invite'])->name('ai-common.shared.invitations.store');
         Route::post('/company/co/shared-invitations/{invitation}/accept', [AiCommonSharedConversationController::class, 'accept'])->name('ai-common.shared.invitations.accept');
         Route::post('/company/co/shared-conversations/{conversation}/human-messages', [AiCommonSharedConversationController::class, 'humanMessage'])->middleware('throttle:30,1')->name('ai-common.shared.human-messages.store');
+        Route::post('/company/co/shared-conversations/{conversation}/sources', [AiCommonSharedConversationController::class, 'source'])->name('ai-common.shared.sources.store');
+        Route::post('/company/co/shared-conversations/{conversation}/co-requests', [AiCommonSharedConversationController::class, 'coRequest'])->middleware('throttle:20,1')->name('ai-common.shared.co-requests.store');
+        Route::post('/company/co/shared-conversations/{conversation}/proposals', [AiCommonSharedConversationController::class, 'proposal'])->name('ai-common.shared.proposals.store');
+        Route::post('/company/co/shared-conversations/{conversation}/proposals/{proposal}/approve', [AiCommonSharedConversationController::class, 'approve'])->name('ai-common.shared.proposals.approve');
+        Route::post('/company/co/shared-conversations/{conversation}/proposals/{proposal}/apply', [AiCommonSharedConversationController::class, 'apply'])->name('ai-common.shared.proposals.apply');
+        Route::post('/company/co/shared-conversations/{conversation}/proposals/{proposal}/undo', [AiCommonSharedConversationController::class, 'undo'])->name('ai-common.shared.proposals.undo');
         Route::delete('/company/co/shared-conversations/{conversation}/participants/{participant}', [AiCommonSharedConversationController::class, 'remove'])->name('ai-common.shared.participants.remove');
         Route::post('/company/co/shared-conversations/{conversation}/leave', [AiCommonSharedConversationController::class, 'leave'])->name('ai-common.shared.leave');
         Route::post('/company/co/shared-conversations/{conversation}/owner-transfer/{participant}', [AiCommonSharedConversationController::class, 'requestOwnerTransfer'])->name('ai-common.shared.owner-transfer.request');

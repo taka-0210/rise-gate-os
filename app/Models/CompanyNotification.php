@@ -10,12 +10,24 @@ use Illuminate\Support\Str;
 class CompanyNotification extends Model
 {
     public const TYPE_ACTION_ASSIGNED = 'action_assigned';
+
     public const TYPE_REVIEW_ATTENTION = 'review_attention';
+
     public const TYPE_ACTION_RETURNED = 'action_returned';
+
     public const TYPE_TODAY_DIGEST = 'today_digest';
+
     public const TYPE_CAPTURE_REMINDER = 'capture_reminder';
+
     public const TYPE_CAPTURE_REQUEST = 'capture_request';
+
     public const TYPE_CAPTURE_TELL_LATER = 'capture_tell_later';
+
+    public const TYPE_SHARED_INVITATION = 'shared_invitation';
+
+    public const TYPE_SHARED_MENTION = 'shared_mention';
+
+    public const TYPE_SHARED_APPROVAL_REQUEST = 'shared_approval_request';
 
     protected $guarded = [];
 
@@ -33,9 +45,28 @@ class CompanyNotification extends Model
         ];
     }
 
-    public function recipient(): BelongsTo { return $this->belongsTo(User::class, 'recipient_user_id'); }
-    public function actor(): BelongsTo { return $this->belongsTo(User::class, 'actor_user_id'); }
-    public function organization(): BelongsTo { return $this->belongsTo(Organization::class); }
-    public function deliveries(): HasMany { return $this->hasMany(NotificationDelivery::class); }
-    public function getRouteKeyName(): string { return 'public_id'; }
+    public function recipient(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recipient_user_id');
+    }
+
+    public function actor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'actor_user_id');
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(NotificationDelivery::class);
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
+    }
 }

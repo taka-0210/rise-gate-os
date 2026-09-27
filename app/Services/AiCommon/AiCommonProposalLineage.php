@@ -11,7 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class AiCommonProposalLineage
 {
-    public function __construct(private readonly AiCommonSourceManifest $manifest) {}
+    public function __construct(
+        private readonly AiCommonSourceManifest $manifest,
+        private readonly AiCommonSharedContext $sharedContext,
+    ) {}
 
     public function sourceMessage(
         User $actor,
@@ -30,7 +33,11 @@ class AiCommonProposalLineage
             throw ValidationException::withMessages(['proposal' => 'Legacy AI responses cannot be used to create a source-derived proposal.']);
         }
         foreach ($message->sourceRevisions as $revision) {
-            $this->manifest->authorizeRevision($actor, $organization, $revision);
+            if ($conversation->conversation_kind === AiCommonConversation::KIND_SHARED) {
+                $this->sharedContext->authorizeRevision($actor, $organization, $revision);
+            } else {
+                $this->manifest->authorizeRevision($actor, $organization, $revision);
+            }
         }
 
         return $message;
@@ -59,7 +66,11 @@ class AiCommonProposalLineage
             throw ValidationException::withMessages(['proposal' => 'Proposal source lineage is incomplete.']);
         }
         foreach ($proposal->sourceRevisions as $revision) {
-            $this->manifest->authorizeRevision($actor, $proposal->commonConversation->organization, $revision);
+            if ($proposal->commonConversation->conversation_kind === AiCommonConversation::KIND_SHARED) {
+                $this->sharedContext->authorizeRevision($actor, $proposal->commonConversation->organization, $revision);
+            } else {
+                $this->manifest->authorizeRevision($actor, $proposal->commonConversation->organization, $revision);
+            }
         }
     }
 }
