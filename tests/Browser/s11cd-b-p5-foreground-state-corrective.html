@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang=en>
+<head><meta charset=utf-8><title>S11-CD-B P5 foreground state corrective</title></head>
+<body>
+<div id=shared-session-recorder
+    data-start-url=/start
+    data-stream-base=/streams
+    data-window-base=/windows
+    data-snapshot-url=/snapshot
+    data-shared-room-sequence=0
+    data-csrf=synthetic>
+    <p data-session-recorder-status>Recorder stopped</p>
+    <button type=button data-session-record-start>Start continuous voice</button>
+    <button type=button data-session-record-stop disabled>Stop normally</button>
+    <button type=button data-session-record-cancel disabled>Cancel</button>
+</div>
+<pre id=result>RUNNING</pre>
+<script>
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+let visibility = 'visible';
+let nextGeneration = 0;
+let networkFailure = false;
+let authorizationFailure = false;
+let cancelCalls = 0;
+let windowPosts = 0;
+let snapshotCalls = [];
+const tracks = [];
+const state = {
+    sequence: 1, session_state: 'active', capture: 'inactive', presence: 'ready',
+    asr: 'idle', context: 'empty', context_watermark_segment_id: null, client_capture: null,
+};
+Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => visibility});
+window.setInterval = () => 0;
+
+class ControlledRecorder extends EventTarget {
+    static isTypeSupported(type) { return type === 'audio/webm;codecs=opus'; }
+    constructor(stream, options) { super(); this.state = 'inactive'; this.mimeType = options?.mimeType || 'audio/webm'; }
+    start() { this.state = 'recording'; }
+    stop() {
+        if (this.state !== 'recording') return;
+        this.state = 'inactive';
+        setTimeout(() => this.dispatchEvent(new BlobEvent('dataavailable', {data: new Blob(['late'], {type: this.mimeType})})), 5);
+        setTimeout(() => this.dispatchEvent(new Event('stop')), 10);
+    }
+}
+window.MediaRecorder = ControlledRecorder;
+Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {getUserMedia: async () => {
+        const track = {stopped: false, stop() { this.stopped = true; }};
+        tracks.push(track);
+        return {getTracks: () => [track]};
+    }},
+});
+const response = (payload, status = 200) => ({ok: status >= 200 && status < 300, status, json: async () => payload});
+window.fetch = async (input, options = {}) => {
+    const url = new URL(String(input), window.location.origin);
+    const method = options.method || 'GET';
+    if (networkFailure) throw new TypeError('synthetic offline');
+    if (url.pathname === '/snapshot') {
+        snapshotCalls.push({client: url.searchParams.get('client_instance_id'), cursor: url.searchParams.get('cursor')});
+        if (authorizationFailure) return response({}, 403);
+        return response({...state, client_capture: state.client_capture ? {...state.client_capture} : null});
+    }
+    if (url.pathname === '/start' && method === 'POST') {
+        nextGeneration += 1;
+        state.sequence += 1;
+        state.capture = 'recording';
+        state.client_capture = {stream_id: `stream-${nextGeneration}`, state: 'recording', generation: nextGeneration, sequence: 0};
+        return response({stream_id: state.client_capture.stream_id, generation: nextGeneration, sequence: 0});
+    }
+    if (/^\/streams\/[^/]+\/cancel$/.test(url.pathname) && method === 'POST') {
+        cancelCalls += 1;
+        state.sequence += 1;
+        state.capture = 'inactive';
+        state.client_capture = {...state.client_capture, state: 'cancelled', sequence: (state.client_capture?.sequence || 0) + 1};
+        return response({state: 'cancelled'});
+    }
+    if (url.pathname.startsWith('/windows') && method === 'POST') windowPosts += 1;
+    return response({});
+};
+</script>
+<script src=/public/js/ai-common-shared-session.js></script>
+<script>
+window.addEventListener('load', async () => {
+    const start = document.querySelector('[data-session-record-start]');
+    const stop = document.querySelector('[data-session-record-stop]');
+    const cancel = document.querySelector('[data-session-record-cancel]');
+    const status = document.querySelector('[data-session-recorder-status]');
+    const scenarios = [];
+    const check = (name, pass, evidence) => scenarios.push({name, pass: Boolean(pass), evidence});
+    const setVisibility = async value => {
+        visibility = value;
+        document.dispatchEvent(new Event('visibilitychange'));
+        await wait(30);
+    };
+
+    await wait(20);
+    start.click();
+    await wait(20);
+    window.dispatchEvent(new PageTransitionEvent('pageshow'));
+    await wait(20);
+    check('active-recording-remains-truthful', status.textContent === 'Recording a bounded window' && stop.disabled === false && cancel.disabled === false, {
+        status: status.textContent, capture: state.capture,
+    });
+
+    await setVisibility('hidden');
+    const hiddenStatus = status.textContent;
+    await setVisibility('visible');
+    check('foreground-confirms-server-cancelled', hiddenStatus.includes('stopped locally') && status.textContent.includes('Server state confirmed') && start.disabled === false && stop.disabled && cancel.disabled && state.client_capture.state === 'cancelled', {
+        hiddenStatus, foregroundStatus: status.textContent, serverState: state.client_capture.state,
+    });
+    check('cancelled-generation-has-no-window', windowPosts === 0 && tracks.at(-1).stopped, {windowPosts, trackStopped: tracks.at(-1).stopped});
+
+    for (let index = 0; index < 2; index += 1) {
+        start.click();
+        await wait(15);
+        await setVisibility('hidden');
+        await setVisibility('visible');
+    }
+    check('repeated-background-foreground', state.client_capture.state === 'cancelled' && status.textContent.includes('Server state confirmed') && start.disabled === false, {
+        generation: state.client_capture.generation, cancelCalls, status: status.textContent,
+    });
+
+    start.click();
+    await wait(15);
+    networkFailure = true;
+    await setVisibility('hidden');
+    await setVisibility('visible');
+    const offlineStatus = status.textContent;
+    networkFailure = false;
+    window.dispatchEvent(new Event('online'));
+    await wait(40);
+    check('network-reconnect-cancels-authoritative-active-stream', offlineStatus.includes('unavailable') && state.client_capture.state === 'cancelled' && status.textContent.includes('Server state confirmed') && start.disabled === false, {
+        offlineStatus, recoveredStatus: status.textContent, cancelCalls,
+    });
+
+    state.session_state = 'paused';
+    state.capture = 'paused';
+    state.client_capture = {...state.client_capture, state: 'paused'};
+    window.dispatchEvent(new PageTransitionEvent('pageshow'));
+    await wait(20);
+    check('pause-projection', status.textContent.includes('Session paused') && start.disabled && stop.disabled && cancel.disabled, {status: status.textContent});
+
+    state.session_state = 'active';
+    state.capture = 'inactive';
+    state.client_capture = {...state.client_capture, state: 'cancelled'};
+    window.dispatchEvent(new PageTransitionEvent('pageshow'));
+    await wait(20);
+    check('resume-projection', status.textContent.includes('Server state confirmed') && start.disabled === false, {status: status.textContent});
+
+    state.session_state = 'ended';
+    window.dispatchEvent(new PageTransitionEvent('pageshow'));
+    await wait(20);
+    check('ended-projection', status.textContent.includes('Session ended') && start.disabled && stop.disabled && cancel.disabled, {status: status.textContent});
+
+    state.session_state = 'active';
+    authorizationFailure = true;
+    window.dispatchEvent(new PageTransitionEvent('pageshow'));
+    await wait(20);
+    check('current-authorization-fails-closed', status.textContent.includes('current authorization could not be confirmed') && start.disabled, {status: status.textContent});
+
+    check('cursor-and-client-stable', snapshotCalls.length >= 8 && new Set(snapshotCalls.map(call => call.client)).size === 1 && snapshotCalls.every(call => /^\d+$/.test(call.cursor)), {
+        snapshotCalls: snapshotCalls.length, clients: new Set(snapshotCalls.map(call => call.client)).size,
+    });
+    const result = {pass: scenarios.every(scenario => scenario.pass), scenarios, snapshotCalls: snapshotCalls.length, cancelCalls, windowPosts};
+    document.querySelector('#result').textContent = JSON.stringify(result);
+});
+</script>
+</body>
+</html>

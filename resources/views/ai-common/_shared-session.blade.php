@@ -30,7 +30,7 @@
         <form method='post' action='{{ route('ai-common.shared.sessions.end', [$conversation, $session]) }}'>@csrf<button>End Session</button></form>
     </div>
     @if($session->state === 'active')
-    <div id='shared-session-recorder' data-start-url='{{ route('ai-common.shared.sessions.streams.start', [$conversation, $session]) }}' data-stream-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/streams') }}' data-window-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/windows') }}' data-csrf='{{ csrf_token() }}'>
+    <div id='shared-session-recorder' data-start-url='{{ route('ai-common.shared.sessions.streams.start', [$conversation, $session]) }}' data-stream-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/streams') }}' data-window-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/windows') }}' data-snapshot-url='{{ route('ai-common.shared.sessions.snapshot', [$conversation, $session]) }}' data-shared-room-sequence='{{ $coState->room_sequence ?? $session->room_sequence ?? 0 }}' data-csrf='{{ csrf_token() }}'>
         <p data-session-recorder-status role='status'>Recorder stopped</p>
         <div class='shared-row'><button type='button' data-session-record-start>Start continuous voice</button><button type='button' data-session-record-stop disabled>Stop normally</button><button type='button' data-session-record-cancel disabled>Cancel</button></div>
         <p class='shared-muted'>Ver.1 permits one shared-room capture stream. Distributed multi-mic is out of scope.</p>

@@ -2,39 +2,16 @@
     'use strict';
     const root = document.getElementById('shared-session-recorder');
     const presence = document.querySelector('[data-shared-room-snapshot]');
-    if (presence) {
-        const client = crypto.randomUUID();
-        let cursor = Number(presence.dataset.sharedRoomSequence || 0);
-        const refresh = async () => {
-            if (document.visibilityState !== 'visible') return;
-            try {
-                const url = new URL(presence.dataset.sharedRoomSnapshot, window.location.origin);
-                url.searchParams.set('client_instance_id', client);
-                url.searchParams.set('cursor', String(cursor));
-                const response = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}, cache: 'no-store'});
-                if (!response.ok) return;
-                const state = await response.json();
-                cursor = Number(state.sequence || cursor);
-                presence.querySelector('[data-presence-state]').textContent = state.presence;
-                presence.querySelector('[data-capture-state]').textContent = state.capture;
-                presence.querySelector('[data-asr-state]').textContent = state.asr;
-                presence.querySelector('[data-context-state]').textContent = state.context;
-                presence.querySelector('[data-context-watermark]').textContent = `Context watermark: segment ${state.context_watermark_segment_id ?? 'none'}`;
-            } catch (_) {
-                // Network loss leaves the last truthful server snapshot visible; no fake progress is inferred.
-            }
-        };
-        refresh();
-        window.setInterval(refresh, 5000);
-    }
-    if (!root) return;
+    if (!root && !presence) return;
 
-    const startButton = root.querySelector('[data-session-record-start]');
-    const stopButton = root.querySelector('[data-session-record-stop]');
-    const cancelButton = root.querySelector('[data-session-record-cancel]');
-    const status = root.querySelector('[data-session-recorder-status]');
-    const csrf = root.dataset.csrf;
     const clientInstanceId = crypto.randomUUID();
+    const snapshotUrl = root?.dataset.snapshotUrl || presence?.dataset.sharedRoomSnapshot;
+    let cursor = Number(root?.dataset.sharedRoomSequence || presence?.dataset.sharedRoomSequence || 0);
+    const startButton = root?.querySelector('[data-session-record-start]');
+    const stopButton = root?.querySelector('[data-session-record-stop]');
+    const cancelButton = root?.querySelector('[data-session-record-cancel]');
+    const status = root?.querySelector('[data-session-recorder-status]');
+    const csrf = root?.dataset.csrf;
     let mediaStream = null;
     let recorder = null;
     let serverStream = null;
@@ -44,7 +21,97 @@
     let normalStop = false;
     let timer = null;
 
-    const setStatus = message => { status.textContent = message; };
+    const setStatus = message => { if (status) status.textContent = message; };
+    const setRecorderControls = (startDisabled, stopDisabled = true, cancelDisabled = true) => {
+        if (!root) return;
+        startButton.disabled = startDisabled;
+        stopButton.disabled = stopDisabled;
+        cancelButton.disabled = cancelDisabled;
+    };
+    const projectSnapshot = state => {
+        if (presence) {
+            presence.querySelector('[data-presence-state]').textContent = state.presence;
+            presence.querySelector('[data-capture-state]').textContent = state.capture;
+            presence.querySelector('[data-asr-state]').textContent = state.asr;
+            presence.querySelector('[data-context-state]').textContent = state.context;
+            presence.querySelector('[data-context-watermark]').textContent = `Context watermark: segment ${state.context_watermark_segment_id ?? 'none'}`;
+        }
+        if (!root) return;
+        const sessionState = state.session_state;
+        const clientState = state.client_capture?.state || 'inactive';
+        if (active && clientState === 'recording') {
+            setRecorderControls(true, false, false);
+            setStatus('Recording a bounded window');
+            return;
+        }
+        active = false;
+        normalStop = false;
+        stopTracks();
+        serverStream = null;
+        if (sessionState === 'active' && clientState === 'inactive' && ['recording', 'paused'].includes(state.capture)) {
+            setRecorderControls(true);
+            setStatus('Recorder unavailable: another capture stream is active.');
+        } else if (sessionState === 'active' && ['cancelled', 'stopped', 'interrupted', 'inactive'].includes(clientState)) {
+            setRecorderControls(false);
+            setStatus(clientState === 'cancelled'
+                ? 'Cancelled. Server state confirmed; late events are fenced.'
+                : 'Recorder stopped. Server state confirmed.');
+        } else if (sessionState === 'paused' || clientState === 'paused') {
+            setRecorderControls(true);
+            setStatus('Session paused. Recorder stopped.');
+        } else if (sessionState === 'ended') {
+            setRecorderControls(true);
+            setStatus('Session ended. Recorder unavailable.');
+        } else {
+            setRecorderControls(true);
+            setStatus('Recorder unavailable. Server state does not permit recording.');
+        }
+    };
+    const refreshSnapshot = async () => {
+        if (!snapshotUrl || document.visibilityState !== 'visible') return;
+        try {
+            const url = new URL(snapshotUrl, window.location.origin);
+            url.searchParams.set('client_instance_id', clientInstanceId);
+            url.searchParams.set('cursor', String(cursor));
+            const response = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            if (!response.ok) {
+                if (root && !active) {
+                    setRecorderControls(true);
+                    setStatus(response.status === 401 || response.status === 403
+                        ? 'Recorder unavailable: current authorization could not be confirmed.'
+                        : 'Recorder state unavailable. Reconnect to verify server state.');
+                }
+                return;
+            }
+            let state = await response.json();
+            cursor = Number(state.sequence || cursor);
+            if (root && !active && ['recording', 'paused'].includes(state.client_capture?.state)) {
+                try {
+                    await postJson(`${root.dataset.streamBase}/${state.client_capture.stream_id}/cancel`, {}, true);
+                    const reconciled = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}, cache: 'no-store'});
+                    if (reconciled.ok) {
+                        state = await reconciled.json();
+                        cursor = Number(state.sequence || cursor);
+                    }
+                } catch (_) {
+                    // Keep controls unavailable until the authoritative active stream can be cancelled.
+                }
+            }
+            projectSnapshot(state);
+        } catch (_) {
+            if (root && !active) {
+                setRecorderControls(true);
+                setStatus('Recorder state unavailable. Reconnect to verify server state.');
+            }
+            // Network loss never invents a server transition or enables recording.
+        }
+    };
+    refreshSnapshot();
+    window.setInterval(refreshSnapshot, 5000);
+    window.addEventListener('pageshow', refreshSnapshot);
+    window.addEventListener('online', refreshSnapshot);
+
+    if (!root) return;
     const postJson = async (url, body = {}, keepalive = false) => {
         const response = await fetch(url, {
             method: 'POST', credentials: 'same-origin', keepalive,
@@ -159,8 +226,13 @@
         clearTimeout(timer);
         if (recorder?.state === 'recording') recorder.stop();
         stopTracks();
-        postJson(streamUrl('cancel'), {}, true).catch(() => {});
+        setRecorderControls(true);
+        setStatus('Recorder stopped locally. Reconnecting to confirm server state.');
+        postJson(streamUrl('cancel'), {}, true).then(refreshSnapshot).catch(() => {});
     };
     window.addEventListener('pagehide', safelyCancel);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') safelyCancel(); });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') safelyCancel();
+        else refreshSnapshot();
+    });
 })();

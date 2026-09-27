@@ -4,6 +4,7 @@ namespace App\Services\AiCommon;
 
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonSharedCheckpointDependency;
+use App\Models\AiCommonSharedCaptureStream;
 use App\Models\AiCommonSharedContextCheckpoint;
 use App\Models\AiCommonSharedCoState;
 use App\Models\AiCommonSharedDeviceCursor;
@@ -279,6 +280,12 @@ class AiCommonSharedLongContext
             throw ValidationException::withMessages(['cursor' => 'This device cursor belongs to another Participant.']);
         }
         $row->fill(['user_id' => $actor->id, 'last_sequence' => $sequence, 'version' => ($row->version ?? 0) + 1, 'last_seen_at_utc' => now('UTC')])->save();
+        $clientCapture = AiCommonSharedCaptureStream::query()
+            ->where('ai_common_shared_session_id', $session->id)
+            ->where('client_instance_id', $clientInstanceId)
+            ->whereHas('operatorParticipant', fn ($query) => $query->where('user_id', $actor->id))
+            ->latest('id')
+            ->first();
 
         return [
             'sequence' => $sequence,
@@ -294,6 +301,12 @@ class AiCommonSharedLongContext
             'asr' => $state->asr_state,
             'context' => $state->context_state,
             'context_watermark_segment_id' => $state->context_watermark_segment_id,
+            'client_capture' => $clientCapture ? [
+                'stream_id' => $clientCapture->public_id,
+                'state' => $clientCapture->state,
+                'generation' => $clientCapture->generation,
+                'sequence' => $clientCapture->sequence,
+            ] : null,
         ];
     }
 
