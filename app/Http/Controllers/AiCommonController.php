@@ -13,6 +13,7 @@ use App\Services\AiCommon\AiCommonAccess;
 use App\Services\AiCommon\AiCommonConversationReader;
 use App\Services\AiCommon\AiCommonGateway;
 use App\Services\AiCommon\AiCommonGatewayException;
+use App\Services\AiCommon\AiCommonHumanMessageWriter;
 use App\Services\AiCommon\AiCommonProposalFactory;
 use App\Services\AiCommon\AiCommonProposalLineage;
 use App\Services\AiCommon\AiCommonSourceManifest;
@@ -93,6 +94,27 @@ class AiCommonController extends Controller
                     && $row['message']->source_lineage_version === AiCommonMessage::SOURCE_LINEAGE_V1
             )['message'] ?? null,
         ]);
+    }
+
+    public function humanMessage(
+        Request $request,
+        AiCommonConversation $conversation,
+        AiCommonHumanMessageWriter $writer,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'operation_id' => ['required', 'uuid'],
+            'content' => ['required', 'string', 'max:4000'],
+            'attachment_ids' => ['nullable', 'array', 'max:5'],
+            'attachment_ids.*' => ['integer'],
+        ]);
+        $writer->post(
+            $request->user(),
+            $request->attributes->get('currentCompany'),
+            $conversation,
+            $validated,
+        );
+
+        return back()->with('status', 'Messageを保存しました。AIへの送信は行っていません。');
     }
 
     public function message(Request $request, AiCommonConversation $conversation, AiCommonAccess $access, AiCommonConversationReader $reader, AiCommonSourceManifest $manifest, AiCommonGateway $gateway): RedirectResponse

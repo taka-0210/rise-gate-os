@@ -49,4 +49,14 @@ class AiCommonMessage extends Model
             'ai_common_source_revision_id',
         )->withTimestamps();
     }
+
+    public function attachments(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            AiCommonAttachment::class,
+            'ai_common_message_attachments',
+            'ai_common_message_id',
+            'ai_common_attachment_id',
+        )->withPivot('attachment_version')->withTimestamps();
+    }
 }

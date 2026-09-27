@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 class AiCommonConversation extends Model
 {
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
@@ -60,5 +61,10 @@ class AiCommonConversation extends Model
     public function proposals(): HasMany
     {
         return $this->hasMany(AiProposal::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(AiCommonAttachment::class);
     }
 }
