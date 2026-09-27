@@ -10,6 +10,7 @@ class AiCommonHandoffRelation extends Model
 {
     protected $fillable = [
         'public_id', 'ai_common_conversation_id', 'ai_proposal_id',
+        'source_message_id', 'source_lineage_version',
         'target_type', 'target_public_id', 'published_summary', 'applied_at',
     ];
 
@@ -31,5 +32,10 @@ class AiCommonHandoffRelation extends Model
     public function proposal(): BelongsTo
     {
         return $this->belongsTo(AiProposal::class, 'ai_proposal_id');
+    }
+
+    public function sourceMessage(): BelongsTo
+    {
+        return $this->belongsTo(AiCommonMessage::class, 'source_message_id');
     }
 }

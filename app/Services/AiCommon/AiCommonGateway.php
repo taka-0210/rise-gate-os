@@ -12,21 +12,41 @@ use Throwable;
 class AiCommonGateway
 {
     public const PURPOSE = 'business_common';
+
     private const MAX_ATTEMPTS = 2;
 
     public function __construct(private readonly AiCommonProvider $provider) {}
 
-    public function respond(User $actor, AiCommonConversation $conversation, array $messages, array $sources, ?string $logicalRequestId = null): array
-    {
+    public function respond(
+        User $actor,
+        AiCommonConversation $conversation,
+        array $messages,
+        array $sources,
+        ?string $logicalRequestId = null,
+        ?callable $authorizeAttempt = null,
+    ): array {
         $requestId = $logicalRequestId ?: (string) Str::uuid();
         $lastError = null;
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
+            $authorizedContext = null;
+            if ($authorizeAttempt !== null) {
+                try {
+                    $authorizedContext = $authorizeAttempt($attempt);
+                    $messages = $authorizedContext['messages'];
+                    $sources = $authorizedContext['sources'];
+                } catch (Throwable $error) {
+                    throw new AiCommonGatewayException('authorization_changed', previous: $error);
+                }
+            }
             $started = hrtime(true);
             try {
                 $result = $this->provider->respond($messages, $sources);
                 $this->record($actor, $conversation, $requestId, $attempt, $result, 'success', null, $started);
 
-                return $result + ['logical_request_id' => $requestId];
+                return array_replace($result, [
+                    'logical_request_id' => $requestId,
+                    '_authorized_context' => $authorizedContext,
+                ]);
             } catch (Throwable $error) {
                 $lastError = $error;
                 $code = in_array($error->getMessage(), ['provider_unavailable', 'provider_error', 'provider_invalid_response'], true)

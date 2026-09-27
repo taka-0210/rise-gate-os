@@ -4,6 +4,7 @@ namespace App\Services\AiCommon;
 
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonSource;
+use App\Models\AiCommonSourceRevision;
 use App\Models\AiResourcePolicy;
 use App\Models\BusinessDomain;
 use App\Models\Capture;
@@ -18,15 +19,18 @@ use App\Services\BusinessDomain\BusinessDomainAccess;
 use App\Services\Capture\CaptureAccess;
 use App\Services\ProjectExecution\ProjectExecutionAccess;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AiCommonSourceManifest
 {
     public const MAX_SOURCES = 20;
+
     public const MAX_SOURCE_CHARS = 2000;
+
     public const MAX_CONTEXT_CHARS = 20000;
 
     private const DOMAIN_FIELDS = [
@@ -45,96 +49,184 @@ class AiCommonSourceManifest
     public function select(User $actor, Organization $organization, AiCommonConversation $conversation, string $type, string $publicId, string $reason): AiCommonSource
     {
         $this->common->authorizeConversation($actor, $organization, $conversation, true);
-        if ($conversation->sources()->count() >= self::MAX_SOURCES) {
-            throw ValidationException::withMessages(['sources' => 'Contextは20件まで選択できます。']);
+        $existing = $conversation->sources()->where('resource_type', $type)->where('resource_public_id', $publicId)->first();
+        if (! $existing && $conversation->sources()->count() >= self::MAX_SOURCES) {
+            throw ValidationException::withMessages(['sources' => 'Context can contain at most 20 source selections.']);
         }
         if (trim($reason) === '' || mb_strlen($reason) > 160) {
-            throw ValidationException::withMessages(['selection_reason' => '選択理由を160文字以内で入力してください。']);
+            throw ValidationException::withMessages(['selection_reason' => 'Enter a selection reason within 160 characters.']);
         }
-        [$resource, $category, $version, $projection] = $this->resolve($actor, $organization, $type, $publicId);
-        [$organizationPolicyVersion, $resourcePolicyVersion] = $this->authorizePolicy($actor, $organization, $category, $type, $publicId);
-        $projection = $this->limitProjection($projection);
-        $fingerprint = $this->fingerprint($actor, $organization, $type, $publicId, $version, $projection, $organizationPolicyVersion, $resourcePolicyVersion);
-        $source = AiCommonSource::query()->updateOrCreate(
-            [
+
+        $snapshot = $this->snapshot($actor, $organization, $type, $publicId);
+
+        return DB::transaction(function () use ($actor, $conversation, $type, $publicId, $reason, $snapshot, $existing): AiCommonSource {
+            $source = $existing
+                ? AiCommonSource::query()->lockForUpdate()->findOrFail($existing->id)
+                : new AiCommonSource([
+                    'ai_common_conversation_id' => $conversation->id,
+                    'resource_type' => $type,
+                    'resource_public_id' => $publicId,
+                ]);
+            $handle = 'src_'.Str::lower(Str::random(48));
+            $source->fill([
+                'selected_by_user_id' => $actor->id,
+                'opaque_handle' => $handle,
+                'resource_version' => $snapshot['resource_version'],
+                'freshness_fingerprint' => $snapshot['access_fingerprint'],
+                'selection_reason' => trim($reason),
+                'projection' => $snapshot['projection'],
+                'selected_at' => now(),
+            ])->save();
+            $revision = $source->revisions()->create([
                 'ai_common_conversation_id' => $conversation->id,
+                'selected_by_user_id' => $actor->id,
+                'opaque_handle' => $handle,
                 'resource_type' => $type,
                 'resource_public_id' => $publicId,
-            ],
-            [
-                'selected_by_user_id' => $actor->id,
-                'opaque_handle' => 'src_'.Str::lower(Str::random(48)),
-                'resource_version' => (string) $version,
-                'freshness_fingerprint' => $fingerprint,
+                'resource_version' => $snapshot['resource_version'],
+                'selector' => ['type' => $type, 'public_id' => $publicId],
+                'projection' => $snapshot['projection'],
+                'organization_policy_version' => $snapshot['organization_policy_version'],
+                'resource_policy_version' => $snapshot['resource_policy_version'],
+                'membership_access_epoch' => $snapshot['membership_access_epoch'],
+                'credential_generation' => $snapshot['credential_generation'],
+                'access_fingerprint' => $snapshot['access_fingerprint'],
                 'selection_reason' => trim($reason),
-                'projection' => $projection,
                 'selected_at' => now(),
-            ],
-        );
+            ]);
+            $source->update(['current_revision_id' => $revision->id]);
 
-        return $source->fresh();
+            return $source->fresh('currentRevision');
+        }, 3);
     }
 
+    /** Backward-compatible selection authorization. New callers should retain the immutable revision. */
     public function authorize(User $actor, Organization $organization, AiCommonSource $source): array
     {
+        $revision = $source->currentRevision()->first();
+        if ($revision) {
+            return $this->authorizeRevision($actor, $organization, $revision);
+        }
+
         if ($source->conversation->organization_id !== $organization->id
             || $source->conversation->user_id !== $actor->id) {
             throw new AuthorizationException;
         }
-        [, $category, $version, $projection] = $this->resolve(
-            $actor,
-            $organization,
-            $source->resource_type,
-            $source->resource_public_id,
-        );
-        [$organizationPolicyVersion, $resourcePolicyVersion] = $this->authorizePolicy(
-            $actor,
-            $organization,
-            $category,
-            $source->resource_type,
-            $source->resource_public_id,
-        );
-        $projection = $this->limitProjection($projection);
-        $fingerprint = $this->fingerprint(
-            $actor,
-            $organization,
-            $source->resource_type,
-            $source->resource_public_id,
-            $version,
-            $projection,
-            $organizationPolicyVersion,
-            $resourcePolicyVersion,
-        );
-        if (! hash_equals($source->freshness_fingerprint, $fingerprint)) {
-            throw ValidationException::withMessages(['source' => '参照元が更新されています。Contextを選び直してください。']);
+        $snapshot = $this->snapshot($actor, $organization, $source->resource_type, $source->resource_public_id);
+        if (! hash_equals($source->freshness_fingerprint, $snapshot['access_fingerprint'])) {
+            throw ValidationException::withMessages(['source' => 'The source changed. Reselect it before reuse.']);
         }
 
-        return [
-            'handle' => $source->opaque_handle,
-            'type' => $source->resource_type,
-            'version' => (string) $version,
-            'data' => $projection,
-        ];
+        return $this->providerSource($source->opaque_handle, $source->resource_type, $snapshot);
     }
 
-    public function authorizedMany(User $actor, Organization $organization, iterable $sources): array
+    public function authorizeRevision(User $actor, Organization $organization, AiCommonSourceRevision $revision): array
+    {
+        if ($revision->conversation->organization_id !== $organization->id
+            || $revision->conversation->user_id !== $actor->id) {
+            throw new AuthorizationException;
+        }
+        $snapshot = $this->snapshot($actor, $organization, $revision->resource_type, $revision->resource_public_id);
+        if (! hash_equals($revision->access_fingerprint, $snapshot['access_fingerprint'])
+            || $revision->resource_version !== $snapshot['resource_version']
+            || $revision->projection !== $snapshot['projection']) {
+            throw ValidationException::withMessages(['source' => 'The source revision is no longer current. Reselect it before reuse.']);
+        }
+
+        return $this->providerSource($revision->opaque_handle, $revision->resource_type, $snapshot);
+    }
+
+    public function revisionsForSelections(User $actor, Organization $organization, iterable $sources): EloquentCollection
+    {
+        $result = new EloquentCollection;
+        foreach ($sources as $source) {
+            $revision = $source->currentRevision()->first();
+            if (! $revision) {
+                throw ValidationException::withMessages(['source' => 'Legacy source selections must be reselected before AI reuse.']);
+            }
+            $this->authorizeRevision($actor, $organization, $revision);
+            $result->push($revision);
+        }
+
+        return $result;
+    }
+
+    public function authorizedRevisions(User $actor, Organization $organization, iterable $revisions): array
     {
         $result = [];
         $chars = 0;
-        foreach ($sources as $source) {
+        foreach (collect($revisions)->unique('id')->values() as $revision) {
             if (count($result) >= self::MAX_SOURCES) {
-                break;
+                throw ValidationException::withMessages(['sources' => 'Source lineage exceeds the 20 source limit.']);
             }
-            $authorized = $this->authorize($actor, $organization, $source);
+            $authorized = $this->authorizeRevision($actor, $organization, $revision);
             $encoded = json_encode($authorized['data'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $chars += mb_strlen((string) $encoded);
             if ($chars > self::MAX_CONTEXT_CHARS) {
-                throw ValidationException::withMessages(['sources' => 'Context上限を超えました。対象を減らしてください。']);
+                throw ValidationException::withMessages(['sources' => 'Source lineage exceeds the context limit.']);
             }
             $result[] = $authorized;
         }
 
         return $result;
+    }
+
+    public function authorizedMany(User $actor, Organization $organization, iterable $sources): array
+    {
+        return $this->authorizedRevisions(
+            $actor,
+            $organization,
+            $this->revisionsForSelections($actor, $organization, $sources),
+        );
+    }
+
+    public function assertSelectionsStillPointTo(iterable $selectionRevisionMap): void
+    {
+        foreach ($selectionRevisionMap as $sourceId => $revisionId) {
+            $current = AiCommonSource::query()->whereKey((int) $sourceId)->value('current_revision_id');
+            if ((int) $current !== (int) $revisionId) {
+                throw ValidationException::withMessages(['source' => 'The selected source changed while the provider was processing.']);
+            }
+        }
+    }
+
+    private function snapshot(User $actor, Organization $organization, string $type, string $publicId): array
+    {
+        [, $category, $version, $projection] = $this->resolve($actor, $organization, $type, $publicId);
+        [$organizationPolicyVersion, $resourcePolicyVersion] = $this->authorizePolicy(
+            $actor,
+            $organization,
+            $category,
+            $type,
+            $publicId,
+        );
+        $projection = $this->limitProjection($projection);
+        $membership = OrganizationUser::query()
+            ->where('organization_id', $organization->id)
+            ->where('user_id', $actor->id)
+            ->where('membership_status', OrganizationUser::STATUS_ACTIVE)
+            ->firstOrFail();
+        $state = [
+            'resource_version' => (string) $version,
+            'projection' => $projection,
+            'organization_policy_version' => $organizationPolicyVersion,
+            'resource_policy_version' => $resourcePolicyVersion,
+            'membership_access_epoch' => (int) $membership->access_epoch,
+            'credential_generation' => (int) $actor->fresh()->credential_generation,
+        ];
+        $state['access_fingerprint'] = $this->fingerprint($type, $publicId, $state);
+
+        return $state;
+    }
+
+    private function providerSource(string $handle, string $type, array $snapshot): array
+    {
+        return [
+            'handle' => $handle,
+            'type' => $type,
+            'version' => $snapshot['resource_version'],
+            'data' => $snapshot['projection'],
+        ];
     }
 
     private function resolve(User $actor, Organization $organization, string $type, string $publicId): array
@@ -144,7 +236,7 @@ class AiCommonSourceManifest
             'action' => $this->action($actor, $organization, $publicId),
             'business_domain' => $this->domain($actor, $organization, $publicId),
             'capture' => $this->capture($actor, $organization, $publicId),
-            default => throw ValidationException::withMessages(['resource_type' => 'AI参照対象が不正です。']),
+            default => throw ValidationException::withMessages(['resource_type' => 'Unsupported AI source type.']),
         };
     }
 
@@ -218,39 +310,26 @@ class AiCommonSourceManifest
     {
         $encoded = json_encode($projection, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if (mb_strlen((string) $encoded) > self::MAX_SOURCE_CHARS) {
-            throw ValidationException::withMessages(['source' => '選択したContextが大きすぎます。']);
+            throw ValidationException::withMessages(['source' => 'The selected source exceeds the source context limit.']);
         }
 
         return $projection;
     }
 
-    private function fingerprint(
-        User $actor,
-        Organization $organization,
-        string $type,
-        string $publicId,
-        int|string $version,
-        array $projection,
-        int $organizationPolicyVersion,
-        int $resourcePolicyVersion,
-    ): string
+    private function fingerprint(string $type, string $publicId, array $state): string
     {
+        $projection = $state['projection'];
         ksort($projection);
-        $membership = OrganizationUser::query()
-            ->where('organization_id', $organization->id)
-            ->where('user_id', $actor->id)
-            ->where('membership_status', OrganizationUser::STATUS_ACTIVE)
-            ->firstOrFail();
 
         return hash('sha256', json_encode([
             $type,
             $publicId,
-            (string) $version,
+            $state['resource_version'],
             $projection,
-            'membership_access_epoch' => (int) $membership->access_epoch,
-            'credential_generation' => (int) $actor->fresh()->credential_generation,
-            'organization_policy_version' => $organizationPolicyVersion,
-            'resource_policy_version' => $resourcePolicyVersion,
+            'membership_access_epoch' => $state['membership_access_epoch'],
+            'credential_generation' => $state['credential_generation'],
+            'organization_policy_version' => $state['organization_policy_version'],
+            'resource_policy_version' => $state['resource_policy_version'],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 }

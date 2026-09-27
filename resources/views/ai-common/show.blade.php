@@ -37,6 +37,7 @@
 <button type="submit">許可済みContextだけで相談する</button></form>
 <section class="co-panel"><h2>保存Proposalを作る</h2><p>AI回答だけでは保存されません。1 Proposal = 1 Unit = 1 operationです。</p>
 <form class="co-form-grid" method="post" action="{{ route('ai-common.proposals.store',$conversation) }}">@csrf
+@if($proposalSourceMessage)<input type="hidden" name="source_message_public_id" value="{{ $proposalSourceMessage->public_id }}">@endif
 <label>操作<select name="operation"><option value="capture.create">Capture create / L1</option><option value="action.create">Action create / L2</option><option value="action.update">Action update / L2</option><option value="project.update">Project update / L2</option><option value="business_domain.update">Domain update / L3</option></select></label>
 <label>Target public ID<input name="target_public_id" placeholder="Capture createでは空欄"></label><label>題名<input name="title" required></label><label>操作ID<input name="idempotency_key" value="{{ Str::uuid() }}" required></label>
 <label class="wide">公開する要約<input name="published_summary" maxlength="1000"></label>

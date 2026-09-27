@@ -10,7 +10,6 @@ use App\Models\AiProposalItemResult;
 use App\Models\AiProposalUndo;
 use App\Models\BusinessDomain;
 use App\Models\Capture;
-use App\Models\Organization;
 use App\Models\OrganizationAiPolicy;
 use App\Models\Project;
 use App\Models\Task;
@@ -39,6 +38,7 @@ class AiCommonUnitAdapter
         private readonly ProjectExecutionWriter $projectWriter,
         private readonly BusinessDomainAccess $domainAccess,
         private readonly BusinessDomainWriter $domainWriter,
+        private readonly AiCommonProposalLineage $lineage,
     ) {}
 
     public function approve(AiProposal $proposal, User $actor): AiProposal
@@ -75,6 +75,7 @@ class AiCommonUnitAdapter
         $appliedAttempt = $proposal->applyAttempts()->where('status', AiProposalApplyAttempt::STATUS_APPLIED)->first();
         if ($proposal->status === AiProposal::STATUS_APPLIED && $appliedAttempt) {
             $this->authorizeAppliedResult($actor, $proposal);
+
             return $proposal->fresh(['items', 'applyAttempts.itemResults', 'commonHandoff']);
         }
         $attempt = $this->newAttempt($proposal, $actor);
@@ -339,6 +340,7 @@ class AiCommonUnitAdapter
     private function authorizeOperation(User $actor, AiProposal $proposal, bool $apply): void
     {
         $org = $proposal->commonConversation->organization;
+        $this->lineage->authorizeProposal($actor, $proposal);
         $item = $proposal->items->sole();
         $category = match ($item->entity_type) {
             AiCommonProposalContract::CAPTURE_CREATE => OrganizationAiPolicy::CATEGORY_CAPTURE,

@@ -5,12 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class AiCommonSource extends Model
 {
     protected $fillable = [
-        'public_id', 'ai_common_conversation_id', 'selected_by_user_id',
+        'public_id', 'ai_common_conversation_id', 'current_revision_id', 'selected_by_user_id',
         'opaque_handle', 'resource_type', 'resource_public_id', 'resource_version',
         'freshness_fingerprint', 'selection_reason', 'projection', 'selected_at',
     ];
@@ -33,6 +34,16 @@ class AiCommonSource extends Model
     public function conversation(): BelongsTo
     {
         return $this->belongsTo(AiCommonConversation::class, 'ai_common_conversation_id');
+    }
+
+    public function currentRevision(): BelongsTo
+    {
+        return $this->belongsTo(AiCommonSourceRevision::class, 'current_revision_id');
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(AiCommonSourceRevision::class);
     }
 
     public function messages(): BelongsToMany

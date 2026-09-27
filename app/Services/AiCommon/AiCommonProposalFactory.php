@@ -4,6 +4,7 @@ namespace App\Services\AiCommon;
 
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonHandoffRelation;
+use App\Models\AiCommonMessage;
 use App\Models\AiProposal;
 use App\Models\AiProposalItem;
 use App\Models\BusinessDomain;
@@ -12,12 +13,14 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AiCommonProposalFactory
 {
-    public function __construct(private readonly AiCommonAccess $access) {}
+    public function __construct(
+        private readonly AiCommonAccess $access,
+        private readonly AiCommonProposalLineage $lineage,
+    ) {}
 
     public function create(User $actor, Organization $organization, AiCommonConversation $conversation, array $input): AiProposal
     {
@@ -45,12 +48,22 @@ class AiCommonProposalFactory
         $commonOperationKey = AiCommonProposalContract::operationUuid(implode('|', [
             $organization->id, $actor->id, $conversation->id, $operation, $idempotency,
         ]));
+        $sourceMessage = $this->lineage->sourceMessage(
+            $actor,
+            $organization,
+            $conversation,
+            $input['source_message_public_id'] ?? null,
+        );
+        $sourceRevisionIds = $sourceMessage?->sourceRevisions->pluck('id')->all() ?? [];
 
-        return DB::transaction(function () use ($actor, $organization, $conversation, $input, $operation, $attributes, $targetType, $targetId, $targetVersion, $itemVersion, $before, $risk, $policy, $idempotency, $commonOperationKey): AiProposal {
+        return DB::transaction(function () use ($actor, $organization, $conversation, $input, $operation, $attributes, $targetType, $targetId, $targetVersion, $itemVersion, $before, $risk, $policy, $idempotency, $commonOperationKey, $sourceMessage, $sourceRevisionIds): AiProposal {
             $existing = AiProposal::query()->where('common_operation_key', $commonOperationKey)->first();
             if ($existing) {
                 $expected = AiCommonProposalContract::canonicalAttributes($operation, $existing->items()->firstOrFail()->after ?? []);
-                if ($existing->contract_version !== AiCommonProposalContract::VERSION || $expected !== $attributes) {
+                $existingSourceMessageId = $existing->commonHandoff?->source_message_id;
+                if ($existing->contract_version !== AiCommonProposalContract::VERSION
+                    || $expected !== $attributes
+                    || $existingSourceMessageId !== $sourceMessage?->id) {
                     throw ValidationException::withMessages(['idempotency_key' => '同じ操作IDを異なる内容には使用できません。']);
                 }
 
@@ -95,10 +108,13 @@ class AiCommonProposalFactory
             AiCommonHandoffRelation::query()->create([
                 'ai_common_conversation_id' => $conversation->id,
                 'ai_proposal_id' => $proposal->id,
+                'source_message_id' => $sourceMessage?->id,
+                'source_lineage_version' => $sourceMessage ? AiCommonMessage::SOURCE_LINEAGE_V1 : null,
                 'published_summary' => trim((string) ($input['published_summary'] ?? '')) ?: null,
             ]);
+            $proposal->sourceRevisions()->sync($sourceRevisionIds);
 
-            return $proposal->fresh('items');
+            return $proposal->fresh(['items', 'sourceRevisions', 'commonHandoff']);
         }, 3);
     }
 
@@ -110,21 +126,25 @@ class AiCommonProposalFactory
             AiCommonProposalContract::CAPTURE_CREATE => ['capture', null, null, null, null],
             AiCommonProposalContract::ACTION_CREATE => (function () use ($organization, $publicId): array {
                 $project = Project::query()->where('organization_id', $organization->id)->where('public_id', $publicId)->firstOrFail();
+
                 return ['project', $project->public_id, $project->plan_version, $project->plan_version, null];
             })(),
             AiCommonProposalContract::ACTION_UPDATE => (function () use ($organization, $publicId): array {
                 $action = Task::query()->where('organization_id', $organization->id)->where('public_id', $publicId)->firstOrFail();
+
                 return ['action', $action->public_id, $action->project->plan_version, $action->plan_version,
                     $action->only(['title', 'description', 'done_condition', 'due_date'])];
             })(),
             AiCommonProposalContract::PROJECT_UPDATE => (function () use ($organization, $publicId): array {
                 $project = Project::query()->where('organization_id', $organization->id)->where('public_id', $publicId)->firstOrFail();
+
                 return ['project', $project->public_id, $project->plan_version, $project->plan_version,
                     $project->only(['purpose', 'expected_outcome'])];
             })(),
             AiCommonProposalContract::DOMAIN_UPDATE => (function () use ($organization, $publicId): array {
                 $domain = BusinessDomain::query()->where('organization_id', $organization->id)->where('public_id', $publicId)
                     ->where('status', BusinessDomain::STATUS_ACTIVE)->firstOrFail();
+
                 return ['business_domain', $domain->public_id, $domain->version, $domain->version,
                     $domain->only(AiCommonProposalContract::FIELD_MAP[AiCommonProposalContract::DOMAIN_UPDATE])];
             })(),

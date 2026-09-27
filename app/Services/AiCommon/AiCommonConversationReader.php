@@ -6,11 +6,13 @@ use App\Models\AiCommonConversation;
 use App\Models\AiCommonMessage;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Throwable;
 
 class AiCommonConversationReader
 {
     public const MAX_HISTORY_MESSAGES = 10;
+
     public const MAX_HISTORY_CHARS = 12000;
 
     public function __construct(
@@ -22,14 +24,34 @@ class AiCommonConversationReader
     {
         $this->access->authorizeConversation($actor, $organization, $conversation);
         $result = [];
-        foreach ($conversation->messages()->with('sources.conversation')->get() as $message) {
-            if ($message->role === AiCommonMessage::ROLE_ASSISTANT && ! $this->sourcesAreCurrent($actor, $organization, $message)) {
+        $legacyLineageUnknown = false;
+        $messages = $conversation->messages()
+            ->with(['sources.conversation', 'sourceRevisions.conversation'])
+            ->get();
+        foreach ($messages as $message) {
+            if ($message->role !== AiCommonMessage::ROLE_ASSISTANT) {
+                $result[] = ['message' => $message, 'visible' => true, 'sources' => []];
+
+                continue;
+            }
+            if ($message->source_lineage_version !== AiCommonMessage::SOURCE_LINEAGE_V1) {
+                if ($message->sources->isNotEmpty()) {
+                    $legacyLineageUnknown = true;
+                }
+                if ($legacyLineageUnknown) {
+                    $result[] = ['message' => $message, 'visible' => false, 'sources' => []];
+
+                    continue;
+                }
+            }
+            if (! $this->revisionsAreCurrent($actor, $organization, $message)) {
                 $result[] = ['message' => $message, 'visible' => false, 'sources' => []];
+
                 continue;
             }
             $sources = [];
-            foreach ($message->sources as $source) {
-                $sources[] = $this->manifest->authorize($actor, $organization, $source);
+            foreach ($message->sourceRevisions as $revision) {
+                $sources[] = $this->manifest->authorizeRevision($actor, $organization, $revision);
             }
             $result[] = ['message' => $message, 'visible' => true, 'sources' => $sources];
         }
@@ -39,27 +61,41 @@ class AiCommonConversationReader
 
     public function providerHistory(User $actor, Organization $organization, AiCommonConversation $conversation): array
     {
-        $messages = collect($this->visible($actor, $organization, $conversation))
-            ->where('visible', true)->pluck('message')->take(-self::MAX_HISTORY_MESSAGES);
-        $result = [];
+        return $this->providerContext($actor, $organization, $conversation)['messages'];
+    }
+
+    public function providerContext(User $actor, Organization $organization, AiCommonConversation $conversation): array
+    {
+        $rows = collect($this->visible($actor, $organization, $conversation))
+            ->where('visible', true)->take(-self::MAX_HISTORY_MESSAGES);
+        $messages = [];
+        $revisions = new EloquentCollection;
         $chars = 0;
-        foreach ($messages as $message) {
+        foreach ($rows as $row) {
+            $message = $row['message'];
             $chars += mb_strlen($message->content);
             if ($chars > self::MAX_HISTORY_CHARS) {
                 break;
             }
-            $result[] = ['role' => $message->role, 'content' => $message->content];
+            $messages[] = ['role' => $message->role, 'content' => $message->content];
+            if ($message->role === AiCommonMessage::ROLE_ASSISTANT
+                && $message->source_lineage_version === AiCommonMessage::SOURCE_LINEAGE_V1) {
+                foreach ($message->sourceRevisions as $revision) {
+                    $revisions->push($revision);
+                }
+            }
         }
 
-        return $result;
+        return ['messages' => $messages, 'revisions' => $revisions->unique('id')->values()];
     }
 
-    private function sourcesAreCurrent(User $actor, Organization $organization, AiCommonMessage $message): bool
+    private function revisionsAreCurrent(User $actor, Organization $organization, AiCommonMessage $message): bool
     {
         try {
-            foreach ($message->sources as $source) {
-                $this->manifest->authorize($actor, $organization, $source);
+            foreach ($message->sourceRevisions as $revision) {
+                $this->manifest->authorizeRevision($actor, $organization, $revision);
             }
+
             return true;
         } catch (Throwable) {
             return false;

@@ -3,18 +3,16 @@
 namespace Tests\Feature;
 
 use App\Contracts\AiCommonProvider;
+use App\Contracts\AiProviderTransport;
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonMessage;
 use App\Models\AiResourcePolicy;
 use App\Models\AiUsageLedger;
-use App\Models\BusinessDomain;
 use App\Models\Capture;
-use App\Models\CompanyNotification;
 use App\Models\Organization;
 use App\Models\OrganizationAiPolicy;
 use App\Models\OrganizationUser;
 use App\Models\ProductAccountEligibility;
-use App\Models\ProjectExecutionEvent;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -27,10 +25,13 @@ use App\Services\AiCommon\AiCommonProposalContract;
 use App\Services\AiCommon\AiCommonProposalFactory;
 use App\Services\AiCommon\AiCommonSourceManifest;
 use App\Services\AiCommon\AiCommonUnitAdapter;
+use App\Services\AiCommon\OpenAiProviderTransport;
 use App\Services\AiProposalApplier;
 use App\Services\AiProposalApprover;
+use App\Services\AiProposalContract;
 use App\Services\AiProposalUndoService;
 use App\Services\BusinessDomain\BusinessDomainWriter;
+use App\Services\ProjectExecution\ProjectExecutionProposalContract;
 use App\Services\ProjectExecution\ProjectExecutionWriter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -443,8 +444,8 @@ class ScopeElevenAiCommonEntryTest extends TestCase
 
     public function test_existing_project_contract_and_s9_exact_payload_remain_unchanged(): void
     {
-        $this->assertSame('project-plan.v1', \App\Services\AiProposalContract::VERSION);
-        $this->assertSame('project-action.v1', \App\Services\ProjectExecution\ProjectExecutionProposalContract::VERSION);
+        $this->assertSame('project-plan.v1', AiProposalContract::VERSION);
+        $this->assertSame('project-action.v1', ProjectExecutionProposalContract::VERSION);
         $provider = file_get_contents(app_path('Services/ActionExecution/OpenAiActionDraftProvider.php'));
         foreach (['target', 'action_title', 'done_condition', 'instruction'] as $field) {
             $this->assertStringContainsString("'{$field}'", $provider);
@@ -455,9 +456,226 @@ class ScopeElevenAiCommonEntryTest extends TestCase
             $this->assertStringContainsString('AiProviderTransport', file_get_contents(app_path('Services/'.$path)));
         }
         $this->assertInstanceOf(
-            \App\Services\AiCommon\OpenAiProviderTransport::class,
-            app(\App\Contracts\AiProviderTransport::class),
+            OpenAiProviderTransport::class,
+            app(AiProviderTransport::class),
         );
+    }
+
+    public function test_f01_transitive_source_lineage_is_inherited_and_revoked_fail_closed(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $this->resourceOn($organization, $owner, 'project', $project->public_id);
+        $source = app(AiCommonSourceManifest::class)->select(
+            $owner,
+            $organization,
+            $conversation,
+            'project',
+            $project->public_id,
+            'F01 direct source',
+        );
+        $session = $this->productOrganizationSession($owner, $organization)
+            + ['access_mode' => 'workspace', 'credential_generation' => 1];
+
+        $this->actingAs($owner)->withSession($session)->post(route('ai-common.messages.store', $conversation), [
+            'content' => 'Create R1 from Source A',
+            'source_ids' => [$source->id],
+        ])->assertRedirect();
+        $r1 = $conversation->messages()->where('role', AiCommonMessage::ROLE_ASSISTANT)->latest('id')->firstOrFail();
+
+        $this->post(route('ai-common.messages.store', $conversation), [
+            'content' => 'Create R2 from prior answer only',
+            'source_ids' => [],
+        ])->assertRedirect();
+        $r2 = $conversation->messages()->where('role', AiCommonMessage::ROLE_ASSISTANT)->latest('id')->firstOrFail();
+
+        $this->assertSame(AiCommonMessage::SOURCE_LINEAGE_V1, $r1->source_lineage_version);
+        $this->assertSame(
+            $r1->sourceRevisions()->pluck('ai_common_source_revisions.id')->all(),
+            $r2->sourceRevisions()->pluck('ai_common_source_revisions.id')->all(),
+        );
+        $this->assertCount(1, $r2->sourceRevisions);
+
+        $proposal = $this->proposal($owner, $organization, $conversation, [
+            'operation' => AiCommonProposalContract::PROJECT_UPDATE,
+            'target_public_id' => $project->public_id,
+            'source_message_public_id' => $r2->public_id,
+            'attributes' => [
+                'purpose' => 'Lineage guarded purpose',
+                'expected_outcome' => 'F01 source-derived proposal',
+            ],
+        ]);
+        $this->assertSame(
+            $r2->sourceRevisions()->pluck('ai_common_source_revisions.id')->all(),
+            $proposal->sourceRevisions()->pluck('ai_common_source_revisions.id')->all(),
+        );
+
+        $project->members()->where('user_id', $owner->id)->update(['status' => 'left']);
+        $rows = app(AiCommonConversationReader::class)->visible($owner, $organization, $conversation);
+        $assistantRows = collect($rows)->filter(fn (array $row): bool => $row['message']->role === AiCommonMessage::ROLE_ASSISTANT);
+        $this->assertSame([false, false], $assistantRows->pluck('visible')->values()->all());
+        $this->assertCount(
+            0,
+            collect(app(AiCommonConversationReader::class)->providerHistory($owner, $organization, $conversation))
+                ->where('role', AiCommonMessage::ROLE_ASSISTANT),
+        );
+        $this->actingAs($owner)->withSession($session)->get(route('ai-common.show', $conversation))
+            ->assertOk()
+            ->assertDontSee('Synthetic proposal');
+
+        try {
+            app(AiProposalApprover::class)->approve($proposal->fresh(), $owner);
+            $this->fail('A source-derived proposal remained usable after transitive source loss.');
+        } catch (AuthorizationException|ValidationException) {
+            $this->assertDatabaseHas('ai_proposals', ['id' => $proposal->id, 'status' => 'pending']);
+        }
+    }
+
+    public function test_f02_reselect_creates_an_immutable_revision_without_rebinding_prior_answer(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $this->resourceOn($organization, $owner, 'project', $project->public_id);
+        $manifest = app(AiCommonSourceManifest::class);
+        $source = $manifest->select($owner, $organization, $conversation, 'project', $project->public_id, 'F02 revision one');
+        $revisionOne = $source->currentRevision;
+        $session = $this->productOrganizationSession($owner, $organization)
+            + ['access_mode' => 'workspace', 'credential_generation' => 1];
+
+        $this->actingAs($owner)->withSession($session)->post(route('ai-common.messages.store', $conversation), [
+            'content' => 'Create R1 from revision one',
+            'source_ids' => [$source->id],
+        ])->assertRedirect();
+        $r1 = $conversation->messages()->where('role', AiCommonMessage::ROLE_ASSISTANT)->latest('id')->firstOrFail();
+
+        $project = app(ProjectExecutionWriter::class)->updateProject(
+            $owner,
+            $project->fresh(),
+            ['purpose' => 'Synthetic revision two'],
+            $project->fresh()->plan_version,
+        );
+        $reselected = $manifest->select($owner, $organization, $conversation, 'project', $project->public_id, 'F02 revision two');
+        $revisionTwo = $reselected->currentRevision;
+
+        $this->assertSame($source->id, $reselected->id);
+        $this->assertNotSame($revisionOne->id, $revisionTwo->id);
+        $this->assertNotSame($revisionOne->opaque_handle, $revisionTwo->opaque_handle);
+        $this->assertNotSame($revisionOne->access_fingerprint, $revisionTwo->access_fingerprint);
+        $this->assertDatabaseCount('ai_common_source_revisions', 2);
+        $this->assertSame(
+            [$revisionOne->id],
+            $r1->sourceRevisions()->pluck('ai_common_source_revisions.id')->all(),
+        );
+        $this->assertSame('Synthetic', $revisionOne->projection['purpose']);
+        $this->assertSame('Synthetic revision two', $revisionTwo->projection['purpose']);
+        try {
+            $revisionOne->update(['selection_reason' => 'Mutation must fail']);
+            $this->fail('An immutable source revision was updated.');
+        } catch (\LogicException) {
+            $this->assertSame('F02 revision one', $revisionOne->fresh()->selection_reason);
+        }
+        $this->assertFalse(
+            collect(app(AiCommonConversationReader::class)->visible($owner, $organization, $conversation))
+                ->firstWhere(fn (array $row): bool => $row['message']->id === $r1->id)['visible'],
+        );
+    }
+
+    public function test_f03_retry_reauthorizes_immediately_before_each_provider_attempt(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $this->resourceOn($organization, $owner, 'project', $project->public_id);
+        $source = app(AiCommonSourceManifest::class)->select(
+            $owner,
+            $organization,
+            $conversation,
+            'project',
+            $project->public_id,
+            'F03 policy retry',
+        );
+        $this->provider->failuresRemaining = 1;
+        $this->provider->onRespond = function (int $call) use ($organization, $project): void {
+            if ($call === 1) {
+                AiResourcePolicy::query()
+                    ->where('organization_id', $organization->id)
+                    ->where('resource_type', 'project')
+                    ->where('resource_public_id', $project->public_id)
+                    ->update(['allows_ai_reference' => false, 'version' => 2]);
+            }
+        };
+        $session = $this->productOrganizationSession($owner, $organization)
+            + ['access_mode' => 'workspace', 'credential_generation' => 1];
+
+        $this->actingAs($owner)->withSession($session)->post(route('ai-common.messages.store', $conversation), [
+            'content' => 'Retry must reauthorize',
+            'source_ids' => [$source->id],
+        ])->assertRedirect()->assertSessionHas('error');
+
+        $this->assertCount(1, $this->provider->calls);
+        $this->assertDatabaseCount('ai_usage_ledgers', 1);
+        $this->assertDatabaseHas('ai_usage_ledgers', ['attempt' => 1, 'result' => 'failed']);
+        $this->assertDatabaseMissing('ai_common_messages', ['role' => AiCommonMessage::ROLE_ASSISTANT]);
+    }
+
+    public function test_f04_provider_response_is_not_published_after_membership_loss_during_io(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $this->resourceOn($organization, $owner, 'project', $project->public_id);
+        $source = app(AiCommonSourceManifest::class)->select(
+            $owner,
+            $organization,
+            $conversation,
+            'project',
+            $project->public_id,
+            'F04 membership loss',
+        );
+        $this->provider->onRespond = function (int $call) use ($organization, $owner): void {
+            if ($call === 1) {
+                OrganizationUser::query()
+                    ->where('organization_id', $organization->id)
+                    ->where('user_id', $owner->id)
+                    ->update(['membership_status' => 'left', 'access_epoch' => 2]);
+            }
+        };
+        $session = $this->productOrganizationSession($owner, $organization)
+            + ['access_mode' => 'workspace', 'credential_generation' => 1];
+
+        $this->actingAs($owner)->withSession($session)->post(route('ai-common.messages.store', $conversation), [
+            'content' => 'Response must be discarded',
+            'source_ids' => [$source->id],
+        ])->assertRedirect()->assertSessionHas('error');
+
+        $this->assertCount(1, $this->provider->calls);
+        $this->assertDatabaseHas('ai_usage_ledgers', ['attempt' => 1, 'result' => 'success']);
+        $this->assertDatabaseMissing('ai_common_messages', ['role' => AiCommonMessage::ROLE_ASSISTANT]);
+    }
+
+    public function test_f05_reselect_during_provider_io_cannot_rebind_the_inflight_response(): void
+    {
+        [$owner, , , $organization, , $project] = $this->tenant(true);
+        $conversation = $this->conversation($owner, $organization);
+        $this->resourceOn($organization, $owner, 'project', $project->public_id);
+        $manifest = app(AiCommonSourceManifest::class);
+        $source = $manifest->select($owner, $organization, $conversation, 'project', $project->public_id, 'F05 initial revision');
+        $initialRevisionId = $source->current_revision_id;
+        $this->provider->onRespond = function (int $call) use ($manifest, $owner, $organization, $conversation, $project): void {
+            if ($call === 1) {
+                $manifest->select($owner, $organization, $conversation, 'project', $project->public_id, 'F05 concurrent reselect');
+            }
+        };
+        $session = $this->productOrganizationSession($owner, $organization)
+            + ['access_mode' => 'workspace', 'credential_generation' => 1];
+
+        $this->actingAs($owner)->withSession($session)->post(route('ai-common.messages.store', $conversation), [
+            'content' => 'Inflight revision must remain exact',
+            'source_ids' => [$source->id],
+        ])->assertRedirect()->assertSessionHas('error');
+
+        $this->assertCount(1, $this->provider->calls);
+        $this->assertNotSame($initialRevisionId, $source->fresh()->current_revision_id);
+        $this->assertDatabaseCount('ai_common_source_revisions', 2);
+        $this->assertDatabaseMissing('ai_common_messages', ['role' => AiCommonMessage::ROLE_ASSISTANT]);
     }
 
     private function proposal(User $actor, Organization $organization, AiCommonConversation $conversation, array $input)
@@ -539,12 +757,19 @@ class Scope11FailAfterWriterUnitAdapter extends AiCommonUnitAdapter
 class Scope11FakeProvider implements AiCommonProvider
 {
     public array $calls = [];
+
     public array $citations = [];
+
     public int $failuresRemaining = 0;
+
+    public $onRespond = null;
 
     public function respond(array $messages, array $sources): array
     {
         $this->calls[] = compact('messages', 'sources');
+        if ($this->onRespond !== null) {
+            ($this->onRespond)(count($this->calls));
+        }
         if ($this->failuresRemaining > 0) {
             $this->failuresRemaining--;
             throw new RuntimeException('provider_unavailable');

@@ -84,6 +84,16 @@ class AiProposal extends Model
         return $this->hasOne(AiCommonHandoffRelation::class);
     }
 
+    public function sourceRevisions()
+    {
+        return $this->belongsToMany(
+            AiCommonSourceRevision::class,
+            'ai_common_proposal_source_revisions',
+            'ai_proposal_id',
+            'ai_common_source_revision_id',
+        )->withTimestamps();
+    }
+
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
