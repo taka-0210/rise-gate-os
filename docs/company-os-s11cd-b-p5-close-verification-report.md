@@ -1,4 +1,4 @@
-# Company OS｜S11 Companion Delta B｜B-P5 Close Verification Report
+# Company OS｜S11 Companion Delta B｜Shared AI Conversation Formal Close Report
 
 - 対象：S11 Companion Delta B｜Shared AI Conversation
 - Phase：B-P5｜Close Verification
@@ -6,25 +6,27 @@
 - Base：`2437c98d5e83f1f259813caced7e4ae11a2eca3e`（B-P4 Evidence）
 - Branch：`s11cd-b-shared-ai-conversation-p5`
 - Corrective Implementation Commit：`58bbabfa9e93df1950f47fcade68cf748bd45816`
-- 判定：**B-P5 DONE候補 / Delta B Formal Close候補 / 人＋ChatGPT Final Review待ち**
+- P5 Final Evidence Commit：`2b0ab337303b421efd9927a028726472deb4cc97`
+- Formal Close日時：**2026-09-28 08:38 JST**
+- Formal Close Status：**S11 Companion Delta B｜Shared AI Conversation：FORMAL CLOSED**
 
 ## 1｜結論
 
-P1〜P4で成立したShared AI Conversation Contractを基準に、P5統合Verification、Voice / foreground stateの限定Corrective、Desktop Browser、iPhone Safari / PWA、隔離DB、long-session、concurrency、回帰を確認した。
+P1〜P4で成立したShared AI Conversation Contractを基準に、P5統合Verification、Voice / foreground stateの限定Corrective、Desktop Browser、iPhone Safari / PWA、隔離DB、long-session、concurrency、回帰を確認した。P5 Close Verification Reportと最終Git状態に対する人＋ChatGPT Final Reviewにより、Formal Closeを正式承認した。
 
 - B-P1〜P4：**DONE**（人＋ChatGPT承認済み）
-- B-P5：**DONE候補**
+- B-P5：**DONE**
 - B-G01：**OPEN / 通過済み維持**
-- B-C01〜C13：**Resolved候補**
-- B-DC01〜40：**DONE候補**
+- B-C01〜C13：**Resolved**
+- B-DC01〜40：**DONE**
 - Conditional / Not Done：**0 / 0**
 - Product Pending / Product Blocker：**0 / 0**
 - Compatibility Blocker：**0**
 - Formal Close Blocker：**0**
 - Product Decision追加：**不要**
-- S11 Companion Delta B：**Code / Verification Complete、Formal Close候補**
+- S11 Companion Delta B：**FORMAL CLOSED**
 
-Codex判断ではFormal Closeしていない。人＋ChatGPT Final Review待ちで停止する。
+Scope DevelopmentとRelease Verificationを分離し、Release Openを未確認のまま維持してFormal Closeする。
 
 ## 2｜P1〜P5最終状態
 
@@ -34,7 +36,7 @@ Codex判断ではFormal Closeしていない。人＋ChatGPT Final Review待ち�
 | B-P2 | DONE | Shared Context intersection、explicit CO Request、Proposal / Notification、current authorization |
 | B-P3 | DONE | Session / Consent、bounded Voice / ASR、Transcript / Speaker / Identity、generation fencing |
 | B-P4 | DONE | Chunk / Checkpoint / Rolling、bounded retrieval、Presence / Atmosphere、One Shared CO |
-| B-P5 | **DONE候補** | 統合、長時間synthetic、concurrency、DB、Browser / device、failure / cleanup、DC01〜40 |
+| B-P5 | **DONE** | 統合、長時間synthetic、concurrency、DB、Browser / device、failure / cleanup、DC01〜40 |
 
 P5は新規Product Capabilityを追加していない。P5中のCode変更は、実機で再現したforeground UI state不整合を直す限定Correctiveのみである。
 
@@ -170,21 +172,21 @@ Corrective後Full Suite：
 
 ## 8｜Compatibility B-C01〜C13
 
-| Compatibility | P5 disposition |
+| Compatibility | Formal Close disposition |
 |---|---|
 | B-C01 Delta A Final Contract | **Resolved**。Delta A Formal Closed維持 |
-| B-C02 Private principal / Shared schema | **Resolved候補**。Private変換・author推測backfill 0 |
-| B-C03 Source lineage | **Resolved候補**。immutable / transitive / currentauth維持 |
-| B-C04 Proposal | **Resolved候補**。既存Engine / Approval / Unit Writerのみ |
-| B-C05 Notification | **Resolved候補**。3種限定、currentauth / dedupe / cancellation |
-| B-C06 Audio / Browser | **Resolved候補**。Edge / Chrome / iPhone Safari / PWA、foreground Corrective PASS |
-| B-C07 Consent | **Resolved候補**。4用途Evidence分離、途中参加 / revoke再認可 |
-| B-C08 Schema / operation | **Resolved候補**。additive / CAS / generation / idempotency |
-| B-C09 Long Context | **Resolved候補**。bounded checkpoint / retrieval / budget |
-| B-C10 Gateway / Usage | **Resolved候補**。ASR / maintenance / CO purpose分離 |
-| B-C11 Diarization | **Resolved候補**。bounded anonymous labels、Unknown縮退、Identity Revision |
-| B-C12 Shared-room / Multi-device View | **Resolved候補**。One Shared CO、authoritative snapshot、1 active stream |
-| B-C13 CO Presence / Atmosphere | **Resolved候補**。truthful projection、foreground同期 |
+| B-C02 Private principal / Shared schema | **Resolved**。Private変換・author推測backfill 0 |
+| B-C03 Source lineage | **Resolved**。immutable / transitive / currentauth維持 |
+| B-C04 Proposal | **Resolved**。既存Engine / Approval / Unit Writerのみ |
+| B-C05 Notification | **Resolved**。3種限定、currentauth / dedupe / cancellation |
+| B-C06 Audio / Browser | **Resolved**。Edge / Chrome / iPhone Safari / PWA、foreground Corrective PASS |
+| B-C07 Consent | **Resolved**。4用途Evidence分離、途中参加 / revoke再認可 |
+| B-C08 Schema / operation | **Resolved**。additive / CAS / generation / idempotency |
+| B-C09 Long Context | **Resolved**。bounded checkpoint / retrieval / budget |
+| B-C10 Gateway / Usage | **Resolved**。ASR / maintenance / CO purpose分離 |
+| B-C11 Diarization | **Resolved**。bounded anonymous labels、Unknown縮退、Identity Revision |
+| B-C12 Shared-room / Multi-device View | **Resolved**。One Shared CO、authoritative snapshot、1 active stream |
+| B-C13 CO Presence / Atmosphere | **Resolved**。truthful projection、foreground同期 |
 
 Compatibility Blocker：**0**。
 
@@ -192,53 +194,53 @@ Compatibility Blocker：**0**。
 
 | DC | 判定 | Close Evidence |
 |---|---|---|
-| DC01 Shared / Owner / Participant | DONE候補 | P1 principal / participant / owner |
-| DC02 途中参加History / Attachment | DONE候補 | consent / history currentauth |
-| DC03 退出 / Owner / 復帰 | DONE候補 | epoch / freeze / safe stop |
-| DC04 Human / AI actor / 明示相談 | DONE候補 | author分離 / explicit CO request |
-| DC05 Shared intersection | DONE候補 | participant read intersection再評価 |
-| DC06 Source freshness / lineage | DONE候補 | immutable DAG / currentauth |
-| DC07 A共通Attachment | DONE候補 | Delta A Writer / Access回帰 |
-| DC08 Shared Proposal / actor | DONE候補 | existing Proposal Engine / actor write |
-| DC09 Target結果Privacy | DONE候補 | target read / source再認可 |
-| DC10 Approval / Apply / Undo | DONE候補 | stale / Atomic / idempotency / Undo |
-| DC11 通知3種 | DONE候補 | Invite / Mention / Approval限定 |
-| DC12 通知取消 / 失権 / 時刻 | DONE候補 | currentauth / dedupe / cancellation |
-| DC13 Archive / Permission | DONE候補 | safe stop / cleanup only convergence |
-| DC14 Audit / Usage / Degraded | DONE候補 | sanitized Audit / 3 purpose Ledger |
-| DC15 DB / performance / concurrency | DONE候補 | SQLite / MariaDB / 2-process convergence |
-| DC16 Browser / 390px / regression | DONE候補 | Edge / Chrome 390 / iPhone / full regression |
-| DC17 Scope12 provenance | DONE候補 | relationのみ、Scope12 Writer 0 |
-| DC18 Formal Close / Release分離 | DONE候補 | known baseline / Release Open分離 |
-| DC19 A短Voice / Audio Shared接続 | DONE候補 | caller Contract分離、Delta A回帰 |
-| DC20 Purpose / Version | DONE候補 | immutable Purpose Revision / Session snapshot |
-| DC21 bounded Session | DONE候補 | Pause / Resume / interruption / End / limits |
-| DC22 分離Consent / 統合UX | DONE候補 | 4用途別Evidence / 一画面確定 |
-| DC23 rolling ASR / gap | DONE候補 | independent windows / sequence / fencing |
-| DC24 Speaker / Person分離 | DONE候補 | anonymous label / confirmed Person分離 |
-| DC25 Transcript / Identity履歴 | DONE候補 | immutable Revision chain |
-| DC26 Chunk / Rolling / checkpoint | DONE候補 | incremental CAS / provenance |
-| DC27 bounded Context / retrieval | DONE候補 | 60 / 120 / 180、bounded lexical retrieval |
-| DC28 派生Data全段再認可 | DONE候補 | dependency DAG / audience fingerprint |
-| DC29 3 Usage / cost | DONE候補 | ASR / maintenance / CO、unknown cost NULL |
-| DC30 明示CO request | DONE候補 | fixed cutoff / single shared result |
-| DC31 Temporary retention | DONE候補 | raw cleanup / durable Transcript分離。正式年限はRP01 |
-| DC32 Failure / race | DONE候補 | generation / receipt / late-event fencing |
-| DC33 実会話端末Evidence | DONE候補 | Edge / Chrome / iPhone Safari / PWA。Delta A playback再利用 |
-| DC34 Session-end整理 / Action | DONE候補 | explicit operation / existing L2 Writer |
-| DC35 bounded anonymous Diarization | DONE候補 | multi-speaker fake Adapter / Unknown / provenance |
-| DC36 CO Presence truthful | DONE候補 | queued / processing / answer-ready分離 |
-| DC37 Conversation Atmosphere | DONE候補 | audio / ASR / Provider state分離、Text代替 |
-| DC38 Shared-room / future Distributed Architecture | DONE候補 | future additive boundary / multi-mic先行実装0 |
-| DC39 One Shared CO / Multi-device View | DONE候補 | authoritative snapshot / sequence / cursor / Provider重複0 |
-| DC40 unsupported multi-mic server guarantee | DONE候補 | mode allowlist / second stream / old generation拒否 |
+| DC01 Shared / Owner / Participant | DONE | P1 principal / participant / owner |
+| DC02 途中参加History / Attachment | DONE | consent / history currentauth |
+| DC03 退出 / Owner / 復帰 | DONE | epoch / freeze / safe stop |
+| DC04 Human / AI actor / 明示相談 | DONE | author分離 / explicit CO request |
+| DC05 Shared intersection | DONE | participant read intersection再評価 |
+| DC06 Source freshness / lineage | DONE | immutable DAG / currentauth |
+| DC07 A共通Attachment | DONE | Delta A Writer / Access回帰 |
+| DC08 Shared Proposal / actor | DONE | existing Proposal Engine / actor write |
+| DC09 Target結果Privacy | DONE | target read / source再認可 |
+| DC10 Approval / Apply / Undo | DONE | stale / Atomic / idempotency / Undo |
+| DC11 通知3種 | DONE | Invite / Mention / Approval限定 |
+| DC12 通知取消 / 失権 / 時刻 | DONE | currentauth / dedupe / cancellation |
+| DC13 Archive / Permission | DONE | safe stop / cleanup only convergence |
+| DC14 Audit / Usage / Degraded | DONE | sanitized Audit / 3 purpose Ledger |
+| DC15 DB / performance / concurrency | DONE | SQLite / MariaDB / 2-process convergence |
+| DC16 Browser / 390px / regression | DONE | Edge / Chrome 390 / iPhone / full regression |
+| DC17 Scope12 provenance | DONE | relationのみ、Scope12 Writer 0 |
+| DC18 Formal Close / Release分離 | DONE | known baseline / Release Open分離 |
+| DC19 A短Voice / Audio Shared接続 | DONE | caller Contract分離、Delta A回帰 |
+| DC20 Purpose / Version | DONE | immutable Purpose Revision / Session snapshot |
+| DC21 bounded Session | DONE | Pause / Resume / interruption / End / limits |
+| DC22 分離Consent / 統合UX | DONE | 4用途別Evidence / 一画面確定 |
+| DC23 rolling ASR / gap | DONE | independent windows / sequence / fencing |
+| DC24 Speaker / Person分離 | DONE | anonymous label / confirmed Person分離 |
+| DC25 Transcript / Identity履歴 | DONE | immutable Revision chain |
+| DC26 Chunk / Rolling / checkpoint | DONE | incremental CAS / provenance |
+| DC27 bounded Context / retrieval | DONE | 60 / 120 / 180、bounded lexical retrieval |
+| DC28 派生Data全段再認可 | DONE | dependency DAG / audience fingerprint |
+| DC29 3 Usage / cost | DONE | ASR / maintenance / CO、unknown cost NULL |
+| DC30 明示CO request | DONE | fixed cutoff / single shared result |
+| DC31 Temporary retention | DONE | raw cleanup / durable Transcript分離。正式年限はRP01 |
+| DC32 Failure / race | DONE | generation / receipt / late-event fencing |
+| DC33 実会話端末Evidence | DONE | Edge / Chrome / iPhone Safari / PWA。Delta A playback再利用 |
+| DC34 Session-end整理 / Action | DONE | explicit operation / existing L2 Writer |
+| DC35 bounded anonymous Diarization | DONE | multi-speaker fake Adapter / Unknown / provenance |
+| DC36 CO Presence truthful | DONE | queued / processing / answer-ready分離 |
+| DC37 Conversation Atmosphere | DONE | audio / ASR / Provider state分離、Text代替 |
+| DC38 Shared-room / future Distributed Architecture | DONE | future additive boundary / multi-mic先行実装0 |
+| DC39 One Shared CO / Multi-device View | DONE | authoritative snapshot / sequence / cursor / Provider重複0 |
+| DC40 unsupported multi-mic server guarantee | DONE | mode allowlist / second stream / old generation拒否 |
 
-集計：DONE候補 **40**、Conditional **0**、Not Done **0**。
+集計：DONE **40**、Conditional **0**、Not Done **0**。
 
 ## 10｜Technical Pending
 
 - TP20：P0 Resolved維持
-- TP01〜19、TP21 / 22 / 24〜26：Scope Development Evidenceを取得し、**Resolved候補**
+- TP01〜19、TP21 / 22 / 24〜26：Scope Development Evidenceを取得し、**Resolved**
 - TP23 distributed multi-mic acoustics / clock：**OUT-LATER維持**。Ver.1 Close Blockerではない
 - TP04 / 12 / 16 / 17 / 19 / 21 / 26の実Provider・実host・正式運用sub-evidence：Release Pendingへ維持
 
@@ -253,6 +255,7 @@ Product Pending / Product Blocker：**0 / 0**。
 v003にはShared-room UIを日本語固定とする明示Contractはなく、state / permission / failureの安全性はText表示を含めPASSした。このため今回のFormal Close Blockerには戻さない。ただし次のProduct UX Follow-upとして明示管理する。
 
 - 日本語localization
+- 技術用語を利用者向け表現へ変換
 - 主要操作の段階表示とボタン数削減
 - 現在状態／次に押す操作の視覚的優先順位
 - `Start / Pause / Resume / End / Cancel`とConsentの説明改善
@@ -289,10 +292,12 @@ Master Update：**不要**（確定v153 / v048 Contract内）。
 
 - Branch：`s11cd-b-shared-ai-conversation-p5`
 - Corrective Implementation Commit：`58bbabfa9e93df1950f47fcade68cf748bd45816`
-- Final Report Commit：このReportのEvidence commit（commit後にGit履歴で固定）
-- origin：同branchへの公開はremote明示承認後に実施
-- tracked working tree：Report commit後Clean予定
+- P5 Final Evidence Commit：`2b0ab337303b421efd9927a028726472deb4cc97`
+- Formal Close Commit：本Formal Close Evidence更新commit（確定hashはGit履歴と完了報告で固定）
+- HEAD / origin：Formal Close CommitのPush後に一致確認する
+- Ahead / Behind：Formal Close CommitのPush後に`0 / 0`を確認する
+- tracked working tree：Formal Close Commit後Cleanを確認する
 
-最終判定：**S11 Companion Delta B｜Shared AI ConversationはFormal Close可能候補**。
+最終判定：**S11 Companion Delta B｜Shared AI Conversation：FORMAL CLOSED**。
 
-Codex自身ではFormal Closeしない。Delta B Formal Close、Scope 12、Production、Deploy、Release Readyへ進まず、人＋ChatGPT Final Review待ちで停止する。
+次工程候補は**S11 Companion Delta B｜Product UX Brush-up**。本Formal Close処理では実装しない。Management Design Core、Scope 12、Production、Deploy、Release Readyへ進まず、人＋ChatGPTの次工程指示待ちで停止する。
