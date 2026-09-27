@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonMessage;
+use App\Models\AiCommonSharedParticipant;
 use App\Models\AiCommonSource;
 use App\Models\AiCommonSourceRevision;
 use App\Models\AiProposal;
@@ -36,11 +37,27 @@ class AiCommonController extends Controller
 
         return view('ai-common.index', [
             'conversations' => AiCommonConversation::query()->where('organization_id', $organization->id)
-                ->where('user_id', $request->user()->id)->where('status', AiCommonConversation::STATUS_ACTIVE)
+                ->where('user_id', $request->user()->id)
+                ->where('conversation_kind', AiCommonConversation::KIND_PRIVATE)
+                ->where('status', AiCommonConversation::STATUS_ACTIVE)
                 ->latest('last_message_at')->latest('id')->get(),
             'archivedConversations' => AiCommonConversation::query()->where('organization_id', $organization->id)
-                ->where('user_id', $request->user()->id)->where('status', AiCommonConversation::STATUS_ARCHIVED)
+                ->where('user_id', $request->user()->id)
+                ->where('conversation_kind', AiCommonConversation::KIND_PRIVATE)
+                ->where('status', AiCommonConversation::STATUS_ARCHIVED)
                 ->latest('archived_at')->latest('id')->get(),
+            'sharedParticipants' => AiCommonSharedParticipant::query()
+                ->where('user_id', $request->user()->id)
+                ->where('status', AiCommonSharedParticipant::STATUS_ACTIVE)
+                ->whereHas('sharedConversation', fn ($query) => $query->where('organization_id', $organization->id))
+                ->with(['sharedConversation.conversation', 'sharedConversation.currentPurposeRevision'])
+                ->get(),
+            'sharedInvitations' => AiCommonSharedParticipant::query()
+                ->where('user_id', $request->user()->id)
+                ->where('status', AiCommonSharedParticipant::STATUS_INVITED)
+                ->whereHas('sharedConversation', fn ($query) => $query->where('organization_id', $organization->id))
+                ->with('sharedConversation.conversation')
+                ->get(),
             'policy' => $access->policy($organization),
             'canManageOrganization' => $membership->organization_role === 'owner',
         ]);
@@ -54,6 +71,7 @@ class AiCommonController extends Controller
         $conversation = AiCommonConversation::query()->create([
             'organization_id' => $organization->id,
             'user_id' => $request->user()->id,
+            'conversation_kind' => AiCommonConversation::KIND_PRIVATE,
             'title' => trim($validated['title']),
             'status' => AiCommonConversation::STATUS_ACTIVE,
             'version' => 1,

@@ -36,7 +36,9 @@ class AiCommonAccess
     public function authorizeConversation(User $user, Organization $organization, AiCommonConversation $conversation, bool $requireActive = false): void
     {
         $this->authorizeOrganization($user, $organization);
-        if ($conversation->organization_id !== $organization->id || $conversation->user_id !== $user->id) {
+        if ($conversation->conversation_kind !== AiCommonConversation::KIND_PRIVATE
+            || $conversation->organization_id !== $organization->id
+            || $conversation->user_id !== $user->id) {
             throw new AuthorizationException;
         }
         if ($requireActive && $conversation->status !== AiCommonConversation::STATUS_ACTIVE) {

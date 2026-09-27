@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class AiCommonMessage extends Model
@@ -58,5 +59,10 @@ class AiCommonMessage extends Model
             'ai_common_message_id',
             'ai_common_attachment_id',
         )->withPivot('attachment_version')->withTimestamps();
+    }
+
+    public function sharedAuthor(): HasOne
+    {
+        return $this->hasOne(AiCommonSharedMessageAuthor::class);
     }
 }

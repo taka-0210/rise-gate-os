@@ -6,6 +6,7 @@ use App\Models\AiCommonAttachment;
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonInputOperation;
 use App\Models\AiCommonMessage;
+use App\Models\AiCommonSharedMessageAuthor;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -17,6 +18,7 @@ class AiCommonHumanMessageWriter
 {
     public function __construct(
         private readonly AiCommonAccess $common,
+        private readonly AiCommonSharedAccess $sharedAccess,
         private readonly AiCommonAttachmentAccess $attachments,
     ) {}
 
@@ -25,6 +27,25 @@ class AiCommonHumanMessageWriter
         Organization $organization,
         AiCommonConversation $conversation,
         array $input,
+    ): AiCommonMessage {
+        return $this->write($actor, $organization, $conversation, $input, false);
+    }
+
+    public function postShared(
+        User $actor,
+        Organization $organization,
+        AiCommonConversation $conversation,
+        array $input,
+    ): AiCommonMessage {
+        return $this->write($actor, $organization, $conversation, $input, true);
+    }
+
+    private function write(
+        User $actor,
+        Organization $organization,
+        AiCommonConversation $conversation,
+        array $input,
+        bool $shared,
     ): AiCommonMessage {
         $operationId = (string) ($input['operation_id'] ?? '');
         if (! Str::isUuid($operationId)) {
@@ -39,12 +60,19 @@ class AiCommonHumanMessageWriter
         if ($attachmentIds->count() > 5) {
             throw ValidationException::withMessages(['attachments' => 'Attachmentは1回5件までです。']);
         }
+        if ($shared && $attachmentIds->isNotEmpty()) {
+            throw ValidationException::withMessages(['attachments' => 'Shared Attachment接続はP2以降で有効化します。']);
+        }
         $fingerprint = hash('sha256', json_encode([
             'content' => $content,
             'attachment_ids' => $attachmentIds->all(),
         ], JSON_THROW_ON_ERROR));
 
-        $this->common->authorizeConversation($actor, $organization, $conversation);
+        if ($shared) {
+            $this->sharedAccess->authorizeParticipant($actor, $organization, $conversation, true);
+        } else {
+            $this->common->authorizeConversation($actor, $organization, $conversation);
+        }
         if ($existing = $this->existing($conversation, $actor, $operationId, $fingerprint)) {
             return $existing;
         }
@@ -57,9 +85,15 @@ class AiCommonHumanMessageWriter
                 $content,
                 $attachmentIds,
                 $fingerprint,
+                $shared,
             ): AiCommonMessage {
                 $locked = AiCommonConversation::query()->lockForUpdate()->findOrFail($conversation->id);
-                $this->common->authorizeConversation($actor, $organization, $locked, true);
+                $sharedParticipant = $shared
+                    ? $this->sharedAccess->authorizeParticipant($actor, $organization, $locked, true, true)
+                    : null;
+                if (! $shared) {
+                    $this->common->authorizeConversation($actor, $organization, $locked, true);
+                }
                 if ($existing = $this->existing($locked, $actor, $operationId, $fingerprint)) {
                     return $existing;
                 }
@@ -75,6 +109,18 @@ class AiCommonHumanMessageWriter
                     'content' => $content,
                     'visibility_status' => AiCommonMessage::VISIBILITY_VISIBLE,
                 ]);
+                if ($sharedParticipant) {
+                    $membership = $this->common->authorizeOrganization($actor, $organization);
+                    AiCommonSharedMessageAuthor::query()->create([
+                        'ai_common_message_id' => $message->id,
+                        'ai_common_shared_conversation_id' => $sharedParticipant->ai_common_shared_conversation_id,
+                        'ai_common_shared_participant_id' => $sharedParticipant->id,
+                        'author_user_id' => $actor->id,
+                        'participant_audience_epoch' => $sharedParticipant->audience_epoch,
+                        'membership_access_epoch' => $membership->access_epoch,
+                        'credential_generation' => $actor->credential_generation,
+                    ]);
+                }
                 $message->attachments()->sync($selected->mapWithKeys(
                     fn (AiCommonAttachment $attachment): array => [$attachment->id => ['attachment_version' => $attachment->version]]
                 ));

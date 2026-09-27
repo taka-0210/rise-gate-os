@@ -5,16 +5,25 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class AiCommonConversation extends Model
 {
+    public const KIND_PRIVATE = 'private';
+
+    public const KIND_SHARED = 'shared';
+
+    protected $attributes = [
+        'conversation_kind' => self::KIND_PRIVATE,
+    ];
+
     public const STATUS_ACTIVE = 'active';
 
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
-        'public_id', 'organization_id', 'user_id', 'project_id', 'title',
+        'public_id', 'organization_id', 'user_id', 'project_id', 'conversation_kind', 'title',
         'status', 'version', 'last_message_at', 'archived_at',
     ];
 
@@ -71,5 +80,10 @@ class AiCommonConversation extends Model
     public function temporaryAudios(): HasMany
     {
         return $this->hasMany(AiCommonTemporaryAudio::class);
+    }
+
+    public function sharedConversation(): HasOne
+    {
+        return $this->hasOne(AiCommonSharedConversation::class);
     }
 }
