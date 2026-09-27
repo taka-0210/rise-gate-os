@@ -6,6 +6,7 @@
 - 対象：S11 Companion Delta A P5 Close Verification
 - 初回判定：**BLOCKED（Voice cancel late-event defectを実動再現。Corrective Delta required）**
 - Corrective継続後判定：**P5 Done候補 / Delta A Formal Close候補（Formal Close未実施）**
+- Human＋ChatGPT Final Review後判定：**S11 Companion Delta A｜Conversation Input / Attachment：FORMAL CLOSED**
 
 ## 1｜停止判断
 
@@ -288,7 +289,7 @@ Windows / 検証環境側：
 
 新規Corrective、Product Contract変更、Compatibility Blockerはない。
 
-## 15｜S11-CD-A-DC01〜24最終判定候補
+## 15｜S11-CD-A-DC01〜24最終判定
 
 | DC | 判定 | Evidence要約 |
 |---|---|---|
@@ -350,25 +351,26 @@ Scope DevelopmentのDoneへ読み替えず、Release Ready前のOpen Evidenceと
 
 この所見を自動的にPASSへ吸収せず、またCodex判断だけでFormal Close Blockerへ変更しない。
 
-## 18｜P5 / Formal Close最終候補
+## 18｜P5 / Formal Close最終状態
 
-- P1：Done維持
-- P2：Done維持
-- P3：Done維持
-- P4：Done維持
-- P5：**Done候補**
+- P1：**DONE**
+- P2：**DONE**
+- P3：**DONE**
+- P4：**DONE**
+- P5：**DONE**
 - A-G01：OPEN / 通過済み維持
 - C01〜C08：Resolved
 - CD-AB-C02：Resolved、F01〜F05全PASS維持
-- A-DC01〜24：Done候補
+- A-DC01〜24：**DONE**
 - Conditional / Not Done：0 / 0
-- Product Pending：0（本人UX observation 1件はFinal Reviewへ明示）
+- Product Decision Pending：0
+- Product UX Follow-up：1件（Conversation Input UIの段階表示・導線整理）
 - Technical Pending：0
 - Compatibility Blocker：0
 - Formal Close Blocker：0
 - Migration総数：102
-- S11 Companion Delta A：**Code Complete / Formal Close候補**
-- Formal Close：**未実施**
+- S11 Companion Delta A｜Conversation Input / Attachment：**FORMAL CLOSED**
+- Formal Close承認・実施日時：**2026-09-27 23:58 JST**
 - Delta B：未開始
 
 ## 19｜保護境界と停止地点
@@ -382,4 +384,50 @@ Scope DevelopmentのDoneへ読み替えず、Release Ready前のOpen Evidenceと
 - Delta B：未開始・非変更
 - 保護対象の未追跡Master 2点：変更・stage・commitなし
 
-Corrective実装・P5継続Verification・iPhone cleanupまで完了した。Codex自身ではDelta AをFormal Closeせず、人＋ChatGPTのDelta A Formal Close Review待ちで停止する。
+Corrective実装・P5継続Verification・iPhone cleanup・Human＋ChatGPT Final Review・Formal Close Evidence反映まで完了した。Delta Bへ自動進行せず、人＋ChatGPTの次工程指示待ちで停止する。
+
+## 20｜Formal Close Decision
+
+### 20.1 承認
+
+2026-09-27 23:58 JST、人＋ChatGPT Final ReviewによりS11 Companion Delta A｜Conversation Input / AttachmentのFormal Closeが明示承認された。初回Voice cancel FAIL、限定Corrective、再Verification、iPhone Safari / PWA本人実機Evidenceの履歴を維持したまま、以下を正式状態として固定する。
+
+- P1〜P5：DONE
+- A-G01：OPEN / 通過済み
+- A-DC01〜24：DONE
+- C01〜C08：Resolved
+- CD-AB-C02：Resolved、F01〜F05 PASS維持
+- Conditional：0
+- Not Done：0
+- Compatibility Blocker：0
+- Formal Close Blocker：0
+- Product Decision追加：不要
+- Migration最終数：102
+- Scope 11本体：Formal Closed維持
+- Delta A：FORMAL CLOSED
+
+### 20.2 Formal Close Evidence
+
+- Voice Cancel Corrective Implementation Commit：`4665197ae94d3fb3d7961874b6a18ab56484fa13`
+- P5 Close Candidate Evidence Commit：`85b9049920a165417a28315ae8704e30f486d93d`
+- Formal Close Commit：本節を含むEvidence-only Commit。確定hashはPush後の完了報告でHEAD / originとともに固定する。
+- Formal Close開始時HEAD / origin：`85b9049920a165417a28315ae8704e30f486d93d` / `85b9049920a165417a28315ae8704e30f486d93d`
+- Formal Close Commit後：HEAD / `origin/s11cd-a-conversation-input-attachment-p5`一致をPush後に再確認する。
+- Working tree：tracked差分は本Reportだけ。保護対象の未追跡Master 2点は非変更・非stageのまま維持する。
+
+### 20.3 Known FAIL / SKIP
+
+- Full SQLite Suite：596 PASS / 5既知FAIL / 16 SKIP / 4,610 assertions
+- 既知FAIL：Scope 9日付依存fixture 3件、`CompanyNavigationTest`既存baseline 1件、固定IR-1 Migration期待値95とRepository 102の差1件
+- Delta A由来Regression：0
+- 既知FAILをPASSへ変更せず、SKIP追加・期待値弱体化・IR-1更新を行っていない。
+
+### 20.4 Release / UX分離
+
+実Provider、実scanner / audio probe、保持 / Storage実運用、Scope 10 SMTP、Android関連EvidenceはRelease Verification Openを維持する。Formal Closeによって未取得EvidenceをPASSへ変更しない。
+
+「Conversation Input UIはボタンが多く、初見では分かりにくい」という本人所見はFormal Close Blockerへ戻さず、Product UX Follow-upとして維持する。今回のFormal Close Evidence更新ではUI再設計を行わない。
+
+### 20.5 保護境界
+
+IR-1、Product Master、master、Production、Deploy、通常local DB、Delta Bは非変更。Formal Close後もDelta Bへ自動進行しない。
