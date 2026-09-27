@@ -31,6 +31,9 @@ class AiCommonSharedSession extends Model
         'operation_id', 'payload_fingerprint', 'started_at_utc', 'paused_at_utc',
         'interrupted_at_utc', 'ending_at_utc', 'ended_at_utc', 'end_cutoff_sequence',
         'hard_stop_at_utc', 'safe_error_code',
+        'context_current_checkpoint_id', 'context_watermark_segment_id',
+        'context_watermark_revision_id', 'context_dirty_from_segment_id',
+        'context_status', 'room_sequence',
     ];
 
     protected function casts(): array
@@ -41,6 +44,9 @@ class AiCommonSharedSession extends Model
             'paused_at_utc' => 'immutable_datetime', 'interrupted_at_utc' => 'immutable_datetime',
             'ending_at_utc' => 'immutable_datetime', 'ended_at_utc' => 'immutable_datetime',
             'hard_stop_at_utc' => 'immutable_datetime',
+            'context_current_checkpoint_id' => 'integer', 'context_watermark_segment_id' => 'integer',
+            'context_watermark_revision_id' => 'integer', 'context_dirty_from_segment_id' => 'integer',
+            'room_sequence' => 'integer',
         ];
     }
 

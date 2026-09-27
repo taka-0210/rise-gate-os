@@ -216,6 +216,9 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/segments/{segment}/revise', [AiCommonSharedSessionController::class, 'revise'])->name('ai-common.shared.sessions.segments.revise');
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/segments/{segment}/identity', [AiCommonSharedSessionController::class, 'confirmIdentity'])->name('ai-common.shared.sessions.segments.identity');
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/segments/{segment}/speaker-relation', [AiCommonSharedSessionController::class, 'relateSpeakers'])->name('ai-common.shared.sessions.segments.relate');
+        Route::get('/company/co/shared-conversations/{conversation}/sessions/{session}/snapshot', [AiCommonSharedSessionController::class, 'snapshot'])->name('ai-common.shared.sessions.snapshot');
+        Route::get('/company/co/shared-conversations/{conversation}/sessions/{session}/historical', [AiCommonSharedSessionController::class, 'historical'])->name('ai-common.shared.sessions.historical');
+        Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/organize', [AiCommonSharedSessionController::class, 'organize'])->name('ai-common.shared.sessions.organize');
         Route::get('/company/settings/ai-common', [AiCommonPolicyController::class, 'edit'])->name('ai-common.policy.edit');
         Route::put('/company/settings/ai-common', [AiCommonPolicyController::class, 'update'])->name('ai-common.policy.update');
         Route::put('/company/settings/ai-common/resource', [AiCommonPolicyController::class, 'resource'])->name('ai-common.resource-policy.update');

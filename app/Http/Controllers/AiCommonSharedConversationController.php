@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\AiCommonConversation;
+use App\Models\AiCommonSharedContextCheckpoint;
 use App\Models\AiCommonSharedCoState;
 use App\Models\AiCommonSharedParticipant;
+use App\Models\AiCommonSharedSessionEndRun;
 use App\Models\AiProposal;
 use App\Models\OrganizationUser;
 use App\Models\User;
@@ -16,6 +18,7 @@ use App\Services\AiCommon\AiCommonSharedContext;
 use App\Services\AiCommon\AiCommonSharedConversationReader;
 use App\Services\AiCommon\AiCommonSharedConversationWriter;
 use App\Services\AiCommon\AiCommonSharedCoWriter;
+use App\Services\AiCommon\AiCommonSharedLongContext;
 use App\Services\AiCommon\AiCommonSharedSessionReader;
 use App\Services\AiCommon\AiCommonSharedSessionWriter;
 use App\Services\AiProposalApplier;
@@ -44,7 +47,7 @@ class AiCommonSharedConversationController extends Controller
         return redirect()->route('ai-common.shared.show', $conversation);
     }
 
-    public function show(Request $request, AiCommonConversation $conversation, AiCommonSharedAccess $access, AiCommonSharedConversationReader $reader, AiCommonProposalLineage $lineage, AiCommonSharedSessionReader $sessionReader): View
+    public function show(Request $request, AiCommonConversation $conversation, AiCommonSharedAccess $access, AiCommonSharedConversationReader $reader, AiCommonProposalLineage $lineage, AiCommonSharedSessionReader $sessionReader, AiCommonSharedLongContext $longContext): View
     {
         $organization = $request->attributes->get('currentCompany');
         $participant = $access->authorizeParticipant($request->user(), $organization, $conversation);
@@ -82,9 +85,19 @@ class AiCommonSharedConversationController extends Controller
 
         $session = $shared->sessions()->latest('id')->first();
         $transcriptRows = [];
+        $p4Checkpoint = null;
+        $sessionEndRuns = collect();
         if ($session) {
             try {
                 $transcriptRows = $sessionReader->transcript($request->user(), $organization, $conversation, $session);
+                if ($session->context_current_checkpoint_id) {
+                    $p4Checkpoint = $longContext->authorizeCheckpoint(
+                        $request->user(), $organization, $conversation, $session,
+                        AiCommonSharedContextCheckpoint::query()->findOrFail($session->context_current_checkpoint_id),
+                    );
+                    $sessionEndRuns = AiCommonSharedSessionEndRun::query()
+                        ->where('ai_common_shared_session_id', $session->id)->with('candidates')->latest('id')->get();
+                }
             } catch (\Throwable) {
                 // A missing current consent or permission must hide the derived transcript.
             }
@@ -99,6 +112,8 @@ class AiCommonSharedConversationController extends Controller
             'coState' => AiCommonSharedCoState::query()->where('ai_common_shared_conversation_id', $shared->id)->first(),
             'session' => $session,
             'transcriptRows' => $transcriptRows,
+            'p4Checkpoint' => $p4Checkpoint,
+            'sessionEndRuns' => $sessionEndRuns,
         ]);
     }
 

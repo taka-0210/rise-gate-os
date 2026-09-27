@@ -11,7 +11,10 @@ class AiCommonSharedCoState extends Model
 
     protected function casts(): array
     {
-        return ['sequence' => 'integer', 'version' => 'integer', 'session_sequence' => 'integer'];
+        return [
+            'sequence' => 'integer', 'version' => 'integer', 'session_sequence' => 'integer',
+            'context_watermark_segment_id' => 'integer', 'room_sequence' => 'integer',
+        ];
     }
 
     public function currentSession(): BelongsTo

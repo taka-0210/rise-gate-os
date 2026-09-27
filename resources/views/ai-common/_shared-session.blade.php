@@ -40,6 +40,43 @@
 @endif
 </section>
 
+@if($session && $transcriptRows !== [])
+<section class='shared-card shared-presence' aria-labelledby='shared-presence-heading'
+    @if($coState) data-shared-room-snapshot='{{ route('ai-common.shared.sessions.snapshot', [$conversation, $session]) }}' data-shared-room-sequence='{{ $coState->room_sequence ?? 0 }}' @endif>
+    <h2 id='shared-presence-heading'>One Shared CO / Conversation Atmosphere</h2>
+    <p class='shared-muted'>These labels project server state. Queued is not provider processing, and Context lag is not presented as understanding.</p>
+    <dl class='shared-state-grid'>
+        <div><dt>CO Presence</dt><dd data-presence-state>{{ $coState->presence_state ?? 'ready' }}</dd></div>
+        <div><dt>Capture</dt><dd data-capture-state>{{ $coState->capture_state ?? 'inactive' }}</dd></div>
+        <div><dt>ASR</dt><dd data-asr-state>{{ $coState->asr_state ?? 'idle' }}</dd></div>
+        <div><dt>Context</dt><dd data-context-state>{{ $coState->context_state ?? ($session->context_status ?? 'empty') }}</dd></div>
+    </dl>
+    <p role='status' data-context-watermark>Context watermark: segment {{ $coState->context_watermark_segment_id ?? 'none' }}</p>
+    <noscript><p>Live multi-device state requires JavaScript. Reload for the current authorized snapshot.</p></noscript>
+    @if($p4Checkpoint)
+        <details><summary>Rolling Context checkpoint {{ $p4Checkpoint->revision_no }}</summary>
+            <pre class='shared-context-text'>{{ json_encode(json_decode($p4Checkpoint->structured_context, true), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+            <p class='shared-muted'>Derived context only. It is not Company Memory or an official Decision.</p>
+        </details>
+        <form method='get' action='{{ route('ai-common.shared.sessions.historical', [$conversation, $session]) }}'>
+            <label>Bounded historical retrieval<input name='query' maxlength='400' required></label>
+            <button>Retrieve authorized ranges</button>
+        </form>
+    @endif
+    @if($session->state === 'ended' && $p4Checkpoint)
+        <form method='post' action='{{ route('ai-common.shared.sessions.organize', [$conversation, $session]) }}'>
+            @csrf<input type='hidden' name='operation_id' value='{{ Str::uuid() }}'>
+            <button>Organize this ended Session</button>
+            <p class='shared-muted'>Explicit request only. Candidates are not official records and no Action is written automatically.</p>
+        </form>
+    @endif
+    @foreach($sessionEndRuns as $run)
+        <h3>Session-end candidates</h3>
+        <ul>@foreach($run->candidates as $candidate)<li><strong>{{ $candidate->kind }}</strong>: {{ $candidate->content }}</li>@endforeach</ul>
+    @endforeach
+</section>
+@endif
+
 @if($transcriptRows !== [])
 <section class='shared-card' aria-labelledby='shared-transcript-heading'><h2 id='shared-transcript-heading'>Session Transcript</h2>
 @foreach($transcriptRows as $row)

@@ -24,6 +24,7 @@ class AiCommonGateway
         array $sources,
         ?string $logicalRequestId = null,
         ?callable $authorizeAttempt = null,
+        string $purpose = self::PURPOSE,
     ): array {
         $requestId = $logicalRequestId ?: (string) Str::uuid();
         $lastError = null;
@@ -41,7 +42,7 @@ class AiCommonGateway
             $started = hrtime(true);
             try {
                 $result = $this->provider->respond($messages, $sources);
-                $this->record($actor, $conversation, $requestId, $attempt, $result, 'success', null, $started);
+                $this->record($actor, $conversation, $requestId, $attempt, $result, 'success', null, $started, $purpose);
 
                 return array_replace($result, [
                     'logical_request_id' => $requestId,
@@ -53,7 +54,7 @@ class AiCommonGateway
                     ? $error->getMessage() : 'provider_failure';
                 $this->record($actor, $conversation, $requestId, $attempt, [
                     'provider' => 'openai', 'model' => null, 'input_tokens' => null, 'output_tokens' => null,
-                ], 'failed', $code, $started);
+                ], 'failed', $code, $started, $purpose);
                 if ($code === 'provider_invalid_response') {
                     break;
                 }
@@ -65,7 +66,7 @@ class AiCommonGateway
         throw new AiCommonGatewayException($code, previous: $lastError);
     }
 
-    private function record(User $actor, AiCommonConversation $conversation, string $requestId, int $attempt, array $result, string $status, ?string $error, int $started): void
+    private function record(User $actor, AiCommonConversation $conversation, string $requestId, int $attempt, array $result, string $status, ?string $error, int $started, string $purpose): void
     {
         $input = $result['input_tokens'] ?? null;
         $output = $result['output_tokens'] ?? null;
@@ -82,7 +83,7 @@ class AiCommonGateway
             'user_id' => $actor->id,
             'ai_common_conversation_id' => $conversation->id,
             'logical_request_id' => $requestId,
-            'purpose' => self::PURPOSE,
+            'purpose' => $purpose,
             'provider' => $result['provider'] ?? 'openai',
             'model' => $result['model'] ?? null,
             'attempt' => $attempt,

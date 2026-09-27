@@ -16,7 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class AiCommonSharedTranscriptWriter
 {
-    public function __construct(private readonly AiCommonSharedSessionAccess $access) {}
+    public function __construct(
+        private readonly AiCommonSharedSessionAccess $access,
+        private readonly AiCommonSharedLongContext $longContext,
+    ) {}
 
     public function revise(
         User $actor,
@@ -37,7 +40,7 @@ class AiCommonSharedTranscriptWriter
         }
         $fingerprint = hash('sha256', json_encode([$segment->id, $content], JSON_THROW_ON_ERROR));
 
-        return DB::transaction(function () use ($actor, $organization, $conversation, $session, $segment, $operationId, $content, $fingerprint): AiCommonSharedTranscriptRevision {
+        $revision = DB::transaction(function () use ($actor, $organization, $conversation, $session, $segment, $operationId, $content, $fingerprint): AiCommonSharedTranscriptRevision {
             $lockedSession = AiCommonSharedSession::query()->lockForUpdate()->findOrFail($session->id);
             $this->access->authorize($actor, $organization, $conversation, $lockedSession);
             $locked = AiCommonSharedTranscriptSegment::query()->lockForUpdate()->findOrFail($segment->id);
@@ -68,6 +71,9 @@ class AiCommonSharedTranscriptWriter
 
             return $revision;
         }, 3);
+        $this->longContext->markDirty($revision);
+
+        return $revision;
     }
 
     public function confirmSelfIdentity(
@@ -86,7 +92,7 @@ class AiCommonSharedTranscriptWriter
             throw ValidationException::withMessages(['identity' => 'Transcript segment is outside this Session.']);
         }
 
-        return DB::transaction(function () use ($actor, $organization, $conversation, $session, $segment, $operationId): AiCommonSharedIdentityRevision {
+        $identity = DB::transaction(function () use ($actor, $organization, $conversation, $session, $segment, $operationId): AiCommonSharedIdentityRevision {
             $lockedSession = AiCommonSharedSession::query()->lockForUpdate()->findOrFail($session->id);
             $this->access->authorize($actor, $organization, $conversation, $lockedSession);
             $locked = AiCommonSharedTranscriptSegment::query()->lockForUpdate()->findOrFail($segment->id);
@@ -106,6 +112,9 @@ class AiCommonSharedTranscriptWriter
                 'confirmed_at_utc' => now(),
             ]);
         }, 3);
+        $this->longContext->markDirty($segment->fresh()->currentRevision);
+
+        return $identity;
     }
 
     public function relateSpeakers(

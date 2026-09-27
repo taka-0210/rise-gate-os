@@ -1,6 +1,32 @@
 (() => {
     'use strict';
     const root = document.getElementById('shared-session-recorder');
+    const presence = document.querySelector('[data-shared-room-snapshot]');
+    if (presence) {
+        const client = crypto.randomUUID();
+        let cursor = Number(presence.dataset.sharedRoomSequence || 0);
+        const refresh = async () => {
+            if (document.visibilityState !== 'visible') return;
+            try {
+                const url = new URL(presence.dataset.sharedRoomSnapshot, window.location.origin);
+                url.searchParams.set('client_instance_id', client);
+                url.searchParams.set('cursor', String(cursor));
+                const response = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}, cache: 'no-store'});
+                if (!response.ok) return;
+                const state = await response.json();
+                cursor = Number(state.sequence || cursor);
+                presence.querySelector('[data-presence-state]').textContent = state.presence;
+                presence.querySelector('[data-capture-state]').textContent = state.capture;
+                presence.querySelector('[data-asr-state]').textContent = state.asr;
+                presence.querySelector('[data-context-state]').textContent = state.context;
+                presence.querySelector('[data-context-watermark]').textContent = `Context watermark: segment ${state.context_watermark_segment_id ?? 'none'}`;
+            } catch (_) {
+                // Network loss leaves the last truthful server snapshot visible; no fake progress is inferred.
+            }
+        };
+        refresh();
+        window.setInterval(refresh, 5000);
+    }
     if (!root) return;
 
     const startButton = root.querySelector('[data-session-record-start]');

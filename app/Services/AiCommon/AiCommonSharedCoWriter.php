@@ -5,8 +5,10 @@ namespace App\Services\AiCommon;
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonMessage;
 use App\Models\AiCommonSharedAiRequest;
+use App\Models\AiCommonSharedContextCheckpoint;
 use App\Models\AiCommonSharedCoState;
 use App\Models\AiCommonSharedMessageAuthor;
+use App\Models\AiCommonSharedSession;
 use App\Models\Organization;
 use App\Models\OrganizationAiPolicy;
 use App\Models\User;
@@ -23,6 +25,7 @@ class AiCommonSharedCoWriter
         private readonly AiCommonSharedContext $context,
         private readonly AiCommonSharedConversationReader $reader,
         private readonly AiCommonGateway $gateway,
+        private readonly AiCommonSharedLongContext $longContext,
     ) {}
 
     public function request(User $actor, Organization $organization, AiCommonConversation $conversation, array $input): AiCommonSharedAiRequest
@@ -82,11 +85,11 @@ class AiCommonSharedCoWriter
                 'payload_fingerprint' => $payloadFingerprint,
                 'audience_fingerprint' => $audience['fingerprint'],
                 'state' => AiCommonSharedAiRequest::STATE_PROCESSING,
-                'phase' => 'provider_processing',
+                'phase' => 'queued',
                 'sequence' => $sequence,
             ]);
             $created = true;
-            $state->update(['current_request_id' => $request->id, 'current_response_message_id' => null, 'state' => AiCommonSharedAiRequest::STATE_PROCESSING, 'phase' => 'provider_processing', 'sequence' => $sequence, 'version' => $state->version + 1]);
+            $state->update(['current_request_id' => $request->id, 'current_response_message_id' => null, 'state' => AiCommonSharedAiRequest::STATE_PROCESSING, 'phase' => 'queued', 'presence_state' => 'queued', 'sequence' => $sequence, 'room_sequence' => $state->room_sequence + 1, 'version' => $state->version + 1]);
             $locked->update(['last_message_at' => now(), 'version' => $locked->version + 1]);
 
             return $request;
@@ -97,8 +100,25 @@ class AiCommonSharedCoWriter
         }
 
         try {
+            $checkpointId = null;
+            $session = $conversation->sharedConversation()->first()?->sessions()
+                ->whereIn('state', [AiCommonSharedSession::STATE_ACTIVE, AiCommonSharedSession::STATE_PAUSED, AiCommonSharedSession::STATE_ENDED])
+                ->latest('id')->first();
+            if ($session && $session->transcriptSegments()->exists()) {
+                $checkpoint = $this->longContext->maintain($actor, $organization, $conversation, $session, (string) Str::uuid());
+                $checkpointId = $checkpoint?->id;
+                if ($checkpointId) {
+                    $request->update(['context_checkpoint_id' => $checkpointId]);
+                }
+            }
+
+            AiCommonSharedCoState::query()->where('current_request_id', $request->id)->update([
+                'presence_state' => 'provider_processing',
+                'phase' => 'provider_processing',
+            ]);
             $result = $this->gateway->respond($actor, $conversation, [], [], $request->logical_request_id,
-                fn (): array => $this->authorizedAttempt($actor, $organization, $conversation, $sourceIds->all(), $request->purpose_revision_id));
+                fn (): array => $this->authorizedAttempt($actor, $organization, $conversation, $sourceIds->all(), $request->purpose_revision_id, $checkpointId, $content),
+                AiCommonSharedLongContext::PURPOSE_CO);
             $authorized = $result['_authorized_context'];
             $allowedHandles = collect($authorized['sources'])->pluck('handle');
             if (collect($result['citations'] ?? [])->diff($allowedHandles)->isNotEmpty()) {
@@ -111,7 +131,8 @@ class AiCommonSharedCoWriter
                 if ($locked->state !== AiCommonSharedAiRequest::STATE_PROCESSING || $state->current_request_id !== $locked->id) {
                     throw ValidationException::withMessages(['request' => 'The Shared request is no longer publishable.']);
                 }
-                $publishContext = $this->authorizedAttempt($actor, $organization, $conversation, $authorized['source_ids'], $locked->purpose_revision_id);
+                $requestContent = (string) AiCommonMessage::query()->whereKey($locked->request_message_id)->value('content');
+                $publishContext = $this->authorizedAttempt($actor, $organization, $conversation, $authorized['source_ids'], $locked->purpose_revision_id, $locked->context_checkpoint_id, $requestContent);
                 if ($publishContext['revision_ids'] !== $authorized['revision_ids']
                     || collect($publishContext['sources'])->pluck('handle')->all() !== collect($authorized['sources'])->pluck('handle')->all()) {
                     throw ValidationException::withMessages(['request' => 'Shared authorization changed before response publication.']);
@@ -129,7 +150,7 @@ class AiCommonSharedCoWriter
                 $assistant->sources()->sync($authorized['source_ids']);
                 $assistant->sourceRevisions()->sync($authorized['revision_ids']);
                 $locked->update(['response_message_id' => $assistant->id, 'state' => AiCommonSharedAiRequest::STATE_ANSWER_READY, 'phase' => 'published']);
-                $state->update(['current_response_message_id' => $assistant->id, 'state' => AiCommonSharedAiRequest::STATE_ANSWER_READY, 'phase' => 'published', 'version' => $state->version + 1]);
+                $state->update(['current_response_message_id' => $assistant->id, 'state' => AiCommonSharedAiRequest::STATE_ANSWER_READY, 'phase' => 'published', 'presence_state' => 'answer_ready', 'room_sequence' => $state->room_sequence + 1, 'version' => $state->version + 1]);
                 $conversation->increment('version');
 
                 return $locked->fresh();
@@ -139,14 +160,14 @@ class AiCommonSharedCoWriter
                 $locked = AiCommonSharedAiRequest::query()->lockForUpdate()->find($request->id);
                 if ($locked && $locked->state === AiCommonSharedAiRequest::STATE_PROCESSING) {
                     $locked->update(['state' => AiCommonSharedAiRequest::STATE_UNAVAILABLE, 'phase' => 'discarded', 'safe_error_code' => 'authorization_or_provider_changed']);
-                    AiCommonSharedCoState::query()->where('current_request_id', $locked->id)->update(['state' => AiCommonSharedAiRequest::STATE_UNAVAILABLE, 'phase' => 'discarded']);
+                    AiCommonSharedCoState::query()->where('current_request_id', $locked->id)->update(['state' => AiCommonSharedAiRequest::STATE_UNAVAILABLE, 'phase' => 'discarded', 'presence_state' => 'unavailable']);
                 }
             });
             throw $error;
         }
     }
 
-    private function authorizedAttempt(User $actor, Organization $organization, AiCommonConversation $conversation, array $sourceIds, int $purposeRevisionId): array
+    private function authorizedAttempt(User $actor, Organization $organization, AiCommonConversation $conversation, array $sourceIds, int $purposeRevisionId, ?int $checkpointId = null, string $query = ''): array
     {
         $this->common->authorizeCategory($actor, $organization, OrganizationAiPolicy::CATEGORY_COMMON);
         $audience = $this->access->audienceSnapshot($actor, $organization, $conversation);
@@ -165,9 +186,15 @@ class AiCommonSharedCoWriter
         $this->context->assertSelectionsStillPointTo($map);
 
         $purpose = $audience['shared']->currentPurposeRevision()->firstOrFail();
+        $longMessages = [];
+        if ($checkpointId) {
+            $checkpoint = AiCommonSharedContextCheckpoint::query()->findOrFail($checkpointId);
+            $session = AiCommonSharedSession::query()->findOrFail($checkpoint->ai_common_shared_session_id);
+            $longMessages = $this->longContext->contextForRequest($actor, $organization, $conversation, $session, $query)['messages'];
+        }
 
         return [
-            'messages' => array_merge([['role' => 'system', 'content' => 'Shared Conversation purpose: '.$purpose->purpose]], $history['messages']),
+            'messages' => array_merge([['role' => 'system', 'content' => 'Shared Conversation purpose: '.$purpose->purpose]], $longMessages, $history['messages']),
             'sources' => $sources,
             'source_ids' => $selected->pluck('id')->all(),
             'revision_ids' => $revisions->pluck('id')->all(),

@@ -7,6 +7,7 @@ use App\Models\AiCommonSharedAudioWindow;
 use App\Models\AiCommonSharedCaptureStream;
 use App\Models\AiCommonSharedSession;
 use App\Models\AiCommonSharedTranscriptSegment;
+use App\Services\AiCommon\AiCommonSharedLongContext;
 use App\Services\AiCommon\AiCommonSharedSessionAudioWriter;
 use App\Services\AiCommon\AiCommonSharedSessionWriter;
 use App\Services\AiCommon\AiCommonSharedTranscriptWriter;
@@ -151,5 +152,35 @@ class AiCommonSharedSessionController extends Controller
         $writer->relateSpeakers($request->user(), $request->attributes->get('currentCompany'), $conversation, $session, $segment, $to, $input['operation_id'], $input['evidence_reference']);
 
         return back()->with('status', '明示Evidenceに基づくcross-window話者関係を記録しました。');
+    }
+
+    public function snapshot(Request $request, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedLongContext $context): JsonResponse
+    {
+        $input = $request->validate([
+            'client_instance_id' => ['required', 'uuid'],
+            'cursor' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        return response()->json($context->snapshot(
+            $request->user(), $request->attributes->get('currentCompany'), $conversation, $session,
+            $input['client_instance_id'], (int) ($input['cursor'] ?? 0),
+        ))->header('Cache-Control', 'no-store, private');
+    }
+
+    public function historical(Request $request, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedLongContext $context): JsonResponse
+    {
+        $input = $request->validate(['query' => ['required', 'string', 'max:400']]);
+
+        return response()->json(['results' => $context->historical(
+            $request->user(), $request->attributes->get('currentCompany'), $conversation, $session, $input['query'],
+        )])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function organize(Request $request, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedLongContext $context): RedirectResponse
+    {
+        $input = $request->validate(['operation_id' => ['required', 'uuid']]);
+        $context->organize($request->user(), $request->attributes->get('currentCompany'), $conversation, $session, $input['operation_id']);
+
+        return back()->with('status', 'Session-end candidates are ready for human review; no official record or Action was written.');
     }
 }

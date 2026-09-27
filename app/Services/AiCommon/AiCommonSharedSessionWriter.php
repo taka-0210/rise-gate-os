@@ -412,10 +412,23 @@ class AiCommonSharedSessionWriter
             ['ai_common_shared_conversation_id' => $sharedConversationId],
             ['state' => 'idle', 'phase' => 'idle', 'sequence' => 0, 'version' => 1],
         );
+        $captureState = AiCommonSharedCaptureStream::query()
+            ->where('ai_common_shared_session_id', $session->id)
+            ->whereIn('state', AiCommonSharedCaptureStream::ACTIVE_STATES)
+            ->value('state') ?? 'inactive';
+        $asrState = AiCommonSharedAudioWindow::query()
+            ->where('ai_common_shared_session_id', $session->id)
+            ->where('state', AiCommonSharedAudioWindow::STATE_TRANSCRIBING)
+            ->exists() ? 'provider_processing' : 'idle';
         $state->update([
             'current_session_id' => $session->id,
             'session_state' => $session->state,
             'session_sequence' => $session->sequence,
+            'capture_state' => $captureState,
+            'asr_state' => $asrState,
+            'context_state' => $session->context_status ?? 'empty',
+            'context_watermark_segment_id' => $session->context_watermark_segment_id,
+            'room_sequence' => max((int) $state->room_sequence + 1, (int) $session->room_sequence),
             'version' => $state->version + 1,
         ]);
     }

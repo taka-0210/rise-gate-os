@@ -7,6 +7,7 @@ use App\Contracts\AiCommonTranscriptionProvider;
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonSharedAudioWindow;
 use App\Models\AiCommonSharedCaptureStream;
+use App\Models\AiCommonSharedCoState;
 use App\Models\AiCommonSharedSession;
 use App\Models\AiCommonSharedSessionConsent;
 use App\Models\AiCommonSharedTranscriptRevision;
@@ -40,6 +41,7 @@ class AiCommonSharedSessionAudioWriter
         private readonly AiCommonTranscriptionProvider $provider,
         private readonly AiCommonTranscriptionEvidence $evidence,
         private readonly AiCommonSharedAudioCleanup $cleanup,
+        private readonly AiCommonSharedLongContext $longContext,
     ) {}
 
     public function recordWindow(
@@ -197,16 +199,19 @@ class AiCommonSharedSessionAudioWriter
 
             return $locked->version;
         }, 3);
+        $this->projectAsr($session, 'provider_processing');
 
         try {
             $encrypted = Storage::disk('ai_common_temporary_audio')->get($window->storage_key);
             $binary = base64_decode(Crypt::decryptString($encrypted), true);
         } catch (Throwable) {
             $this->finalizeFailure($actor, $organization, $conversation, $window, 'temporary_audio_integrity_failed', false, false);
+            $this->projectAsr($session, 'unavailable');
             throw ValidationException::withMessages(['audio' => 'Temporary Session Audio integrity check failed.']);
         }
         if (! is_string($binary) || ! hash_equals($window->sha256, hash('sha256', $binary))) {
             $this->finalizeFailure($actor, $organization, $conversation, $window, 'temporary_audio_integrity_failed', false, false);
+            $this->projectAsr($session, 'unavailable');
             throw ValidationException::withMessages(['audio' => 'Temporary Session Audio integrity check failed.']);
         }
 
@@ -217,12 +222,15 @@ class AiCommonSharedSessionAudioWriter
             $segments = $this->normalizeSegments($result, $window);
         } catch (AiCommonTranscriptionException $error) {
             $this->finalizeFailure($actor, $organization, $conversation, $window, $error->safeCode, $error->resultUnknown, true, $started);
+            $this->projectAsr($session, 'unavailable');
             throw ValidationException::withMessages(['audio' => $error->safeCode]);
         } catch (AuthorizationException|ValidationException $error) {
             $this->finalizeFailure($actor, $organization, $conversation, $window, 'transcription_authorization_changed', false, true, $started, discarded: true);
+            $this->projectAsr($session, 'unavailable');
             throw $error;
         } catch (Throwable $error) {
             $this->finalizeFailure($actor, $organization, $conversation, $window, 'transcription_result_unknown', true, true, $started);
+            $this->projectAsr($session, 'unavailable');
             throw new AiCommonTranscriptionException('transcription_result_unknown', true, $error);
         }
 
@@ -300,11 +308,27 @@ class AiCommonSharedSessionAudioWriter
             }, 3);
         } catch (AuthorizationException|ValidationException $error) {
             $this->finalizeFailure($actor, $organization, $conversation, $window, 'late_result_fenced', false, true, $started, $result, true);
+            $this->projectAsr($session, 'unavailable');
             throw $error;
         }
         $this->cleanup->cleanup($published);
+        $this->projectAsr($session, 'idle');
+
+        foreach ($published->fresh(['segments.currentRevision'])->segments as $segment) {
+            if ($segment->currentRevision) {
+                $this->longContext->markDirty($segment->currentRevision);
+            }
+        }
 
         return $published->fresh(['segments.currentRevision']);
+    }
+
+    private function projectAsr(AiCommonSharedSession $session, string $state): void
+    {
+        $co = AiCommonSharedCoState::query()->where('current_session_id', $session->id)->first();
+        if ($co) {
+            $co->update(['asr_state' => $state, 'room_sequence' => $co->room_sequence + 1]);
+        }
     }
 
     private function authorizeTranscription(
