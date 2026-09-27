@@ -242,3 +242,87 @@ IR-1のRC、Artifact、Manifest、Test、Gate、Track A/B、Migration 95件Evide
 | Formal Close | **可能候補**。Code Complete。人＋ChatGPT Final Review待ち |
 
 本ReportでFormal Close、G03 OPEN、Scope 12、Release Ready、Production、Deployへは進めない。
+
+## 18. Formal Close Decision（2026-09-27 JST）
+
+人＋ChatGPT Final ReviewによりCode Complete / Formal Close候補が承認され、最新Master v148 / v043との同期確認を実施した。
+
+### 18.1 最新Master
+
+| Master | SHA-256 |
+|---|---|
+| `CompanyOS_v148_Scope11_Provider_Neutral_Clarified.pptx` | `059E82D8580AC5A0848010143BF037A9C20700886E50694ECD2C6E0A56113277` |
+| `CompanyOS_Ver1_要件仕様書_v043_Scope11_AI_Common_Entry_Implemented.xlsx` | `BA91F27231EA7B78DADB9B5EFEE22B4109327F16CA2FE6A424978F583D807740` |
+
+照合対象はDownloads配置の上記正本。PPT v148のScope 11 slides 169〜176、XLSX v043の `36_Scope11_AI_Common` / `37_Scope11実装結果` をv002および本Reportとread-only照合した。
+
+### 18.2 Master同期結果
+
+- S11-DE01〜13、Capability Matrix、Capture / Action / Project / Business DomainのField境界は一致。
+- L1 / L2 / L3、Organization AI Policy default OFF、Source Manifest / Citation再認可、Usage Ledgerのunknown≠0は一致。
+- Ver.1 IN / OUT、Autonomous Apply禁止、第二Proposal Engine禁止、既存Writer / Permission再利用は一致。
+- P1〜P5、DC01〜20、18 PASS / 82 assertions、Full SQLite、MariaDB、Browser、buildのEvidence数値は一致。
+- Capture UnitのProject不要、Done Condition不要、1 recipient、通知Policy再利用、Action昇格境界は一致。
+- Product Contract、実装、Masterの間に、実装変更または追加Product Decisionを必要とする意味上の不整合はない。
+
+本Report §15の「Master同期必要」は、v148 / v043で充足済みとなった。Masterの追加更新は不要。
+
+### 18.3 Provider-neutral Architecture
+
+v148で明確化されたArchitectureは現在実装と一致する。
+
+`Provider-neutral AI Gateway -> Provider Adapter`
+
+- Company OSはOpenAI専用Product Contractではない。
+- Ver.1はOpenAIを最初のProvider Adapterとして実装する。
+- `AiCommonProvider` / `AiProviderTransport` interfaceとOpenAI adapterを分離し、Context認可・Proposal・Approval・Unit Writer安全境界をProviderから独立させている。
+- purpose固定routingを使用し、Business Common EntryからDevelopment/Image/MCP Toolを起動しない。
+- Claude / Gemini / Other Provider Adapterは将来追加可能だが、現時点では未実装。
+- Multi-provider同時実装、動的routing、Cross-provider automatic fallbackはVer.1 OUTのまま。
+
+これはProduct Contract変更ではなく、実装済みArchitectureのMaster上の明確化である。追加実装・再実装は不要。
+
+### 18.4 S11-G02正式判定
+
+既存Proposal Contract回帰、current Permission再評価、Unit Writer接続、Field whitelist、stale、Atomic Apply、Idempotency、response-loss、Writer途中失敗、Private provenance、Notification重複なしのFocused Evidenceが揃っている。
+
+したがって正式状態を次のとおり更新する。
+
+**S11-G02｜Handoff接続Gate：OPEN / 通過済み**
+
+### 18.5 Formal Close
+
+Master整合、G02 Evidence、DC01〜20のDone、Conditional / Not Done 0、Product Blocker 0を確認し、承認されたFormal Closeを正式反映する。
+
+| 項目 | Formal Close状態 |
+|---|---|
+| S11-P1〜P5 | Done |
+| S11-DC01〜20 | Done |
+| Conditional / Not Done | 0 / 0 |
+| Product Blocker | 0 |
+| S11-C01 / C02 / C03 | Resolved / Resolved / Resolved |
+| S11-G01 | OPEN / 通過済み |
+| S11-G02 | OPEN / 通過済み |
+| S11-G03 | Formal Close / 通過済み |
+| Scope 11｜AI Common Entry | **Formal Closed** |
+
+### 18.6 Release Verification持越し
+
+次の項目はScope Development Formal Closeから分離し、未確認のままOpen Evidenceとして維持する。Formal CloseによってPASSへ変更しない。
+
+1. S11-TP09｜保持年限・消去・Legal条件
+2. S11-TP10｜実Provider / Model / Price / Secret / 実AI Smoke
+3. S11-TP11｜Knowledge / RAG：OUT-LATER
+4. Scope 10｜実SMTP ProviderによるEmail実受信
+5. Scope 10｜Android Chrome実機 PWA Install / Push / Deep Link
+
+### 18.7 保護境界・停止地点
+
+- Formal Close Evidence以外のCode / Test / Migration / Product実装変更なし。
+- IR-1 RC / Artifact / Manifest / Test / Gate / Track A・Bは非変更。
+- `master` branchは非変更。
+- Production / Production DB / Credentialへ接続していない。
+- Deploy、通常local DB変更、Release Ready判定を行っていない。
+- Scope 12へ着手していない。
+
+Scope 11はFormal Closed。次工程への自動進行は行わず、Release Verificationおよび後続Scopeは別の明示承認を待つ。
