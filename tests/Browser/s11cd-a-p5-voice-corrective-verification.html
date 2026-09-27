@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>S11-CD-A P5 voice corrective verification</title></head>
+<body>
+<form data-voice-recorder>
+    <input data-voice-file type="file" name="voice">
+    <button data-voice-start type="button">録音開始</button>
+    <button data-voice-stop type="button" disabled>録音停止</button>
+    <button data-voice-cancel type="button" disabled>録音取消</button>
+    <p data-voice-status></p>
+</form>
+<pre id="result">RUNNING</pre>
+<script>
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const recorders = [];
+const tracks = [];
+let nextPlan = [];
+let rejectNextPermission = false;
+let documentHidden = false;
+
+Object.defineProperty(document, 'hidden', { configurable: true, get: () => documentHidden });
+
+class ControlledRecorder extends EventTarget {
+    static isTypeSupported(type) { return type === 'audio/webm;codecs=opus'; }
+    constructor(stream, options) {
+        super();
+        this.id = recorders.length + 1;
+        this.mimeType = options.mimeType;
+        this.plan = nextPlan;
+        this.state = 'inactive';
+        recorders.push(this);
+    }
+    start() { this.state = 'recording'; }
+    stop() {
+        if (this.state !== 'recording') return;
+        this.state = 'inactive';
+        for (const event of this.plan) {
+            setTimeout(() => {
+                if (event.type === 'dataavailable') {
+                    this.dispatchEvent(new BlobEvent('dataavailable', {
+                        data: new Blob([event.content ?? `audio-${this.id}`], { type: this.mimeType }),
+                    }));
+                } else {
+                    this.dispatchEvent(new Event(event.type));
+                }
+            }, event.delay);
+        }
+    }
+}
+
+Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+        getUserMedia: async () => {
+            if (rejectNextPermission) {
+                rejectNextPermission = false;
+                throw new DOMException('Permission denied', 'NotAllowedError');
+            }
+            const track = { stopped: false, stop() { this.stopped = true; } };
+            tracks.push(track);
+            return { getTracks: () => [track] };
+        },
+    },
+});
+window.MediaRecorder = ControlledRecorder;
+</script>
+<script src="/public/js/ai-common-input.js"></script>
+<script>
+window.addEventListener('load', async () => {
+    const file = document.querySelector('[data-voice-file]');
+    const start = document.querySelector('[data-voice-start]');
+    const stop = document.querySelector('[data-voice-stop]');
+    const cancel = document.querySelector('[data-voice-cancel]');
+    const status = document.querySelector('[data-voice-status]');
+    const results = [];
+    const check = (name, pass, evidence) => results.push({ name, pass: Boolean(pass), evidence });
+    const begin = async (plan) => {
+        nextPlan = plan;
+        start.click();
+        await wait(0);
+        return recorders.at(-1);
+    };
+
+    await begin([
+        { type: 'dataavailable', delay: 10, content: 'cancelled' },
+        { type: 'stop', delay: 15 },
+    ]);
+    cancel.click();
+    const cancelImmediate = file.files.length;
+    cancel.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await wait(30);
+    check('cancel-late-events', cancelImmediate === 0 && file.files.length === 0 && status.textContent === '録音を取り消しました。', {
+        cancelImmediate,
+        afterLateEvents: file.files.length,
+        status: status.textContent,
+    });
+
+    await begin([
+        { type: 'dataavailable', delay: 30, content: 'old-generation' },
+        { type: 'stop', delay: 35 },
+    ]);
+    cancel.click();
+    const newRecorder = await begin([
+        { type: 'dataavailable', delay: 5, content: 'new-generation' },
+        { type: 'stop', delay: 10 },
+    ]);
+    await wait(45);
+    const oldDidNotMutateNew = file.files.length === 0 && status.textContent.includes('録音中');
+    stop.click();
+    await wait(20);
+    const newContent = file.files[0] ? await file.files[0].text() : null;
+    check('old-generation-new-recording', oldDidNotMutateNew && file.files.length === 1 && newContent === 'new-generation', {
+        oldDidNotMutateNew,
+        files: file.files.length,
+        newContent,
+        newRecorder: newRecorder.id,
+    });
+
+    file.value = '';
+    await begin([
+        { type: 'dataavailable', delay: 5, content: 'normal-stop' },
+        { type: 'stop', delay: 10 },
+    ]);
+    stop.click();
+    await wait(20);
+    check('normal-stop', file.files.length === 1 && await file.files[0].text() === 'normal-stop' && status.textContent.includes('録音を準備しました'), {
+        files: file.files.length,
+        status: status.textContent,
+    });
+
+    file.value = '';
+    await begin([
+        { type: 'stop', delay: 5 },
+        { type: 'dataavailable', delay: 10, content: 'too-late' },
+    ]);
+    stop.click();
+    await wait(20);
+    check('stop-before-data', file.files.length === 0 && status.textContent === '録音Dataを取得できませんでした。', {
+        files: file.files.length,
+        status: status.textContent,
+    });
+
+    await begin([
+        { type: 'dataavailable', delay: 5, content: 'hidden-stop' },
+        { type: 'stop', delay: 10 },
+    ]);
+    const hiddenTrack = tracks.at(-1);
+    documentHidden = true;
+    document.dispatchEvent(new Event('visibilitychange'));
+    await wait(20);
+    check('visibility-hidden', hiddenTrack.stopped && file.files.length === 1 && await file.files[0].text() === 'hidden-stop', {
+        trackStopped: hiddenTrack.stopped,
+        files: file.files.length,
+    });
+    documentHidden = false;
+
+    file.value = '';
+    await begin([
+        { type: 'dataavailable', delay: 5, content: 'pagehide-late' },
+        { type: 'stop', delay: 10 },
+    ]);
+    const pagehideTrack = tracks.at(-1);
+    window.dispatchEvent(new PageTransitionEvent('pagehide'));
+    await wait(20);
+    check('pagehide', pagehideTrack.stopped && file.files.length === 0, {
+        trackStopped: pagehideTrack.stopped,
+        files: file.files.length,
+    });
+
+    rejectNextPermission = true;
+    start.click();
+    await wait(0);
+    check('permission-rejected', file.files.length === 0 && status.textContent.includes('Text入力はそのまま利用できます'), {
+        files: file.files.length,
+        status: status.textContent,
+    });
+
+    const result = {
+        edgeUserAgent: navigator.userAgent,
+        scenarios: results,
+        trackCount: tracks.length,
+        stoppedTrackCount: tracks.filter((track) => track.stopped).length,
+        pass: results.every((scenario) => scenario.pass),
+    };
+    document.querySelector('#result').textContent = JSON.stringify(result);
+    await fetch('/tests/Browser/s11cd-a-p5-cancel-late-event-result.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+    });
+});
+</script>
+</body>
+</html>

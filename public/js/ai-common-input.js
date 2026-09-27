@@ -7,25 +7,41 @@
     const stop = form.querySelector('[data-voice-stop]');
     const cancel = form.querySelector('[data-voice-cancel]');
     const status = form.querySelector('[data-voice-status]');
-    let recorder = null;
-    let stream = null;
-    let chunks = [];
-    let limitTimer = null;
+    let generation = 0;
+    let activeSession = null;
 
-    const stopTracks = () => {
-        if (stream) stream.getTracks().forEach((track) => track.stop());
-        stream = null;
-        clearTimeout(limitTimer);
-        limitTimer = null;
+    const stopSession = (session) => {
+        if (!session) return;
+        session.stream?.getTracks().forEach((track) => track.stop());
+        session.stream = null;
+        clearTimeout(session.limitTimer);
+        session.limitTimer = null;
     };
-    const reset = (message) => {
-        stopTracks();
-        recorder = null;
-        chunks = [];
+    const reset = (message, session = null) => {
+        if (session && activeSession !== session) return;
+        stopSession(session);
+        if (!session || activeSession === session) activeSession = null;
         start.disabled = false;
         stop.disabled = true;
         cancel.disabled = true;
         status.textContent = message;
+    };
+    const isCurrent = (session) => activeSession === session && !session.cancelled && !session.finished;
+    const cancelSession = (message = null) => {
+        const session = activeSession;
+        if (session) {
+            session.cancelled = true;
+            activeSession = null;
+            clearTimeout(session.limitTimer);
+            session.limitTimer = null;
+            if (session.recorder?.state === 'recording') session.recorder.stop();
+            stopSession(session);
+        }
+        file.value = '';
+        start.disabled = false;
+        stop.disabled = true;
+        cancel.disabled = true;
+        if (message !== null) status.textContent = message;
     };
     const supportedType = () => [
         'audio/webm;codecs=opus',
@@ -40,47 +56,62 @@
             status.textContent = 'このBrowserでは録音を利用できません。Voice Fileを選択してください。';
             return;
         }
+        const session = {
+            generation: ++generation,
+            recorder: null,
+            stream: null,
+            chunks: [],
+            limitTimer: null,
+            cancelled: false,
+            finished: false,
+        };
+        activeSession = session;
         try {
-            stream = await navigator.mediaDevices.getUserMedia({audio: true});
-            chunks = [];
-            recorder = new MediaRecorder(stream, {mimeType});
-            recorder.addEventListener('dataavailable', (event) => {
-                if (event.data.size) chunks.push(event.data);
+            const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+            if (!isCurrent(session)) {
+                stream.getTracks().forEach((track) => track.stop());
+                return;
+            }
+            session.stream = stream;
+            session.recorder = new MediaRecorder(stream, {mimeType});
+            session.recorder.addEventListener('dataavailable', (event) => {
+                if (isCurrent(session) && event.data.size) session.chunks.push(event.data);
             });
-            recorder.addEventListener('stop', () => {
-                if (!chunks.length) return reset('録音Dataを取得できませんでした。');
-                const blob = new Blob(chunks, {type: mimeType});
+            session.recorder.addEventListener('stop', () => {
+                if (!isCurrent(session)) return;
+                session.finished = true;
+                if (!session.chunks.length) return reset('録音Dataを取得できませんでした。', session);
+                const blob = new Blob(session.chunks, {type: mimeType});
                 const extension = mimeType.startsWith('audio/mp4') ? 'm4a' : 'webm';
                 const transfer = new DataTransfer();
                 transfer.items.add(new File([blob], `voice.${extension}`, {type: mimeType}));
                 file.files = transfer.files;
-                reset('録音を準備しました。保存ボタンを押すまで送信されません。');
+                reset('録音を準備しました。保存ボタンを押すまで送信されません。', session);
             });
-            recorder.start(1000);
+            session.recorder.start(1000);
             start.disabled = true;
             stop.disabled = false;
             cancel.disabled = false;
             status.textContent = '録音中です。3分で自動停止します。';
-            limitTimer = setTimeout(() => recorder?.state === 'recording' && recorder.stop(), 180000);
+            session.limitTimer = setTimeout(() => {
+                if (isCurrent(session) && session.recorder?.state === 'recording') session.recorder.stop();
+            }, 180000);
         } catch {
-            reset('マイクは許可されませんでした。Text入力はそのまま利用できます。');
+            reset('マイクは許可されませんでした。Text入力はそのまま利用できます。', session);
         }
     });
-    stop.addEventListener('click', () => recorder?.state === 'recording' && recorder.stop());
-    cancel.addEventListener('click', () => {
-        if (recorder?.state === 'recording') {
-            recorder.ondataavailable = null;
-            recorder.onstop = null;
-            recorder.stop();
-        }
-        file.value = '';
-        reset('録音を取り消しました。');
+    stop.addEventListener('click', () => {
+        const session = activeSession;
+        if (isCurrent(session) && session.recorder?.state === 'recording') session.recorder.stop();
     });
+    cancel.addEventListener('click', () => cancelSession('録音を取り消しました。'));
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden && recorder?.state === 'recording') {
-            recorder.stop();
+        const session = activeSession;
+        if (document.hidden && isCurrent(session) && session.recorder?.state === 'recording') {
+            session.recorder.stop();
+            stopSession(session);
             status.textContent = '画面が非表示になったため録音を停止しました。';
         }
     });
-    window.addEventListener('pagehide', stopTracks);
+    window.addEventListener('pagehide', () => cancelSession(null));
 })();
