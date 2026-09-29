@@ -143,8 +143,25 @@ function safeProviderEvent(event, receiveOrder, samplesSent, estimatedCostMicrou
   return result;
 }
 
-function safeFailureReason(error) {
-  const value = error instanceof Error ? error.message : String(error ?? 'unknown_failure');
+export function safeFailureReason(error) {
+  let value = 'unknown_failure';
+  if (error instanceof Error && error.message) {
+    value = error.message;
+  } else if (typeof error === 'string' && error.trim()) {
+    value = error;
+  } else if (error && typeof error === 'object') {
+    if (typeof error.message === 'string' && error.message.trim()) {
+      value = error.message;
+    } else if (error.error instanceof Error && error.error.message) {
+      value = error.error.message;
+    } else if (typeof error.error?.message === 'string' && error.error.message.trim()) {
+      value = error.error.message;
+    } else if (typeof error.reason === 'string' && error.reason.trim()) {
+      value = error.reason;
+    } else {
+      value = 'unknown_object_failure';
+    }
+  }
   return value
     .replace(/(authorization|api[-_ ]?key|token|credential)\s*[:=]\s*\S+/gi, '$1=[REDACTED]')
     .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
@@ -157,6 +174,12 @@ export function buildFailureEvidence(state = {}, error = new Error('unknown_fail
   const sampleRate = Number.isInteger(state.sampleRate) ? state.sampleRate : 16000;
   const providerRequestCount = Number.isInteger(state.providerRequestCount) ? state.providerRequestCount : 0;
   const actualRequest = state.actualRequest ?? null;
+  const diagnosticErrors = Array.isArray(state.diagnosticErrors)
+    ? state.diagnosticErrors.map(diagnostic => ({
+      classification: typeof diagnostic?.classification === 'string' ? diagnostic.classification : 'runtime',
+      safe_reason: safeFailureReason(diagnostic?.safe_reason ?? diagnostic?.message ?? diagnostic),
+    }))
+    : [];
   return {
     status: 'INCONCLUSIVE_EVIDENCE_FAILURE',
     safe_exit_state: 'fail_closed',
@@ -209,7 +232,9 @@ export function buildFailureEvidence(state = {}, error = new Error('unknown_fail
     provider_events: [],
     frame_receipts: [],
     browser_messages: [],
-    errors: [{ classification: state.classification ?? 'runtime', safe_reason: reason }],
+    errors: diagnosticErrors.length > 0
+      ? diagnosticErrors
+      : [{ classification: state.classification ?? 'runtime', safe_reason: reason }],
   };
 }
 
@@ -306,8 +331,9 @@ export async function runLimitedVerification(env = process.env) {
         }
       });
       provider.on('error', error => {
-        errors.push({ classification: 'provider', message: error.message });
-        providerClosed.reject(error);
+        const reason = safeFailureReason(error);
+        errors.push({ classification: providerOpened ? 'provider' : 'session', safe_reason: reason });
+        providerClosed.reject(new Error(reason));
       });
       provider.on('close', event => {
         providerCloseCode = event?.code ?? null;
@@ -315,7 +341,11 @@ export async function runLimitedVerification(env = process.env) {
         providerClosed.resolve();
       });
       startDeepgramSession(provider);
-      await within(provider.waitForOpen(), 10000, 'provider_open_timeout');
+      try {
+        await within(provider.waitForOpen(), 10000, 'provider_open_timeout');
+      } catch (error) {
+        throw new Error(safeFailureReason(error));
+      }
       if (!providerOpened) throw new Error('provider_open_event_missing');
       ws.send(JSON.stringify({ type: 'provider_state', state: 'ready' }));
       clientReady.resolve();
@@ -367,7 +397,7 @@ export async function runLimitedVerification(env = process.env) {
       ws.on('close', (code, reason) => clientClosed.resolve({ code, reason: reason.toString('utf8') }));
       ws.on('error', error => clientClosed.reject(error));
     } catch (error) {
-      errors.push({ classification: 'session', message: error.message });
+      errors.push({ classification: 'session', safe_reason: safeFailureReason(error) });
       abortController.abort();
       if (ws.readyState === WebSocket.OPEN) ws.close(1011, 'session fail closed');
       clientReady.reject(error);
@@ -474,7 +504,7 @@ export async function runLimitedVerification(env = process.env) {
       sourceSha256: APPROVED_SOURCE_SHA256, estimatedCostUsd: policy.estimatedCostUsd,
       costLimitUsd: policy.limit, frameCount: frameReceipts.length, partialCount: partials.length,
       finalCount: finals.length, metadataCount: metadata.length, loopbackListenerOpened,
-      audioSendStarted, audioSendCompleted, localCloseCode, localCloseReason,
+      audioSendStarted, audioSendCompleted, localCloseCode, localCloseReason, diagnosticErrors: errors,
     }, error);
   } finally {
     secret = '';

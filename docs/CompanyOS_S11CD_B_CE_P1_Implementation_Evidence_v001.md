@@ -4,12 +4,12 @@
 - Branch: ce-p1-realtime-corrective
 - Baseline / prior local commits: 9890dc0 / ae95731 / ce49baa / 84bf025
 - Public push / deploy: 0 / 0
-- CE-P1 Deepgram executions: initial 1 + corrective 1 + Hardened approved 1; latest run recorded Provider acceptance false and audio send 0
+- CE-P1 Deepgram executions: 5 authorized single-attempt runs total; final run recorded Provider acceptance false and audio send 0
 - Production Credential use: 0
 - Production / normal local / shared DB migration: 0
 - Realtime feature flags: default OFF / audio send OFF
 
-This update records the approved implementation through P1-H, both earlier P1-I executions, Evidence Harness Hardening, and the single approved Hardened Verification. P1-I remains inconclusive because the latest run stopped before Provider acceptance and its exact sanitized failure reason was not persisted. Human UX is not started.
+This update records the approved implementation through P1-H and every authorized P1-I Limited Verification through the final attempt. P1-I remains inconclusive because the final run stopped before Provider acceptance and the SDK ErrorEvent reason was flattened before sanitized persistence. A Provider-free Evidence-boundary Corrective is complete. Human UX is not started.
 
 ## 1｜Phase status
 
@@ -23,7 +23,7 @@ This update records the approved implementation through P1-H, both earlier P1-I 
 | P1-F Compatibility / Durable Final | IMPLEMENTED / AUTOMATED PASS | Bounded/realtime discriminator and mandatory Commit→Receipt→verified Source Range→Segment/Revision lineage. |
 | P1-G Capture / Waveform | IMPLEMENTED CANDIDATE / AUTOMATED PASS | One microphone stream/Web Audio graph, 100 ms frames, waveform, same-origin WSS lease boundary and lifecycle cleanup. Actual relay runtime and Human UX remain unverified. |
 | P1-H Partial / Final / CO Grace | IMPLEMENTED CANDIDATE / SYNTHETIC PASS | Ephemeral partial, validating final, Durable Final-only canonical UI, exact-target grace and immutable click-time request snapshot. |
-| P1-I Limited Provider Verification | INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE / STOPPED | Hardened IPC succeeded, but the latest single authorized run stopped before Provider acceptance/audio send. SDK lifecycle mismatch is the strongest candidate; exact safe reason remains Unknown. No retry or resend followed. See §14. |
+| P1-I Limited Provider Verification | INCONCLUSIVE / TECHNICAL VERIFICATION REQUIRED / STOPPED | Final authorized Request stopped before Provider acceptance/audio send. Exact transport reason remains Unknown because the SDK ErrorEvent was flattened before persistence. Provider Failure is not established. No retry or resend followed. See Section 17. |
 | P1-J Human UX / device matrix | NOT STARTED | P1-I did not PASS; no human device or microphone operation started. |
 
 ## 2｜P1-F Compatibility and bounded preservation
@@ -333,3 +333,24 @@ Detailed package:
 - `docs/CompanyOS_S11CD_B_CE_P1_I_Runtime_Corrected_Verification_Outcome_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_I_Deepgram_Runtime_Corrected_v001.json`
 - `docs/evidence/CompanyOS_CE_P1_I_Runtime_Corrected_Verification_Outcome_v001.json`
+
+
+## 17 | P1-I Final Limited Verification outcome
+
+The explicitly approved final one-Request Deepgram Limited Verification was executed once and stopped without retry, reconnect, or resend. The valid sentinel-framed Evidence records a connection attempt before Provider acceptance, audio `0 samples / 0 bytes / 0 seconds`, Provider events `0`, and actual cost Unknown.
+
+The outcome is `INCONCLUSIVE_SESSION_TRANSPORT_ERROR_EVIDENCE_GAP`, not PASS and not a Deepgram Provider failure. The pinned SDK rejected `waitForOpen()` with a nested ErrorEvent, but the Harness flattened the reason to `[object Object]` before sanitized persistence. Authentication rejection, request rejection, transient transport failure, and local runtime failure therefore remain Unknown.
+
+A Provider-free Corrective now normalizes SDK ErrorEvent and nested error messages, redacts secrets, retains diagnostic errors, keeps pre-acceptance failures at the session layer, and rejects unknown objects without stringifying them. Verification is Node `9 PASS`, Failure Matrix plus P1 focused `24 PASS / 1 gated SKIP / 516 assertions`, bounded regression `33 PASS / 1 gated SKIP / 326 assertions`, and full Laravel `665 PASS / 1 known out-of-scope FAIL / 17 SKIP / 5,413 assertions`. The known failure remains the existing CompanyNavigation stale intended-URL mismatch.
+
+Recommended Decision:
+
+**Do not authorize another Provider Request at this time. Keep P1-I INCONCLUSIVE / Technical Verification Required and P1-J NOT STARTED, then submit the accumulated Repository, prior successful E1 Deepgram connectivity, and current final Evidence for Human + ChatGPT disposition.**
+
+Any later requirement for current-relay live proof needs a new explicit Human Gate. No Request is authorized by this recommendation.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_I_Final_Limited_Verification_Outcome_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_I_Deepgram_Final_Limited_v001.json`
+- `docs/evidence/CompanyOS_CE_P1_I_Final_Limited_Verification_Outcome_v001.json`

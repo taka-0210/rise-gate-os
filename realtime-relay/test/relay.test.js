@@ -4,7 +4,9 @@ import {
   assertNetworkFence, buildRequestProjection, createDeepgramSession, SDK_VERSION, startDeepgramSession,
 } from '../src/deepgram-port.js';
 import { ConnectionRegistry } from '../src/connection-registry.js';
-import { assertLimitedPolicy, buildFailureEvidence, encodeEvidenceFrame, validateFrame } from '../src/limited-verification.js';
+import {
+  assertLimitedPolicy, buildFailureEvidence, encodeEvidenceFrame, safeFailureReason, validateFrame,
+} from '../src/limited-verification.js';
 import crypto from 'node:crypto';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -74,6 +76,27 @@ test('P1-I failure evidence is persisted before assertion without raw provider d
   assert.equal(evidence.provider_events.length, 0);
   assert.equal(evidence.frame_receipts.length, 0);
   assert.doesNotMatch(JSON.stringify(evidence), /secret-value/);
+});
+
+test('P1-I SDK ErrorEvent is normalized and diagnostic evidence remains sanitized', () => {
+  const sdkEvent = {
+    type: 'error',
+    error: new Error('Unexpected server response: 401 Authorization: secret-value'),
+  };
+  assert.equal(safeFailureReason(sdkEvent), 'Unexpected server response: 401 Authorization=[REDACTED]');
+
+  const evidence = buildFailureEvidence({
+    classification: 'session',
+    providerRequestCount: 1,
+    actualRequest: { mip_opt_out: 'true', reconnectAttempts: 0 },
+    diagnosticErrors: [{ classification: 'session', safe_reason: safeFailureReason(sdkEvent) }],
+  }, sdkEvent);
+  assert.equal(evidence.safe_reason, 'Unexpected server response: 401 Authorization=[REDACTED]');
+  assert.deepEqual(evidence.errors, [{
+    classification: 'session', safe_reason: 'Unexpected server response: 401 Authorization=[REDACTED]',
+  }]);
+  assert.doesNotMatch(JSON.stringify(evidence), /secret-value/);
+  assert.doesNotMatch(JSON.stringify(evidence), /\[object Object\]/);
 });
 
 test('P1-I child emits a run-specific deterministic evidence frame', () => {

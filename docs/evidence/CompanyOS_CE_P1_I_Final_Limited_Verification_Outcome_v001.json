@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "stage": "CE-P1-I_FINAL_LIMITED_VERIFICATION_OUTCOME",
+  "date_jst": "2026-09-30",
+  "branch": "ce-p1-realtime-corrective",
+  "authorization": {
+    "approved_request_max": 1,
+    "allowance_consumed": true,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend": 0,
+    "further_request_authorized": false
+  },
+  "outcome": {
+    "status": "INCONCLUSIVE_SESSION_TRANSPORT_ERROR_EVIDENCE_GAP",
+    "provider_failure_established": false,
+    "harness_classification": "RUNTIME_FAILURE",
+    "evidence_envelope": "valid_sentinel_json_v1",
+    "safe_reason": "object_error_not_normalized",
+    "underlying_transport_reason": "unknown",
+    "error_layer": "session",
+    "provider_connection_attempted": true,
+    "provider_acceptance": false,
+    "audio_samples": 0,
+    "audio_bytes": 0,
+    "audio_duration_seconds": 0,
+    "provider_events": 0,
+    "close_code": 1000,
+    "close_is_provider_success_evidence": false,
+    "actual_billed_cost_usd": "unknown"
+  },
+  "root_cause": {
+    "classification": "SDK_ERROR_EVENT_NORMALIZATION_AND_PERSISTENCE_GAP",
+    "details": "waitForOpen rejected with a nested SDK ErrorEvent; the session boundary flattened it to [object Object] and failure serialization replaced the earlier diagnostic detail",
+    "provider_failure": false,
+    "unknown_inferred": false
+  },
+  "corrective": {
+    "provider_free": true,
+    "normalize_error_message": true,
+    "normalize_nested_error_message": true,
+    "normalize_close_reason": true,
+    "unknown_object_fails_closed": true,
+    "pre_acceptance_classification": "session",
+    "diagnostic_errors_preserved": true,
+    "secret_redaction": true,
+    "additional_provider_requests": 0
+  },
+  "synthetic_sdk_projection": {
+    "network_request_made": false,
+    "scheme": "wss:",
+    "host": "api.deepgram.com",
+    "path": "/v1/listen",
+    "model": "nova-3",
+    "language": "ja",
+    "encoding": "linear16",
+    "sample_rate": 16000,
+    "channels": 1,
+    "mip_opt_out": true,
+    "authorization_header_present": true,
+    "authorization_value_recorded": false,
+    "reconnect_attempts": 0
+  },
+  "verification": {
+    "node": "9 PASS / 0 FAIL",
+    "failure_matrix_and_p1_focused": "24 PASS / 1 gated SKIP / 516 assertions",
+    "ce_p1_bounded_regression": "33 PASS / 1 gated SKIP / 326 assertions",
+    "full_laravel_suite": "665 PASS / 1 known out-of-scope FAIL / 17 SKIP / 5413 assertions",
+    "known_out_of_scope_failure": "CompanyNavigationTest stale intended URL",
+    "secret_scan": "PASS"
+  },
+  "security_privacy": {
+    "raw_credential_persisted": false,
+    "authorization_header_value_persisted": false,
+    "raw_provider_payload_persisted": false,
+    "raw_realtime_audio_persisted": false,
+    "transcript_body_persisted_in_evidence": false
+  },
+  "post_stop": {
+    "attempt_marker_sha256": "69403250B90919909BF9EB77E4B0918F2F8A4A6B4B4EED30FF89F25D9F26E444",
+    "actual_evidence_sha256": "9CE9956A9D7955D5B294787BA20FDA85F965179EF60D6FC5ABDAD4689787128A",
+    "node_processes": 0,
+    "php_processes": 0,
+    "ephemeral_tls_removed": true,
+    "repository_env_sha256": "DC2A0E2A2402229EFA555609FFCEB6A9721F9A2CC1A452D5B7DEEEF3BC6CB0ED",
+    "normal_local_db_sha256": "19278A4B11E3DCBF1B717969C554D7E45919B1C0B362F54EA1BFCA4D9BFC072C",
+    "azure_requests": 0,
+    "other_provider_requests": 0,
+    "production_credential_used": false,
+    "production_db_migration": false,
+    "deploy": false,
+    "public_push": false
+  },
+  "recommended_next_action": {
+    "decision": "DO_NOT_AUTHORIZE_ANOTHER_PROVIDER_REQUEST_AT_THIS_TIME",
+    "submit_accumulated_evidence_for_human_chatgpt_disposition": true,
+    "p1_i": "INCONCLUSIVE_TECHNICAL_VERIFICATION_REQUIRED_STOPPED",
+    "p1_j": "NOT_STARTED",
+    "new_human_gate_required_if_live_current_relay_proof_is_later_mandated": true
+  }
+}
