@@ -255,6 +255,7 @@ class AiCommonSharedSessionAudioWriter
                         'ai_common_shared_session_id' => $lockedSession->id,
                         'ai_common_shared_audio_window_id' => $locked->id,
                         'ai_common_shared_capture_stream_id' => $stream->id,
+                        'source_kind' => AiCommonSharedTranscriptSegment::SOURCE_BOUNDED,
                         'segment_index' => $index + 1,
                         'speaker_label' => $segmentData['speaker'],
                         'speaker_scope' => 'window:'.$locked->public_id.':'.$segmentData['speaker'],

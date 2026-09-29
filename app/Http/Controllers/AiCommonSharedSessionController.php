@@ -5,15 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\AiCommonConversation;
 use App\Models\AiCommonSharedAudioWindow;
 use App\Models\AiCommonSharedCaptureStream;
+use App\Models\AiCommonSharedRelayLease;
 use App\Models\AiCommonSharedSession;
 use App\Models\AiCommonSharedTranscriptSegment;
 use App\Services\AiCommon\AiCommonSharedLongContext;
 use App\Services\AiCommon\AiCommonSharedSessionAudioWriter;
 use App\Services\AiCommon\AiCommonSharedSessionWriter;
 use App\Services\AiCommon\AiCommonSharedTranscriptWriter;
+use App\Services\AiCommon\Realtime\RealtimeLeaseManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AiCommonSharedSessionController extends Controller
 {
@@ -85,6 +88,37 @@ class AiCommonSharedSessionController extends Controller
         $stream = $writer->startStream($request->user(), $request->attributes->get('currentCompany'), $conversation, $session, $input);
 
         return response()->json(['stream_id' => $stream->public_id, 'generation' => $stream->generation, 'sequence' => $stream->sequence]);
+    }
+
+    public function issueLease(Request $request, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedCaptureStream $stream, RealtimeLeaseManager $leases): JsonResponse
+    {
+        $relayUrl = (string) config('ai-common-realtime.relay_url');
+        $host = parse_url($relayUrl, PHP_URL_HOST);
+        if (! config('ai-common-realtime.enabled') || ! config('ai-common-realtime.audio_send_enabled')
+            || parse_url($relayUrl, PHP_URL_SCHEME) !== 'wss' || ! is_string($host) || ! hash_equals($request->getHost(), $host)) {
+            throw ValidationException::withMessages(['lease' => 'Realtime relay is unavailable or is not an authorized same-origin WSS endpoint.']);
+        }
+        $lease = $leases->issue($request->user(), $request->attributes->get('currentCompany'), $conversation, $session, $stream);
+
+        return response()->json([
+            'lease_id' => $lease->public_id,
+            'stream_id' => $stream->public_id,
+            'generation' => $lease->generation,
+            'expires_at' => $lease->expires_at_utc->toIso8601String(),
+            'refresh_seconds' => (int) config('ai-common-realtime.lease_refresh_seconds'),
+            'relay_url' => $relayUrl,
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function refreshLease(Request $request, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedRelayLease $lease, RealtimeLeaseManager $leases): JsonResponse
+    {
+        $lease = $leases->refresh($request->user(), $request->attributes->get('currentCompany'), $conversation, $session, $lease);
+
+        return response()->json([
+            'lease_id' => $lease->public_id,
+            'lease_version' => $lease->lease_version,
+            'expires_at' => $lease->expires_at_utc->toIso8601String(),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function stopStream(Request $request, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedCaptureStream $stream, AiCommonSharedSessionWriter $writer): JsonResponse

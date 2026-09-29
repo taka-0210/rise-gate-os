@@ -209,6 +209,8 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/resume', [AiCommonSharedSessionController::class, 'resume'])->name('ai-common.shared.sessions.resume');
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/end', [AiCommonSharedSessionController::class, 'end'])->name('ai-common.shared.sessions.end');
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/streams', [AiCommonSharedSessionController::class, 'startStream'])->name('ai-common.shared.sessions.streams.start');
+        Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/streams/{stream}/lease', [AiCommonSharedSessionController::class, 'issueLease'])->name('ai-common.shared.sessions.streams.lease');
+        Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/leases/{lease}/refresh', [AiCommonSharedSessionController::class, 'refreshLease'])->name('ai-common.shared.sessions.leases.refresh');
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/streams/{stream}/stop', [AiCommonSharedSessionController::class, 'stopStream'])->name('ai-common.shared.sessions.streams.stop');
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/streams/{stream}/cancel', [AiCommonSharedSessionController::class, 'cancelStream'])->name('ai-common.shared.sessions.streams.cancel');
         Route::post('/company/co/shared-conversations/{conversation}/sessions/{session}/streams/{stream}/windows', [AiCommonSharedSessionController::class, 'recordWindow'])->name('ai-common.shared.sessions.windows.store');

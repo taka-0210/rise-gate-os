@@ -4,235 +4,185 @@
     const presence = document.querySelector('[data-shared-room-snapshot]');
     if (!root && !presence) return;
 
-    const clientInstanceId = crypto.randomUUID();
+    const clientId = crypto.randomUUID();
+    const csrf = root?.dataset.csrf;
     const snapshotUrl = root?.dataset.snapshotUrl || presence?.dataset.sharedRoomSnapshot;
     let cursor = Number(root?.dataset.sharedRoomSequence || presence?.dataset.sharedRoomSequence || 0);
-    const startButton = root?.querySelector('[data-session-record-start]');
-    const stopButton = root?.querySelector('[data-session-record-stop]');
-    const cancelButton = root?.querySelector('[data-session-record-cancel]');
-    const status = root?.querySelector('[data-session-recorder-status]');
-    const csrf = root?.dataset.csrf;
-    let mediaStream = null;
-    let recorder = null;
-    let serverStream = null;
-    let generationToken = 0;
-    let windowSequence = 0;
-    let active = false;
-    let normalStop = false;
-    let timer = null;
+    let state = null;
+    let sendChain = Promise.resolve();
 
-    const setStatus = message => { if (status) status.textContent = message; };
-    const setRecorderControls = (startDisabled, stopDisabled = true, cancelDisabled = true) => {
-        if (!root) return;
-        startButton.disabled = startDisabled;
-        stopButton.disabled = stopDisabled;
-        cancelButton.disabled = cancelDisabled;
-    };
-    const projectSnapshot = state => {
-        if (presence) {
-            presence.querySelector('[data-presence-state]').textContent = state.presence;
-            presence.querySelector('[data-capture-state]').textContent = state.capture;
-            presence.querySelector('[data-asr-state]').textContent = state.asr;
-            presence.querySelector('[data-context-state]').textContent = state.context;
-            presence.querySelector('[data-context-watermark]').textContent = `Context watermark: segment ${state.context_watermark_segment_id ?? 'none'}`;
-        }
-        if (!root) return;
-        const sessionState = state.session_state;
-        const clientState = state.client_capture?.state || 'inactive';
-        if (active && clientState === 'recording') {
-            setRecorderControls(true, false, false);
-            setStatus('Recording a bounded window');
-            return;
-        }
-        active = false;
-        normalStop = false;
-        stopTracks();
-        serverStream = null;
-        if (sessionState === 'active' && clientState === 'inactive' && ['recording', 'paused'].includes(state.capture)) {
-            setRecorderControls(true);
-            setStatus('Recorder unavailable: another capture stream is active.');
-        } else if (sessionState === 'active' && ['cancelled', 'stopped', 'interrupted', 'inactive'].includes(clientState)) {
-            setRecorderControls(false);
-            setStatus(clientState === 'cancelled'
-                ? 'Cancelled. Server state confirmed; late events are fenced.'
-                : 'Recorder stopped. Server state confirmed.');
-        } else if (sessionState === 'paused' || clientState === 'paused') {
-            setRecorderControls(true);
-            setStatus('Session paused. Recorder stopped.');
-        } else if (sessionState === 'ended') {
-            setRecorderControls(true);
-            setStatus('Session ended. Recorder unavailable.');
-        } else {
-            setRecorderControls(true);
-            setStatus('Recorder unavailable. Server state does not permit recording.');
-        }
-    };
-    const refreshSnapshot = async () => {
-        if (!snapshotUrl || document.visibilityState !== 'visible') return;
-        try {
-            const url = new URL(snapshotUrl, window.location.origin);
-            url.searchParams.set('client_instance_id', clientInstanceId);
-            url.searchParams.set('cursor', String(cursor));
-            const response = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}, cache: 'no-store'});
-            if (!response.ok) {
-                if (root && !active) {
-                    setRecorderControls(true);
-                    setStatus(response.status === 401 || response.status === 403
-                        ? 'Recorder unavailable: current authorization could not be confirmed.'
-                        : 'Recorder state unavailable. Reconnect to verify server state.');
-                }
-                return;
-            }
-            let state = await response.json();
-            cursor = Number(state.sequence || cursor);
-            if (root && !active && ['recording', 'paused'].includes(state.client_capture?.state)) {
-                try {
-                    await postJson(`${root.dataset.streamBase}/${state.client_capture.stream_id}/cancel`, {}, true);
-                    const reconciled = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}, cache: 'no-store'});
-                    if (reconciled.ok) {
-                        state = await reconciled.json();
-                        cursor = Number(state.sequence || cursor);
-                    }
-                } catch (_) {
-                    // Keep controls unavailable until the authoritative active stream can be cancelled.
-                }
-            }
-            projectSnapshot(state);
-        } catch (_) {
-            if (root && !active) {
-                setRecorderControls(true);
-                setStatus('Recorder state unavailable. Reconnect to verify server state.');
-            }
-            // Network loss never invents a server transition or enables recording.
-        }
-    };
-    refreshSnapshot();
-    window.setInterval(refreshSnapshot, 5000);
-    window.addEventListener('pageshow', refreshSnapshot);
-    window.addEventListener('online', refreshSnapshot);
-
-    if (!root) return;
-    const postJson = async (url, body = {}, keepalive = false) => {
-        const response = await fetch(url, {
-            method: 'POST', credentials: 'same-origin', keepalive,
-            headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf},
-            body: JSON.stringify(body),
-        });
+    const node = selector => root?.querySelector(selector);
+    const controls = {start: node('[data-session-record-start]'), stop: node('[data-session-record-stop]'), cancel: node('[data-session-record-cancel]')};
+    const labels = {status: node('[data-session-recorder-status]'), capture: node('[data-realtime-capture]'), relay: node('[data-realtime-relay]'), provider: node('[data-realtime-provider]'), transcript: node('[data-realtime-transcript]'), partial: node('[data-realtime-partial]'), finals: node('[data-realtime-finals]')};
+    const post = async (url, body = {}, keepalive = false) => {
+        const response = await fetch(url, {method: 'POST', credentials: 'same-origin', keepalive, headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf}, body: JSON.stringify(body)});
         if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || `HTTP ${response.status}`);
         return response.json();
     };
-    const postForm = async (url, form) => {
-        const response = await fetch(url, {method: 'POST', credentials: 'same-origin', headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': csrf}, body: form});
-        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || `HTTP ${response.status}`);
-        return response.json();
+    const label = (key, value) => { if (labels[key]) labels[key].textContent = value; };
+    const setControls = active => {
+        if (!root) return;
+        controls.start.disabled = active || root.dataset.realtimeEnabled !== 'true';
+        controls.stop.disabled = !active;
+        controls.cancel.disabled = !active;
     };
     const stopTracks = () => {
-        if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
-        mediaStream = null;
+        state?.media?.getTracks().forEach(track => track.stop());
     };
-    const streamUrl = action => `${root.dataset.streamBase}/${serverStream.stream_id}/${action}`;
-
-    const startWindow = token => {
-        if (!active || token !== generationToken || !mediaStream) return;
-        const mimeType = ['audio/webm;codecs=opus', 'audio/mp4'].find(type => MediaRecorder.isTypeSupported(type)) || '';
-        const current = new MediaRecorder(mediaStream, mimeType ? {mimeType} : undefined);
-        recorder = current;
-        const chunks = [];
-        current.addEventListener('dataavailable', event => {
-            if (token === generationToken && event.data.size > 0) chunks.push(event.data);
-        });
-        current.addEventListener('stop', async () => {
-            clearTimeout(timer);
-            if (token !== generationToken) return;
-            const shouldContinue = active;
-            try {
-                if (chunks.length > 0) {
-                    windowSequence += 1;
-                    const blob = new Blob(chunks, {type: current.mimeType || chunks[0].type || 'audio/webm'});
-                    const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
-                    const form = new FormData();
-                    form.append('operation_id', crypto.randomUUID());
-                    form.append('generation', String(serverStream.generation));
-                    form.append('sequence', String(windowSequence));
-                    form.append('audio', blob, `shared-window-${windowSequence}.${extension}`);
-                    const saved = await postForm(`${streamUrl('windows')}`, form);
-                    await postJson(`${root.dataset.windowBase}/${saved.window_id}/transcribe`, {operation_id: crypto.randomUUID()});
-                }
-                if (shouldContinue && token === generationToken) {
-                    setStatus('Recording next bounded window');
-                    startWindow(token);
-                } else if (normalStop && token === generationToken) {
-                    await postJson(streamUrl('stop'));
-                    setStatus('Stopped normally. Reload to view the authorized transcript.');
-                    stopTracks();
-                    normalStop = false;
-                    startButton.disabled = false;
-                }
-            } catch (error) {
-                active = false;
-                stopTracks();
-                startButton.disabled = false;
-                stopButton.disabled = true;
-                cancelButton.disabled = true;
-                setStatus(`Safe stop: ${error.message}`);
-            }
-        });
-        current.start();
-        timer = setTimeout(() => { if (current.state === 'recording') current.stop(); }, 55_000);
-    };
-
-    startButton.addEventListener('click', async () => {
-        try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({audio: true});
-            serverStream = await postJson(root.dataset.startUrl, {operation_id: crypto.randomUUID(), client_instance_id: clientInstanceId, mode: 'shared_room'});
-            generationToken += 1;
-            active = true;
-            normalStop = false;
-            windowSequence = 0;
-            startButton.disabled = true;
-            stopButton.disabled = false;
-            cancelButton.disabled = false;
-            setStatus('Recording a bounded window');
-            startWindow(generationToken);
-        } catch (error) {
-            stopTracks();
-            setStatus(`Cannot start: ${error.message}`);
+    const cleanup = async (mode, notify = true) => {
+        const current = state;
+        if (!current || current.closing) return;
+        current.closing = true;
+        current.processor?.port.postMessage({type: 'active', value: false});
+        clearInterval(current.leaseTimer);
+        cancelAnimationFrame(current.waveformFrame);
+        current.socket?.close(1000, mode);
+        current.source?.disconnect();
+        current.processor?.disconnect();
+        current.gain?.disconnect();
+        await current.context?.close().catch(() => {});
+        stopTracks();
+        state = null;
+        setControls(false);
+        label('capture', 'stopped'); label('relay', 'disconnected'); label('provider', 'not connected');
+        if (labels.partial) labels.partial.textContent = '';
+        if (notify && current.serverStream) {
+            await post(`${root.dataset.streamBase}/${current.serverStream.stream_id}/${mode === 'normal_stop' ? 'stop' : 'cancel'}`, {}, mode !== 'normal_stop');
         }
-    });
-    stopButton.addEventListener('click', () => {
-        active = false;
-        normalStop = true;
-        stopButton.disabled = true;
-        cancelButton.disabled = true;
-        if (recorder?.state === 'recording') recorder.stop();
-    });
-    cancelButton.addEventListener('click', async () => {
-        active = false;
-        normalStop = false;
-        generationToken += 1;
-        clearTimeout(timer);
-        if (recorder?.state === 'recording') recorder.stop();
-        stopTracks();
-        stopButton.disabled = true;
-        cancelButton.disabled = true;
-        startButton.disabled = false;
-        try { await postJson(streamUrl('cancel')); setStatus('Cancelled. Late events are fenced.'); }
-        catch (error) { setStatus(`Cancelled locally; server confirmation required: ${error.message}`); }
-    });
-    const safelyCancel = () => {
-        if (!active || !serverStream) return;
-        active = false;
-        generationToken += 1;
-        clearTimeout(timer);
-        if (recorder?.state === 'recording') recorder.stop();
-        stopTracks();
-        setRecorderControls(true);
-        setStatus('Recorder stopped locally. Reconnecting to confirm server state.');
-        postJson(streamUrl('cancel'), {}, true).then(refreshSnapshot).catch(() => {});
+        label('status', mode === 'normal_stop' ? 'Stopped normally. Final evidence is server-authoritative.' : 'Cancelled. Late events are fenced.');
     };
-    window.addEventListener('pagehide', safelyCancel);
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') safelyCancel();
-        else refreshSnapshot();
-    });
+    const fail = async error => {
+        await cleanup('cancel').catch(() => {});
+        label('status', `Safe stop: ${error.message}`);
+        label('provider', 'unavailable');
+    };
+    const drawWaveform = current => {
+        const canvas = node('[data-session-waveform]');
+        if (!canvas || !current.analyser) return;
+        const values = new Uint8Array(current.analyser.fftSize);
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let last = 0;
+        const draw = timestamp => {
+            if (state !== current || current.closing) return;
+            if (!reduced || timestamp - last > 500) {
+                last = timestamp;
+                current.analyser.getByteTimeDomainData(values);
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#0f172a'; context.fillRect(0, 0, canvas.width, canvas.height);
+                context.strokeStyle = '#38bdf8'; context.lineWidth = 2; context.beginPath();
+                values.forEach((value, index) => {
+                    const x = index * canvas.width / (values.length - 1);
+                    const y = value * canvas.height / 256;
+                    if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+                });
+                context.stroke();
+            }
+            current.waveformFrame = requestAnimationFrame(draw);
+        };
+        current.waveformFrame = requestAnimationFrame(draw);
+    };
+    const sha256 = async buffer => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))).map(byte => byte.toString(16).padStart(2, '0')).join('');
+    const sendFrame = (current, frame) => {
+        sendChain = sendChain.then(async () => {
+            if (state !== current || current.closing || current.socket.readyState !== WebSocket.OPEN) throw new Error('Realtime relay is not open.');
+            const metadata = {
+                type: 'audio_frame', lease_id: current.lease.lease_id, stream_id: current.serverStream.stream_id,
+                generation: current.serverStream.generation, sequence: ++current.sequence, client_event_id: crypto.randomUUID(),
+                start_sample: frame.startSample, end_sample: frame.endSample, sample_count: frame.endSample - frame.startSample,
+                sample_rate: 16000, bit_depth: 16, channels: 1, format: 'pcm_s16le', content_sha256: await sha256(frame.pcm),
+            };
+            current.socket.send(JSON.stringify(metadata));
+            current.socket.send(frame.pcm);
+        }).catch(fail);
+    };
+    const relayMessage = event => {
+        if (typeof event.data !== 'string') return;
+        let message;
+        try { message = JSON.parse(event.data); } catch (_) { return; }
+        if (message.type === 'partial') {
+            label('transcript', 'partial / ephemeral');
+            label('partial', message.content || '');
+            document.querySelectorAll('[data-realtime-target-provider-session]').forEach(input => { input.value = message.provider_session_id || ''; });
+            document.querySelectorAll('[data-realtime-target-receive-order]').forEach(input => { input.value = String(message.expected_final_receive_order || ''); });
+        } else if (message.type === 'final_candidate') {
+            label('transcript', 'final validating');
+        } else if (message.type === 'durable_final') {
+            label('partial', ''); label('transcript', 'durable final');
+            if (labels.finals) { const item = document.createElement('li'); item.textContent = message.content || ''; labels.finals.append(item); }
+        } else if (message.type === 'provider_state') {
+            label('provider', message.state || 'unknown');
+        } else if (message.type === 'rejected') {
+            label('partial', ''); label('transcript', `rejected: ${message.safe_reason_code || 'unverified'}`);
+        }
+    };
+    const start = async () => {
+        if (state || root.dataset.realtimeEnabled !== 'true') return;
+        setControls(true); label('status', 'Requesting one continuous microphone stream…');
+        const current = {closing: false, sequence: 0, leaseTimer: null, waveformFrame: null};
+        state = current;
+        try {
+            current.media = await navigator.mediaDevices.getUserMedia({audio: {channelCount: 1, echoCancellation: true, noiseSuppression: true}, video: false});
+            current.serverStream = await post(root.dataset.startUrl, {operation_id: crypto.randomUUID(), client_instance_id: clientId, mode: 'shared_room'});
+            current.lease = await post(`${root.dataset.streamBase}/${current.serverStream.stream_id}/lease`);
+            current.socket = new WebSocket(current.lease.relay_url);
+            current.socket.binaryType = 'arraybuffer';
+            current.socket.addEventListener('message', relayMessage);
+            current.socket.addEventListener('close', event => {
+                if (!current.closing) fail(new Error('Realtime relay closed unexpectedly (' + event.code + ').'));
+            });
+            current.media.getTracks().forEach(track => track.addEventListener('ended', () => {
+                if (!current.closing) fail(new Error('Microphone device ended or permission was revoked.'));
+            }, {once: true}));
+            await new Promise((resolve, reject) => {
+                current.socket.addEventListener('open', resolve, {once: true});
+                current.socket.addEventListener('error', () => reject(new Error('Authorized WSS relay connection failed.')), {once: true});
+            });
+            current.context = new AudioContext({sampleRate: 16000, latencyHint: 'interactive'});
+            await current.context.audioWorklet.addModule(root.dataset.workletUrl);
+            current.source = current.context.createMediaStreamSource(current.media);
+            current.analyser = current.context.createAnalyser(); current.analyser.fftSize = 256;
+            current.processor = new AudioWorkletNode(current.context, 'company-os-realtime-processor');
+            current.gain = current.context.createGain(); current.gain.gain.value = 0;
+            current.source.connect(current.analyser); current.source.connect(current.processor); current.processor.connect(current.gain).connect(current.context.destination);
+            current.processor.port.onmessage = event => { if (event.data?.type === 'frame') sendFrame(current, event.data); };
+            current.processor.port.postMessage({type: 'active', value: true});
+            current.leaseTimer = setInterval(() => post(`${root.dataset.leasesBase}/${current.lease.lease_id}/refresh`).catch(fail), current.lease.refresh_seconds * 1000);
+            label('capture', 'continuous'); label('relay', 'authorized WSS'); label('provider', 'connecting'); label('transcript', 'listening'); label('status', 'Realtime capture active.');
+            drawWaveform(current);
+        } catch (error) { await fail(error); }
+    };
+
+    document.querySelectorAll('[data-realtime-co-form]').forEach(form => form.addEventListener('submit', () => {
+        const provider = form.querySelector('[data-realtime-target-provider-session]');
+        const order = form.querySelector('[data-realtime-target-receive-order]');
+        const hasTarget = Boolean(provider?.value && order?.value);
+        if (provider) provider.disabled = !hasTarget;
+        if (order) order.disabled = !hasTarget;
+        label('partial', '');
+        label('transcript', hasTarget ? 'waiting for target final' : 'fixed durable snapshot');
+    }));
+    controls.start?.addEventListener('click', start);
+    controls.stop?.addEventListener('click', () => cleanup('normal_stop').catch(fail));
+    controls.cancel?.addEventListener('click', () => cleanup('cancel').catch(fail));
+    const abandon = () => { if (state) cleanup('cancel', true).catch(() => {}); };
+    window.addEventListener('pagehide', abandon);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') abandon(); });
+
+    const refresh = async () => {
+        if (!snapshotUrl || document.visibilityState !== 'visible') return;
+        try {
+            const url = new URL(snapshotUrl, location.origin); url.searchParams.set('client_instance_id', clientId); url.searchParams.set('cursor', String(cursor));
+            const response = await fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            if (!response.ok) return;
+            const snapshot = await response.json(); cursor = Number(snapshot.sequence || cursor);
+            if (presence) {
+                presence.querySelector('[data-presence-state]').textContent = snapshot.presence;
+                presence.querySelector('[data-capture-state]').textContent = snapshot.capture;
+                presence.querySelector('[data-asr-state]').textContent = snapshot.asr;
+                presence.querySelector('[data-context-state]').textContent = snapshot.context;
+                presence.querySelector('[data-context-watermark]').textContent = `Context watermark: segment ${snapshot.context_watermark_segment_id ?? 'none'}`;
+            }
+        } catch (_) { if (!state) label('status', 'Server state unavailable; capture remains disabled until verified.'); }
+    };
+    refresh(); setInterval(refresh, 5000);
 })();

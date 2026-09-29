@@ -2,18 +2,24 @@
 
 namespace App\Models;
 
+use App\Services\AiCommon\Realtime\RealtimeTranscriptSourceGuard;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use LogicException;
 
 class AiCommonSharedTranscriptSegment extends Model
 {
+    public const SOURCE_BOUNDED = 'bounded_audio';
+
+    public const SOURCE_REALTIME = 'realtime_source';
+
     public const SPEAKER_UNKNOWN = 'Unknown';
 
     protected $fillable = [
         'public_id', 'ai_common_shared_session_id', 'ai_common_shared_audio_window_id',
-        'ai_common_shared_capture_stream_id', 'segment_index', 'speaker_label',
+        'ai_common_shared_capture_stream_id', 'source_kind', 'realtime_durable_final_commit_id', 'segment_index', 'speaker_label',
         'speaker_scope', 'range_start_ms', 'range_end_ms', 'confidence', 'current_revision_id',
     ];
 
@@ -27,7 +33,17 @@ class AiCommonSharedTranscriptSegment extends Model
 
     protected static function booted(): void
     {
-        static::creating(fn (self $segment) => $segment->public_id ??= (string) Str::ulid());
+        static::creating(function (self $segment): void {
+            $segment->public_id ??= (string) Str::ulid();
+            $segment->source_kind ??= self::SOURCE_BOUNDED;
+            if ($segment->source_kind === self::SOURCE_BOUNDED && $segment->ai_common_shared_audio_window_id !== null) {
+                return;
+            }
+            if ($segment->source_kind === self::SOURCE_REALTIME && app(RealtimeTranscriptSourceGuard::class)->allows($segment)) {
+                return;
+            }
+            throw new LogicException('Transcript source lineage must be created by its authorized Writer.');
+        });
     }
 
     public function getRouteKeyName(): string

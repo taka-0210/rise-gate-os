@@ -198,7 +198,12 @@ class AiCommonSharedConversationController extends Controller
 
     public function coRequest(Request $request, AiCommonConversation $conversation, AiCommonSharedCoWriter $writer): RedirectResponse
     {
-        $validated = $request->validate(['operation_id' => ['required', 'uuid'], 'content' => ['required', 'string', 'max:4000'], 'source_ids' => ['nullable', 'array', 'max:20'], 'source_ids.*' => ['integer']]);
+        $validated = $request->validate([
+            'operation_id' => ['required', 'uuid'], 'content' => ['required', 'string', 'max:4000'],
+            'source_ids' => ['nullable', 'array', 'max:20'], 'source_ids.*' => ['integer'],
+            'realtime_target_provider_session_id' => ['nullable', 'uuid', 'required_with:realtime_target_receive_order'],
+            'realtime_target_receive_order' => ['nullable', 'integer', 'min:1', 'required_with:realtime_target_provider_session_id'],
+        ]);
         $writer->request($request->user(), $request->attributes->get('currentCompany'), $conversation, $validated);
 
         return back()->with('status', 'One Shared CO response is ready.');

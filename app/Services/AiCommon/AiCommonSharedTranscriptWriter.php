@@ -134,7 +134,9 @@ class AiCommonSharedTranscriptWriter
         $this->access->authorize($actor, $organization, $conversation, $session);
         if ($from->ai_common_shared_session_id !== $session->id
             || $to->ai_common_shared_session_id !== $session->id
-            || $from->ai_common_shared_audio_window_id === $to->ai_common_shared_audio_window_id
+            || ($from->source_kind === AiCommonSharedTranscriptSegment::SOURCE_BOUNDED
+                && $to->source_kind === AiCommonSharedTranscriptSegment::SOURCE_BOUNDED
+                && $from->ai_common_shared_audio_window_id === $to->ai_common_shared_audio_window_id)
             || $from->id === $to->id) {
             throw ValidationException::withMessages(['speaker' => 'Cross-window continuity requires two distinct Session segments.']);
         }

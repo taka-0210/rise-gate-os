@@ -13,6 +13,8 @@ class AiCommonSharedContextCheckpoint extends Model
 
     public const STATUS_STALE = 'stale';
 
+    public const STATUS_REQUEST_SNAPSHOT = 'request_snapshot';
+
     protected $guarded = [];
 
     protected function casts(): array

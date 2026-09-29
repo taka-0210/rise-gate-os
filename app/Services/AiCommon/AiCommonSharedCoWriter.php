@@ -12,6 +12,7 @@ use App\Models\AiCommonSharedSession;
 use App\Models\Organization;
 use App\Models\OrganizationAiPolicy;
 use App\Models\User;
+use App\Services\AiCommon\Realtime\RealtimeCoFinalizationGrace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -26,6 +27,7 @@ class AiCommonSharedCoWriter
         private readonly AiCommonSharedConversationReader $reader,
         private readonly AiCommonGateway $gateway,
         private readonly AiCommonSharedLongContext $longContext,
+        private readonly RealtimeCoFinalizationGrace $finalizationGrace,
     ) {}
 
     public function request(User $actor, Organization $organization, AiCommonConversation $conversation, array $input): AiCommonSharedAiRequest
@@ -33,15 +35,31 @@ class AiCommonSharedCoWriter
         $operationId = (string) ($input['operation_id'] ?? '');
         $content = trim((string) ($input['content'] ?? ''));
         $sourceIds = collect($input['source_ids'] ?? [])->map(fn ($id): int => (int) $id)->filter()->unique()->sort()->values();
-        if (! Str::isUuid($operationId) || $content === '' || mb_strlen($content) > 4000 || $sourceIds->count() > 20) {
-            throw ValidationException::withMessages(['request' => 'A valid operation, content, and bounded source set are required.']);
+        $targetProviderSession = isset($input['realtime_target_provider_session_id']) ? trim((string) $input['realtime_target_provider_session_id']) : null;
+        $targetReceiveOrder = isset($input['realtime_target_receive_order']) ? (int) $input['realtime_target_receive_order'] : null;
+        if (! Str::isUuid($operationId) || $content === '' || mb_strlen($content) > 4000 || $sourceIds->count() > 20
+            || (($targetProviderSession === null) !== ($targetReceiveOrder === null))
+            || ($targetProviderSession !== null && (! Str::isUuid($targetProviderSession) || $targetReceiveOrder < 1))) {
+            throw ValidationException::withMessages(['request' => 'A valid operation, content, bounded source set, and complete realtime target are required.']);
         }
-        $payloadFingerprint = hash('sha256', json_encode(['content' => $content, 'sources' => $sourceIds->all()], JSON_THROW_ON_ERROR));
+        $payloadFingerprint = hash('sha256', json_encode([
+            'content' => $content, 'sources' => $sourceIds->all(),
+            'realtime_target' => [$targetProviderSession, $targetReceiveOrder],
+        ], JSON_THROW_ON_ERROR));
         $this->common->authorizeCategory($actor, $organization, OrganizationAiPolicy::CATEGORY_COMMON);
         $this->access->audienceSnapshot($actor, $organization, $conversation);
         if ($existing = $this->existing($conversation, $actor, $operationId, $payloadFingerprint)) {
             return $existing;
         }
+        $session = $conversation->sharedConversation()->first()?->sessions()
+            ->whereIn('state', [AiCommonSharedSession::STATE_ACTIVE, AiCommonSharedSession::STATE_PAUSED, AiCommonSharedSession::STATE_ENDED])
+            ->latest('id')->first();
+        if (! $session && $targetProviderSession !== null) {
+            throw ValidationException::withMessages(['realtime_target' => 'The realtime target has no authorized Session.']);
+        }
+        $baseRevisionIds = $session
+            ? $this->longContext->captureRequestRevisionIds($actor, $organization, $conversation, $session)
+            : [];
 
         $created = false;
         $request = DB::transaction(function () use ($actor, $organization, $conversation, $operationId, $content, $sourceIds, $payloadFingerprint, &$created): AiCommonSharedAiRequest {
@@ -101,11 +119,16 @@ class AiCommonSharedCoWriter
 
         try {
             $checkpointId = null;
-            $session = $conversation->sharedConversation()->first()?->sessions()
-                ->whereIn('state', [AiCommonSharedSession::STATE_ACTIVE, AiCommonSharedSession::STATE_PAUSED, AiCommonSharedSession::STATE_ENDED])
-                ->latest('id')->first();
-            if ($session && $session->transcriptSegments()->exists()) {
-                $checkpoint = $this->longContext->maintain($actor, $organization, $conversation, $session, (string) Str::uuid());
+            if ($session) {
+                if ($baseRevisionIds !== []) {
+                    $this->longContext->maintain($actor, $organization, $conversation, $session, (string) Str::uuid());
+                }
+                $targetRevisionIds = $this->finalizationGrace->awaitTarget($session, $targetProviderSession, $targetReceiveOrder);
+                $checkpoint = $this->longContext->createRequestSnapshot(
+                    $actor, $organization, $conversation, $session,
+                    collect($baseRevisionIds)->concat($targetRevisionIds)->unique()->all(),
+                    (string) Str::uuid(),
+                );
                 $checkpointId = $checkpoint?->id;
                 if ($checkpointId) {
                     $request->update(['context_checkpoint_id' => $checkpointId]);
@@ -190,7 +213,7 @@ class AiCommonSharedCoWriter
         if ($checkpointId) {
             $checkpoint = AiCommonSharedContextCheckpoint::query()->findOrFail($checkpointId);
             $session = AiCommonSharedSession::query()->findOrFail($checkpoint->ai_common_shared_session_id);
-            $longMessages = $this->longContext->contextForRequest($actor, $organization, $conversation, $session, $query)['messages'];
+            $longMessages = $this->longContext->contextForRequest($actor, $organization, $conversation, $session, $query, $checkpoint)['messages'];
         }
 
         return [

@@ -4,20 +4,28 @@ namespace Tests\Feature;
 
 use App\Models\AiCommonSharedProviderSession;
 use App\Models\AiCommonSharedSessionConsent;
+use App\Models\AiCommonSharedTranscriptRevision;
+use App\Models\AiCommonSharedTranscriptSegment;
 use App\Models\Organization;
 use App\Models\OrganizationAiPolicy;
 use App\Models\OrganizationUser;
 use App\Models\ProductAccountEligibility;
 use App\Models\User;
 use App\Services\AiCommon\AiCommonSharedConversationWriter;
+use App\Services\AiCommon\AiCommonSharedLongContext;
 use App\Services\AiCommon\AiCommonSharedSessionWriter;
+use App\Services\AiCommon\AiCommonSharedTranscriptWriter;
 use App\Services\AiCommon\Realtime\CanonicalAudioFrame;
 use App\Services\AiCommon\Realtime\DeepgramStreamingAdapter;
+use App\Services\AiCommon\Realtime\RealtimeCoFinalizationGrace;
+use App\Services\AiCommon\Realtime\RealtimeDurableFinalCommitter;
 use App\Services\AiCommon\Realtime\RealtimeLeaseManager;
 use App\Services\AiCommon\Realtime\RealtimeProviderEventStore;
 use App\Services\AiCommon\Realtime\RealtimeSourceLedger;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -108,6 +116,89 @@ class RealtimeCorrectiveP1Test extends TestCase
         $this->assertSame($receipt->id, app(RealtimeProviderEventStore::class)->persist($final, $provider)->id);
         $this->assertStringNotContainsString('確定しました', (string) DB::table('ai_common_shared_provider_event_receipts')->where('id', $receipt->id)->value('normalized_final_metadata'));
 
+        $commitOperation = (string) Str::uuid();
+        $commit = app(RealtimeDurableFinalCommitter::class)->commit(
+            $owner, $organization, $conversation, $session, $receipt, $commitOperation,
+        );
+        $this->assertSame('committed', $commit->state);
+        $this->assertSame($commit->id, app(RealtimeDurableFinalCommitter::class)->commit(
+            $owner, $organization, $conversation, $session, $receipt, $commitOperation,
+        )->id);
+        try {
+            app(RealtimeDurableFinalCommitter::class)->commit(
+                $owner, $organization, $conversation, $session, $receipt, (string) Str::uuid(),
+            );
+            $this->fail('A receipt cannot be committed under a second operation identity.');
+        } catch (ValidationException $error) {
+            $this->assertStringContainsString('different lineage', json_encode($error->errors()));
+        }
+        $this->assertDatabaseHas('ai_common_shared_transcript_segments', [
+            'ai_common_shared_session_id' => $session->id,
+            'ai_common_shared_audio_window_id' => null,
+            'source_kind' => 'realtime_source',
+        ]);
+        $this->assertDatabaseHas('ai_common_shared_durable_final_commit_items', ['durable_final_commit_id' => $commit->id]);
+        $this->assertDatabaseHas('ai_common_shared_transcript_segments', ['realtime_durable_final_commit_id' => $commit->id]);
+        $this->assertDatabaseCount('ai_common_shared_audio_windows', 0);
+
+        foreach ([
+            ['source_kind' => 'realtime_source', 'window_id' => null],
+            ['source_kind' => 'bounded_audio', 'window_id' => null],
+        ] as $invalid) {
+            try {
+                DB::table('ai_common_shared_transcript_segments')->insert([
+                    'public_id' => (string) Str::ulid(), 'ai_common_shared_session_id' => $session->id,
+                    'ai_common_shared_audio_window_id' => $invalid['window_id'],
+                    'ai_common_shared_capture_stream_id' => $stream->id,
+                    'source_kind' => $invalid['source_kind'], 'realtime_durable_final_commit_id' => null,
+                    'segment_index' => 90, 'speaker_label' => 'fake', 'speaker_scope' => 'fake',
+                    'range_start_ms' => 0, 'range_end_ms' => 100, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $this->fail('DB source/lineage trigger must reject a nullable-window discriminator bypass.');
+            } catch (QueryException) {
+                $this->assertTrue(true);
+            }
+        }
+
+        try {
+            AiCommonSharedTranscriptSegment::query()->create([
+                'ai_common_shared_session_id' => $session->id,
+                'ai_common_shared_audio_window_id' => null,
+                'ai_common_shared_capture_stream_id' => $stream->id,
+                'source_kind' => 'realtime_source', 'segment_index' => 99,
+                'speaker_label' => 'fake', 'speaker_scope' => 'fake',
+                'range_start_ms' => 0, 'range_end_ms' => 100,
+            ]);
+            $this->fail('A caller cannot spoof realtime source_kind outside the Durable Final Writer.');
+        } catch (\LogicException) {
+            $this->assertTrue(true);
+        }
+
+        config()->set('ai-common-realtime.finalization_grace_ms', 0);
+        $targetRevisionIds = app(RealtimeCoFinalizationGrace::class)->awaitTarget($session, $provider->public_id, 2);
+        $this->assertCount(1, $targetRevisionIds);
+        $this->assertSame([], app(RealtimeCoFinalizationGrace::class)->awaitTarget($session, $provider->public_id, 999));
+        $longContext = app(AiCommonSharedLongContext::class);
+        $snapshot = $longContext->createRequestSnapshot(
+            $owner, $organization, $conversation, $session,
+            $longContext->captureRequestRevisionIds($owner, $organization, $conversation, $session),
+            (string) Str::uuid(),
+        );
+        $this->assertSame('request_snapshot', $snapshot->status);
+        $segment = AiCommonSharedTranscriptSegment::query()->where('realtime_durable_final_commit_id', $commit->id)->firstOrFail();
+        $providerRevisionId = $segment->current_revision_id;
+        app(AiCommonSharedTranscriptWriter::class)->revise(
+            $owner, $organization, $conversation, $session, $segment, (string) Str::uuid(), 'Human corrected realtime final.',
+        );
+        $this->assertSame($providerRevisionId, DB::table('ai_common_shared_durable_final_commit_items')->where('durable_final_commit_id', $commit->id)->value('transcript_revision_id'));
+        $this->assertSame('human', $segment->fresh()->currentRevision->kind);
+        try {
+            $longContext->contextForRequest($owner, $organization, $conversation, $session, 'fixed', $snapshot);
+            $this->fail('A click-time snapshot must fail closed if its Transcript Revision changes.');
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+
         try {
             app(RealtimeProviderEventStore::class)->persist($adapter->normalize(['type' => 'Metadata', 'request_id' => (string) Str::uuid()], $provider->public_id, 1, $mapping), $provider);
             $this->fail('An out-of-order provider event must fail closed.');
@@ -131,6 +222,16 @@ class RealtimeCorrectiveP1Test extends TestCase
         $this->assertSame('rejected', $late->status);
         $this->assertSame('provider_event_late', $late->safe_reason_code);
         $this->assertDatabaseCount('ai_common_shared_provider_event_receipts', 5);
+        $segmentsBeforeLateCommit = AiCommonSharedTranscriptSegment::query()->count();
+        try {
+            app(RealtimeDurableFinalCommitter::class)->commit(
+                $owner, $organization, $conversation, $session, $late, (string) Str::uuid(),
+            );
+            $this->fail('A final received after lease revocation cannot be committed.');
+        } catch (ValidationException $error) {
+            $this->assertStringContainsString('provider_mapping_unverified', json_encode($error->errors()));
+        }
+        $this->assertSame($segmentsBeforeLateCommit, AiCommonSharedTranscriptSegment::query()->count());
     }
 
     public function test_pause_closes_relay_and_resume_requires_a_new_generation(): void
@@ -152,6 +253,93 @@ class RealtimeCorrectiveP1Test extends TestCase
         ]);
         $this->assertSame(2, $replacement->generation);
         $this->assertNotSame($lease->id, app(RealtimeLeaseManager::class)->issue($owner, $organization, $conversation, $resumed, $replacement)->id);
+    }
+
+    public function test_durable_final_writer_failure_rolls_back_the_entire_lineage(): void
+    {
+        [$owner, , $organization, $conversation, $session, $stream] = $this->activeFixture();
+        $lease = app(RealtimeLeaseManager::class)->issue($owner, $organization, $conversation, $session, $stream);
+        $ledger = app(RealtimeSourceLedger::class);
+        $range = $ledger->accept($this->frame($lease->public_id, $stream->public_id, 1, 1, 0, 1600, 'rollback'), $lease);
+        $provider = AiCommonSharedProviderSession::query()->create([
+            'relay_lease_id' => $lease->id, 'ai_common_shared_capture_stream_id' => $stream->id,
+            'generation' => 1, 'adapter' => 'deepgram', 'adapter_version' => 'synthetic-v1',
+            'capability_profile_version' => 'nova3-ja-v1', 'state' => 'synthetic',
+        ]);
+        $ledger->sent($provider, $range);
+        $mapping = $ledger->sourceMapping($provider, 0, 1600);
+        $final = app(DeepgramStreamingAdapter::class)->normalize(
+            $this->providerEvent(true, 'synthetic rollback'), $provider->public_id, 1, $mapping,
+        );
+        $receipt = app(RealtimeProviderEventStore::class)->persist($final, $provider);
+
+        $eventName = 'eloquent.creating: '.AiCommonSharedTranscriptRevision::class;
+        Event::listen($eventName, static function (): never {
+            throw new \RuntimeException('synthetic writer failure');
+        });
+        try {
+            app(RealtimeDurableFinalCommitter::class)->commit(
+                $owner, $organization, $conversation, $session, $receipt, (string) Str::uuid(),
+            );
+            $this->fail('Synthetic Writer failure must abort the transaction.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('synthetic writer failure', $error->getMessage());
+        } finally {
+            Event::forget($eventName);
+        }
+
+        $this->assertDatabaseCount('ai_common_shared_durable_final_commits', 0);
+        $this->assertDatabaseCount('ai_common_shared_durable_final_commit_items', 0);
+        $this->assertDatabaseCount('ai_common_shared_transcript_segments', 0);
+        $this->assertDatabaseCount('ai_common_shared_transcript_revisions', 0);
+    }
+
+    public function test_realtime_browser_contract_uses_one_media_stream_and_no_bounded_fallback(): void
+    {
+        $script = file_get_contents(public_path('js/ai-common-shared-session.js'));
+        $worklet = file_get_contents(public_path('js/ai-common-realtime-processor.js'));
+        $view = file_get_contents(resource_path('views/ai-common/_shared-session.blade.php'));
+
+        $this->assertSame(1, substr_count($script, 'getUserMedia('));
+        $this->assertStringContainsString('AudioWorkletNode', $script);
+        $this->assertStringContainsString('new WebSocket', $script);
+        $this->assertStringContainsString("format: 'pcm_s16le'", $script);
+        $this->assertStringNotContainsString('MediaRecorder', $script);
+        $this->assertStringContainsString('new Int16Array(1600)', $worklet);
+        $this->assertStringContainsString('prefers-reduced-motion: reduce', $script);
+        $this->assertStringContainsString('if (!current || current.closing) return', $script);
+        $this->assertStringContainsString('Microphone device ended or permission was revoked', $script);
+        $this->assertStringNotContainsString('event.code !== 1000', $script);
+        $this->assertStringContainsString('data-realtime-enabled', $view);
+        $this->assertStringContainsString('data-realtime-co-form', $view);
+        $this->assertStringNotContainsString('data-window-base', $view);
+        $this->assertStringContainsString('legacy 55-second bounded path is isolated', $view);
+        $this->assertStringContainsString('@media(max-width:390px)', file_get_contents(resource_path('views/ai-common/shared-show.blade.php')));
+    }
+
+    public function test_lease_http_boundary_requires_audio_fence_and_same_origin_wss(): void
+    {
+        [$owner, , $organization, $conversation, $session, $stream] = $this->activeFixture();
+        $client = $this->actingAs($owner)->withSession([
+            'access_mode' => 'workspace',
+            'current_company_id' => $organization->id,
+            'current_company_access_epoch' => 1,
+            'credential_generation' => $owner->credential_generation,
+        ]);
+        $url = route('ai-common.shared.sessions.streams.lease', [$conversation, $session, $stream]);
+        $client->postJson($url)->assertUnprocessable();
+
+        config()->set('ai-common-realtime.audio_send_enabled', true);
+        config()->set('ai-common-realtime.relay_url', 'wss://localhost/realtime-relay');
+        $response = $client->postJson($url)->assertOk()
+            ->assertJsonPath('stream_id', $stream->public_id)
+            ->assertJsonPath('generation', 1)
+            ->assertJsonPath('relay_url', 'wss://localhost/realtime-relay');
+        $leaseId = $response->json('lease_id');
+        $client->postJson(route('ai-common.shared.sessions.leases.refresh', [$conversation, $session, $leaseId]))
+            ->assertOk()->assertJsonPath('lease_id', $leaseId);
+        $this->assertDatabaseCount('ai_common_shared_provider_sessions', 0);
+        $this->assertDatabaseCount('ai_common_shared_provider_event_receipts', 0);
     }
 
     private function activeFixture(): array

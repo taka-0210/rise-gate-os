@@ -1,6 +1,6 @@
 <section class='shared-card' aria-labelledby='shared-session-heading'>
 <h2 id='shared-session-heading'>Shared-room Session / Voice</h2>
-<p class='shared-muted'>Human Message storage and AI Request are separate. Audio is limited to independently decodable windows of 60 seconds or less.</p>
+<p class='shared-muted'>Human Message storage and AI Request are separate. Realtime audio stays memory-bounded; the legacy bounded path retains its independently decodable 60-second limit.</p>
 @if(!$session)
     @if($conversation->status === 'active' && $participant->role === 'owner')
     <form method='post' action='{{ route('ai-common.shared.sessions.prepare', $conversation) }}'>
@@ -30,10 +30,28 @@
         <form method='post' action='{{ route('ai-common.shared.sessions.end', [$conversation, $session]) }}'>@csrf<button>End Session</button></form>
     </div>
     @if($session->state === 'active')
-    <div id='shared-session-recorder' data-start-url='{{ route('ai-common.shared.sessions.streams.start', [$conversation, $session]) }}' data-stream-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/streams') }}' data-window-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/windows') }}' data-snapshot-url='{{ route('ai-common.shared.sessions.snapshot', [$conversation, $session]) }}' data-shared-room-sequence='{{ $coState->room_sequence ?? $session->room_sequence ?? 0 }}' data-csrf='{{ csrf_token() }}'>
-        <p data-session-recorder-status role='status'>Recorder stopped</p>
-        <div class='shared-row'><button type='button' data-session-record-start>Start continuous voice</button><button type='button' data-session-record-stop disabled>Stop normally</button><button type='button' data-session-record-cancel disabled>Cancel</button></div>
-        <p class='shared-muted'>Ver.1 permits one shared-room capture stream. Distributed multi-mic is out of scope.</p>
+    @php($realtimeReady = config('ai-common-realtime.enabled') && config('ai-common-realtime.audio_send_enabled') && filled(config('ai-common-realtime.relay_url')))
+    <div id='shared-session-recorder'
+        data-realtime-enabled='{{ $realtimeReady ? 'true' : 'false' }}'
+        data-start-url='{{ route('ai-common.shared.sessions.streams.start', [$conversation, $session]) }}'
+        data-stream-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/streams') }}'
+        data-leases-base='{{ url('/company/co/shared-conversations/'.$conversation->getRouteKey().'/sessions/'.$session->getRouteKey().'/leases') }}'
+        data-worklet-url='{{ asset('js/ai-common-realtime-processor.js') }}'
+        data-snapshot-url='{{ route('ai-common.shared.sessions.snapshot', [$conversation, $session]) }}'
+        data-shared-room-sequence='{{ $coState->room_sequence ?? $session->room_sequence ?? 0 }}'
+        data-csrf='{{ csrf_token() }}'>
+        <p data-session-recorder-status role='status'>{{ $realtimeReady ? 'Recorder stopped. Realtime capture ready.' : 'Recorder stopped. Realtime capture unavailable: safety gates are closed.' }}</p>
+        <canvas class='shared-waveform' data-session-waveform width='720' height='96' aria-label='Live microphone level'></canvas>
+        <dl class='shared-state-grid shared-realtime-states'>
+            <div><dt>Capture</dt><dd data-realtime-capture>idle</dd></div>
+            <div><dt>Relay</dt><dd data-realtime-relay>disconnected</dd></div>
+            <div><dt>Provider</dt><dd data-realtime-provider>not connected</dd></div>
+            <div><dt>Transcript</dt><dd data-realtime-transcript>idle</dd></div>
+        </dl>
+        <p class='shared-partial' data-realtime-partial aria-live='off'></p>
+        <ol class='shared-durable-finals' data-realtime-finals aria-live='polite'></ol>
+        <div class='shared-row'><button type='button' data-session-record-start @disabled(!$realtimeReady)>Start realtime voice</button><button type='button' data-session-record-stop disabled>Stop normally</button><button type='button' data-session-record-cancel disabled>Cancel</button></div>
+        <p class='shared-muted'>One continuous MediaStream feeds both waveform and 16 kHz mono PCM frames. Partial text is ephemeral; only a verified Durable Final is shown as committed. The legacy 55-second bounded path is isolated and is not selectable here.</p>
     </div>
     @endif
     @endif
@@ -52,6 +70,17 @@
         <div><dt>Context</dt><dd data-context-state>{{ $coState->context_state ?? ($session->context_status ?? 'empty') }}</dd></div>
     </dl>
     <p role='status' data-context-watermark>Context watermark: segment {{ $coState->context_watermark_segment_id ?? 'none' }}</p>
+    @if($conversation->status === 'active')
+        <form method='post' action='{{ route('ai-common.shared.co-requests.store', $conversation) }}' data-realtime-co-form>
+            @csrf
+            <input type='hidden' name='operation_id' value='{{ Str::uuid() }}'>
+            <input type='hidden' name='realtime_target_provider_session_id' data-realtime-target-provider-session disabled>
+            <input type='hidden' name='realtime_target_receive_order' data-realtime-target-receive-order disabled>
+            <label>COに相談<textarea name='content' maxlength='4000' required></textarea></label>
+            <button type='submit'>現在の確定TranscriptでCOに相談</button>
+            <p class='shared-muted'>最新のPartialがある場合だけ最大1.5秒待ちます。未確定Partialは保存・参照せず、timeout時はclick時点のDurable Snapshotを使います。</p>
+        </form>
+    @endif
     <noscript><p>Live multi-device state requires JavaScript. Reload for the current authorized snapshot.</p></noscript>
     @if($p4Checkpoint)
         <details><summary>Rolling Context checkpoint {{ $p4Checkpoint->revision_no }}</summary>

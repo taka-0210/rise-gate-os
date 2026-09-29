@@ -15,6 +15,11 @@ class AiCommonSharedRelayLease extends Model
 
     public const STATE_EXPIRED = 'expired';
 
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
+    }
+
     protected $guarded = [];
 
     protected function casts(): array

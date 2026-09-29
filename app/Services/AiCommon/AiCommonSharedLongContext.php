@@ -3,8 +3,8 @@
 namespace App\Services\AiCommon;
 
 use App\Models\AiCommonConversation;
-use App\Models\AiCommonSharedCheckpointDependency;
 use App\Models\AiCommonSharedCaptureStream;
+use App\Models\AiCommonSharedCheckpointDependency;
 use App\Models\AiCommonSharedContextCheckpoint;
 use App\Models\AiCommonSharedCoState;
 use App\Models\AiCommonSharedDeviceCursor;
@@ -213,18 +213,104 @@ class AiCommonSharedLongContext
         }, 3);
     }
 
-    public function contextForRequest(User $actor, Organization $organization, AiCommonConversation $conversation, AiCommonSharedSession $session, string $query): array
+    public function captureRequestRevisionIds(User $actor, Organization $organization, AiCommonConversation $conversation, AiCommonSharedSession $session): array
     {
-        $checkpoint = $this->currentCheckpoint($session->fresh());
+        $this->authorizeContext($actor, $organization, $conversation, $session);
+
+        return $this->currentRows($session->fresh())->pluck('revision.id')->map(fn ($id): int => (int) $id)->all();
+    }
+
+    public function createRequestSnapshot(User $actor, Organization $organization, AiCommonConversation $conversation, AiCommonSharedSession $session, array $revisionIds, string $operationId): ?AiCommonSharedContextCheckpoint
+    {
+        if (! Str::isUuid($operationId)) {
+            throw ValidationException::withMessages(['operation_id' => 'A valid request snapshot operation is required.']);
+        }
+        $this->authorizeContext($actor, $organization, $conversation, $session);
+        $revisionIds = collect($revisionIds)->map(fn ($id): int => (int) $id)->filter()->unique()->sort()->values()->all();
+        if ($revisionIds === []) {
+            return null;
+        }
+        $audience = $this->sharedAccess->audienceSnapshot($actor, $organization, $conversation);
+
+        return DB::transaction(function () use ($actor, $organization, $conversation, $session, $revisionIds, $operationId, $audience): AiCommonSharedContextCheckpoint {
+            $locked = AiCommonSharedSession::query()->lockForUpdate()->findOrFail($session->id);
+            $this->authorizeContext($actor->fresh(), $organization, $conversation->fresh(), $locked);
+            $rows = $this->rowsForRevisionIds($locked, $revisionIds);
+            if ($rows->count() !== count($revisionIds)) {
+                throw ValidationException::withMessages(['context' => 'Click-time Transcript revisions changed before request snapshot publication.']);
+            }
+            $fingerprint = hash('sha256', json_encode([$locked->id, $revisionIds, $locked->purpose_revision_id, $audience['fingerprint'], 'request_snapshot'], JSON_THROW_ON_ERROR));
+            $existing = AiCommonSharedContextCheckpoint::query()->where('ai_common_shared_session_id', $locked->id)->where('operation_id', $operationId)->first();
+            if ($existing) {
+                if (! hash_equals($existing->payload_fingerprint, $fingerprint)) {
+                    throw ValidationException::withMessages(['operation_id' => 'Request snapshot operation was reused with different lineage.']);
+                }
+
+                return $this->authorizeCheckpoint($actor, $organization, $conversation, $locked, $existing, true);
+            }
+            $current = $this->currentCheckpoint($locked);
+            $last = $rows->last();
+            $rendered = $this->renderRows($rows, self::MAX_RECENT_CHARACTERS);
+            $currentRevisionIds = $current?->dependencies()->pluck('transcript_revision_id')->map(fn ($id): int => (int) $id) ?? collect();
+            $structured = $current && $currentRevisionIds->diff($revisionIds)->isEmpty()
+                ? $current->structured_context
+                : json_encode([
+                    'current_topic' => null, 'main_views' => [], 'agreement_candidates' => [],
+                    'open_questions' => [], 'to_confirm' => [], 'source_refs' => [],
+                ], JSON_THROW_ON_ERROR);
+            $checkpoint = AiCommonSharedContextCheckpoint::query()->create([
+                'ai_common_shared_session_id' => $locked->id,
+                'previous_checkpoint_id' => $current?->id,
+                'created_by_user_id' => $actor->id,
+                'purpose_revision_id' => $locked->purpose_revision_id,
+                'revision_no' => ((int) AiCommonSharedContextCheckpoint::query()->where('ai_common_shared_session_id', $locked->id)->max('revision_no')) + 1,
+                'operation_id' => $operationId,
+                'payload_fingerprint' => $fingerprint,
+                'audience_fingerprint' => $audience['fingerprint'],
+                'through_segment_id' => $last['segment']->id,
+                'through_revision_id' => $last['revision']->id,
+                'status' => AiCommonSharedContextCheckpoint::STATUS_REQUEST_SNAPSHOT,
+                'structured_context' => $structured,
+                'estimated_tokens' => $this->estimateTokens([['role' => 'system', 'content' => $rendered]]),
+                'lineage_fingerprint' => hash('sha256', implode('|', $revisionIds)),
+                'provider' => null,
+                'model' => null,
+            ]);
+            foreach ($rows as $row) {
+                $identity = $row['identity'];
+                AiCommonSharedCheckpointDependency::query()->create([
+                    'ai_common_shared_context_checkpoint_id' => $checkpoint->id,
+                    'transcript_segment_id' => $row['segment']->id,
+                    'transcript_revision_id' => $row['revision']->id,
+                    'identity_revision_id' => $identity?->id,
+                    'speaker_label' => $row['segment']->speaker_label,
+                    'speaker_scope' => $row['segment']->speaker_scope,
+                    'range_start_ms' => $row['revision']->range_start_ms,
+                    'range_end_ms' => $row['revision']->range_end_ms,
+                    'dependency_fingerprint' => hash('sha256', implode('|', [$row['segment']->id, $row['revision']->id, $identity?->id ?? 'none'])),
+                ]);
+            }
+
+            return $this->authorizeCheckpoint($actor, $organization, $conversation, $locked, $checkpoint, true);
+        }, 3);
+    }
+
+    public function contextForRequest(User $actor, Organization $organization, AiCommonConversation $conversation, AiCommonSharedSession $session, string $query, ?AiCommonSharedContextCheckpoint $fixedCheckpoint = null): array
+    {
+        $checkpoint = $fixedCheckpoint ?? $this->currentCheckpoint($session->fresh());
         if (! $checkpoint) {
             return ['messages' => [], 'checkpoint_id' => null, 'dependencies' => []];
         }
-        $checkpoint = $this->authorizeCheckpoint($actor, $organization, $conversation, $session, $checkpoint);
-        $recent = $this->renderRows($this->currentRows($session)->take(-20), self::MAX_RECENT_CHARACTERS);
-        $historical = collect($this->historical($actor, $organization, $conversation, $session, $query))
-            ->pluck('content')->implode("\n");
+        $checkpoint = $this->authorizeCheckpoint($actor, $organization, $conversation, $session, $checkpoint, $fixedCheckpoint !== null);
+        $recent = $this->renderRows($this->rowsForCheckpoint($session, $checkpoint)->take(-20), self::MAX_RECENT_CHARACTERS);
+        $historical = $fixedCheckpoint
+            ? ''
+            : collect($this->historical($actor, $organization, $conversation, $session, $query))->pluck('content')->implode("\n");
         $purpose = $session->purposeRevision()->value('purpose');
-        $content = "Conversation Purpose: {$purpose}\nRolling Context: {$checkpoint->structured_context}\nRecent Transcript:\n{$recent}\nRelevant Historical Transcript:\n{$historical}";
+        $content = "Conversation Purpose: {$purpose}\nRolling Context: {$checkpoint->structured_context}\nFixed Transcript Snapshot:\n{$recent}";
+        if ($historical !== '') {
+            $content .= "\nRelevant Historical Transcript:\n{$historical}";
+        }
         if ($this->estimateTokens([['role' => 'system', 'content' => $content]]) > self::MAX_INPUT_TOKENS) {
             throw ValidationException::withMessages(['context' => 'Authorized context cannot fit the bounded request budget.']);
         }
@@ -373,12 +459,14 @@ class AiCommonSharedLongContext
         }, 3);
     }
 
-    public function authorizeCheckpoint(User $actor, Organization $organization, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedContextCheckpoint $checkpoint): AiCommonSharedContextCheckpoint
+    public function authorizeCheckpoint(User $actor, Organization $organization, AiCommonConversation $conversation, AiCommonSharedSession $session, AiCommonSharedContextCheckpoint $checkpoint, bool $allowRequestSnapshot = false): AiCommonSharedContextCheckpoint
     {
         $this->authorizeContext($actor, $organization, $conversation, $session);
         $audience = $this->sharedAccess->audienceSnapshot($actor, $organization, $conversation);
         if ($checkpoint->ai_common_shared_session_id !== $session->id
-            || $checkpoint->status !== AiCommonSharedContextCheckpoint::STATUS_CURRENT
+            || ! in_array($checkpoint->status, $allowRequestSnapshot
+                ? [AiCommonSharedContextCheckpoint::STATUS_CURRENT, AiCommonSharedContextCheckpoint::STATUS_REQUEST_SNAPSHOT]
+                : [AiCommonSharedContextCheckpoint::STATUS_CURRENT], true)
             || $checkpoint->purpose_revision_id !== $session->purpose_revision_id
             || ! hash_equals($checkpoint->audience_fingerprint, $audience['fingerprint'])) {
             throw ValidationException::withMessages(['context' => 'The Rolling Context is stale or outside the current audience.']);
@@ -427,6 +515,26 @@ class AiCommonSharedLongContext
                 'identity' => $segment->identityRevisions->sortByDesc('revision_no')->first(),
             ];
         })->filter(fn (array $row): bool => $row['revision'] !== null)->values();
+    }
+
+    private function rowsForRevisionIds(AiCommonSharedSession $session, array $revisionIds): Collection
+    {
+        $wanted = collect($revisionIds)->map(fn ($id): int => (int) $id)->values();
+
+        return $session->transcriptSegments()->with(['currentRevision', 'identityRevisions'])
+            ->whereIn('current_revision_id', $wanted)->orderBy('id')->get()->map(function ($segment): array {
+                return [
+                    'segment' => $segment,
+                    'revision' => $segment->currentRevision,
+                    'identity' => $segment->identityRevisions->sortByDesc('revision_no')->first(),
+                ];
+            })->filter(fn (array $row): bool => $row['revision'] !== null)
+            ->sortBy(fn (array $row): int => array_search((int) $row['revision']->id, $wanted->all(), true))->values();
+    }
+
+    private function rowsForCheckpoint(AiCommonSharedSession $session, AiCommonSharedContextCheckpoint $checkpoint): Collection
+    {
+        return $this->rowsForRevisionIds($session, $checkpoint->dependencies()->orderBy('id')->pluck('transcript_revision_id')->all());
     }
 
     private function renderRows(Collection $rows, int $limit): string
