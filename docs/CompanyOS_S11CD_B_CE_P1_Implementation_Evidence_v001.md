@@ -3,6 +3,7 @@
 - Evidence date: 2026-09-29 JST
 - Branch: `ce-p1-realtime-corrective`
 - Baseline local commit: `9890dc0`
+- P1-B〜P1-E local commit: `ae95731`
 - Public push: **0**
 - Deploy: **0**
 - Provider communication / audio send in CE-P1: **0 / 0**
