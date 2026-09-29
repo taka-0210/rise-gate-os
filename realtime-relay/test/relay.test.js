@@ -8,7 +8,9 @@ import {
   assertLimitedPolicy, buildFailureEvidence, encodeEvidenceFrame, safeFailureReason, validateFrame,
 } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
-import { assertHumanRuntimePolicy, HumanGateController, sanitizeProviderEvent, validateProductFrame } from '../src/product-relay.js';
+import {
+  assertHumanRuntimePolicy, HumanGateController, normalizeProxyResponseHeaders, sanitizeProviderEvent, validateProductFrame,
+} from '../src/product-relay.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
   assert.equal(SDK_VERSION, '5.10.0');
@@ -175,6 +177,21 @@ test('P1-J Product relay policy is loopback-bounded, zero-retry and cost-limited
   assert.throws(() => assertHumanRuntimePolicy({ ...approved, COMPANY_OS_REALTIME_RETRY_MAX: '1' }), /fence_closed/);
   assert.throws(() => assertHumanRuntimePolicy({ ...approved, COMPANY_OS_REALTIME_MAX_AUDIO_SECONDS: '301' }), /cost_or_attempt/);
   assert.throws(() => assertHumanRuntimePolicy({ ...approved, COMPANY_OS_REALTIME_BRIDGE_TOKEN: 'short' }), /bridge_token/);
+});
+
+test('P1-J HTTPS proxy rewrites only its own insecure absolute redirects', () => {
+  assert.equal(
+    normalizeProxyResponseHeaders({ location: 'http://localhost:8443/login' }, 'https://localhost:8443').location,
+    'https://localhost:8443/login',
+  );
+  assert.equal(
+    normalizeProxyResponseHeaders({ location: 'https://example.test/login' }, 'https://localhost:8443').location,
+    'https://example.test/login',
+  );
+  assert.equal(
+    normalizeProxyResponseHeaders({ location: '/login' }, 'https://localhost:8443').location,
+    '/login',
+  );
 });
 
 test('P1-J Product relay validates live PCM identity and sanitizes Provider events', () => {

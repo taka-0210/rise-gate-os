@@ -131,6 +131,24 @@ function appendEvidence(file, record) {
   fs.appendFileSync(file, `${JSON.stringify({ at: new Date().toISOString(), ...record })}\n`, { encoding: 'utf8' });
 }
 
+export function normalizeProxyResponseHeaders(headers, expectedOrigin) {
+  const normalized = { ...headers };
+  if (typeof normalized.location !== 'string') return normalized;
+
+  try {
+    const expected = new URL(expectedOrigin);
+    const location = new URL(normalized.location);
+    if (location.protocol === 'http:' && location.hostname === expected.hostname && location.port === expected.port) {
+      location.protocol = expected.protocol;
+      normalized.location = location.toString();
+    }
+  } catch {
+    // Relative and malformed Location values are passed through unchanged.
+  }
+
+  return normalized;
+}
+
 export async function createProductRelay(env = process.env) {
   const policy = assertHumanRuntimePolicy(env);
   const host = env.COMPANY_OS_REALTIME_RELAY_HOST ?? '127.0.0.1';
@@ -162,7 +180,14 @@ export async function createProductRelay(env = process.env) {
     if (!['127.0.0.1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress)) { response.writeHead(404); response.end(); return; }
     const proxy = http.request({ hostname: upstream.hostname, port: upstream.port, path: request.url, method: request.method, headers: {
       ...request.headers, host: `localhost:${port}`, 'x-forwarded-proto': 'https', 'x-forwarded-host': `localhost:${port}`,
-    } }, upstreamResponse => { response.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers); upstreamResponse.pipe(response); });
+      'x-forwarded-port': String(port),
+    } }, upstreamResponse => {
+      response.writeHead(
+        upstreamResponse.statusCode ?? 502,
+        normalizeProxyResponseHeaders(upstreamResponse.headers, expectedOrigin),
+      );
+      upstreamResponse.pipe(response);
+    });
     proxy.on('error', () => { if (!response.headersSent) response.writeHead(502); response.end('Local application unavailable.'); });
     request.pipe(proxy);
   });
