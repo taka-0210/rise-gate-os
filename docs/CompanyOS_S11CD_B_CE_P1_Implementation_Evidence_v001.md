@@ -4,12 +4,12 @@
 - Branch: ce-p1-realtime-corrective
 - Baseline / prior local commits: 9890dc0 / ae95731 / ce49baa / 84bf025
 - Public push / deploy: 0 / 0
-- CE-P1 Deepgram executions: initial authorization 1 + corrective authorization 1; Provider acceptance and completed audio send remain unevidenced
+- CE-P1 Deepgram executions: initial 1 + corrective 1 + Hardened approved 1; latest run recorded Provider acceptance false and audio send 0
 - Production Credential use: 0
 - Production / normal local / shared DB migration: 0
 - Realtime feature flags: default OFF / audio send OFF
 
-This update records the approved implementation through P1-H, the initial P1-I execution, and the one explicitly authorized corrective re-verification. P1-I still did not produce complete Provider Evidence and is not PASS. Human UX is not started.
+This update records the approved implementation through P1-H, both earlier P1-I executions, Evidence Harness Hardening, and the single approved Hardened Verification. P1-I remains inconclusive because the latest run stopped before Provider acceptance and its exact sanitized failure reason was not persisted. Human UX is not started.
 
 ## 1｜Phase status
 
@@ -23,7 +23,7 @@ This update records the approved implementation through P1-H, the initial P1-I e
 | P1-F Compatibility / Durable Final | IMPLEMENTED / AUTOMATED PASS | Bounded/realtime discriminator and mandatory Commit→Receipt→verified Source Range→Segment/Revision lineage. |
 | P1-G Capture / Waveform | IMPLEMENTED CANDIDATE / AUTOMATED PASS | One microphone stream/Web Audio graph, 100 ms frames, waveform, same-origin WSS lease boundary and lifecycle cleanup. Actual relay runtime and Human UX remain unverified. |
 | P1-H Partial / Final / CO Grace | IMPLEMENTED CANDIDATE / SYNTHETIC PASS | Ephemeral partial, validating final, Durable Final-only canonical UI, exact-target grace and immutable click-time request snapshot. |
-| P1-I Limited Provider Verification | INCONCLUSIVE_EVIDENCE_FAILURE / STOPPED | The initial execution and the one authorized corrective re-verification both ended before complete sanitized Provider Evidence was persisted. No retry or resend followed the corrective execution. See §10 and §12. |
+| P1-I Limited Provider Verification | INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE / STOPPED | Hardened IPC succeeded, but the latest single authorized run stopped before Provider acceptance/audio send. SDK lifecycle mismatch is the strongest candidate; exact safe reason remains Unknown. No retry or resend followed. See §14. |
 | P1-J Human UX / device matrix | NOT STARTED | P1-I did not PASS; no human device or microphone operation started. |
 
 ## 2｜P1-F Compatibility and bounded preservation
@@ -270,3 +270,27 @@ Decision recommendation:
 **Authorize exactly one additional Limited Deepgram Request only through a new explicit Human Gate.**
 
 No request is authorized by this recommendation. Until a new approval is supplied, P1-I remains `INCONCLUSIVE_EVIDENCE_FAILURE`, P1-J remains `NOT STARTED`, and Provider communication/audio send remain disabled.
+
+## 14｜P1-I Hardened Limited Provider Verification outcome
+
+The Recommended Decision was explicitly approved and the Hardened Limited Verification was invoked once. The prior stdout parsing defect did not recur: the child produced a valid `sentinel-json-v1` frame and the parent persisted sanitized process, request, Provider, audio, event, and close state.
+
+The run stopped before Provider acceptance and before audio send. Evidence records one Provider connection attempt, `mip_opt_out=true`, reconnectAttempts `0`, audio `0 samples / 0 bytes / 0 seconds`, zero Provider events, child exit code `1`, and no raw output or Provider payload persistence. No retry, reconnect, or resend followed.
+
+Static inspection found an SDK lifecycle mismatch: Deepgram SDK v5 begins connecting when its `ReconnectingWebSocket` is constructed, while the current Relay additionally calls `provider.connect()`, which the SDK implements as `reconnect()`. This is the strongest Runtime integration candidate. However, the parent failure writer omitted the child sanitized `safe_reason` and error-layer classification, so the execution-specific cause remains Unknown and Provider failure is not established.
+
+Disposition:
+
+**P1-I = INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE / STOPPED**
+
+**P1-J = NOT STARTED**
+
+**Additional Provider request = NOT AUTHORIZED**
+
+Recommended Next Action is a Provider-free corrective for the SDK lifecycle and failure Evidence completeness, followed by synthetic/regression verification. Only after that PASS should a new maximum-one-request Human Gate be considered.
+
+Detailed outcome:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_I_Hardened_Verification_Outcome_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_I_Deepgram_Hardened_v001.json`
+- `docs/evidence/CompanyOS_CE_P1_I_Hardened_Verification_Outcome_v001.json`

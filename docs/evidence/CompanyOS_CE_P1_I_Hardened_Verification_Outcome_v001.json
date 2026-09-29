@@ -1,0 +1,97 @@
+{
+    "schema_version":  1,
+    "stage":  "CE-P1-I_HARDENED_LIMITED_PROVIDER_VERIFICATION_OUTCOME",
+    "date_jst":  "2026-09-30",
+    "status":  "INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE",
+    "provider_failure_established":  false,
+    "p1_i":  "INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE",
+    "p1_j":  "NOT_STARTED",
+    "authorization":  {
+                          "approved_request_max":  1,
+                          "test_invocation_count":  1,
+                          "provider_connection_attempted":  true,
+                          "allowance_consumed":  true,
+                          "retry":  0,
+                          "automatic_reconnect":  0,
+                          "manual_reconnect":  0,
+                          "resend":  0,
+                          "additional_request_authorized":  false
+                      },
+    "preflight":  {
+                      "status":  "PASS",
+                      "node":  "v24.21.0",
+                      "deepgram_sdk":  "5.10.0",
+                      "ws":  "8.22.0",
+                      "wav_bytes":  604900,
+                      "wav_sha256":  "396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A",
+                      "credential_loadable":  true,
+                      "secret_displayed":  false,
+                      "node_tests":  "6 PASS",
+                      "synthetic_failure_matrix":  "12 PASS / 265 assertions"
+                  },
+    "actual":  {
+                   "ipc":  "sentinel-json-v1",
+                   "process_exit_state":  "exited",
+                   "safe_exit_code":  1,
+                   "json_parse_state":  "valid",
+                   "provider_connection_attempted":  true,
+                   "provider_acceptance":  false,
+                   "request_projection_captured":  true,
+                   "mip_opt_out":  "true",
+                   "reconnect_attempts":  0,
+                   "audio_send_state":  false,
+                   "audio_samples":  0,
+                   "audio_bytes":  0,
+                   "audio_duration_seconds":  0,
+                   "event_count":  0,
+                   "close_state":  1000,
+                   "exact_safe_reason":  "unknown_not_persisted",
+                   "error_layer":  "unknown_not_persisted"
+               },
+    "root_cause":  {
+                       "classification":  "SDK_LIFECYCLE_INTEGRATION_CANDIDATE_PLUS_EVIDENCE_COMPLETENESS_DEFECT",
+                       "runtime_candidate":  "Deepgram SDK v5 starts ReconnectingWebSocket during construction; Company OS then calls provider.connect(), whose SDK implementation calls reconnect(), disconnecting the in-progress socket and starting another connection",
+                       "execution_specific_cause_proven":  false,
+                       "reason_not_proven":  "the PHP failure writer persisted the parent harness projection but omitted the child sanitized safe_reason and error classification",
+                       "completeness_false_positive":  true,
+                       "unknown_inferred":  false
+                   },
+    "cost":  {
+                 "hard_limit_usd":  0.01,
+                 "full_audio_conservative_estimate_usd":  0.0030557728125,
+                 "actual_billed_cost_usd":  "unknown",
+                 "audio_sent_seconds":  0
+             },
+    "security_privacy":  {
+                             "raw_credential_persisted":  false,
+                             "authorization_header_persisted":  false,
+                             "raw_provider_payload_persisted":  false,
+                             "raw_realtime_audio_persisted":  false,
+                             "raw_stdout_persisted":  false,
+                             "raw_stderr_persisted":  false
+                         },
+    "post_stop":  {
+                      "ephemeral_tls_removed":  true,
+                      "node_processes":  0,
+                      "repository_env_sha256":  "DC2A0E2A2402229EFA555609FFCEB6A9721F9A2CC1A452D5B7DEEEF3BC6CB0ED",
+                      "normal_local_db_sha256":  "19278A4B11E3DCBF1B717969C554D7E45919B1C0B362F54EA1BFCA4D9BFC072C",
+                      "azure_requests":  0,
+                      "other_provider_requests":  0,
+                      "production_credential_used":  false,
+                      "production_db_migration":  false,
+                      "deploy":  false,
+                      "public_push":  false
+                  },
+    "recommended_next_action":  {
+                                    "decision":  "DO_NOT_AUTHORIZE_ANOTHER_REQUEST_YET",
+                                    "provider_free_corrective":  [
+                                                                     "remove redundant provider.connect call",
+                                                                     "prove one SDK constructor connection and zero explicit reconnect with synthetic tests",
+                                                                     "persist sanitized safe_reason and error-layer classification",
+                                                                     "require diagnostic fields before evidence_completeness can be complete on non-PASS",
+                                                                     "add SDK-open failure, Provider rejection, and connection-abort matrix cases",
+                                                                     "rerun Node, P1 focused, CE-P1 Regression, and secret scans with Provider communication zero"
+                                                                 ],
+                                    "future_gate":  "after corrective verification PASS, request separate explicit approval for at most one request under the same limits"
+                                }
+}
