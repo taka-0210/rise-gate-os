@@ -10,7 +10,10 @@ export function buildRequestProjection(overrides = {}, env = process.env) {
     sample_rate: 16000,
     channels: 1,
     diarize: true,
+    diarize_model: 'latest',
     interim_results: true,
+    punctuate: true,
+    smart_format: true,
     mip_opt_out: true,
     automatic_retry: false,
     ...overrides,
@@ -32,22 +35,26 @@ export function assertNetworkFence(projection, env = process.env) {
   return true;
 }
 
-export async function createDeepgramSession({ apiKey, signal, env = process.env, projection = null }) {
+export async function createDeepgramSession({ apiKey, signal, env = process.env, projection = null, onRequestProjection = null }) {
   projection ??= buildRequestProjection({}, env);
   assertNetworkFence(projection, env);
   if (!apiKey || typeof apiKey !== 'string') throw new Error('server_credential_unavailable');
   const client = new DeepgramClient({ apiKey });
-  const connection = await client.listen.v1.connect({
+  const request = {
     model: projection.model,
     language: projection.language,
     encoding: projection.encoding,
     sample_rate: projection.sample_rate,
     channels: projection.channels,
     diarize: String(projection.diarize),
+    diarize_model: projection.diarize_model,
     interim_results: String(projection.interim_results),
+    punctuate: String(projection.punctuate),
+    smart_format: String(projection.smart_format),
     mip_opt_out: 'true',
     abortSignal: signal,
-    shouldReconnect: () => false,
-  });
-  return connection;
+    reconnectAttempts: 0,
+  };
+  onRequestProjection?.(Object.freeze({ ...request, abortSignal: Boolean(request.abortSignal) }));
+  return client.listen.v1.connect(request);
 }

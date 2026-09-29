@@ -2,14 +2,14 @@
 
 - Evidence date: 2026-09-30 JST
 - Branch: ce-p1-realtime-corrective
-- Baseline / prior local commits: 9890dc0 / ae95731 / ce49baa
+- Baseline / prior local commits: 9890dc0 / ae95731 / ce49baa / 84bf025
 - Public push / deploy: 0 / 0
-- CE-P1 Provider communication / audio send: 0 / 0
+- CE-P1 Deepgram attempt: at most 1 Provider handshake/request attempt; completed audio send and Provider acceptance are not evidenced
 - Production Credential use: 0
 - Production / normal local / shared DB migration: 0
 - Realtime feature flags: default OFF / audio send OFF
 
-This update records the approved P1-F compatibility extension and repository/synthetic implementation through P1-H. It does not declare Provider Evidence or Human UX PASS.
+This update records the approved implementation through P1-H and the single authorized P1-I attempt. P1-I did not produce complete Evidence and is not PASS. Human UX is not started.
 
 ## 1｜Phase status
 
@@ -23,8 +23,8 @@ This update records the approved P1-F compatibility extension and repository/syn
 | P1-F Compatibility / Durable Final | IMPLEMENTED / AUTOMATED PASS | Bounded/realtime discriminator and mandatory Commit→Receipt→verified Source Range→Segment/Revision lineage. |
 | P1-G Capture / Waveform | IMPLEMENTED CANDIDATE / AUTOMATED PASS | One microphone stream/Web Audio graph, 100 ms frames, waveform, same-origin WSS lease boundary and lifecycle cleanup. Actual relay runtime and Human UX remain unverified. |
 | P1-H Partial / Final / CO Grace | IMPLEMENTED CANDIDATE / SYNTHETIC PASS | Ephemeral partial, validating final, Durable Final-only canonical UI, exact-target grace and immutable click-time request snapshot. |
-| P1-I Limited Provider Verification | HUMAN GATE / NOT STARTED | No Deepgram connection or audio transmission occurred. See §11. |
-| P1-J Human UX / device matrix | NOT STARTED | Automated evidence is not Human UX PASS. |
+| P1-I Limited Provider Verification | INCONCLUSIVE_EVIDENCE_FAILURE / STOPPED | The one authorized execution returned non-success before complete sanitized Provider Evidence was persisted. No retry was performed. See §10. |
+| P1-J Human UX / device matrix | NOT STARTED | P1-I did not PASS; no human device or microphone operation started. |
 
 ## 2｜P1-F Compatibility and bounded preservation
 
@@ -74,7 +74,7 @@ Repository implementation provides:
 
 The Laravel lease boundary remains fail closed unless realtime and audio-send are enabled. It permits only wss:// with the exact application host. HTTP tests create no Provider Session or Receipt.
 
-Runtime limitation: no persistent relay process/listener, public port, reverse-proxy upgrade, Tunnel or Firewall change was created. The repository does not declare a standalone WSS server dependency. Actual WSS transport and end-to-end microphone behavior remain Provider/Human evidence.
+P1-I added an isolated Node relay verification runtime and direct `ws@8.22.0` dependency. The listener is hard-bound to loopback with one accepted WSS connection, an exact origin/path check, and no public port, Tunnel, Firewall or Production reverse-proxy change. The process is session-bounded and is not a Production deployment.
 
 ## 5｜P1-H partial, final and CO grace
 
@@ -96,11 +96,11 @@ Runtime limitation: no persistent relay process/listener, public port, reverse-p
 - SDK: @deepgram/sdk@5.10.0, server-side boundary only.
 - SDK integrity: sha512-GNse88Irf4ow4UlL+WbJjDOnJbpnX6B6e21PLxzfG0ioJlx5rVGbEX0OF06QgTiVyJ+VCtG5gdNum5DV2pwI1A==.
 - SDK license: MIT.
-- Locked transitive ws: 8.22.0; not newly declared as an application WSS server dependency.
+- Direct WSS server dependency: ws@8.22.0 exact-pinned, MIT, Node-compatible; offline audit reported 0 vulnerabilities.
 - Global install / PATH mutation: none.
 - Browser/Repository/report/log Provider Credential: none.
 - mip_opt_out=true is fixed in the request builder and checked again immediately before network creation.
-- automatic_retry=false and shouldReconnect returns false.
+- automatic_retry=false; SDK v5 uses reconnectAttempts=0 with AbortSignal. Manual reconnect is 0.
 - Raw Provider payload is never durable; partial is memory-only; normalized final metadata is encrypted at rest.
 - Feature flags remain OFF after tests.
 
@@ -122,15 +122,15 @@ Down refuses an unsafe bounded-only restoration while realtime rows exist. Migra
 
 | Verification | Result |
 |---|---|
-| P1 focused (after final WSS close guard) | 7 PASS / 96 assertions |
-| P1 + bounded P3/P4/P5 | 29 PASS / 295 assertions |
+| P1 focused communication-free | 11 PASS / 111 assertions / gated P1-I 1 SKIP |
+| P1 + bounded P3/P4/P5 + Release Hardening | 37 PASS / 339 assertions / gated P1-I 1 SKIP |
 | Release Hardening | 4 PASS / 29 assertions |
 | Isolated migration up / compatibility down / reapply | PASS |
-| Relay synthetic Node | 2 PASS |
+| Relay synthetic Node / P1-I fences | 4 PASS |
 | Relay and browser JS syntax | PASS |
-| Full Laravel suite | 645 PASS / 4 FAIL / 16 SKIP / 4,986 assertions before the final WSS close-only tightening; focused P1 rerun PASS afterward |
+| Full Laravel suite after P1-I stop | 648 PASS / 1 existing FAIL / 17 SKIP / 4,995 assertions |
 
-No CE-P1 test failed. The four remaining full-suite failures are outside changed CE-P1 paths: one existing CompanyNavigation stale intended-URL expectation and three date/schedule-sensitive ScopeNineActionExecution cases. The prior Migration-count failure is resolved.
+No communication-free CE-P1 automated test failed. The single full-suite failure is the pre-existing CompanyNavigation stale intended-URL expectation and is outside the changed CE-P1 paths. ScopeNine date-sensitive cases passed on this run. The separately gated real Provider test returned non-success as recorded in §10; it was not part of the closed-gate full-suite run.
 
 ## 9｜Evidence disposition
 
@@ -139,58 +139,67 @@ No CE-P1 test failed. The four remaining full-suite failures are outside changed
 | Product Design | Approved P1-F extension implemented |
 | Repository | P1-A〜P1-H candidate implemented |
 | Automated | Focused, connected regression, race/rollback and migration PASS |
-| Provider | NOT STARTED in CE-P1 |
+| Provider | INCONCLUSIVE_EVIDENCE_FAILURE; one authorized execution, no retry |
 | Human UX | NOT STARTED |
-| CE-P1 | IN PROGRESS / stopped at P1-I Human Gate |
+| CE-P1 | IN PROGRESS / stopped after inconclusive P1-I |
 | CE-G01 | CLOSED |
 
 P1-G/H are not promoted to Product/Human PASS from automated evidence alone.
 
-## 10｜P1-I first communication: exact proposed scope
+## 10｜P1-I single authorized execution
 
-No item below has executed.
+Execution date: 2026-09-30 JST.
 
-Credential:
+Approved boundaries were implemented before execution:
 
-- Candidate is the existing Evaluation-only Deepgram Credential stored by Windows CurrentUser DPAPI outside the Repository.
-- Secret plaintext remains absent from Evidence/Browser/Git/log.
-- Production Credential use remains prohibited.
-- DPAPI-to-relay load and zeroization must be verified before transport.
+- Deepgram Nova-3 Streaming / Japanese / diarization / interim results;
+- the approved 18.9016875-second synthetic WAV and SHA-256 `396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A`;
+- one attempt maximum, retry 0, automatic/manual reconnect 0;
+- conservative full-audio estimate USD `0.0030557728125`, hard ceiling USD `0.01`;
+- `mip_opt_out=true` at the actual SDK request projection;
+- server-side CurrentUser DPAPI Credential load only;
+- direct WSS bound to `127.0.0.1` with an ephemeral local certificate;
+- Azure and every other Provider disabled;
+- isolated in-memory test DB only; Repository `.env` and normal local DB hashes checked before/after.
 
-Existing approved non-customer audio:
+Communication-free verification before the attempt:
 
-- Microsoft Haruka Desktop synthetic Japanese speech;
-- PCM WAV / 16 kHz / 16-bit / mono;
-- duration 18.9016875 seconds;
-- 100 ms chunks at realtime 1.0x;
-- source SHA-256 396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A;
-- Ground Truth SHA-256 395041A321E8A77317FC95DB606B6F7BDCF81877E72E4FF821A1A4FC083F3E04;
-- no customer, business, confidential or third-party human data.
+- `@deepgram/sdk@5.10.0` and `ws@8.22.0` exact pins: PASS;
+- direct dependency offline audit: 0 vulnerabilities;
+- Node policy/canonical frame tests: 4 PASS;
+- P1 plus bounded P3/P4/P5 and Release Hardening: 37 PASS / 339 assertions / gated P1-I test skipped;
+- actual SDK option corrected from the obsolete `shouldReconnect` field to `reconnectAttempts=0`;
+- sub-frame Provider timing mapping and same-request multi-Final identity Regression: PASS.
 
-Request:
+Execution result:
 
-- Deepgram Nova-3 Streaming, language ja, diarization and interim enabled;
-- mip_opt_out=true exactly;
-- maximum 1 request / 18.9016875 seconds;
-- automatic retry/reconnect 0/0; manual retry/reconnect 0/0;
-- estimated cost USD 0.0030557728125;
-- proposed hard ceiling USD 0.01;
-- unknown cost before send: fail closed.
+- the gated Integration test returned non-success after 3.13 seconds;
+- the test stopped before application-side Provider Event normalization and Durable Final verification completed;
+- `.env`: unchanged;
+- normal local DB: unchanged;
+- ephemeral TLS key/certificate: removed;
+- persistent relay process after stop: none;
+- retry / second request / reconnect: 0;
+- Azure communication: 0;
+- Production Credential / DB / deploy / public push: 0.
 
-Only linear PCM plus technical request fields and random Provider correlation may leave the relay. Tenant names, membership data, sources/citations and unrelated conversation context are excluded.
+The original execution path asserted child-process success before writing a sanitized failure envelope. Consequently, the exact Provider handshake disposition, audio bytes/duration accepted by Deepgram, close/error detail, usage, cost and secret-absence scan were not persisted. The Harness was corrected after the attempt so a future explicitly authorized run would persist a hashed, secret-free failure envelope before asserting. That corrective was not used to resend.
 
-Required Evidence: server-held credential, actual MIP projection, WSS/authentication, partial/final, result identity, Provider and word timing, anonymous speaker hint, source mapping, Durable Final lineage, close/error/egress stop, sanitized usage/cost, and absence of raw payload/audio/secret/header from durable Evidence.
+Disposition:
 
-Stop with no retry on credential/runtime/fence mismatch, authorization/Consent/generation/sequence/range/hash failure, unexpected close/error, incomplete Evidence, unknown/excess cost, or any new unapproved package/process/network change.
+**P1-I = INCONCLUSIVE_EVIDENCE_FAILURE**
 
-## 11｜Additional approval item and current stop
+This is not classified as a Deepgram Provider failure. It is not inferred as PASS. The maximum-one-attempt rule is treated as consumed conservatively because Provider acceptance cannot be proven either way. Actual cost is unknown; the approved full-audio conservative estimate is an upper planning value, not actual usage Evidence.
 
-The browser and Laravel WSS contracts are implemented, but an actual same-origin WSS listener needs an isolated persistent runtime. Starting it, declaring a direct WSS server dependency, or changing reverse proxy/port remains unapproved. This must be reviewed together with the P1-I first-communication scope; no process or listener was started speculatively.
+## 11｜Current stop and next gate
 
-Current state:
+- P1-A through P1-H: repository/automated state retained.
+- P1-I: stopped after the single inconclusive execution.
+- P1-J Human UX: NOT STARTED.
+- Human microphone/device actions: 0.
+- Feature flags: default OFF; execution-scoped enablement ended with the child process.
+- No second Deepgram request is authorized.
+- No P1-J preparation is promoted to PASS.
+- CE-G01 remains CLOSED.
 
-- CE-P1 Provider request / audio / cost: 0 / 0 seconds / USD 0.
-- Prior CE-PD08B traffic is not counted as CE-P1.
-- Production DB migration / Credential: 0 / 0.
-- Public push / deploy: 0 / 0.
-- Next action: Human + ChatGPT review of §10–11 only. Do not enter P1-I/P1-J, Provider adoption, Production migration, push or deploy without approval.
+Next action is Human + ChatGPT Review of this P1-I disposition. Any further Provider request requires a new explicit Human authorization. Production DB migration, Production/Demo deploy, public GitHub push, Production Credential use, public port, Tunnel and Firewall changes remain prohibited.

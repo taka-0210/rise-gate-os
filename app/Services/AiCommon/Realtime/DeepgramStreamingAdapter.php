@@ -24,7 +24,12 @@ final class DeepgramStreamingAdapter implements ProviderStreamingPort
             'speaker' => isset($word['speaker']) ? 'speaker-'.(int) $word['speaker'] : null,
         ])->all();
         $speakers = collect($words)->pluck('speaker')->filter()->unique()->values()->all();
-        $identity = $providerEvent['request_id'] ?? $providerEvent['event_id'] ?? $providerEvent['metadata']['request_id'] ?? null;
+        $requestIdentity = $providerEvent['request_id'] ?? $providerEvent['event_id'] ?? $providerEvent['metadata']['request_id'] ?? null;
+        $identity = $requestIdentity === null ? null : hash('sha256', implode('|', [
+            (string) $requestIdentity, $type, ($providerEvent['is_final'] ?? false) === true ? 'final' : 'interim',
+            (string) ($providerEvent['start'] ?? ''), (string) ($providerEvent['duration'] ?? ''),
+            hash('sha256', (string) ($content ?? '')),
+        ]));
         $verified = ($sourceMapping['verification_state'] ?? 'unverified') === 'verified';
 
         return new ProviderStreamingEventEnvelope(
@@ -32,7 +37,7 @@ final class DeepgramStreamingAdapter implements ProviderStreamingPort
             (string) config('ai-common-realtime.deepgram.adapter_version'),
             $providerSessionId,
             $eventType,
-            $identity === null ? null : hash('sha256', (string) $identity),
+            $identity,
             isset($providerEvent['sequence']) ? (int) $providerEvent['sequence'] : null,
             $receiveOrder,
             $content,

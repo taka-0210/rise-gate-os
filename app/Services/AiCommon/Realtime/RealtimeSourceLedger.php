@@ -84,21 +84,33 @@ final class RealtimeSourceLedger
 
     public function sourceMapping(AiCommonSharedProviderSession $providerSession, int $providerStart, int $providerEnd): array
     {
-        $rows = AiCommonSharedProviderSendRange::query()->where('provider_session_id', $providerSession->id)
-            ->where('provider_offset_start_sample', '>=', $providerStart)
-            ->where('provider_offset_end_sample', '<=', $providerEnd)
-            ->with('sourceRange')->orderBy('send_ordinal')->get();
-        if ($rows->isEmpty() || $rows->first()->provider_offset_start_sample !== $providerStart
-            || $rows->last()->provider_offset_end_sample !== $providerEnd) {
+        if ($providerStart < 0 || $providerEnd <= $providerStart) {
             return ['verification_state' => 'unverified'];
         }
-        for ($i = 1; $i < $rows->count(); $i++) {
-            if ($rows[$i - 1]->provider_offset_end_sample !== $rows[$i]->provider_offset_start_sample
-                || $rows[$i - 1]->sourceRange->end_sample !== $rows[$i]->sourceRange->start_sample) {
+        $rows = AiCommonSharedProviderSendRange::query()->where('provider_session_id', $providerSession->id)
+            ->where('provider_offset_end_sample', '>', $providerStart)
+            ->where('provider_offset_start_sample', '<', $providerEnd)
+            ->with('sourceRange')->orderBy('send_ordinal')->get();
+        if ($rows->isEmpty() || $rows->first()->provider_offset_start_sample > $providerStart
+            || $rows->last()->provider_offset_end_sample < $providerEnd) {
+            return ['verification_state' => 'unverified'];
+        }
+        foreach ($rows as $index => $row) {
+            if (! $row->sourceRange || $row->state !== 'sent' || $row->sourceRange->state !== 'accepted') {
+                return ['verification_state' => 'unverified'];
+            }
+            if ($index > 0 && ($rows[$index - 1]->provider_offset_end_sample !== $row->provider_offset_start_sample
+                || $rows[$index - 1]->sourceRange->end_sample !== $row->sourceRange->start_sample)) {
                 return ['verification_state' => 'unverified'];
             }
         }
+        $first = $rows->first();
+        $last = $rows->last();
+        $sourceStart = $first->sourceRange->start_sample + ($providerStart - $first->provider_offset_start_sample);
+        $sourceEnd = $last->sourceRange->end_sample - ($last->provider_offset_end_sample - $providerEnd);
 
-        return ['verification_state' => 'verified', 'start_sample' => $rows->first()->sourceRange->start_sample, 'end_sample' => $rows->last()->sourceRange->end_sample];
+        return $sourceEnd > $sourceStart
+            ? ['verification_state' => 'verified', 'start_sample' => $sourceStart, 'end_sample' => $sourceEnd]
+            : ['verification_state' => 'unverified'];
     }
 }

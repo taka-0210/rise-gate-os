@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class RealtimeCorrectiveP1Test extends TestCase
@@ -101,8 +102,22 @@ class RealtimeCorrectiveP1Test extends TestCase
         $ledger->sent($provider, $second);
         $mapping = $ledger->sourceMapping($provider, 0, 3200);
         $this->assertSame(['verification_state' => 'verified', 'start_sample' => 0, 'end_sample' => 3200], $mapping);
+        $this->assertSame(
+            ['verification_state' => 'verified', 'start_sample' => 800, 'end_sample' => 2400],
+            $ledger->sourceMapping($provider, 800, 2400),
+        );
 
         $adapter = app(DeepgramStreamingAdapter::class);
+        $identityA = $adapter->normalize([
+            'type' => 'Results', 'request_id' => 'same-provider-request', 'is_final' => true, 'start' => 0, 'duration' => .1,
+            'channel' => ['alternatives' => [['transcript' => 'first final', 'words' => []]]],
+        ], $provider->public_id, 1, $mapping);
+        $identityB = $adapter->normalize([
+            'type' => 'Results', 'request_id' => 'same-provider-request', 'is_final' => true, 'start' => .1, 'duration' => .1,
+            'channel' => ['alternatives' => [['transcript' => 'second final', 'words' => []]]],
+        ], $provider->public_id, 2, $mapping);
+        $this->assertNotSame($identityA->eventIdentityHash, $identityB->eventIdentityHash);
+
         $partial = $adapter->normalize($this->providerEvent(false, '途中'), $provider->public_id, 1, $mapping);
         $this->assertNull(app(RealtimeProviderEventStore::class)->persist($partial, $provider));
         $this->assertDatabaseCount('ai_common_shared_provider_event_receipts', 0);
@@ -340,6 +355,151 @@ class RealtimeCorrectiveP1Test extends TestCase
             ->assertOk()->assertJsonPath('lease_id', $leaseId);
         $this->assertDatabaseCount('ai_common_shared_provider_sessions', 0);
         $this->assertDatabaseCount('ai_common_shared_provider_event_receipts', 0);
+    }
+
+    public function test_p1_i_limited_real_provider_evidence_reaches_durable_final(): void
+    {
+        if (getenv('COMPANY_OS_P1_I_RUN') !== 'true') {
+            $this->markTestSkipped('P1-I real Provider gate is closed by default.');
+        }
+        foreach (['COMPANY_OS_P1_I_NODE', 'COMPANY_OS_P1_I_AUDIO_PATH', 'COMPANY_OS_P1_I_CREDENTIAL_PATH',
+            'COMPANY_OS_P1_I_DPAPI_HELPER_PATH', 'COMPANY_OS_P1_I_TLS_KEY_PATH', 'COMPANY_OS_P1_I_TLS_CERT_PATH',
+            'COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'] as $required) {
+            $this->assertNotFalse(getenv($required), $required.' is required.');
+        }
+        config()->set('ai-common-realtime.lease_ttl_seconds', 120);
+        $process = new Process([
+            (string) getenv('COMPANY_OS_P1_I_NODE'),
+            base_path('realtime-relay/src/limited-verification.js'),
+        ], base_path(), [
+            'COMPANY_OS_P1_I_APPROVED' => 'true',
+            'COMPANY_OS_REALTIME_ENABLED' => 'true',
+            'COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED' => 'true',
+            'COMPANY_OS_P1_I_ATTEMPT_MAX' => '1',
+            'COMPANY_OS_P1_I_RETRY_MAX' => '0',
+            'COMPANY_OS_P1_I_RECONNECT_MAX' => '0',
+            'COMPANY_OS_P1_I_COST_LIMIT_USD' => '0.01',
+            'COMPANY_OS_P1_I_AUDIO_PATH' => (string) getenv('COMPANY_OS_P1_I_AUDIO_PATH'),
+            'COMPANY_OS_P1_I_CREDENTIAL_PATH' => (string) getenv('COMPANY_OS_P1_I_CREDENTIAL_PATH'),
+            'COMPANY_OS_P1_I_DPAPI_HELPER_PATH' => (string) getenv('COMPANY_OS_P1_I_DPAPI_HELPER_PATH'),
+            'COMPANY_OS_P1_I_TLS_KEY_PATH' => (string) getenv('COMPANY_OS_P1_I_TLS_KEY_PATH'),
+            'COMPANY_OS_P1_I_TLS_CERT_PATH' => (string) getenv('COMPANY_OS_P1_I_TLS_CERT_PATH'),
+        ]);
+        $process->setTimeout(70);
+        $process->run();
+        $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        if (! $process->isSuccessful() || ($result['status'] ?? 'FAIL') !== 'PASS') {
+            $failure = [
+                'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION',
+                'status' => 'INCONCLUSIVE_EVIDENCE_FAILURE', 'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(),
+                'provider' => 'Deepgram Nova-3 Streaming', 'checks' => $result['checks'] ?? [],
+                'counts' => $result['counts'] ?? [], 'connection' => $result['connection'] ?? [],
+                'errors' => collect($result['errors'] ?? [])->map(fn (array $error): array => [
+                    'classification' => (string) ($error['classification'] ?? 'unknown'),
+                    'message_sha256' => hash('sha256', (string) ($error['message'] ?? '')),
+                ])->all(), 'retry_performed' => false, 'raw_failure_payload_persisted' => false,
+            ];
+            file_put_contents((string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'),
+                json_encode($failure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL, LOCK_EX);
+        }
+        $this->assertTrue($process->isSuccessful(), 'Limited Provider verification failed without retry.');
+        $this->assertSame('PASS', $result['status']);
+        $this->assertSame(1, $result['counts']['provider_requests']);
+        $this->assertSame('true', $result['request']['mip_opt_out']);
+        $this->assertSame(0, $result['request']['reconnectAttempts']);
+        $this->assertLessThanOrEqual(.01, $result['cost']['estimated_usd']);
+        $this->assertSame(302427, $result['source']['sample_frames']);
+
+        [$owner, , $organization, $conversation, $session, $stream] = $this->activeFixture();
+        $lease = app(RealtimeLeaseManager::class)->issue($owner, $organization, $conversation, $session, $stream);
+        $ledger = app(RealtimeSourceLedger::class);
+        $provider = AiCommonSharedProviderSession::query()->create([
+            'relay_lease_id' => $lease->id, 'ai_common_shared_capture_stream_id' => $stream->id,
+            'generation' => 1, 'adapter' => 'deepgram', 'adapter_version' => 'company-os-deepgram-v1',
+            'capability_profile_version' => 'nova3-ja-v1', 'state' => 'open', 'opened_at_utc' => now(),
+        ]);
+        foreach ($result['frame_receipts'] as $frame) {
+            $canonical = CanonicalAudioFrame::fromArray([
+                'lease_id' => $lease->public_id, 'stream_id' => $stream->public_id, 'generation' => 1,
+                'sequence' => $frame['sequence'], 'client_event_id' => $frame['client_event_id'],
+                'start_sample' => $frame['start_sample'], 'end_sample' => $frame['end_sample'],
+                'sample_count' => $frame['end_sample'] - $frame['start_sample'], 'sample_rate' => 16000,
+                'bit_depth' => 16, 'channels' => 1, 'format' => 'pcm_s16le',
+                'content_sha256' => strtolower($frame['content_sha256']),
+            ]);
+            $ledger->sent($provider, $ledger->accept($canonical, $lease));
+        }
+
+        $adapter = app(DeepgramStreamingAdapter::class);
+        $store = app(RealtimeProviderEventStore::class);
+        $durable = [];
+        $partialCount = 0;
+        foreach ($result['provider_events'] as $event) {
+            if (($event['type'] ?? null) === 'Results') {
+                $start = (int) round(((float) $event['start']) * 16000);
+                $end = $start + (int) round(((float) $event['duration']) * 16000);
+                $mapping = $ledger->sourceMapping($provider, $start, $end);
+                $this->assertSame('verified', $mapping['verification_state']);
+                $envelope = $adapter->normalize($event, $provider->public_id, (int) $event['_company_os']['receive_order'], $mapping);
+                if (($event['is_final'] ?? false) !== true) {
+                    $this->assertNull($store->persist($envelope, $provider));
+                    $partialCount++;
+
+                    continue;
+                }
+                if (trim((string) data_get($event, 'channel.alternatives.0.transcript')) === '') {
+                    continue;
+                }
+                $receipt = $store->persist($envelope, $provider);
+                $commit = app(RealtimeDurableFinalCommitter::class)->commit(
+                    $owner, $organization, $conversation, $session, $receipt, (string) Str::uuid(),
+                );
+                $durable[] = ['receipt_id' => $receipt->public_id, 'commit_id' => $commit->public_id,
+                    'content_sha256' => $receipt->final_content_sha256,
+                    'source_start_sample' => $receipt->verified_source_start_sample,
+                    'source_end_sample' => $receipt->verified_source_end_sample,
+                    'speaker_count' => count($receipt->normalized_final_metadata['speakers'] ?? [])];
+
+                continue;
+            }
+            if (($event['type'] ?? null) === 'Metadata') {
+                $store->persist($adapter->normalize(
+                    $event, $provider->public_id, (int) $event['_company_os']['receive_order'], ['verification_state' => 'unverified'],
+                ), $provider);
+            }
+        }
+        $lastOrder = collect($result['provider_events'])->max(fn (array $event): int => (int) data_get($event, '_company_os.receive_order', 0));
+        $store->persist($adapter->normalize([
+            'type' => 'Close', 'event_id' => hash('sha256', 'p1-i-normal-close'),
+        ], $provider->public_id, $lastOrder + 1, ['verification_state' => 'unverified']), $provider);
+        $provider->update(['state' => 'closed', 'closed_at_utc' => now()]);
+
+        $this->assertGreaterThan(0, $partialCount);
+        $this->assertNotEmpty($durable);
+        $this->assertSame(count($durable), DB::table('ai_common_shared_durable_final_commits')->where('state', 'committed')->count());
+        $this->assertSame(count($durable), DB::table('ai_common_shared_transcript_segments')->where('source_kind', 'realtime_source')->count());
+        $this->assertSame(0, DB::table('ai_common_shared_audio_windows')->count());
+        $this->assertDatabaseHas('ai_common_shared_provider_event_receipts', [
+            'normalized_event_type' => 'metadata', 'usage_unit' => 'duration_seconds',
+        ]);
+        $this->assertDatabaseHas('ai_common_shared_provider_event_receipts', ['normalized_event_type' => 'close', 'status' => 'accepted']);
+
+        $sanitized = [
+            'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION', 'status' => 'PASS',
+            'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(), 'provider' => 'Deepgram Nova-3 Streaming',
+            'request' => $result['request'], 'source' => $result['source'], 'cost' => $result['cost'],
+            'counts' => $result['counts'] + ['partial_normalized' => $partialCount, 'durable_final_commits' => count($durable)],
+            'connection' => $result['connection'], 'checks' => $result['checks'] + [
+                'provider_event_normalization' => true, 'source_cursor_mapping' => true,
+                'durable_final_commit' => true, 'raw_audio_persisted' => false, 'raw_provider_payload_persisted' => false,
+                'credential_exposed_to_browser_or_evidence' => false,
+            ],
+            'durable_finals' => $durable, 'automatic_retry_count' => 0,
+            'automatic_reconnect_count' => 0, 'manual_reconnect_count' => 0,
+        ];
+        $serialized = json_encode($sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
+        $this->assertDoesNotMatchRegularExpression('/authorization|api[_-]?key|credential_path|transcript/i', $serialized);
+        file_put_contents((string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'), $serialized, LOCK_EX);
     }
 
     private function activeFixture(): array

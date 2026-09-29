@@ -12,6 +12,7 @@
     "check": "node --check src/*.js"
   },
   "dependencies": {
-    "@deepgram/sdk": "5.10.0"
+    "@deepgram/sdk": "5.10.0",
+    "ws": "8.22.0"
   }
 }

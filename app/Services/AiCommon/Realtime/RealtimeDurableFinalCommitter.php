@@ -68,14 +68,14 @@ final class RealtimeDurableFinalCommitter
 
             $ranges = AiCommonSharedProviderSendRange::query()->where('provider_session_id', $provider->id)
                 ->with('sourceRange')->orderBy('send_ordinal')->lockForUpdate()->get()
-                ->filter(fn ($row) => $row->sourceRange && $row->sourceRange->start_sample >= $start && $row->sourceRange->end_sample <= $end)->values();
-            if ($ranges->isEmpty() || $ranges->first()->sourceRange->start_sample !== $start || $ranges->last()->sourceRange->end_sample !== $end) {
+                ->filter(fn ($row) => $row->sourceRange && $row->sourceRange->end_sample > $start && $row->sourceRange->start_sample < $end)->values();
+            if ($ranges->isEmpty() || $ranges->first()->sourceRange->start_sample > $start || $ranges->last()->sourceRange->end_sample < $end) {
                 $this->failLineage();
             }
             $cursor = $start;
             foreach ($ranges as $row) {
                 $range = $row->sourceRange;
-                if ($range->state !== 'accepted' || $range->start_sample !== $cursor
+                if ($range->state !== 'accepted' || $range->start_sample > $cursor || $range->end_sample <= $cursor
                     || $range->ai_common_shared_session_id !== $lockedSession->id
                     || $range->ai_common_shared_capture_stream_id !== $provider->ai_common_shared_capture_stream_id
                     || $range->generation !== $provider->generation
@@ -83,7 +83,7 @@ final class RealtimeDurableFinalCommitter
                     || ! hash_equals($range->consent_fingerprint, $lease->consent_fingerprint)) {
                     $this->failLineage();
                 }
-                $cursor = $range->end_sample;
+                $cursor = min($end, $range->end_sample);
             }
             if ($cursor !== $end) {
                 $this->failLineage();
