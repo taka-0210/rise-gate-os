@@ -10,6 +10,7 @@ import { buildRequestProjection, createDeepgramSession, startDeepgramSession } f
 import { safeFailureReason } from './limited-verification.js';
 
 export const CONSERVATIVE_COST_USD_PER_MINUTE = 0.0097;
+export const FAILURE_EVIDENCE_CONTRACT = 'p1-j-failure-v2';
 const SAMPLE_RATE = 16000;
 
 function sleep(milliseconds) {
@@ -58,6 +59,7 @@ export function buildSessionFailureEvidence({ error, failureStage, providerConne
   const stage = typeof failureStage === 'string' && failureStage !== '' ? failureStage : 'unknown';
   return {
     type: 'session_failure',
+    evidence_contract: FAILURE_EVIDENCE_CONTRACT,
     reason,
     failure_stage: stage,
     provider_connection_attempted: providerConnectionAttempted === true,
@@ -343,7 +345,14 @@ export async function createProductRelay(env = process.env) {
     server, wss, policy,
     async listen() {
       await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
-      appendEvidence(evidencePath, { type: 'runtime_ready', host, port, provider_requests: 0, audio_seconds: 0 });
+      appendEvidence(evidencePath, {
+        type: 'runtime_ready', host, port, provider_requests: 0, audio_seconds: 0,
+        evidence_contract: FAILURE_EVIDENCE_CONTRACT,
+        failure_fields: [
+          'failure_stage', 'provider_connection_attempted', 'provider_accepted',
+          'samples_sent', 'reason', 'evidence_completeness',
+        ],
+      });
       return { host, port, origin: expectedOrigin };
     },
     async close() {

@@ -109,6 +109,7 @@ try {
 
     [ordered]@{
         schema_version = 1
+        evidence_contract = 'p1-j-failure-v2'
         state = 'READY_FOR_HUMAN_MICROPHONE_GATE'
         started_at_jst = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'Tokyo Standard Time').ToString('o')
         url = 'https://localhost:8443/company/co'

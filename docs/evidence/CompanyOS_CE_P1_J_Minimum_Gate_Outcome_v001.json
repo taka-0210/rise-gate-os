@@ -54,6 +54,26 @@
     "human_review_required": true,
     "recommendation": "After a new Human Gate, run at most one corrected P1-J Minimum Gate request with retry, reconnect, and resend all zero; never auto-resend regardless of outcome."
   },
+  "reauthorization": {
+    "approved": true,
+    "approved_maximum_human_start_actions": 1,
+    "new_runtime_started_at_jst": "2026-09-30T06:05:10+09:00",
+    "evidence_contract": "p1-j-failure-v2",
+    "failure_fields": [
+      "failure_stage",
+      "provider_connection_attempted",
+      "provider_accepted",
+      "samples_sent",
+      "reason",
+      "evidence_completeness"
+    ],
+    "retry": 0,
+    "reconnect": 0,
+    "resend": 0,
+    "provider_requests_at_ready": 0,
+    "audio_seconds_at_ready": 0,
+    "runtime_state": "READY_FOR_HUMAN_MICROPHONE_GATE"
+  },
   "public_push": false,
   "production_database": false,
   "production_credential": false,

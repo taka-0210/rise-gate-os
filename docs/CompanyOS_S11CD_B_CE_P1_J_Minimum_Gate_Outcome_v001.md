@@ -65,3 +65,19 @@ Provider通信0件でNode Synthetic / Regressionを実施し、`14 PASS`。DPAPI
 次のHuman Gateで再開する場合は、修正済みEvidence Contractを有効にした新しいloopback runtimeで、同じMinimum Gateを最大1回だけ実施することを推奨する。条件はretry / reconnect / resendすべて0、最初の`Mic → WSS → Relay → Provider acceptance → Partial`だけを確認し、PASS / FAIL / INCONCLUSIVEのいずれでも再送しない。
 
 Public Push、Production DB、Production Credential、Deployは未実施・未承認のまま維持する。
+
+## Re-authorization / New Runtime Ready
+
+人＋ChatGPT Reviewにより、修正済みEvidence ContractでのP1-J Minimum Human UX Gate最大1回が再承認された。
+
+- 起動日時：2026-09-30 06:05 JST
+- Evidence Contract：`p1-j-failure-v2`
+- 必須field：`failure_stage` / `provider_connection_attempted` / `provider_accepted` / `samples_sent` / sanitized `reason` / `evidence_completeness`
+- Listener：`127.0.0.1:8443`、Laravel upstream：`127.0.0.1:8765`
+- HTTPS login form：`https://localhost:8443/login`
+- retry / reconnect / resend：`0 / 0 / 0`
+- Provider requests at ready：`0`
+- Audio seconds at ready：`0`
+- 状態：`READY_FOR_HUMAN_MICROPHONE_GATE`
+
+P1-Iは`INCONCLUSIVE / Technical Verification Required`、P1-Jは`AUTHORIZED WITH KNOWN P1-I LIMITATION`を維持する。

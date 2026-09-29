@@ -9,8 +9,8 @@ import {
 } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
 import {
-  assertHumanRuntimePolicy, buildSessionFailureEvidence, HumanGateController, normalizeProxyResponseHeaders, safeReason,
-  sanitizeProviderEvent, validateProductFrame,
+  assertHumanRuntimePolicy, buildSessionFailureEvidence, FAILURE_EVIDENCE_CONTRACT, HumanGateController,
+  normalizeProxyResponseHeaders, safeReason, sanitizeProviderEvent, validateProductFrame,
 } from '../src/product-relay.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -202,6 +202,7 @@ test('P1-J Product relay preserves sanitized SDK ErrorEvent diagnostics and comp
   });
   assert.deepEqual(evidence, {
     type: 'session_failure',
+    evidence_contract: FAILURE_EVIDENCE_CONTRACT,
     reason: 'Unexpected server response: 401 Authorization=[REDACTED]',
     failure_stage: 'provider_open_wait',
     provider_connection_attempted: true,
