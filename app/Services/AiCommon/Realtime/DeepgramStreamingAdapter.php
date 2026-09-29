@@ -44,6 +44,8 @@ final class DeepgramStreamingAdapter implements ProviderStreamingPort
             $speakers,
             $eventType === ProviderStreamingEventEnvelope::ERROR ? SafeRealtimeReason::ProviderUnavailable->value : null,
             is_array($providerEvent['usage'] ?? null) ? $providerEvent['usage'] : [],
+            isset($providerEvent['start']) ? (int) round(((float) $providerEvent['start']) * 16000) : null,
+            isset($providerEvent['duration']) ? (int) round(((float) $providerEvent['duration']) * 16000) : null,
         );
     }
 

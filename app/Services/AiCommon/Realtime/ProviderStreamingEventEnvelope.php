@@ -7,9 +7,13 @@ use LogicException;
 final readonly class ProviderStreamingEventEnvelope
 {
     public const PARTIAL = 'partial';
+
     public const FINAL = 'final';
+
     public const METADATA = 'metadata';
+
     public const ERROR = 'error';
+
     public const CLOSE = 'close';
 
     public function __construct(
@@ -29,6 +33,8 @@ final readonly class ProviderStreamingEventEnvelope
         public array $anonymousSpeakers,
         public ?string $safeReasonCode = null,
         public array $usage = [],
+        public ?int $providerStartSample = null,
+        public ?int $providerDurationSamples = null,
     ) {
         if (! in_array($eventType, [self::PARTIAL, self::FINAL, self::METADATA, self::ERROR, self::CLOSE], true)
             || $receiveOrder < 1
@@ -48,6 +54,8 @@ final readonly class ProviderStreamingEventEnvelope
             'provider_event_identity_hash' => $this->eventIdentityHash,
             'provider_sequence' => $this->providerSequence,
             'receive_order' => $this->receiveOrder,
+            'provider_start_sample' => $this->providerStartSample,
+            'provider_duration_samples' => $this->providerDurationSamples,
             'normalized_event_type' => $this->eventType,
             'verified_source_start_sample' => $this->sourceStartSample,
             'verified_source_end_sample' => $this->sourceEndSample,

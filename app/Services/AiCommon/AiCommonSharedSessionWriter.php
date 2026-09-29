@@ -11,6 +11,8 @@ use App\Models\AiCommonSharedSessionConsent;
 use App\Models\AiCommonSharedSessionParticipant;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\AiCommon\Realtime\RealtimeLeaseManager;
+use App\Services\AiCommon\Realtime\SafeRealtimeReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +25,7 @@ class AiCommonSharedSessionWriter
         private readonly AiCommonSharedAccess $shared,
         private readonly AiCommonSharedSessionAccess $access,
         private readonly AiCommonSharedAudioCleanup $cleanup,
+        private readonly RealtimeLeaseManager $realtimeLeases,
     ) {}
 
     public function prepare(User $actor, Organization $organization, AiCommonConversation $conversation, array $input): AiCommonSharedSession
@@ -319,6 +322,7 @@ class AiCommonSharedSessionWriter
                 return $locked;
             }
             $state = $cancel ? AiCommonSharedCaptureStream::STATE_CANCELLED : AiCommonSharedCaptureStream::STATE_STOPPED;
+            $this->realtimeLeases->enqueueControl($locked, $cancel ? 'hard_abort' : 'lifecycle_close', $cancel ? SafeRealtimeReason::HardAbort : SafeRealtimeReason::NormalStop);
             $locked->update([
                 'state' => $state,
                 'version' => $locked->version + 1,
@@ -363,16 +367,32 @@ class AiCommonSharedSessionWriter
             if ($locked->state !== $from) {
                 throw ValidationException::withMessages(['session' => "Session cannot transition from {$locked->state} to {$to}."]);
             }
+            $streams = AiCommonSharedCaptureStream::query()
+                ->where('ai_common_shared_session_id', $locked->id)
+                ->whereIn('state', AiCommonSharedCaptureStream::ACTIVE_STATES)
+                ->lockForUpdate()->get();
+            foreach ($streams as $stream) {
+                $realtimeManaged = $this->realtimeLeases->isManaged($stream);
+                $reason = $to === AiCommonSharedSession::STATE_PAUSED ? SafeRealtimeReason::NormalStop : SafeRealtimeReason::GenerationSuperseded;
+                if ($realtimeManaged && $to === AiCommonSharedSession::STATE_PAUSED) {
+                    $this->realtimeLeases->enqueueControl($stream, 'lifecycle_close', $reason);
+                }
+                $stream->update([
+                    'state' => $to === AiCommonSharedSession::STATE_PAUSED
+                        ? AiCommonSharedCaptureStream::STATE_PAUSED
+                        : ($realtimeManaged ? AiCommonSharedCaptureStream::STATE_STOPPED : AiCommonSharedCaptureStream::STATE_RECORDING),
+                    'version' => $stream->version + 1,
+                    'sequence' => $stream->sequence + 1,
+                    'stopped_at_utc' => $realtimeManaged && $to === AiCommonSharedSession::STATE_ACTIVE ? now() : null,
+                    'safe_error_code' => $realtimeManaged ? $reason->value : null,
+                ]);
+            }
             $locked->update([
                 'state' => $to,
                 'sequence' => $locked->sequence + 1,
                 'version' => $locked->version + 1,
                 'paused_at_utc' => $to === AiCommonSharedSession::STATE_PAUSED ? now() : null,
             ]);
-            AiCommonSharedCaptureStream::query()
-                ->where('ai_common_shared_session_id', $locked->id)
-                ->whereIn('state', AiCommonSharedCaptureStream::ACTIVE_STATES)
-                ->update(['state' => $to === AiCommonSharedSession::STATE_PAUSED ? AiCommonSharedCaptureStream::STATE_PAUSED : AiCommonSharedCaptureStream::STATE_RECORDING]);
             $this->syncState($locked->ai_common_shared_conversation_id, $locked->fresh());
 
             return $locked->fresh();
@@ -394,16 +414,34 @@ class AiCommonSharedSessionWriter
 
     private function fenceStreams(AiCommonSharedSession $session, string $state, string $safeCode): void
     {
-        AiCommonSharedCaptureStream::query()
+        $streams = AiCommonSharedCaptureStream::query()
             ->where('ai_common_shared_session_id', $session->id)
             ->whereIn('state', AiCommonSharedCaptureStream::ACTIVE_STATES)
-            ->update([
+            ->lockForUpdate()->get();
+        foreach ($streams as $stream) {
+            $reason = $this->safeRealtimeReason($safeCode, $state);
+            $this->realtimeLeases->enqueueControl($stream, $state === AiCommonSharedCaptureStream::STATE_STOPPED ? 'lifecycle_close' : 'hard_abort', $reason);
+            $stream->update([
                 'state' => $state,
-                'version' => DB::raw('version + 1'),
-                'sequence' => DB::raw('sequence + 1'),
+                'version' => $stream->version + 1,
+                'sequence' => $stream->sequence + 1,
                 $state === AiCommonSharedCaptureStream::STATE_STOPPED ? 'stopped_at_utc' : 'interrupted_at_utc' => now(),
                 'safe_error_code' => $safeCode,
             ]);
+        }
+    }
+
+    private function safeRealtimeReason(string $safeCode, string $state): SafeRealtimeReason
+    {
+        if ($state === AiCommonSharedCaptureStream::STATE_STOPPED) {
+            return SafeRealtimeReason::NormalStop;
+        }
+
+        return match ($safeCode) {
+            'consent_changed' => SafeRealtimeReason::ConsentChanged,
+            'participant_joined', 'participant_left', 'membership_changed', 'credential_changed' => SafeRealtimeReason::AuthorizationChanged,
+            default => SafeRealtimeReason::HardAbort,
+        };
     }
 
     private function syncState(int $sharedConversationId, AiCommonSharedSession $session): void

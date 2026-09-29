@@ -2,8 +2,8 @@
 
 namespace App\Services\AiCommon\Realtime;
 
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 final readonly class CanonicalAudioFrame
 {
