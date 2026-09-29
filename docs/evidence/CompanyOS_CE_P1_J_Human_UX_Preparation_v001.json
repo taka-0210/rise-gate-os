@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded_at_jst": "2026-09-30T05:04:47+09:00",
+  "recorded_at_jst": "2026-09-30T05:23:21+09:00",
   "p1_i": {
     "status": "INCONCLUSIVE_TECHNICAL_VERIFICATION_REQUIRED",
     "provider_failure": "NOT_ESTABLISHED",
@@ -49,8 +49,20 @@
     "raw_credential_persisted": false,
     "raw_realtime_audio_persisted": false
   },
+  "loopback_https_proxy_corrective": {
+    "initial_symptom": "ERR_EMPTY_RESPONSE_ON_LOGIN_FORM_SUBMIT",
+    "password_validation_reached": false,
+    "root_cause": "untrusted_loopback_forwarded_proto_generated_http_absolute_urls_for_an_https_only_port",
+    "scope": "P1_J_ISOLATED_RUNTIME_ONLY",
+    "trusted_proxy": "127.0.0.1",
+    "generated_login_form_action": "https://localhost:8443/login",
+    "insecure_localhost_references_after_corrective": 0,
+    "provider_requests_during_corrective": 0,
+    "audio_seconds_during_corrective": 0
+  },
   "automated_verification": {
-    "node": "12 PASS",
+    "node": "13 PASS",
+    "loopback_https_proxy": "1 PASS / 3 assertions",
     "p1_focused": "13 PASS / 1 gated SKIP / 134 assertions",
     "isolated_migrations": [
       "2026_09_29_000001 Ran",
@@ -58,9 +70,10 @@
     ],
     "loopback_health_http_status": 302,
     "secret_scan": "PASS",
-    "full_laravel_regression": "667 PASS / 1 known out-of-scope FAIL / 17 SKIP / 5431 assertions"
+    "full_laravel_regression": "668 PASS / 1 known out-of-scope FAIL / 17 SKIP / 5439 assertions"
   },
-  "human_action_started": false,
+  "human_browser_preflight_started": true,
+  "human_microphone_action_started": false,
   "public_push": false,
   "production_database": false,
   "production_credential": false,

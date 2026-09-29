@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        if (filter_var(env('COMPANY_OS_TRUST_LOOPBACK_PROXY', false), FILTER_VALIDATE_BOOL)) {
+            $middleware->trustProxies(at: ['127.0.0.1']);
+        }
+
         $middleware->trimStrings(except: ['file_content']);
         $middleware->alias([
             'workspace' => EnsureCurrentWorkspace::class,

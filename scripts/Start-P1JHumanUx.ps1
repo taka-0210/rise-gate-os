@@ -56,6 +56,7 @@ $env:DB_DATABASE = $databasePath
 if ($LASTEXITCODE -ne 0) { throw 'Isolated P1-J database migration failed.' }
 
 $env:APP_URL = 'https://localhost:8443'
+$env:COMPANY_OS_TRUST_LOOPBACK_PROXY = 'true'
 $env:COMPANY_OS_REALTIME_ENABLED = 'true'
 $env:COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED = 'true'
 $env:COMPANY_OS_REALTIME_RELAY_URL = 'wss://localhost:8443/realtime-relay'
