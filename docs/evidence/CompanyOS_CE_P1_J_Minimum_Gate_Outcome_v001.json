@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "recorded_at_jst": "2026-09-30T05:56:44+09:00",
+  "stage": "CE_P1_J_MINIMUM_HUMAN_UX_GATE",
+  "status": "INCONCLUSIVE_TECHNICAL_VERIFICATION_REQUIRED",
+  "provider_failure": "NOT_ESTABLISHED",
+  "current_relay_live_pass": false,
+  "human_observation": {
+    "browser": "Microsoft Edge desktop",
+    "start_actions": 1,
+    "waveform_change_observed": false,
+    "japanese_partial_observed": false,
+    "retry_actions": 0
+  },
+  "runtime_evidence": {
+    "browser_same_origin_wss": true,
+    "provider_session_records": 1,
+    "provider_connection_attempted": "unknown_legacy_evidence_field_missing",
+    "provider_accepted": false,
+    "source_range_count": 0,
+    "source_samples": 0,
+    "provider_send_range_count": 0,
+    "provider_sent_samples": 0,
+    "provider_event_receipt_count": 0,
+    "durable_final_commit_count": 0,
+    "relay_close": "hard_abort",
+    "safe_reason": "unknown_runtime_failure",
+    "evidence_completeness": "incomplete"
+  },
+  "usage": {
+    "provider_usage_evidence": false,
+    "audio_based_estimated_cost_usd": 0.0,
+    "actual_billed_cost": "unknown"
+  },
+  "security_privacy": {
+    "raw_credential_persisted": false,
+    "authorization_header_persisted": false,
+    "raw_provider_payload_persisted": false,
+    "raw_realtime_audio_persisted": false
+  },
+  "provider_free_corrective": {
+    "shared_sdk_error_event_normalizer": true,
+    "failure_stage_added": true,
+    "provider_connection_attempted_added": true,
+    "evidence_completeness_added": true,
+    "secret_redaction_verified": true,
+    "dpapi_credential_load_ready": true,
+    "node_tests": "14 PASS",
+    "additional_provider_requests": 0,
+    "additional_audio_samples": 0
+  },
+  "recommended_next_action": {
+    "automatic_retry": false,
+    "human_review_required": true,
+    "recommendation": "After a new Human Gate, run at most one corrected P1-J Minimum Gate request with retry, reconnect, and resend all zero; never auto-resend regardless of outcome."
+  },
+  "public_push": false,
+  "production_database": false,
+  "production_credential": false,
+  "deploy": false
+}

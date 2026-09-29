@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { buildRequestProjection, createDeepgramSession, startDeepgramSession } from './deepgram-port.js';
+import { safeFailureReason } from './limited-verification.js';
 
 export const CONSERVATIVE_COST_USD_PER_MINUTE = 0.0097;
 const SAMPLE_RATE = 16000;
@@ -52,12 +53,21 @@ export class HumanGateController {
     if (!this.minimumPassed) this.halted = true;
   }
 }
-export function safeReason(error) {
-  const value = error instanceof Error ? error.message : (typeof error === 'string' ? error : 'unknown_runtime_failure');
-  return String(value || 'unknown_runtime_failure')
-    .replace(/(authorization|api[-_ ]?key|token|credential)\s*[:=]\s*\S+/gi, '$1=[REDACTED]')
-    .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]').slice(0, 240);
+export function buildSessionFailureEvidence({ error, failureStage, providerConnectionAttempted, providerAccepted, samplesSent }) {
+  const reason = safeFailureReason(error);
+  const stage = typeof failureStage === 'string' && failureStage !== '' ? failureStage : 'unknown';
+  return {
+    type: 'session_failure',
+    reason,
+    failure_stage: stage,
+    provider_connection_attempted: providerConnectionAttempted === true,
+    provider_accepted: providerAccepted === true,
+    samples_sent: Number.isInteger(samplesSent) && samplesSent >= 0 ? samplesSent : 0,
+    evidence_completeness: stage !== 'unknown' && !reason.startsWith('unknown_') ? 'complete' : 'incomplete',
+  };
 }
+
+export const safeReason = safeFailureReason;
 
 export function assertHumanRuntimePolicy(env = process.env) {
   const maxSessions = Number(env.COMPANY_OS_REALTIME_MAX_PROVIDER_SESSIONS);
@@ -208,6 +218,8 @@ export async function createProductRelay(env = process.env) {
     let secret = '';
     let opened = false;
     let closing = false;
+    let failureStage = 'browser_connected';
+    let providerConnectionAttempted = false;
     let messageChain = Promise.resolve();
     let eventChain = Promise.resolve();
     const abortController = new AbortController();
@@ -216,9 +228,12 @@ export async function createProductRelay(env = process.env) {
     const fail = async error => {
       if (closing) return;
       closing = true;
-      const reason = safeReason(error);
+      const failureEvidence = buildSessionFailureEvidence({
+        error, failureStage, providerConnectionAttempted, providerAccepted: opened, samplesSent,
+      });
+      const reason = failureEvidence.reason;
       humanGate.markFailure();
-      appendEvidence(evidencePath, { type: 'session_failure', reason, provider_accepted: opened, samples_sent: samplesSent });
+      appendEvidence(evidencePath, failureEvidence);
       abortController.abort();
       if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal: false, safe_reason_code: reason }).catch(() => {});
       sendBrowser({ type: 'rejected', safe_reason_code: reason });
@@ -230,10 +245,14 @@ export async function createProductRelay(env = process.env) {
       humanGate.assertStartAllowed();
       sessionCount += 1;
       if (sessionCount > policy.maxSessions) throw new Error('provider_session_limit_exceeded');
+      failureStage = 'bridge_open';
       const openedRecord = await bridge('open', { lease_id: metadata.lease_id, stream_id: metadata.stream_id, generation: metadata.generation });
       providerSessionId = openedRecord.provider_session_id;
+      failureStage = 'credential_load';
       secret = loadDpapiSecret(credentialPath, helperPath);
+      failureStage = 'request_projection';
       const projection = buildRequestProjection({}, env);
+      failureStage = 'provider_session_create';
       provider = await createDeepgramSession({ apiKey: secret, signal: abortController.signal, env, projection });
       provider.on('open', () => { opened = true; });
       provider.on('message', event => {
@@ -252,12 +271,17 @@ export async function createProductRelay(env = process.env) {
       });
       provider.on('error', error => providerClosed.reject(error));
       provider.on('close', event => providerClosed.resolve({ code: event?.code ?? null }));
+      failureStage = 'provider_session_start';
       startDeepgramSession(provider);
+      providerConnectionAttempted = true;
+      failureStage = 'provider_open_wait';
       await within(provider.waitForOpen(), 10000, 'provider_open_timeout');
       if (!opened) throw new Error('provider_open_event_missing');
+      failureStage = 'bridge_opened';
       await bridge('opened', { provider_session_id: providerSessionId, provider_session_reference: null });
       appendEvidence(evidencePath, { type: 'provider_accepted', provider_session_id: providerSessionId, mip_opt_out: true, reconnect_attempts: 0 });
       sendBrowser({ type: 'provider_state', state: 'ready' });
+      failureStage = 'provider_ready';
       secret = '';
     };
     const stop = async normal => {

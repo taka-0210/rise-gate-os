@@ -9,7 +9,8 @@ import {
 } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
 import {
-  assertHumanRuntimePolicy, HumanGateController, normalizeProxyResponseHeaders, sanitizeProviderEvent, validateProductFrame,
+  assertHumanRuntimePolicy, buildSessionFailureEvidence, HumanGateController, normalizeProxyResponseHeaders, safeReason,
+  sanitizeProviderEvent, validateProductFrame,
 } from '../src/product-relay.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -192,6 +193,25 @@ test('P1-J HTTPS proxy rewrites only its own insecure absolute redirects', () =>
     normalizeProxyResponseHeaders({ location: '/login' }, 'https://localhost:8443').location,
     '/login',
   );
+});
+
+test('P1-J Product relay preserves sanitized SDK ErrorEvent diagnostics and completeness', () => {
+  const evidence = buildSessionFailureEvidence({
+    error: { type: 'error', error: new Error('Unexpected server response: 401 Authorization: secret-value') },
+    failureStage: 'provider_open_wait', providerConnectionAttempted: true, providerAccepted: false, samplesSent: 0,
+  });
+  assert.deepEqual(evidence, {
+    type: 'session_failure',
+    reason: 'Unexpected server response: 401 Authorization=[REDACTED]',
+    failure_stage: 'provider_open_wait',
+    provider_connection_attempted: true,
+    provider_accepted: false,
+    samples_sent: 0,
+    evidence_completeness: 'complete',
+  });
+  assert.equal(safeReason({ nested: 'unrecognized' }), 'unknown_object_failure');
+  assert.equal(buildSessionFailureEvidence({ error: {}, failureStage: '', samplesSent: 0 }).evidence_completeness, 'incomplete');
+  assert.doesNotMatch(JSON.stringify(evidence), /secret-value/);
 });
 
 test('P1-J Product relay validates live PCM identity and sanitizes Provider events', () => {
