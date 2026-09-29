@@ -23,6 +23,24 @@ Authorityの優先順位:
 
 既存Commit `89f2dea` は変更しない。CE-G01 Closed Contract、IR-1、Delta B Formal Closed Contract、Master、Provider Evaluation Evidenceも変更しない。
 
+### 1.1 Human + ChatGPT Product Decision Review（2026-09-29 JST）
+
+P-01〜P-07は人＋ChatGPT Reviewで全件Resolvedとなった。本書は候補設計の意味を拡張せず、次の承認結果へ同期する。
+
+| ID | Approved Product Contract | State |
+|---|---|---|
+| P-01 | Pause / Normal Endは新規audioを即時停止し、current authorization / Consent下で既送信audioのbounded final-only drainだけを許可。Cancel / RevokeはHard Abort | RESOLVED |
+| P-02 | Deepgram / Relay failure時はCaptureも停止。Text Conversationは継続し、明示retryだけをnew generation / lease / Provider Sessionで行う | RESOLVED |
+| P-03 | background / OS suspension時はPause / Close。foregroundで自動Resumeせず、current authorization / Consent再確認後の明示Resumeを要求 | RESOLVED |
+| P-04 | bounded finalization graceを採用。具体秒数はHuman UX Verificationで決める | RESOLVED / Approved Principle + Deferred UX Parameter |
+| P-05 | data class別の必要最小保持、raw audio/payload/partial非永続、session relationを採用。具体期間・暗号化・legal preservation・cascade detailはPrivacy / Release Reviewで決める | RESOLVED / Approved Principle + Deferred Operational Detail |
+| P-06 | 旧55秒pathをRealtime移行・Regression・Human UX期間だけ隔離保持し、silent fallbackに使わない。Realtime Evidence成立後の撤去は別Cleanup / Migration承認で行う | RESOLVED |
+| P-07 | grace失敗時はpartialを昇格せず、押下時base durable snapshotでCO Requestを続行。late finalを進行中Requestへ追加しない | RESOLVED |
+
+Product Decision Pendingは`7 → 0`。P-04 / P-05の後工程値はProduct Pendingへ戻さず、承認済み原則配下のVerification / Operational Parameterとして管理する。
+
+Corrective Design全体の推奨は **APPROVE candidate**。Codex自身はApprovedへ変更せず、CE-G01もOPENしない。
+
 ## 2. Design scope and invariants
 
 ### 2.1 Corrective scope
@@ -197,14 +215,14 @@ DB interruptとProvider socket/audio egress停止を別Evidenceにする。DB st
 - stream generation supersede
 - relay authorization timeout
 
-**Lifecycle close（新規audioを即時停止し、in-flight finalの扱いはProduct Decision `P-01`）**:
+**Lifecycle close（P-01 Approved: 新規audioを即時停止し、既送信audioだけをbounded final-only drain）**:
 
 - pause
 - normal stop / end
 - browser disconnect / page close
 - device / permission loss
 
-Safety default候補は、Hard revokeではuncommitted partial/finalをrejectし、Lifecycle closeではauthorization / Consentがcurrentな場合に限って既送信audioのbounded final-only drainを許可する。音声の追加送信はどちらでも禁止する。
+Approved Contractとして、Hard revokeではFinalize待ちをせずuncommitted partial/finalをrejectする。Pause / Normal Endではauthorization / Consentがcurrentな場合に限って既送信audioのbounded final-only drainを許可し、drain完了またはbounded timeout後にcloseする。新しいaudioの追加送信はどちらでも禁止する。
 
 ### 6.3 Idempotency
 
@@ -452,9 +470,9 @@ Migrationの作成・実行は本工程の承認外。以下はschema candidate�
 4. 新codeはfeature flag OFFでdeploy可能にする候補。正式deployは別承認。
 5. schema → writer compatibility → read compatibility → relay activationの順にする。
 6. rollbackはfeature flag OFFと旧application互換維持を第一とし、同releaseでtable dropしない。
-7. destructive cleanupはretention / old path Product Decision後の別Migrationとする。
+7. destructive cleanupはapproved retention detailとP-06のRealtime Evidence成立後に、別の明示Cleanup / Migration承認で行う。
 
-旧55秒pathの撤去・隔離保持・期間限定共存はProduct Pending `P-06`。Realtime failure時のsilent fallback用途には使わない。
+P-06により、旧55秒pathはRealtime実装・Regression・Provider Evidence・Human UX Verification中だけ隔離保持する。通常UXで選択させず、Realtime failure時のsilent fallbackにも使わない。Evidence成立後は撤去方向とするが、実削除は別の明示Cleanup / Migration承認を必要とする。
 
 ### 11.3 Immutability and deletion relation
 
@@ -473,14 +491,14 @@ Migrationの作成・実行は本工程の承認外。以下はschema candidate�
 | Existing bounded raw audio | 既存contract | existing encrypted temporary storage | 既存cleanupを維持 |
 | Raw Provider payload | Adapter memoryのみ | なし | log禁止、処理後破棄 |
 | Partial text | Browser/Relay memory | なし | supersede/final/closeで破棄 |
-| Source range receipt | Relay/DB | append-only metadata | session deletion cascade、retention pending |
-| Normalized final event | Relay/DB | hash、timing、range、safe metadata | encryption/redaction、retention pending |
+| Source range receipt | Relay/DB | append-only metadata | session relation、期間/cascadeはdeferred operational detail |
+| Normalized final event | Relay/DB | hash、timing、range、safe metadata | encryption/redaction、期間はdeferred operational detail |
 | Transcript | Existing Writer | existing Segment/Revision | existing lineage/deletion contract |
-| Anonymous speaker hint | final normalized dataのみ | encrypted candidate | person identityと分離、retention pending |
+| Anonymous speaker hint | final normalized dataのみ | encrypted candidate | person identityと分離、期間はdeferred operational detail |
 | Usage / cost | safe normalized metrics | candidate | credential/request bodyなし |
 | Error | safe code only | candidate | payload/header/secretなし |
 
-Retention期間、final timing/speaker dataの暗号化方式、audit receiptをsession削除と同時削除するか法定保全するかはProduct Pending `P-05`。削除cascadeはtenant / conversation / session境界を越えない。
+P-05のProduct原則として、data class別の必要最小保持、raw realtime audio / raw Provider payload / partial非永続、session deletion relation、Transcript/Revision/lineage非連動削除を採用する。具体期間、暗号化方式、legal/audit preservation、cascade detailはPrivacy / Release Reviewで確定するdeferred operational detailであり、Product Pendingではない。削除境界はtenant / conversation / sessionを越えない。
 
 ## 13. CE-C08｜Single Continuous Capture
 
@@ -504,13 +522,13 @@ one getUserMedia
 
 | Event | Capture | Relay / Provider | Transcript |
 |---|---|---|---|
-| Pause | 新規sample生成停止 | audio egress停止。in-flight finalはP-01 | committed durableのみ維持 |
+| Pause | 新規sample生成停止 | audio egress即時停止。current auth/Consent下で既送信audioだけbounded final-only drain | committed durableのみ維持 |
 | Resume | 同一MediaStream再開可能性を確認 | new generation / new lease / new Provider Session | 同一capture streamならcursor継続。track/timebase再作成時だけnew streamを0開始 |
-| End | capture終了・track cleanup | egress停止、P-01のbounded drain後close候補 | durable finalまで確定後session end |
+| End | capture終了・track cleanup | egress即時停止、既送信audioのbounded final-only drain完了/timeout後close | drainでcommitできたdurable finalまで確定後session end |
 | Cancel | 即時cleanup | hard close、uncommitted event reject | partial破棄 |
 | Consent revoke / removal | 即時停止 | hard revoke / forced close | late event reject |
 | Device / permission loss | failedへ遷移・cleanup | close | partial破棄、truthful error |
-| Background / foreground | Product Pending P-03 | safety defaultはpause/close | false active表示禁止 |
+| Background / foreground | backgroundでPause / Close、foregroundで自動Resumeなし | 明示Resume時にcurrent auth/Consent再確認後new generation / lease / Provider Session | false active表示禁止 |
 
 ## 14. CE-C08｜Waveform
 
@@ -529,7 +547,7 @@ Pause / End / Cancel / permission revoke / device loss / page closeで次をidem
 - animation frame cancel
 - analyser/source node disconnect
 - AudioContext suspend/close（event semanticsに応じる）
-- MediaStream track stop（Pauseで保持するかはP-01 / P-03と整合）
+- MediaStream track stopまたは安全な停止（Pause中もsample生成・egressは必ず停止。track保持/再取得のtechnical detailはT-07で検証）
 - energy buffer zero/release
 - visible stateを停止/利用不可へ更新
 
@@ -580,10 +598,10 @@ Product UIは内部state名を露出せず、複合stateからtruthfulな短い�
 
 graceなし、timeout、Provider error、invalid range、revokeの場合はpartialをContextへ昇格しない。CO Request開始後のlate finalを進行中requestへ追加しない。
 
-### 17.2 Pending Product decisions
+### 17.2 Approved Product decisions and deferred parameters
 
-- `P-04`: graceの上限とUX表現（本書では秒数を固定しない）。
-- `P-07`: timeout時にbase durable snapshotで相談を続行するか、Userへ再確認するか。推奨候補は、partialを除外したことをtruthfulに示してbase snapshotで続行する。
+- `P-04 RESOLVED`: bounded graceを採用する。具体秒数はHuman UX Verificationで決定するdeferred UX parameter。
+- `P-07 RESOLVED`: timeout / Provider error / invalid range / authorization・Consent・Writer failure時はpartialを昇格せず、最新発話を確定できなかったことをtruthfulに扱い、押下時base durable snapshotでCO Requestを続行する。
 
 ## 18. DG-D01｜Provider-neutral Port and Deepgram Adapter
 
@@ -594,7 +612,7 @@ Domainが扱うoperation候補:
 - open normalized streaming session
 - send accepted canonical source range
 - receive normalized event envelope
-- request provider finalize（P-01で許可された場合のみ）
+- request provider finalize（P-01で承認されたPause / Normal Endのbounded final-only drainだけ）
 - close / abort
 - usage / safe error projection
 
@@ -619,6 +637,15 @@ Adapterだけが次を知る。
 4. sanitized Evidenceには`mip_opt_out_enforced=true`とguard resultだけを残し、request header / keyは残さない。
 5. Evaluation Credentialをproduction configurationへ移さない。
 
+### 18.4 Runtime / SDK technical candidate（未承認）
+
+- T-01でisolated Node relay workerが承認された場合、server-sideの公式`@deepgram/sdk` v5系を第一候補とする。
+- exact package versionは未選定とし、H-TECH-03承認後にpinしてlockfile・integrity・licenseを確認する。現時点では導入しない。
+- SDK境界でactual requestの`mip_opt_out=true`二重guard、Provider event identity、source cursor mapping、automatic retry/reconnect禁止を保証できない場合は、direct WSSを技術代替候補として比較する。
+- BrowserからDeepgramへ直接接続せず、Provider secretとnetwork boundaryはCompany OS Relayに閉じる。
+- 根拠資料: Deepgram公式JavaScript SDK <https://github.com/deepgram/deepgram-js-sdk>、公式Streaming STT overview <https://developers.deepgram.com/docs/getting-started-with-live-streaming-audio>
+- 本節はT-01、H-TECH-03、新Package導入、Provider通信の承認を意味しない。
+
 ## 19. No Automatic Fallback and failure UX
 
 Deepgram / Relay failure時:
@@ -629,7 +656,7 @@ Deepgram / Relay failure時:
 - Text Conversationと既存durable transcript閲覧は継続可能。
 - Userへ「リアルタイム文字起こしは停止しました」とtruthfulに表示する。
 - retryはUserの明示操作でnew generation / new lease / new Provider Sessionとする。
-- failure後もcaptureを継続するか停止するかはProduct Pending `P-02`。推奨は、音声が保存・文字起こしされると誤認させないためcaptureも停止する。
+- P-02によりfailure後はCaptureも停止する。Text Conversationは継続し、自動retryせず、Userの明示操作でnew generation / lease / Provider Sessionを作成する。
 
 ## 20. FAIL-D01｜Failure matrix
 
@@ -637,22 +664,22 @@ Deepgram / Relay failure時:
 |---|---|---|---|---|---|---|
 | mic failure | failed/停止 | connectしない | 未接続 | なし | 既存のみ | durable snapshotのみ可 |
 | permission denied | idle/denied | connectしない | 未接続 | なし | 既存のみ | textで可 |
-| permission revoked | 即時cleanup | forced close | abort | 破棄 | cutoff後reject | partial待機解除、P-07 |
-| device disconnected | failed/cleanup | close | close | 破棄 | verified済みのみ | P-07 |
+| permission revoked | 即時cleanup | forced close | abort | 破棄 | cutoff後reject | partial除外、base durable snapshotで続行 |
+| device disconnected | failed/cleanup | close | close | 破棄 | verified済みのみ | partial除外、base durable snapshotで続行 |
 | network interruption | sample生成停止。unsent bufferはnew generationへ暗黙再送しない | failed/expiry | close | stale表示せず破棄 | uncommitted reject | base durableのみ |
 | Relay unavailable | start不可 | failed | 未接続 | なし | 既存のみ | textで可 |
 | lease expired | egress停止 | forced close | close | 破棄 | expiry後reject | base durableのみ |
 | Consent revoked | 即時停止 | hard revoke | abort | 破棄 | late reject | AI Referenceも再認可 |
 | participant removed | 即時停止 | hard revoke | abort | 破棄 | late reject | request不可 |
-| Deepgram connection failure | P-02 | close/no fallback | failed | 破棄 | 既存のみ | base durableのみ |
+| Deepgram connection failure | Capture停止 | close/no fallback | failed | 破棄 | 既存のみ | base durable snapshotで続行可 |
 | Deepgram late event | 影響なし | cutoff検証 | event受領後discard | 反映しない | commitしない | 進行中へ追加しない |
 | duplicate event | 影響なし | idempotent | 1件扱い | 二重表示なし | unique receiptで1回 | 影響なし |
 | out-of-order event | 影響なし | receive order検証 | buffer/validate | older partial破棄 | range/order不成立ならreject | 影響なし |
-| invalid source range | current generation停止候補 | fail closed | close | 破棄 | commit禁止 | P-07 |
+| invalid source range | current generation停止 | fail closed | close | 破棄 | commit禁止 | partial除外、base durable snapshotで続行 |
 | Writer failure | captureは独立 | event保持/close条件 | 追加送信判断はstate依存 | canonical化しない | transaction rollback | snapshot作成しない |
 | DB transaction failure | safety停止 | lease/commit fail closed | close | 破棄 | partial commit禁止 | 開始しない |
-| grace timeout | captureは通常state | 影響なし | auto fallbackなし | latest partial除外 | 既存durableのみ | P-07 |
-| page background | P-03 | safety default close | close | 破棄 | verified済みのみ | dispatch済みrequestはserver stateで管理 |
+| grace timeout | captureは通常state | 影響なし | auto fallbackなし | latest partial除外 | 既存durableのみ | base durable snapshotで続行 |
+| page background | Pause / Close、false active表示禁止 | close | close | 破棄 | verified済みのみ | dispatch済みrequestはserver stateで管理。foreground自動Resumeなし |
 | page close | track cleanup | disconnect/close | close | 破棄 | cutoff policy適用 | new request開始なし |
 
 どのfailureでも、実際にCapture / Relay / Providerが停止しているのに「録音中」「文字起こし中」と表示しない。
@@ -726,36 +753,41 @@ Deepgram / Relay failure時:
 
 | Area / Blocker | Candidate status | Remaining requirement |
 |---|---|---|
-| CE-C01 / CE-B-C01-01 | **Design Candidate Ready** | P-01、T-01/T-02、人＋ChatGPT承認、実装・forced-close verification |
-| CE-C03 / CE-B-C03-01 | **Design Candidate Ready** | T-03/T-04/T-05、Migration承認、exact range verification |
-| CE-C03 / CE-B-C03-02 | **Design Candidate Ready** | T-05、normalized receipt implementation/evidence |
-| CE-C03 / CE-B-C03-03 | **Design Candidate Ready** | T-06、atomic Writer integration verification |
-| CE-C08 / CE-B-C08-01 | **Design Candidate Ready** | P-02/P-03、T-07、runtime/browser verification |
-| CE-C08 / CE-B-C08-02 | **Design Candidate Ready** | repository implementation + Automated + Human UX Evidence |
-| CE-C08 / CE-B-C08-03 | **Design Candidate Ready** | partial/final projection implementation + Human UX Evidence |
-| CO / CE-B-CO-01 | **Design Candidate Ready** | P-04/P-07、T-06、grace/context verification |
+| CE-C01 / CE-B-C01-01 | **Resolved by Approved Design candidate** | Corrective Design最終承認、T-01/T-02/T-08、実装・forced-close/Provider verification |
+| CE-C03 / CE-B-C03-01 | **Resolved by Approved Design candidate** | T-03/T-04/T-05、Migration作成承認、exact range verification |
+| CE-C03 / CE-B-C03-02 | **Resolved by Approved Design candidate** | T-05/T-09、normalized receipt implementation/Provider Evidence |
+| CE-C03 / CE-B-C03-03 | **Resolved by Approved Design candidate** | T-06、atomic Writer integration verification |
+| CE-C08 / CE-B-C08-01 | **Resolved by Approved Design candidate** | T-03/T-07、runtime/browser/Provider/Human UX verification |
+| CE-C08 / CE-B-C08-02 | **Resolved by Approved Design candidate** | repository implementation + Automated + Human UX Evidence |
+| CE-C08 / CE-B-C08-03 | **Resolved by Approved Design candidate** | partial/final implementation + Provider + Human UX Evidence |
+| CO / CE-B-CO-01 | **Resolved by Approved Design candidate** | P-04 deferred値、T-06、grace/context/Human UX verification |
 | CE-G01 | **Still Closed / Human Gate Required** | 本書だけではOPENしない |
 
-`Design Candidate Ready`は「実装可能なCorrective Design候補をReviewへ提出できる状態」であり、Blocker Resolvedを意味しない。すべてのBlockerは人＋ChatGPT ReviewまでOPENを維持する。承認後にだけ`Resolved by Approved Design`候補となる。実装Evidence、Automated Verification、Provider実接続Evidence、Human UX Evidenceを必要とする項目は、設計承認だけでPASSにしない。
+`Resolved by Approved Design candidate`は、P-01〜P-07反映後の設計で各Compatibility gapを解消できる候補であることを示す。Corrective Design全体が人＋ChatGPTに最終承認されるまではBlockerをOPEN維持し、Resolvedと確定しない。承認後もImplementation / Automated / Provider / Human UX Evidenceは別のOPEN verification itemとして残す。
 
 ## 25. CE-G01 OPEN review checklist
 
 | Review item | Candidate |
 |---|---|
+| Product Decision Pending | 0 / Ready |
 | CE-C01 corrective design | Design Ready |
 | CE-C03 source cursor | Design Ready / Technical Verification Required |
 | Provider-neutral receipt | Design Ready / Technical Verification Required |
 | Durable Final Commit Receipt | Design Ready / Technical Verification Required |
-| additive Migration design | Design Ready / Product Decision Required |
+| additive Migration design | Design Ready / Migration作成のHuman Approval Required |
 | CE-C08 continuous capture | Design Ready / Technical Verification Required |
 | Waveform | Design Ready / Human UX Verification Required |
 | Partial / Final UX | Design Ready / Human UX Verification Required |
-| CO Finalization Grace | Design Ready / Product Decision Required |
+| CO Finalization Grace | Design Ready / Numeric UX Parameter Deferred |
 | Deepgram Adapter boundary | Design Ready / Provider Verification Required |
 | MIP Fail Closed | Design Ready / Automated + Provider Evidence Required |
 | Failure Matrix | Design Ready |
 | Regression Matrix | Design Ready |
 | Human UX Evidence Plan | Design Ready |
+| T-01 relay runtime topology | Human Approval Required before CE-P1 |
+| T-08 control delivery topology | Human Approval Required before CE-P1 |
+| SDK/direct protocol + package/version | Human Approval Required before Adapter phase |
+| CE-P1 Scope / Branch / Done Contract | Human Final Gate Approval Required |
 
 CE-G01をOPENできるかは人＋ChatGPTが判断する。本書は自動OPENしない。
 

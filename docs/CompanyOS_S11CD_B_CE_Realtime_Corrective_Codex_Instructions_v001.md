@@ -19,17 +19,31 @@ Authoritative companion documents:
 3. `CompanyOS_S11CD_B_CE_Realtime_Compatibility_Focused_Verification_v001.md`
 4. PPT v155 / Excel v050
 
+### 1.1 Product Decisions incorporated
+
+- P-01: Pause / Normal Endは新規audioを即時停止し、current auth/Consent下で既送信audioだけbounded final-only drain。Cancel / RevokeはHard Abort。
+- P-02: Provider / Relay failure時はCaptureも停止。No fallback、auto retryなし、明示retryはnew generation / lease / Provider Session。
+- P-03: backgroundはPause / Close、foreground自動Resumeなし、明示Resume時にauth/Consent再確認。
+- P-04: bounded grace採用。具体秒数はHuman UX Verificationで調整。
+- P-05: minimum class-based retention、raw audio/payload/partial非永続。具体運用値はPrivacy / Release Review。
+- P-06: 旧55秒pathは移行期間だけ隔離保持しsilent fallback禁止。Evidence成立後の撤去は別承認。
+- P-07: grace失敗時はpartialを昇格せず、click-time base durable snapshotでCO Requestを続行。
+
+Product Decision Pendingは0。P-04 / P-05のdeferred parameterを未解決Product Decisionとして扱わない。
+
 ## 2. Mandatory preconditions before any CE-P1 work
 
 次がすべて明示されるまで実装を開始しない。
 
 - Human + ChatGPT Corrective Design Review: Approved
 - applicable Blocker: `Resolved by Approved Design`
-- Product Pending P-01〜P-07: resolvedまたは後工程境界を明示
+- P-01〜P-07 approved Product Contract: incorporated（完了）
 - CE-G01: Human + ChatGPTが明示的にOPEN
 - CE-P1 scope / branch / Done Contract: approved
 - additive Migrationの作成可否: approved
-- persistent relay process / WSS / control bus等のinfra scope: approved
+- T-01 persistent relay process / same-origin WSS / reverse proxy / process manager: **must be explicitly approved; current state is not approved**
+- T-08 control outbox / delivery / connection registry topology: **must be explicitly approved; current state is not approved**
+- Deepgram SDK vs direct protocol / package / version policy: **must be explicitly approved before Adapter phase; current state is not approved**。T-01でisolated Node relay workerが承認された場合のtechnical recommendationはserver-side公式`@deepgram/sdk` v5系。exact versionは未選定であり、Browser direct connectionは禁止する
 - new package / SDKが必要な場合: package名・version・隔離方法を承認
 - Provider実接続が必要な場合: data / request count / cost / privacy / stop conditionを承認
 
@@ -117,7 +131,7 @@ Implement:
 - transactional control outbox
 - connection registry
 - forced close acknowledgement
-- hard revoke and approved lifecycle close semantics
+- Hard Revoke即時abortと、Pause / Normal Endのapproved bounded final-only drain
 - new generation reconnect
 
 Tests:
@@ -241,7 +255,7 @@ Implement:
 - latest-partial-only bounded grace
 - target final validation/commit
 - final context snapshot fixed before CO request
-- timeout/error/revoke behavior per approved P-04/P-07
+- bounded grace（numeric deferred）と、timeout/error/revoke時のpartial除外 + base durable snapshot続行
 - no late final injection into active request
 
 Tests:
@@ -328,7 +342,7 @@ Each feature must have all applicable layers.
 
 | Layer | Minimum artifact |
 |---|---|
-| Product Design | approved Corrective Design and resolved/deferred Product Pending |
+| Product Design | approved Corrective Design、P-01〜P-07、deferred parameter boundary |
 | Repository | focused diff, interfaces, migrations, UI, no unrelated files |
 | Automated | focused tests + connected regression + failure/race tests |
 | Provider | explicitly approved limited real Evidence where required |
@@ -377,7 +391,7 @@ Automated PASSだけでHuman UX Doneにしない。
 将来の各Phase終了時に最低限報告する。
 
 - approved scope / actual delta
-- Product Pending / Technical Pendingの変化
+- Product Decision / deferred parameter / Technical Pendingの変化
 - Blocker state（設計承認と実装PASSを分離）
 - Migration / DB / Storage impact
 - security / privacy / MIP / credential boundary
@@ -392,9 +406,12 @@ Automated PASSだけでHuman UX Doneにしない。
 本Handoff作成時点:
 
 - Corrective Design: candidate only
-- Product Decision Pending: 7
+- Product Decision Pending: 0
 - Technical Pending: 10
 - Compatibility Blocker: 8 OPEN
+- Corrective Design: APPROVE candidate / not yet Approved
+- T-01 / T-08 runtime-control topology: not approved
+- Deepgram SDK/direct protocol/package/version: official `@deepgram/sdk` v5系がrecommended candidate / exact version not selected / not approved / not installed
 - CE-G01: CLOSED
 - CE-P1: NOT STARTED
 - Migration: not created / not run
