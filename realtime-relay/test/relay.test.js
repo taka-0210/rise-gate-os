@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assertNetworkFence, buildRequestProjection, SDK_VERSION } from '../src/deepgram-port.js';
 import { ConnectionRegistry } from '../src/connection-registry.js';
-import { assertLimitedPolicy, buildFailureEvidence, validateFrame } from '../src/limited-verification.js';
+import { assertLimitedPolicy, buildFailureEvidence, encodeEvidenceFrame, validateFrame } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -72,4 +72,12 @@ test('P1-I failure evidence is persisted before assertion without raw provider d
   assert.equal(evidence.provider_events.length, 0);
   assert.equal(evidence.frame_receipts.length, 0);
   assert.doesNotMatch(JSON.stringify(evidence), /secret-value/);
+});
+
+test('P1-I child emits a run-specific deterministic evidence frame', () => {
+  const frameId = '0123456789abcdef0123456789abcdef';
+  const frame = encodeEvidenceFrame({ status: 'PASS' }, frameId);
+  assert.match(frame, new RegExp(`^@@COMPANY_OS_EVIDENCE_V1:${frameId}:BEGIN@@`));
+  assert.match(frame, new RegExp(`@@COMPANY_OS_EVIDENCE_V1:${frameId}:END@@\\n$`));
+  assert.throws(() => encodeEvidenceFrame({ status: 'PASS' }, 'predictable'), /frame_id_invalid/);
 });

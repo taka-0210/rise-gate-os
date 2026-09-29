@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "stage": "CE-P1-I_EVIDENCE_HARNESS_HARDENING",
+  "date_jst": "2026-09-30",
+  "status": "PASS_PROVIDER_COMMUNICATION_ZERO",
+  "provider_communication": 0,
+  "audio_send": 0,
+  "root_cause": [
+    "parent assumed the entire child stdout was one JSON document",
+    "parent attempted JSON decode before persisting a supervisor-owned failure envelope",
+    "deferred child errors could reject before the awaiting boundary serialized evidence"
+  ],
+  "structured_ipc": {
+    "selected": "run-specific sentinel framed JSON",
+    "version": "sentinel-json-v1",
+    "reason": "deterministic extraction tolerates unrelated stdout and multiline JSON, detects missing/truncated frames, and requires no persistent raw IPC file",
+    "rejected": {
+      "whole_stdout_json": "breaks on any unrelated output or partial termination",
+      "json_lines": "ambiguous when unrelated lines or a truncated final line are present",
+      "dedicated_file": "adds residual-file, permission, cleanup, and atomic-write boundaries"
+    }
+  },
+  "evidence_contract": [
+    "attempt_started",
+    "child_started",
+    "process_exit_state",
+    "safe_exit_code",
+    "stdout_capture_state",
+    "stderr_capture_state",
+    "json_parse_state",
+    "provider_connection_state",
+    "provider_acceptance_state",
+    "audio_send_state",
+    "audio_samples",
+    "audio_bytes",
+    "audio_duration_seconds",
+    "event_count",
+    "close_state",
+    "evidence_completeness",
+    "final_classification"
+  ],
+  "synthetic_failure_matrix": [
+    {"case": "valid JSON / exit 0", "result": "PASS", "classification": "PASS", "parse": "valid"},
+    {"case": "valid JSON / non-zero exit", "result": "PASS", "classification": "RUNTIME_FAILURE", "parse": "valid"},
+    {"case": "explicit Provider failure", "result": "PASS", "classification": "PROVIDER_FAILURE", "parse": "valid"},
+    {"case": "stdout prefix and suffix noise", "result": "PASS", "classification": "PASS", "parse": "valid"},
+    {"case": "multiline stdout JSON", "result": "PASS", "classification": "PASS", "parse": "valid"},
+    {"case": "stderr present", "result": "PASS", "classification": "PASS", "parse": "valid"},
+    {"case": "empty stdout", "result": "PASS", "classification": "EVIDENCE_CAPTURE_FAILURE", "parse": "empty_stdout"},
+    {"case": "malformed JSON", "result": "PASS", "classification": "EVIDENCE_CAPTURE_FAILURE", "parse": "json_malformed"},
+    {"case": "truncated / partial JSON", "result": "PASS", "classification": "EVIDENCE_CAPTURE_FAILURE", "parse": "frame_truncated"},
+    {"case": "child timeout", "result": "PASS", "classification": "CHILD_TIMEOUT", "parse": "empty_stdout"},
+    {"case": "child kill", "result": "PASS", "classification": "CHILD_KILLED", "parse": "empty_stdout"},
+    {"case": "abnormal exit", "result": "PASS", "classification": "RUNTIME_FAILURE", "parse": "empty_stdout"}
+  ],
+  "verification": {
+    "synthetic_matrix": "12 PASS / 265 assertions",
+    "node": "6 PASS",
+    "p1_focused": "23 PASS / 376 assertions / real Provider gate 1 SKIP",
+    "ce_p1_regression": "33 PASS / 326 assertions / real Provider gate 1 SKIP",
+    "full_laravel": "660 PASS / 1 pre-existing CE-P1-out-of-scope FAIL / 17 SKIP / 5260 assertions",
+    "full_laravel_known_failure": "CompanyNavigationTest::regular login ignores a stale forbidden intended url; expected /company, actual /system-admin/members",
+    "actual_node_closed_fence": {
+      "frame": "complete",
+      "process_exit": 1,
+      "classification": "preflight_boundary",
+      "provider_requests": 0,
+      "audio_samples": 0
+    },
+    "provider_communication": 0,
+    "audio_send": 0
+  },
+  "privacy": {
+    "raw_stdout_persisted": false,
+    "raw_stderr_persisted": false,
+    "raw_provider_payload_persisted": false,
+    "raw_credential_persisted": false,
+    "unknown_inferred": false
+  },
+  "decision": {
+    "recommendation": "RECOMMEND_ONE_ADDITIONAL_LIMITED_REQUEST_AFTER_EXPLICIT_HUMAN_APPROVAL",
+    "reason": "both prior attempts failed at the Evidence Harness layer before Provider evaluation; the corrected parent-owned envelope and framed IPC now cover success, Provider failure, runtime failure, malformed output, timeout, kill, and abnormal exit without losing sanitized evidence",
+    "current_authorization": "NOT_AUTHORIZED",
+    "p1_i": "INCONCLUSIVE_EVIDENCE_FAILURE",
+    "p1_j": "NOT_STARTED"
+  }
+}

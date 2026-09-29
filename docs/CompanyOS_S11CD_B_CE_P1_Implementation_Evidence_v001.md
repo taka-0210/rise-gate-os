@@ -251,3 +251,22 @@ Disposition:
 **Provider Failure = NOT ESTABLISHED**
 
 **Next action = Human + ChatGPT Review**
+
+## 13｜P1-I Evidence Harness Hardening
+
+Provider communication and audio send remained `0 / 0`. The Harness no longer assumes that the complete child stdout is one JSON document. It now uses run-specific sentinel-framed JSON plus a parent-owned sanitized supervisor envelope.
+
+The 12-case Provider-free Synthetic Failure Matrix passed, including Provider success/failure, Runtime failure, unrelated stdout, multiline output, stderr, empty/malformed/truncated output, timeout, kill, and abnormal exit. Node tests were `6 PASS`; P1 focused was `23 PASS / 376 assertions / 1 gated SKIP`; CE-P1 connected Regression was `33 PASS / 326 assertions / 1 gated SKIP`.
+
+The full Laravel suite completed with `660 PASS / 1 pre-existing CE-P1-out-of-scope FAIL / 17 SKIP / 5,260 assertions`. The sole failure remains the known `CompanyNavigationTest::regular login ignores a stale forbidden intended url` redirect mismatch and is not caused by this Corrective.
+
+The detailed Root Cause, IPC decision, Evidence Contract, matrix, Regression, privacy, next-request conditions, cost, and stop condition are recorded in:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_I_Harness_Hardening_Decision_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_I_Evidence_Harness_Hardening_v001.json`
+
+Decision recommendation:
+
+**Authorize exactly one additional Limited Deepgram Request only through a new explicit Human Gate.**
+
+No request is authorized by this recommendation. Until a new approval is supplied, P1-I remains `INCONCLUSIVE_EVIDENCE_FAILURE`, P1-J remains `NOT STARTED`, and Provider communication/audio send remain disabled.

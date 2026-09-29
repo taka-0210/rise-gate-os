@@ -213,6 +213,13 @@ export function buildFailureEvidence(state = {}, error = new Error('unknown_fail
   };
 }
 
+export function encodeEvidenceFrame(result, frameId) {
+  if (!/^[a-f0-9]{32}$/.test(String(frameId ?? ''))) throw new Error('evidence_frame_id_invalid');
+  const begin = `@@COMPANY_OS_EVIDENCE_V1:${frameId}:BEGIN@@`;
+  const end = `@@COMPANY_OS_EVIDENCE_V1:${frameId}:END@@`;
+  return `${begin}\n${JSON.stringify(result)}\n${end}\n`;
+}
+
 export async function runLimitedVerification(env = process.env) {
   const audioPath = path.resolve(env.COMPANY_OS_P1_I_AUDIO_PATH ?? '');
   const credentialPath = path.resolve(env.COMPANY_OS_P1_I_CREDENTIAL_PATH ?? '');
@@ -420,6 +427,9 @@ export async function runLimitedVerification(env = process.env) {
     const metadata = events.filter(event => event.type === 'Metadata');
     const checks = {
       loopback_wss_only: address.address === '127.0.0.1', provider_request_count_one: providerRequestCount === 1,
+      provider_connection_attempted: providerRequestCount === 1, provider_accepted: providerOpened,
+      actual_request_projection_captured: actualRequest !== null,
+      audio_send_started: audioSendStarted, audio_send_completed: audioSendCompleted,
       actual_mip_opt_out_true: actualRequest?.mip_opt_out === 'true', reconnect_attempts_zero: actualRequest?.reconnectAttempts === 0,
       server_held_credential: true, source_audio_complete: samplesSent === format.sampleFrames,
       source_cursor_complete: frameReceipts.length === Math.ceil(format.sampleFrames / CHUNK_SAMPLES),
@@ -442,6 +452,8 @@ export async function runLimitedVerification(env = process.env) {
       source: {
         sha256: APPROVED_SOURCE_SHA256, duration_seconds: format.durationSeconds, sample_rate_hz: 16000,
         bits_per_sample: 16, channels: 1, chunk_ms: 100, sample_frames: format.sampleFrames,
+        samples_sent: samplesSent, bytes_sent: samplesSent * 2,
+        duration_sent_seconds: samplesSent / format.sampleRate,
       },
       cost: { estimated_usd: policy.estimatedCostUsd, limit_usd: policy.limit, price_version: 'deepgram-conservative-2026-09' },
       counts: { provider_requests: providerRequestCount, frames: frameReceipts.length, partials: partials.length, finals: finals.length, metadata: metadata.length },
@@ -483,10 +495,15 @@ const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (invokedPath === fileURLToPath(import.meta.url)) {
   try {
     const result = await runLimitedVerification(process.env);
-    process.stdout.write(JSON.stringify(result));
+    process.stdout.write(encodeEvidenceFrame(result, process.env.COMPANY_OS_EVIDENCE_FRAME_ID));
     if (result.status !== 'PASS') process.exitCode = 1;
   } catch (error) {
-    process.stdout.write(JSON.stringify(buildFailureEvidence({ classification: 'preflight_boundary' }, error)));
+    const failure = buildFailureEvidence({ classification: 'preflight_boundary' }, error);
+    try {
+      process.stdout.write(encodeEvidenceFrame(failure, process.env.COMPANY_OS_EVIDENCE_FRAME_ID));
+    } catch (frameError) {
+      process.stderr.write(`${safeFailureReason(frameError)}\n`);
+    }
     process.exitCode = 1;
   }
 }

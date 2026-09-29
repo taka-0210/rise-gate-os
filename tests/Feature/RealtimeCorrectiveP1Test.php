@@ -17,6 +17,7 @@ use App\Services\AiCommon\AiCommonSharedSessionWriter;
 use App\Services\AiCommon\AiCommonSharedTranscriptWriter;
 use App\Services\AiCommon\Realtime\CanonicalAudioFrame;
 use App\Services\AiCommon\Realtime\DeepgramStreamingAdapter;
+use App\Services\AiCommon\Realtime\ProviderEvidenceProcessRunner;
 use App\Services\AiCommon\Realtime\RealtimeCoFinalizationGrace;
 use App\Services\AiCommon\Realtime\RealtimeDurableFinalCommitter;
 use App\Services\AiCommon\Realtime\RealtimeLeaseManager;
@@ -29,7 +30,6 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class RealtimeCorrectiveP1Test extends TestCase
@@ -368,9 +368,8 @@ class RealtimeCorrectiveP1Test extends TestCase
             $this->assertNotFalse(getenv($required), $required.' is required.');
         }
         config()->set('ai-common-realtime.lease_ttl_seconds', 120);
-        $process = new Process([
-            (string) getenv('COMPANY_OS_P1_I_NODE'),
-            base_path('realtime-relay/src/limited-verification.js'),
+        $run = app(ProviderEvidenceProcessRunner::class)->run([
+            (string) getenv('COMPANY_OS_P1_I_NODE'), base_path('realtime-relay/src/limited-verification.js'),
         ], base_path(), [
             'COMPANY_OS_P1_I_APPROVED' => 'true',
             'COMPANY_OS_REALTIME_ENABLED' => 'true',
@@ -384,51 +383,21 @@ class RealtimeCorrectiveP1Test extends TestCase
             'COMPANY_OS_P1_I_DPAPI_HELPER_PATH' => (string) getenv('COMPANY_OS_P1_I_DPAPI_HELPER_PATH'),
             'COMPANY_OS_P1_I_TLS_KEY_PATH' => (string) getenv('COMPANY_OS_P1_I_TLS_KEY_PATH'),
             'COMPANY_OS_P1_I_TLS_CERT_PATH' => (string) getenv('COMPANY_OS_P1_I_TLS_CERT_PATH'),
-        ]);
-        $process->setTimeout(70);
-        $process->run();
-        try {
-            $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
-        } catch (\JsonException $exception) {
-            $stdout = $process->getOutput();
-            $stderr = $process->getErrorOutput();
+        ], timeoutSeconds: 70.0);
+        $result = $run['payload'];
+        $harness = $run['evidence'];
+        if (($harness['final_classification'] ?? null) !== 'PASS' || ($result['status'] ?? null) !== 'PASS') {
             $failure = [
                 'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION',
                 'status' => 'INCONCLUSIVE_EVIDENCE_FAILURE', 'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(),
-                'provider' => 'Deepgram Nova-3 Streaming', 'safe_exit_state' => 'child_process_ended',
-                'safe_reason' => 'child_stdout_json_parse_failed', 'test_invocation_count' => 1,
-                'provider_request_attempt' => 'unknown', 'provider_accepted' => 'unknown',
-                'audio_send_samples' => 'unknown', 'close_state' => 'unknown',
-                'stdout_bytes' => strlen($stdout), 'stdout_sha256' => hash('sha256', $stdout),
-                'stderr_bytes' => strlen($stderr), 'stderr_sha256' => hash('sha256', $stderr),
-                'retry_performed' => false, 'raw_child_output_persisted' => false,
-                'raw_failure_payload_persisted' => false,
-            ];
-            file_put_contents((string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'),
-                json_encode($failure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL, LOCK_EX);
-
-            throw $exception;
-        }
-        if (! $process->isSuccessful() || ($result['status'] ?? 'FAIL') !== 'PASS') {
-            $failure = [
-                'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION',
-                'status' => 'INCONCLUSIVE_EVIDENCE_FAILURE', 'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(),
-                'provider' => 'Deepgram Nova-3 Streaming', 'checks' => $result['checks'] ?? [],
-                'safe_exit_state' => $result['safe_exit_state'] ?? 'unknown',
-                'safe_reason' => $result['safe_reason'] ?? 'unknown',
-                'request' => $result['request'] ?? null, 'source' => $result['source'] ?? [],
-                'cost' => $result['cost'] ?? [], 'safe_exit' => $result['safe_exit'] ?? [],
-                'counts' => $result['counts'] ?? [], 'connection' => $result['connection'] ?? [],
-                'errors' => collect($result['errors'] ?? [])->map(fn (array $error): array => [
-                    'classification' => (string) ($error['classification'] ?? 'unknown'),
-                    'safe_reason' => (string) ($error['safe_reason'] ?? 'unknown'),
-                    'reason_sha256' => hash('sha256', (string) ($error['safe_reason'] ?? 'unknown')),
-                ])->all(), 'retry_performed' => false, 'raw_failure_payload_persisted' => false,
+                'provider' => 'Deepgram Nova-3 Streaming', 'harness' => $harness,
+                'retry_performed' => false, 'raw_failure_payload_persisted' => false,
             ];
             file_put_contents((string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'),
                 json_encode($failure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL, LOCK_EX);
         }
-        $this->assertTrue($process->isSuccessful(), 'Limited Provider verification failed without retry.');
+        $this->assertSame('PASS', $harness['final_classification'], 'Limited Provider verification failed without retry.');
+        $this->assertIsArray($result);
         $this->assertSame('PASS', $result['status']);
         $this->assertSame(1, $result['counts']['provider_requests']);
         $this->assertSame('true', $result['request']['mip_opt_out']);
@@ -513,6 +482,7 @@ class RealtimeCorrectiveP1Test extends TestCase
         $sanitized = [
             'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION', 'status' => 'PASS',
             'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(), 'provider' => 'Deepgram Nova-3 Streaming',
+            'harness' => $harness,
             'request' => $result['request'], 'source' => $result['source'], 'cost' => $result['cost'],
             'counts' => $result['counts'] + ['partial_normalized' => $partialCount, 'durable_final_commits' => count($durable)],
             'connection' => $result['connection'], 'checks' => $result['checks'] + [
