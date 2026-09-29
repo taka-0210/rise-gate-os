@@ -51,7 +51,10 @@ export async function createDeepgramSession({
     encoding: projection.encoding,
     sample_rate: projection.sample_rate,
     channels: projection.channels,
-    diarize: String(projection.diarize),
+    // `diarize_model` enables diarization by itself. Do not also send the
+    // deprecated `diarize=true` switch: the E1 request that established
+    // Provider capability used only `diarize_model`, and SDK v5 documents
+    // these as alternative request controls.
     diarize_model: projection.diarize_model,
     interim_results: String(projection.interim_results),
     punctuate: String(projection.punctuate),

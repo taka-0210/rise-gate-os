@@ -81,3 +81,77 @@ Public Push、Production DB、Production Credential、Deployは未実施・未�
 - 状態：`READY_FOR_HUMAN_MICROPHONE_GATE`
 
 P1-Iは`INCONCLUSIVE / Technical Verification Required`、P1-Jは`AUTHORIZED WITH KNOWN P1-I LIMITATION`を維持する。
+
+## Re-authorized Minimum Gate Outcome
+
+再承認された最大1回を、2026-09-30 06:29 JSTにMicrosoft Edge desktopから実施した。
+
+- マイク許可promptは表示されなかった。Edgeに既存の許可状態が保存されていた可能性はあるが、許可成立を推測でPASSにはしない。
+- Humanは指定文を発話し、待機した。
+- Waveformの変化はなく、日本語Partialも表示されなかった。
+- `Start realtime voice`の再操作、retry、reconnect、resendは行っていない。
+
+修正済みEvidence Contractは、失敗を次のとおり完全に保存した。
+
+| 項目 | Re-authorized run |
+|---|---|
+| failure stage | `provider_open_wait` |
+| sanitized reason | `Unexpected server response: 400` |
+| Provider connection attempted | `true` |
+| Provider accepted | `false` |
+| Audio samples sent | `0` |
+| Evidence completeness | `complete` |
+| Provider session | 1 / `failed` |
+| Source ranges / send ranges | 0 / 0 |
+| Event receipts / Durable Final commits | 0 / 0 |
+| Partial / Final | 0 / 0 |
+| retry / reconnect / resend | `0 / 0 / 0` |
+
+したがって、画面が変化しなかった原因はHumanの発話音量や日本語認識ではない。Current RelayのDeepgram handshake requestがHTTP 400で拒否され、Provider acceptance前かつ音声送信前にFail Closedしたためである。これはCurrent Relay request compatibility failureであり、Deepgram Provider Capability Failureとは判定しない。
+
+P1-Iは`INCONCLUSIVE / Technical Verification Required`、P1-Jは`AUTHORIZED WITH KNOWN P1-I LIMITATION`のまま維持する。Current Relay live integration PASSは成立していない。
+
+## Provider-free Request Compatibility Corrective
+
+固定済み公式SDK `@deepgram/sdk@5.10.0`の型・serializerと、実Provider接続PASS済みのCE-PD08B E1 requestをProvider通信なしで比較した。
+
+- CE-PD08B E1成功request：`diarize_model=latest`のみ
+- 失敗時Current Relay request：deprecated `diarize=true`と`diarize_model=latest`を同時指定
+- SDK v5 Contract：`diarize_model`の指定自体がdiarizationを有効化し、deprecated `diarize=true`の併記は不要
+
+HTTP 400と一致する最も強いRequest compatibility差分として、Deepgram Adapterのactual SDK requestからdeprecated `diarize` queryだけを除去した。Provider-neutral側の「diarization必須」、`diarize_model=latest`、Nova-3、Japanese、PCM linear16 / 16 kHz / mono、`mip_opt_out=true`、retry / reconnect 0は維持した。
+
+Pinned SDKが生成するProvider-free queryを直接検査するAutomated Testを追加し、次を確認した。
+
+- `diarize`：不存在
+- `diarize_model=latest`：1方式のみ
+- `mip_opt_out=true`
+- `model=nova-3` / `language=ja`
+- `encoding=linear16` / `sample_rate=16000` / `channels=1`
+- Socketはstart closed、Provider通信0件
+- Node relay tests：`15 PASS`
+- CE-P1 focused：`9 PASS / 1 Gate skip`
+- 全Laravel regression：`668 PASS / 17 skip / 1 known CE-P1外 failure`
+- 既知failure：`CompanyNavigationTest::regular login ignores a stale forbidden intended url`。今回変更によるRegressionではない
+- Secret pattern scan：PASS
+
+このCorrective中のProvider通信 / 音声送信は`0 / 0`。Raw Credential、Authorization Header、raw Provider payload、raw realtime audioは保存していない。承認済み1回の終了後、loopback runtimeは停止した。
+
+## Recommended Decision Package
+
+**同じP1-J Minimum Human UX Gateを、新しいloopback runtimeで最大1回だけ再承認することを推奨する。**
+
+理由：Provider-free検証により、過去E1成功requestとCurrent Relayの差分を解消し、SDK生成queryも決定的に検証できた。ただしHTTP 400の解消、Provider acceptance、Partialはlive Current Relay pathでのみ確定できるため、CorrectiveだけでP1-I/P1-JをPASSにはしない。
+
+推奨条件：
+
+- Humanの`Start realtime voice`：最大1回
+- 最初に確認する経路：`Mic → same-origin WSS → Relay → Provider acceptance → Partial`
+- retry / automatic reconnect / manual reconnect / resend：`0 / 0 / 0 / 0`
+- `mip_opt_out=true`必須、既存DPAPI Evaluation Credentialのみ
+- 推奨発話：10〜20秒、上限300秒
+- Cost hard limit：USD 0.05（10〜20秒の想定costはUSD 0.01未満）
+- PASS / FAIL / INCONCLUSIVEのいずれでも再送しない
+- Missing Evidenceを推測でPASSまたはProvider Failureにしない
+
+新しいHuman Gateが承認されるまでProvider通信は行わない。Public Push、Production DB、Production Credential、Deploy、Azure / 他Provider通信も未実施・未承認のまま維持する。

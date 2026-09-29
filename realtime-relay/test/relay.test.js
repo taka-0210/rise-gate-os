@@ -123,6 +123,27 @@ test('pinned SDK listen socket is startClosed before the initial start', async (
   controller.abort();
 });
 
+test('pinned SDK request uses exactly one supported diarization control', async () => {
+  const controller = new AbortController();
+  const session = await createDeepgramSession({
+    apiKey: 'synthetic-server-side-key',
+    signal: controller.signal,
+    env: { COMPANY_OS_REALTIME_ENABLED: 'true', COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED: 'true' },
+  });
+
+  const query = session.socket._queryParameters;
+  assert.equal(query.diarize, undefined);
+  assert.equal(query.diarize_model, 'latest');
+  assert.equal(query.mip_opt_out, 'true');
+  assert.equal(query.model, 'nova-3');
+  assert.equal(query.language, 'ja');
+  assert.equal(query.encoding, 'linear16');
+  assert.equal(query.sample_rate, 16000);
+  assert.equal(query.channels, 1);
+  assert.equal(session.readyState, 3);
+  controller.abort();
+});
+
 test('SDK v5 startClosed lifecycle performs one initial start and rejects duplicate start', async () => {
   const lifecycle = {
     sdk_socket_created: 0,
