@@ -313,3 +313,23 @@ Detailed package:
 
 - `docs/CompanyOS_S11CD_B_CE_P1_I_Runtime_Integration_Corrective_Decision_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_I_Runtime_Integration_Corrective_v001.json`
+
+## 16｜P1-I Runtime-Corrected Limited Verification outcome
+
+The explicitly approved one-Request Limited Deepgram Verification was invoked once and stopped without retry or resend. Sanitized Evidence records `RUNTIME_FAILURE`, `provider_open_timeout`, Provider acceptance false, audio `0 samples / 0 bytes / 0 seconds`, Provider events `0`, and close state Unknown. Missing close Evidence remains Unknown. Provider Failure is not established.
+
+Pinned SDK source inspection proved that `WrappedListenV1Client.connect()` constructs its transport with `startClosed=true`. The prior Corrective incorrectly treated socket construction as initial connection start, so the Harness waited on a CLOSED socket. A Provider-free Corrective now starts the returned session exactly once after registering handlers, rejects duplicate start, and retains SDK retry/reconnect `0`.
+
+Provider-free verification is Node `8 PASS`, P1 focused `28 PASS / 1 gated SKIP / 529 assertions`, and CE-P1 plus bounded regression `54 PASS / 1 gated SKIP / 757 assertions`. The corrected real Provider gate remained closed. Node/P1-I PHP processes and TLS temporary material are `0`; Repository `.env` and normal local DB hashes remain unchanged.
+
+Recommended Decision:
+
+**Authorize one final Limited Deepgram Request only through a new explicit Human Gate under the unchanged one-request, USD 0.01, zero retry/reconnect/resend, DPAPI Credential, and `mip_opt_out=true` limits.**
+
+This recommendation is not authorization. P1-I remains `INCONCLUSIVE_RUNTIME_LIFECYCLE_FAILURE / STOPPED`, P1-J remains `NOT STARTED`, and further Provider communication remains `NOT AUTHORIZED`.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_I_Runtime_Corrected_Verification_Outcome_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_I_Deepgram_Runtime_Corrected_v001.json`
+- `docs/evidence/CompanyOS_CE_P1_I_Runtime_Corrected_Verification_Outcome_v001.json`

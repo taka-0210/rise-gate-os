@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertNetworkFence, buildRequestProjection, createDeepgramSession, SDK_VERSION } from '../src/deepgram-port.js';
+import {
+  assertNetworkFence, buildRequestProjection, createDeepgramSession, SDK_VERSION, startDeepgramSession,
+} from '../src/deepgram-port.js';
 import { ConnectionRegistry } from '../src/connection-registry.js';
 import { assertLimitedPolicy, buildFailureEvidence, encodeEvidenceFrame, validateFrame } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
@@ -82,25 +84,42 @@ test('P1-I child emits a run-specific deterministic evidence frame', () => {
   assert.throws(() => encodeEvidenceFrame({ status: 'PASS' }, 'predictable'), /frame_id_invalid/);
 });
 
-test('SDK v5 lifecycle starts one socket without explicit connect or reconnect', async () => {
+test('pinned SDK listen socket is startClosed before the initial start', async () => {
+  const controller = new AbortController();
+  const session = await createDeepgramSession({
+    apiKey: 'synthetic-server-side-key',
+    signal: controller.signal,
+    env: { COMPANY_OS_REALTIME_ENABLED: 'true', COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED: 'true' },
+  });
+
+  assert.equal(session.readyState, 3);
+  controller.abort();
+});
+
+test('SDK v5 startClosed lifecycle performs one initial start and rejects duplicate start', async () => {
   const lifecycle = {
     sdk_socket_created: 0,
     initial_connection_started: 0,
-    explicit_provider_connect: 0,
-    reconnect: 0,
+    sdk_start_method_calls: 0,
+    post_start_reconnect: 0,
     retry: 0,
     duplicate_socket: 0,
   };
   const socket = {
-    connect() { lifecycle.explicit_provider_connect += 1; },
-    reconnect() { lifecycle.reconnect += 1; },
+    readyState: 3,
+    connect() {
+      lifecycle.sdk_start_method_calls += 1;
+      if (this.readyState !== 3) lifecycle.post_start_reconnect += 1;
+      this.readyState = 0;
+      lifecycle.initial_connection_started += 1;
+      return this;
+    },
   };
   const session = await createDeepgramSession({
     apiKey: 'synthetic-server-side-key',
     env: { COMPANY_OS_REALTIME_ENABLED: 'true', COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED: 'true' },
     clientFactory: () => ({ listen: { v1: { connect: request => {
       lifecycle.sdk_socket_created += 1;
-      lifecycle.initial_connection_started += 1;
       lifecycle.retry = request.reconnectAttempts;
       lifecycle.duplicate_socket = Math.max(0, lifecycle.sdk_socket_created - 1);
       return socket;
@@ -108,11 +127,14 @@ test('SDK v5 lifecycle starts one socket without explicit connect or reconnect',
   });
 
   assert.equal(session, socket);
+  assert.equal(lifecycle.initial_connection_started, 0);
+  assert.equal(startDeepgramSession(session), socket);
+  assert.throws(() => startDeepgramSession(session), /provider_session_start_duplicate/);
   assert.deepEqual(lifecycle, {
     sdk_socket_created: 1,
     initial_connection_started: 1,
-    explicit_provider_connect: 0,
-    reconnect: 0,
+    sdk_start_method_calls: 1,
+    post_start_reconnect: 0,
     retry: 0,
     duplicate_socket: 0,
   });

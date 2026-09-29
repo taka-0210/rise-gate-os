@@ -2,6 +2,8 @@ import { DeepgramClient } from '@deepgram/sdk';
 
 export const SDK_VERSION = '5.10.0';
 
+const startedSessions = new WeakSet();
+
 export function buildRequestProjection(overrides = {}, env = process.env) {
   const projection = {
     model: 'nova-3',
@@ -60,4 +62,11 @@ export async function createDeepgramSession({
   };
   onRequestProjection?.(Object.freeze({ ...request, abortSignal: Boolean(request.abortSignal) }));
   return client.listen.v1.connect(request);
+}
+
+export function startDeepgramSession(session) {
+  if (!session || typeof session.connect !== 'function') throw new Error('provider_session_start_unavailable');
+  if (startedSessions.has(session)) throw new Error('provider_session_start_duplicate');
+  startedSessions.add(session);
+  return session.connect();
 }

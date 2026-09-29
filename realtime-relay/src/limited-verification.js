@@ -5,7 +5,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
-import { buildRequestProjection, createDeepgramSession } from './deepgram-port.js';
+import { buildRequestProjection, createDeepgramSession, startDeepgramSession } from './deepgram-port.js';
 
 export const APPROVED_SOURCE_SHA256 = '396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A';
 export const APPROVED_DURATION_SECONDS = 18.9016875;
@@ -314,6 +314,7 @@ export async function runLimitedVerification(env = process.env) {
         providerCloseReason = typeof event?.reason === 'string' ? event.reason : '';
         providerClosed.resolve();
       });
+      startDeepgramSession(provider);
       await within(provider.waitForOpen(), 10000, 'provider_open_timeout');
       if (!providerOpened) throw new Error('provider_open_event_missing');
       ws.send(JSON.stringify({ type: 'provider_state', state: 'ready' }));

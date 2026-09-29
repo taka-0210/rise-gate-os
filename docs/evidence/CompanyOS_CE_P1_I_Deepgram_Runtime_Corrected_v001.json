@@ -1,0 +1,64 @@
+{
+    "schema_version": 1,
+    "stage": "CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION",
+    "status": "INCONCLUSIVE_EVIDENCE_FAILURE",
+    "completed_at_jst": "2026-09-30T03:49:07+09:00",
+    "provider": "Deepgram Nova-3 Streaming",
+    "harness": {
+        "schema_version": 1,
+        "ipc": "sentinel-json-v1",
+        "attempt_started": true,
+        "child_started": true,
+        "process_exit_state": "exited",
+        "safe_exit_code": 1,
+        "start_failure_class": "none",
+        "stdout_capture_state": "captured",
+        "stderr_capture_state": "empty",
+        "capture": {
+            "stdout": {
+                "state": "captured",
+                "bytes": 1705,
+                "sha256": "bfa6a88deb00ce85d9516a91f972697beb783d252c872a5a53a7cc38a1f7154b",
+                "raw_persisted": false,
+                "noise_before_bytes": 0,
+                "noise_after_bytes": 1
+            },
+            "stderr": {
+                "state": "empty",
+                "bytes": 0,
+                "sha256": null,
+                "raw_persisted": false
+            }
+        },
+        "json_parse_state": "valid",
+        "provider_connection_state": true,
+        "provider_acceptance_state": false,
+        "audio_send_state": false,
+        "audio_samples": 0,
+        "audio_bytes": 0,
+        "audio_duration_seconds": 0,
+        "event_count": 0,
+        "close_state": "unknown",
+        "safe_reason": "provider_open_timeout",
+        "error_layer_classification": "session",
+        "safe_request_projection": {
+            "model": "nova-3",
+            "language": "ja",
+            "encoding": "linear16",
+            "sample_rate": 16000,
+            "channels": 1,
+            "diarize": "true",
+            "interim_results": "true",
+            "mip_opt_out": "true",
+            "reconnectAttempts": 0
+        },
+        "evidence_completeness": "partial",
+        "final_classification": "RUNTIME_FAILURE",
+        "unknown_inferred": false,
+        "raw_stdout_persisted": false,
+        "raw_stderr_persisted": false,
+        "raw_provider_payload_persisted": false
+    },
+    "retry_performed": false,
+    "raw_failure_payload_persisted": false
+}

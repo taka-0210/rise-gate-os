@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "stage": "CE-P1-I_RUNTIME_CORRECTED_LIMITED_VERIFICATION_OUTCOME",
+  "date_jst": "2026-09-30",
+  "branch": "ce-p1-realtime-corrective",
+  "authorization": {
+    "approved_request_max": 1,
+    "allowance_consumed": true,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend": 0,
+    "further_request_authorized": false
+  },
+  "outcome": {
+    "status": "INCONCLUSIVE_RUNTIME_LIFECYCLE_FAILURE",
+    "provider_failure_established": false,
+    "harness_classification": "RUNTIME_FAILURE",
+    "evidence_completeness": "partial",
+    "safe_reason": "provider_open_timeout",
+    "error_layer": "session",
+    "provider_acceptance": false,
+    "audio_samples": 0,
+    "audio_bytes": 0,
+    "audio_duration_seconds": 0,
+    "provider_events": 0,
+    "close_state": "unknown",
+    "actual_billed_cost_usd": "unknown"
+  },
+  "root_cause": {
+    "classification": "SDK_START_CLOSED_LIFECYCLE_MISMATCH",
+    "pinned_sdk": "@deepgram/sdk@5.10.0",
+    "source_confirmed": true,
+    "details": "WrappedListenV1Client.connect constructs a ReconnectingWebSocket with startClosed=true; the prior corrective removed the one initial socket.connect call, so waitForOpen timed out without starting the transport",
+    "provider_failure": false,
+    "unknown_inferred": false
+  },
+  "corrective": {
+    "provider_free": true,
+    "one_shot_start_boundary": true,
+    "handlers_registered_before_start": true,
+    "initial_start_calls": 1,
+    "post_start_reconnect": 0,
+    "sdk_retry": 0,
+    "duplicate_start_accepted": false,
+    "additional_provider_requests": 0
+  },
+  "verification": {
+    "node": "8 PASS / 0 FAIL",
+    "p1_focused": "28 PASS / 1 gated SKIP / 529 assertions",
+    "ce_p1_bounded_regression": "54 PASS / 1 gated SKIP / 757 assertions",
+    "real_provider_gate_after_corrective": "CLOSED"
+  },
+  "security_privacy": {
+    "raw_credential_persisted": false,
+    "authorization_header_persisted": false,
+    "raw_provider_payload_persisted": false,
+    "raw_realtime_audio_persisted": false,
+    "transcript_body_persisted_in_evidence": false
+  },
+  "post_stop": {
+    "attempt_marker_sha256": "75B0175D66FEDB05B2F9712DEBF9B78C59AD2C824B0F07F68ACD979B7B122EF4",
+    "node_processes": 0,
+    "p1_i_php_processes": 0,
+    "ephemeral_tls_removed": true,
+    "repository_env_sha256": "DC2A0E2A2402229EFA555609FFCEB6A9721F9A2CC1A452D5B7DEEEF3BC6CB0ED",
+    "normal_local_db_sha256": "19278A4B11E3DCBF1B717969C554D7E45919B1C0B362F54EA1BFCA4D9BFC072C",
+    "azure_requests": 0,
+    "other_provider_requests": 0,
+    "production_credential_used": false,
+    "production_db_migration": false,
+    "deploy": false,
+    "public_push": false
+  },
+  "recommended_next_action": {
+    "decision": "AUTHORIZE_ONE_FINAL_LIMITED_REQUEST_AT_A_NEW_EXPLICIT_HUMAN_GATE",
+    "recommendation_only": true,
+    "request_max": 1,
+    "audio_duration_seconds": 18.9016875,
+    "hard_cost_limit_usd": 0.01,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend": 0,
+    "mip_opt_out": true,
+    "stop_after_single_result": true
+  },
+  "p1_i": "INCONCLUSIVE_RUNTIME_LIFECYCLE_FAILURE_STOPPED",
+  "p1_j": "NOT_STARTED"
+}
