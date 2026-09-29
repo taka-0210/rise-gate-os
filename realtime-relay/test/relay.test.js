@@ -10,7 +10,8 @@ import {
 import crypto from 'node:crypto';
 import {
   assertHumanRuntimePolicy, buildSessionFailureEvidence, FAILURE_EVIDENCE_CONTRACT, HumanGateController,
-  normalizeProxyResponseHeaders, safeReason, sanitizeProviderEvent, validateProductFrame,
+  LEDGER_BATCH_FRAMES, MAX_QUEUED_FRAMES, normalizeProxyResponseHeaders, safeReason,
+  sanitizeProviderEvent, SentEvidenceGate, takeLedgerBatch, validateProductFrame,
 } from '../src/product-relay.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -253,6 +254,51 @@ test('P1-J Product relay validates live PCM identity and sanitizes Provider even
   assert.equal(event.channel.alternatives[0].transcript, 'テスト');
   assert.equal(event.channel.alternatives[0].words[0].speaker, 0);
   assert.equal(Object.hasOwn(event, 'authorization'), false);
+});
+test('P1-J ledger batching preserves 100 ms frame identity with a bounded memory queue', () => {
+  const queue = Array.from({length: LEDGER_BATCH_FRAMES * 2 + 3}, (_, index) => ({
+    metadata: {sequence: index + 1, start_sample: index * 1600, end_sample: (index + 1) * 1600},
+  }));
+  const first = takeLedgerBatch(queue);
+  const second = takeLedgerBatch(queue);
+  const remainder = takeLedgerBatch(queue, true);
+
+  assert.equal(LEDGER_BATCH_FRAMES, 10);
+  assert.equal(MAX_QUEUED_FRAMES, 30);
+  assert.equal(first.length, 10);
+  assert.equal(second.length, 10);
+  assert.equal(remainder.length, 3);
+  assert.deepEqual(
+    [...first, ...second, ...remainder].map(item => item.metadata.sequence),
+    Array.from({length: 23}, (_, index) => index + 1),
+  );
+  assert.equal(queue.length, 0);
+  assert.deepEqual(takeLedgerBatch([{metadata: {sequence: 24}}]), []);
+  assert.throws(() => takeLedgerBatch(null), /queue_invalid/);
+});
+test('P1-J Provider events wait only for the sent Evidence watermark captured at arrival', async () => {
+  const gate = new SentEvidenceGate();
+  let resolveFirst;
+  let resolveFuture;
+  const first = new Promise(resolve => { resolveFirst = resolve; });
+  const future = new Promise(resolve => { resolveFuture = resolve; });
+  gate.advance(first);
+  const eventWatermark = gate.snapshot();
+  gate.advance(future);
+
+  let eventReleased = false;
+  eventWatermark.then(() => { eventReleased = true; });
+  resolveFirst();
+  await eventWatermark;
+  assert.equal(eventReleased, true);
+
+  let futureReleased = false;
+  gate.snapshot().then(() => { futureReleased = true; });
+  await Promise.resolve();
+  assert.equal(futureReleased, false);
+  resolveFuture();
+  await gate.snapshot();
+  assert.equal(futureReleased, true);
 });
 test('P1-J minimum Human Gate permits continuation only after a real Partial and halts after failure', () => {
   const failed = new HumanGateController();

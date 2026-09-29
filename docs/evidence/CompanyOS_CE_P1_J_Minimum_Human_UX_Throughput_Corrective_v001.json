@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "recorded_at_jst": "2026-09-30T08:24:00+09:00",
+  "stage": "CE_P1_J_MINIMUM_HUMAN_UX_THROUGHPUT_CORRECTIVE",
+  "base_head": "2fda0aa",
+  "disposition": {
+    "p1_i": "INCONCLUSIVE_TECHNICAL_VERIFICATION_REQUIRED",
+    "p1_j": "AUTHORIZED_WITH_KNOWN_P1_I_LIMITATION_MINIMUM_GATE_INCONCLUSIVE",
+    "provider_failure": "NOT_ESTABLISHED",
+    "current_relay_live_end_to_end_pass": false,
+    "human_start_actions_consumed": 1,
+    "retry": 0,
+    "reconnect": 0,
+    "resend": 0
+  },
+  "human_observation": {
+    "browser": "Microsoft Edge desktop",
+    "microphone_speech_performed": true,
+    "waveform_change_observed": true,
+    "partial_displayed": false
+  },
+  "runtime_evidence": {
+    "provider_sessions": 1,
+    "mip_opt_out": true,
+    "reconnect_attempts": 0,
+    "samples_sent": 144000,
+    "audio_seconds_sent": 9.0,
+    "session_close_normal": false,
+    "persisted_provider_events": 0,
+    "late_internal_event_route_attempts": 9,
+    "late_event_types": "unknown",
+    "partial": "not_observed",
+    "durable_final": "not_reached",
+    "actual_billed_cost": "unknown",
+    "audio_based_estimated_cost_usd": 0.001455
+  },
+  "root_cause": {
+    "classification": "LOCAL_RELAY_LINEAGE_THROUGHPUT_AND_EVENT_WATERMARK_FAILURE",
+    "provider_failure": false,
+    "per_100ms_frame_internal_requests": 2,
+    "observed_wall_seconds": 85,
+    "processed_audio_seconds": 9,
+    "event_waited_for_future_browser_frames": true
+  },
+  "provider_free_corrective": {
+    "provider_communication": 0,
+    "audio_send": 0,
+    "ledger_batch_frames": 10,
+    "source_range_granularity_ms": 100,
+    "atomic_accept_batch": true,
+    "atomic_sent_batch": true,
+    "server_side_pcm_sha256_verification": true,
+    "stream_generation_scope_verification": true,
+    "raw_audio_persisted": false,
+    "maximum_memory_queue_frames": 30,
+    "hard_abort_discards_unsent_queue": true,
+    "provider_event_waits_for_arrival_time_sent_watermark_only": true
+  },
+  "verification": {
+    "php_syntax": "PASS",
+    "pint": "PASS",
+    "node": "17 PASS",
+    "ce_p1_focused": "11 PASS / 1 gated live test SKIP / 142 assertions",
+    "full_laravel": "670 PASS / 17 SKIP / 1 known out-of-scope FAIL / 5458 assertions",
+    "known_out_of_scope_failure": "CompanyNavigationTest::regular login ignores a stale forbidden intended url",
+    "new_regressions": 0,
+    "secret_value_hits": 0,
+    "normal_env_changed": false,
+    "normal_local_database_changed": false,
+    "loopback_runtime_stopped": true
+  },
+  "recommended_next_action": {
+    "conclusion": "RECOMMEND_ONE_NEW_P1_J_MINIMUM_HUMAN_START_AFTER_EXPLICIT_HUMAN_GATE",
+    "synthetic_provider_request": false,
+    "human_start_maximum": 1,
+    "minimum_path": "Mic -> Waveform -> same-origin WSS -> Relay -> Provider acceptance -> Partial",
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend": 0,
+    "cost_hard_limit_usd": 0.05,
+    "human_gate_required": true
+  },
+  "public_push": false,
+  "production_database": false,
+  "production_credential": false,
+  "deploy": false
+}

@@ -41,14 +41,17 @@ final class RealtimeRelayBridgeController extends Controller
                 if ($existing->relay_lease_id !== $lease->id || ! in_array($existing->state, ['connecting', 'open'], true)) {
                     throw ValidationException::withMessages(['relay' => SafeRealtimeReason::GenerationSuperseded->value]);
                 }
+
                 return $existing;
             }
+
             return AiCommonSharedProviderSession::query()->create([
                 'relay_lease_id' => $lease->id, 'ai_common_shared_capture_stream_id' => $stream->id, 'generation' => $stream->generation,
                 'adapter' => 'deepgram', 'adapter_version' => (string) config('ai-common-realtime.deepgram.adapter_version'),
                 'capability_profile_version' => 'nova3-ja-v1', 'state' => 'connecting',
             ]);
         }, 3);
+
         return response()->json(['provider_session_id' => $provider->public_id, 'state' => $provider->state]);
     }
 
@@ -61,6 +64,7 @@ final class RealtimeRelayBridgeController extends Controller
             'provider_session_reference_hash' => filled($input['provider_session_reference'] ?? null) ? hash('sha256', $input['provider_session_reference']) : null,
             'state' => 'open', 'opened_at_utc' => now(),
         ]);
+
         return response()->json(['state' => 'open']);
     }
 
@@ -71,7 +75,40 @@ final class RealtimeRelayBridgeController extends Controller
         $provider = $this->provider($input['provider_session_id']);
         $lease = AiCommonSharedRelayLease::query()->findOrFail($provider->relay_lease_id);
         $range = $ledger->accept(CanonicalAudioFrame::fromArray($input['frame']), $lease);
+
         return response()->json(['source_range_id' => $range->public_id, 'state' => $range->state]);
+    }
+
+    public function frames(Request $request, RealtimeSourceLedger $ledger): JsonResponse
+    {
+        $this->authorizeBridge($request);
+        $input = $request->validate([
+            'provider_session_id' => ['required', 'uuid'],
+            'frames' => ['required', 'array', 'min:1', 'max:10'],
+            'frames.*.frame' => ['required', 'array'],
+            'frames.*.pcm_base64' => ['required', 'string', 'max:5000'],
+        ]);
+        $provider = $this->provider($input['provider_session_id']);
+        $lease = AiCommonSharedRelayLease::query()->findOrFail($provider->relay_lease_id);
+        $stream = AiCommonSharedCaptureStream::query()->findOrFail($provider->ai_common_shared_capture_stream_id);
+        $frames = array_map(static function (array $entry) use ($provider, $stream): CanonicalAudioFrame {
+            $frame = CanonicalAudioFrame::fromArray($entry['frame']);
+            $binary = base64_decode($entry['pcm_base64'], true);
+            if ($binary === false || strlen($binary) !== $frame->sampleCount * 2
+                || ! hash_equals($frame->contentSha256, hash('sha256', $binary))
+                || ! hash_equals($stream->public_id, $frame->streamId)
+                || $provider->generation !== $frame->generation) {
+                throw ValidationException::withMessages(['frames' => 'Realtime batch binary identity or Provider scope failed closed.']);
+            }
+
+            return $frame;
+        }, $input['frames']);
+        $ranges = $ledger->acceptBatch($frames, $lease);
+
+        return response()->json(['ranges' => array_map(static fn (AiCommonSharedSourceRange $range): array => [
+            'source_range_id' => $range->public_id,
+            'state' => $range->state,
+        ], $ranges)]);
     }
 
     public function sent(Request $request, RealtimeSourceLedger $ledger): JsonResponse
@@ -81,7 +118,29 @@ final class RealtimeRelayBridgeController extends Controller
         $provider = $this->provider($input['provider_session_id']);
         $range = AiCommonSharedSourceRange::query()->where('public_id', $input['source_range_id'])->firstOrFail();
         $sent = $ledger->sent($provider, $range);
+
         return response()->json(['send_ordinal' => $sent->send_ordinal, 'state' => $sent->state]);
+    }
+
+    public function sentBatch(Request $request, RealtimeSourceLedger $ledger): JsonResponse
+    {
+        $this->authorizeBridge($request);
+        $input = $request->validate([
+            'provider_session_id' => ['required', 'uuid'],
+            'source_range_ids' => ['required', 'array', 'min:1', 'max:10'],
+            'source_range_ids.*' => ['required', 'uuid', 'distinct'],
+        ]);
+        $provider = $this->provider($input['provider_session_id']);
+        $ranges = array_map(
+            static fn (string $publicId): AiCommonSharedSourceRange => AiCommonSharedSourceRange::query()->where('public_id', $publicId)->firstOrFail(),
+            $input['source_range_ids'],
+        );
+        $sent = $ledger->sentBatch($provider, $ranges);
+
+        return response()->json(['sent' => array_map(static fn ($range): array => [
+            'send_ordinal' => $range->send_ordinal,
+            'state' => $range->state,
+        ], $sent)]);
     }
 
     public function event(Request $request, DeepgramStreamingAdapter $adapter, RealtimeSourceLedger $ledger, RealtimeProviderEventStore $store, RealtimeDurableFinalCommitter $committer): JsonResponse
@@ -103,6 +162,7 @@ final class RealtimeRelayBridgeController extends Controller
         }
         [$actor, $organization, $conversation, $session] = $this->commitContext($provider);
         $commit = $committer->commit($actor, $organization, $conversation, $session, $receipt, (string) Str::uuid());
+
         return response()->json([
             'type' => 'durable_final', 'provider_session_id' => $provider->public_id, 'receive_order' => $envelope->receiveOrder,
             'content' => $envelope->content, 'speaker_count' => count($envelope->anonymousSpeakers), 'commit_id' => $commit->public_id,
@@ -118,6 +178,7 @@ final class RealtimeRelayBridgeController extends Controller
         AiCommonSharedRelayLease::query()->whereKey($provider->relay_lease_id)->update([
             'state' => AiCommonSharedRelayLease::STATE_CLOSED, 'closed_at_utc' => now(), 'safe_reason_code' => $input['safe_reason_code'],
         ]);
+
         return response()->json(['state' => $provider->fresh()->state]);
     }
 
@@ -137,6 +198,7 @@ final class RealtimeRelayBridgeController extends Controller
         if (! in_array($provider->state, ['connecting', 'open'], true)) {
             throw ValidationException::withMessages(['relay' => SafeRealtimeReason::ProviderUnavailable->value]);
         }
+
         return $provider;
     }
 
@@ -144,6 +206,7 @@ final class RealtimeRelayBridgeController extends Controller
     {
         $stream = AiCommonSharedCaptureStream::query()->with('operatorParticipant.user')->findOrFail($provider->ai_common_shared_capture_stream_id);
         $lease = AiCommonSharedRelayLease::query()->findOrFail($provider->relay_lease_id);
+
         return [
             $stream->operatorParticipant->user, Organization::query()->findOrFail($lease->organization_id),
             AiCommonConversation::query()->findOrFail($lease->ai_common_conversation_id), AiCommonSharedSession::query()->findOrFail($lease->ai_common_shared_session_id),

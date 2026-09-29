@@ -11,7 +11,29 @@ import { safeFailureReason } from './limited-verification.js';
 
 export const CONSERVATIVE_COST_USD_PER_MINUTE = 0.0097;
 export const FAILURE_EVIDENCE_CONTRACT = 'p1-j-failure-v2';
+export const LEDGER_BATCH_FRAMES = 10;
+export const LEDGER_BATCH_FLUSH_MS = 1000;
+export const MAX_QUEUED_FRAMES = 30;
 const SAMPLE_RATE = 16000;
+
+export function takeLedgerBatch(queue, flushAll = false) {
+  if (!Array.isArray(queue)) throw new Error('relay_frame_queue_invalid');
+  if (queue.length < LEDGER_BATCH_FRAMES && !flushAll) return [];
+  return queue.splice(0, Math.min(LEDGER_BATCH_FRAMES, queue.length));
+}
+
+export class SentEvidenceGate {
+  #watermark = Promise.resolve();
+
+  advance(promise) {
+    this.#watermark = Promise.resolve(promise);
+    return this.#watermark;
+  }
+
+  snapshot() {
+    return this.#watermark;
+  }
+}
 
 function sleep(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -178,6 +200,7 @@ export async function createProductRelay(env = process.env) {
 
   let sessionCount = 0;
   let totalSamplesSent = 0;
+  let totalSamplesAdmitted = 0;
   const humanGate = new HumanGateController();
   const bridge = async (action, payload) => {
     const response = await fetch(new URL(`/api/internal/realtime-relay/${action}`, upstream), {
@@ -220,10 +243,16 @@ export async function createProductRelay(env = process.env) {
     let secret = '';
     let opened = false;
     let closing = false;
+    let hardAborted = false;
     let failureStage = 'browser_connected';
     let providerConnectionAttempted = false;
     let messageChain = Promise.resolve();
     let eventChain = Promise.resolve();
+    let frameQueue = [];
+    let nextQueuedSample = 0;
+    let batchTimer = null;
+    let batchFlushChain = Promise.resolve();
+    const sentEvidenceGate = new SentEvidenceGate();
     const abortController = new AbortController();
     const providerClosed = deferred();
     const sendBrowser = message => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
@@ -236,6 +265,9 @@ export async function createProductRelay(env = process.env) {
       const reason = failureEvidence.reason;
       humanGate.markFailure();
       appendEvidence(evidencePath, failureEvidence);
+      hardAborted = true;
+      if (batchTimer) clearTimeout(batchTimer);
+      frameQueue = [];
       abortController.abort();
       if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal: false, safe_reason_code: reason }).catch(() => {});
       sendBrowser({ type: 'rejected', safe_reason_code: reason });
@@ -262,7 +294,10 @@ export async function createProductRelay(env = process.env) {
         const order = receiveOrder;
         const estimated = Math.round((totalSamplesSent / SAMPLE_RATE / 60 * CONSERVATIVE_COST_USD_PER_MINUTE) * 1_000_000);
         const safe = sanitizeProviderEvent(event, samplesSent, estimated);
-        const framesSettled = messageChain;
+        // A Provider event waits only for the lineage watermark covering audio
+        // already sent to that Provider. It must not wait for future Browser
+        // frames that happened to be queued when the event arrived.
+        const framesSettled = sentEvidenceGate.snapshot();
         eventChain = eventChain.then(async () => {
           await framesSettled;
           const result = await bridge('event', { provider_session_id: providerSessionId, receive_order: order, event: safe });
@@ -286,11 +321,80 @@ export async function createProductRelay(env = process.env) {
       failureStage = 'provider_ready';
       secret = '';
     };
+
+    const flushFrames = (flushAll = false) => {
+      if (batchTimer) {
+        clearTimeout(batchTimer);
+        batchTimer = null;
+      }
+      batchFlushChain = batchFlushChain.then(async () => {
+        while (!hardAborted) {
+          const batch = takeLedgerBatch(frameQueue, flushAll);
+          if (batch.length === 0) break;
+
+          failureStage = 'bridge_frames';
+          const accepted = await bridge('frames', {
+            provider_session_id: providerSessionId,
+            frames: batch.map(item => ({
+              frame: item.metadata,
+              pcm_base64: item.binary.toString('base64'),
+            })),
+          });
+          const ranges = Array.isArray(accepted?.ranges) ? accepted.ranges : [];
+          if (ranges.length !== batch.length || ranges.some(range => range?.state !== 'accepted' || typeof range?.source_range_id !== 'string')) {
+            throw new Error('bridge_frame_batch_evidence_incomplete');
+          }
+          if (hardAborted) throw new Error('relay_hard_abort');
+
+          failureStage = 'provider_media_send';
+          for (const item of batch) provider.sendMedia(item.binary);
+          const batchSamples = batch.reduce((sum, item) => sum + item.metadata.sample_count, 0);
+          samplesSent = batch.at(-1).metadata.end_sample;
+          totalSamplesSent += batchSamples;
+
+          failureStage = 'bridge_sent_batch';
+          const sentPromise = bridge('sent-batch', {
+            provider_session_id: providerSessionId,
+            source_range_ids: ranges.map(range => range.source_range_id),
+          });
+          sentEvidenceGate.advance(sentPromise);
+          const sent = await sentPromise;
+          const receipts = Array.isArray(sent?.sent) ? sent.sent : [];
+          if (receipts.length !== batch.length || receipts.some(receipt => receipt?.state !== 'sent')) {
+            throw new Error('bridge_sent_batch_evidence_incomplete');
+          }
+          appendEvidence(evidencePath, {
+            type: 'ledger_batch', frame_count: batch.length,
+            start_sample: batch[0].metadata.start_sample,
+            end_sample: batch.at(-1).metadata.end_sample,
+            raw_audio_persisted: false,
+          });
+          failureStage = 'provider_ready';
+        }
+      });
+      return batchFlushChain;
+    };
+
+    const scheduleFrameFlush = () => {
+      if (frameQueue.length >= LEDGER_BATCH_FRAMES) {
+        flushFrames(false).catch(fail);
+        return;
+      }
+      if (!batchTimer) {
+        batchTimer = setTimeout(() => {
+          batchTimer = null;
+          flushFrames(true).catch(fail);
+        }, LEDGER_BATCH_FLUSH_MS);
+      }
+    };
+
     const stop = async normal => {
       if (closing) return;
       closing = true;
       try {
         if (provider && normal) {
+          await flushFrames(true);
+          await sentEvidenceGate.snapshot();
           provider.sendFinalize({ type: 'Finalize' });
           await sleep(1500);
           await eventChain;
@@ -303,6 +407,9 @@ export async function createProductRelay(env = process.env) {
           });
           await eventChain;
         } else {
+          hardAborted = true;
+          if (batchTimer) clearTimeout(batchTimer);
+          frameQueue = [];
           abortController.abort();
         }
         if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal, safe_reason_code: normal ? 'normal_stop' : 'hard_abort' });
@@ -327,14 +434,14 @@ export async function createProductRelay(env = process.env) {
         }
         if (!pendingMetadata || closing || !provider || !opened) throw new Error('relay_binary_sequence_invalid');
         const binary = Buffer.from(data);
-        const nextSample = validateProductFrame(pendingMetadata, binary, samplesSent);
-        if ((totalSamplesSent + pendingMetadata.sample_count) / SAMPLE_RATE > policy.maxAudioSeconds) throw new Error('audio_duration_limit_exceeded');
-        const accepted = await bridge('frame', { provider_session_id: providerSessionId, frame: pendingMetadata, binary_hash_verified: true });
-        provider.sendMedia(binary);
-        await bridge('sent', { provider_session_id: providerSessionId, source_range_id: accepted.source_range_id });
-        samplesSent = nextSample;
-        totalSamplesSent += pendingMetadata.sample_count;
+        const nextSample = validateProductFrame(pendingMetadata, binary, nextQueuedSample);
+        if ((totalSamplesAdmitted + pendingMetadata.sample_count) / SAMPLE_RATE > policy.maxAudioSeconds) throw new Error('audio_duration_limit_exceeded');
+        frameQueue.push({ metadata: pendingMetadata, binary });
+        nextQueuedSample = nextSample;
+        totalSamplesAdmitted += pendingMetadata.sample_count;
         pendingMetadata = null;
+        if (frameQueue.length > MAX_QUEUED_FRAMES) throw new Error('relay_frame_backlog_failed_closed');
+        scheduleFrameFlush();
       }).catch(fail);
     });
     ws.on('close', () => { if (!closing) stop(false).catch(() => {}); });

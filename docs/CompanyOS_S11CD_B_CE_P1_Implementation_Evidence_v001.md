@@ -379,3 +379,20 @@ Preparation verification:
 Safety bounds are retry/reconnect `0 / 0`, maximum 3 Provider Sessions, maximum 300 seconds total audio, USD 0.05 hard limit, `mip_opt_out=true`, loopback listener only, no Browser Credential, no raw audio persistence, no Public Port/Tunnel/Firewall change, no Production DB/Credential/Deploy/Public Push.
 
 Human instructions and PASS/FAIL criteria are in `docs/CompanyOS_S11CD_B_CE_P1_J_Human_UX_Verification_Package_v001.md`. The next action is the Human microphone gate; failure before Partial must stop without an additional request.
+
+## 19 | P1-J Minimum Human UX throughput corrective
+
+The explicitly approved Human Start was used once in Microsoft Edge. Human Evidence established microphone speech and same-stream Waveform movement. Runtime Evidence established same-origin WSS, Provider acceptance, `mip_opt_out=true`, reconnect `0`, and 144,000 samples / 9.0 seconds sent. Partial was not displayed, Durable Final was not reached, and the session later ended with `normal=false`; no retry, reconnect, resend, or second Start followed.
+
+Provider Failure is not established. Sanitized local logs and source inspection identified a Current Relay throughput defect: every 100 ms frame performed two serial Laravel HTTP round trips, while Provider events waited for the Browser `messageChain` containing future queued frames. Only 9 seconds of audio progressed during approximately 85 seconds of wall time, and late event submissions occurred after hard abort.
+
+The Provider-free Corrective keeps every 100 ms Source Range but transports ten ranges per atomic request. Laravel independently validates transient PCM byte length/SHA-256 and Provider stream/generation scope; no raw audio is persisted. Send Range persistence is batched atomically, the memory queue is bounded to 30 frames, hard abort discards unsent frames, and Provider events now wait only for the sent-Evidence watermark captured at event arrival.
+
+Verification is Node `17 PASS`, CE-P1 focused `11 PASS / 1 gated live SKIP / 142 assertions`, and full Laravel `670 PASS / 17 SKIP / 1 known out-of-scope FAIL / 5,458 assertions`. The known CompanyNavigation intended-URL mismatch is unchanged. Repository `.env` and the normal local DB remain unchanged; the loopback runtime is stopped. No Provider communication or audio send occurred during the Corrective.
+
+Disposition remains P1-I `INCONCLUSIVE / Technical Verification Required` and P1-J `AUTHORIZED WITH KNOWN P1-I LIMITATION / Minimum Gate INCONCLUSIVE`. Recommended next action is one newly authorized P1-J Human Start through an explicit Human Gate, using the corrected Actual Product Path and zero retry/reconnect/resend. This recommendation is not authorization.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_J_Minimum_Human_UX_Throughput_Corrective_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_J_Minimum_Human_UX_Throughput_Corrective_v001.json`

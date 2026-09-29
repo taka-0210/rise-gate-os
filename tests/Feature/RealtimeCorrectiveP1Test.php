@@ -586,13 +586,74 @@ class RealtimeCorrectiveP1Test extends TestCase
         ])->assertOk()->assertJsonPath('state', 'closed');
     }
 
+    public function test_p1_j_batch_bridge_is_atomic_and_preserves_each_source_range_and_send_ordinal(): void
+    {
+        config()->set('ai-common-realtime.enabled', true);
+        config()->set('ai-common-realtime.audio_send_enabled', true);
+        config()->set('ai-common-realtime.bridge_token', str_repeat('c', 32));
+        [$owner, , $organization, $conversation, $session, $stream] = $this->activeFixture();
+        config()->set('ai-common-realtime.audio_send_enabled', true);
+        $lease = app(RealtimeLeaseManager::class)->issue($owner, $organization, $conversation, $session, $stream);
+        $headers = ['X-CompanyOS-Relay-Token' => str_repeat('c', 32)];
+        $providerId = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/open', [
+            'lease_id' => $lease->public_id, 'stream_id' => $stream->public_id, 'generation' => 1,
+        ])->assertOk()->json('provider_session_id');
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/opened', [
+            'provider_session_id' => $providerId, 'provider_session_reference' => null,
+        ])->assertOk();
+
+        $batch = [];
+        for ($index = 0; $index < 10; $index++) {
+            $pcm = str_repeat(chr($index), 3200);
+            $batch[] = ['frame' => [
+                'lease_id' => $lease->public_id, 'stream_id' => $stream->public_id, 'generation' => 1,
+                'sequence' => $index + 1, 'client_event_id' => (string) Str::uuid(),
+                'start_sample' => $index * 1600, 'end_sample' => ($index + 1) * 1600, 'sample_count' => 1600,
+                'sample_rate' => 16000, 'bit_depth' => 16, 'channels' => 1, 'format' => 'pcm_s16le',
+                'content_sha256' => hash('sha256', $pcm),
+            ], 'pcm_base64' => base64_encode($pcm)];
+        }
+
+        $tampered = $batch;
+        $tampered[0]['pcm_base64'] = base64_encode(str_repeat(chr(255), 3200));
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frames', [
+            'provider_session_id' => $providerId, 'frames' => $tampered,
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('ai_common_shared_source_ranges', 0);
+
+        $gapped = $batch;
+        $gapped[9]['frame']['start_sample'] = 16000;
+        $gapped[9]['frame']['end_sample'] = 17600;
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frames', [
+            'provider_session_id' => $providerId, 'frames' => $gapped,
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('ai_common_shared_source_ranges', 0);
+
+        $ranges = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frames', [
+            'provider_session_id' => $providerId, 'frames' => $batch,
+        ])->assertOk()->assertJsonCount(10, 'ranges')->json('ranges');
+        $this->assertDatabaseCount('ai_common_shared_source_ranges', 10);
+        $sent = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/sent-batch', [
+            'provider_session_id' => $providerId,
+            'source_range_ids' => array_column($ranges, 'source_range_id'),
+        ])->assertOk()->assertJsonCount(10, 'sent')->json('sent');
+        $this->assertSame(range(1, 10), array_column($sent, 'send_ordinal'));
+        $this->assertDatabaseCount('ai_common_shared_provider_send_ranges', 10);
+
+        $provider = AiCommonSharedProviderSession::query()->where('public_id', $providerId)->firstOrFail();
+        $this->assertSame(
+            ['verification_state' => 'verified', 'start_sample' => 0, 'end_sample' => 16000],
+            app(RealtimeSourceLedger::class)->sourceMapping($provider, 0, 16000),
+        );
+    }
+
     public function test_p1_j_browser_stop_waits_for_relay_finalization_handshake(): void
     {
         $script = file_get_contents(public_path('js/ai-common-shared-session.js'));
         $this->assertStringContainsString("current.socket.send(JSON.stringify({type: mode === 'normal_stop' ? 'stop' : 'cancel'}))", $script);
         $this->assertStringContainsString("message.type === 'relay_stopped'", $script);
         $this->assertStringContainsString("mode === 'normal_stop' ? 12000 : 1000", $script);
-        $this->assertLessThan(strpos($script, "current.socket.close(1000, mode)"), strpos($script, "await stopped"));
+        $this->assertLessThan(strpos($script, 'current.socket.close(1000, mode)'), strpos($script, 'await stopped'));
     }
 
     private function writeLimitedProviderCapture(string $path, array $harness, array $result): void

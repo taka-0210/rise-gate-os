@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Api\AiProposalController;
-use App\Http\Controllers\Api\AiProjectController;
 use App\Http\Controllers\Api\AiMcpController;
+use App\Http\Controllers\Api\AiProjectController;
+use App\Http\Controllers\Api\AiProposalController;
 use App\Http\Controllers\Api\RealtimeRelayBridgeController;
 use App\Models\AiAccessKey;
 use Illuminate\Support\Facades\Route;
@@ -28,7 +28,9 @@ Route::prefix('/internal/realtime-relay')->middleware('throttle:3000,1')->group(
     Route::post('/open', [RealtimeRelayBridgeController::class, 'open']);
     Route::post('/opened', [RealtimeRelayBridgeController::class, 'opened']);
     Route::post('/frame', [RealtimeRelayBridgeController::class, 'frame']);
+    Route::post('/frames', [RealtimeRelayBridgeController::class, 'frames']);
     Route::post('/sent', [RealtimeRelayBridgeController::class, 'sent']);
+    Route::post('/sent-batch', [RealtimeRelayBridgeController::class, 'sentBatch']);
     Route::post('/event', [RealtimeRelayBridgeController::class, 'event']);
     Route::post('/close', [RealtimeRelayBridgeController::class, 'close']);
 });
