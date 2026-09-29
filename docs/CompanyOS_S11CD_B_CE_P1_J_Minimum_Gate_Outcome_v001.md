@@ -155,3 +155,56 @@ Pinned SDKが生成するProvider-free queryを直接検査するAutomated Test�
 - Missing Evidenceを推測でPASSまたはProvider Failureにしない
 
 新しいHuman Gateが承認されるまでProvider通信は行わない。Public Push、Production DB、Production Credential、Deploy、Azure / 他Provider通信も未実施・未承認のまま維持する。
+
+## Corrective Limited Verification Outcome
+
+人＋ChatGPT Reviewで承認された最大1 Requestを、Humanマイクではなく既承認Synthetic Japanese WAVで実施した。Root Cause Correctiveを最も直接的に確認でき、Human操作を不要に繰り返さないためである。
+
+- Provider：Deepgram Nova-3 Streaming
+- Source：18.9016875秒 / 302427 samples
+- SHA-256：`396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A`
+- Request：`1 / 1 consumed`
+- retry / reconnect / resend：`0 / 0 / 0`
+- Cost hard limit：USD 0.01
+- Corrected parameter class：`diarize_model=latest`のみ
+
+実行はProvider HarnessのPASS Contractと、Provider後に置かれたrequest count、`mip_opt_out=true`、reconnect 0、cost上限、302427 samplesのassertionを通過した。したがって、HTTP 400 CorrectiveとProvider acceptanceは実行control flow上で成立した。
+
+ただし、その後のlocal Durable Final統合で`Unsafe lease TTL/refresh configuration.`により停止した。Detailed sanitized Provider Evidenceのfile writeがlocal integrationより後に配置されていたため、Partial / Final / timing / speaker / Metadataの正確な件数を永続Evidenceとして回収できなかった。これらを推測でPASSへ昇格しない。
+
+判定：
+
+- Limited run全体：`INCONCLUSIVE / LOCAL INTEGRATION EVIDENCE PERSISTENCE FAILURE`
+- Deepgram Provider Failure：`NOT ESTABLISHED`
+- HTTP 400 Corrective：実行control flow上で解消
+- Current Relayの正式PASS：未成立
+- P1-I：`INCONCLUSIVE / Technical Verification Required`を維持
+- P1-J：`AUTHORIZED WITH KNOWN P1-I LIMITATION`を維持
+- 追加送信：`0`
+
+### Provider-free Root Cause / Corrective
+
+Root CauseはProviderではなく、Limited Verification testのlocal integration設定とEvidence write順序である。
+
+1. Testが`lease_ttl_seconds=120`を設定していた。
+2. 現行Product ContractはTTLを6〜30秒に制限している。
+3. Provider captureのsanitized file writeがlocal Durable Final統合完了後に置かれていた。
+4. そのためProvider Harness通過後のlocal failureで詳細Evidenceを失った。
+
+Corrective：
+
+- Test TTLをContract上限内の30秒へ修正
+- Provider Harness PASS直後にsanitized captureを永続化
+- その後にSource Range / Event normalization / Durable Final統合を実行
+- local integration failure時もProvider captureを保持
+- Raw Credential、Authorization Header、raw Provider payload、raw audioを保存しない
+
+Provider通信0件で、Node relay `15 PASS`、CE-P1 focused `10 PASS / 1 Provider Gate skip / 128 assertions`を確認した。通常`.env`と通常local DBのSHA-256は実行前後で不変、loopback listener残存0である。
+
+### Updated Recommended Decision
+
+**Synthetic Requestは繰り返さず、P1-J Minimum Human UX GateのHuman Startを最大1回だけ新たに承認することを推奨する。**
+
+HTTP 400 CorrectiveとProvider acceptanceは実行control flowで確認でき、残る有用なEvidenceはActual Product PathのHuman UXである。新しいHuman Gateでは最初に`Mic → same-origin WSS → Relay → Provider acceptance → Partial`のみを確認し、成立した場合だけ既承認のWaveform / Final / Durable Final / Pause / Resume / End等へ進む。成立しない場合は再送せず停止する。
+
+詳細sanitized record：`docs/evidence/CompanyOS_CE_P1_J_Corrective_Limited_Verification_v001.json`

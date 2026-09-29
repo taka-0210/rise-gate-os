@@ -357,6 +357,39 @@ class RealtimeCorrectiveP1Test extends TestCase
         $this->assertDatabaseCount('ai_common_shared_provider_event_receipts', 0);
     }
 
+    public function test_p1_i_provider_capture_is_persisted_before_local_integration(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'p1-i-capture-');
+        $this->assertNotFalse($path);
+        try {
+            $this->writeLimitedProviderCapture($path, [
+                'final_classification' => 'PASS', 'evidence_completeness' => 'complete',
+            ], [
+                'status' => 'PASS',
+                'request' => ['mip_opt_out' => 'true', 'reconnectAttempts' => 0],
+                'source' => ['sha256' => str_repeat('a', 64), 'sample_frames' => 302427],
+                'cost' => ['estimated_usd' => 0.0031, 'limit_usd' => 0.01],
+                'counts' => ['provider_requests' => 1, 'partials' => 1, 'finals' => 1, 'metadata' => 1],
+                'connection' => ['provider_close_code' => 1000],
+                'checks' => ['provider_accepted' => true, 'actual_mip_opt_out_true' => true],
+            ]);
+
+            $capture = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertSame('PROVIDER_CAPTURED_PENDING_LOCAL_INTEGRATION', $capture['status']);
+            $this->assertTrue($capture['checks']['provider_accepted']);
+            $this->assertSame(1, $capture['counts']['provider_requests']);
+            $this->assertFalse($capture['local_durable_integration_completed']);
+            $this->assertDoesNotMatchRegularExpression(
+                '/authorization|api[_-]?key|credential_path|transcript/i',
+                (string) file_get_contents($path),
+            );
+        } finally {
+            if (is_string($path) && file_exists($path)) {
+                unlink($path);
+            }
+        }
+    }
+
     public function test_p1_i_limited_real_provider_evidence_reaches_durable_final(): void
     {
         if (getenv('COMPANY_OS_P1_I_RUN') !== 'true') {
@@ -367,7 +400,7 @@ class RealtimeCorrectiveP1Test extends TestCase
             'COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'] as $required) {
             $this->assertNotFalse(getenv($required), $required.' is required.');
         }
-        config()->set('ai-common-realtime.lease_ttl_seconds', 120);
+        config()->set('ai-common-realtime.lease_ttl_seconds', 30);
         $run = app(ProviderEvidenceProcessRunner::class)->run([
             (string) getenv('COMPANY_OS_P1_I_NODE'), base_path('realtime-relay/src/limited-verification.js'),
         ], base_path(), [
@@ -386,6 +419,11 @@ class RealtimeCorrectiveP1Test extends TestCase
         ], timeoutSeconds: 70.0);
         $result = $run['payload'];
         $harness = $run['evidence'];
+        if (($harness['final_classification'] ?? null) === 'PASS' && ($result['status'] ?? null) === 'PASS') {
+            $this->writeLimitedProviderCapture(
+                (string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'), $harness, $result,
+            );
+        }
         if (($harness['final_classification'] ?? null) !== 'PASS' || ($result['status'] ?? null) !== 'PASS') {
             $failure = [
                 'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION',
@@ -556,6 +594,35 @@ class RealtimeCorrectiveP1Test extends TestCase
         $this->assertStringContainsString("mode === 'normal_stop' ? 12000 : 1000", $script);
         $this->assertLessThan(strpos($script, "current.socket.close(1000, mode)"), strpos($script, "await stopped"));
     }
+
+    private function writeLimitedProviderCapture(string $path, array $harness, array $result): void
+    {
+        $capture = [
+            'schema_version' => 1,
+            'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION',
+            'status' => 'PROVIDER_CAPTURED_PENDING_LOCAL_INTEGRATION',
+            'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(),
+            'provider' => 'Deepgram Nova-3 Streaming',
+            'harness' => $harness,
+            'request' => $result['request'],
+            'source' => $result['source'],
+            'cost' => $result['cost'],
+            'counts' => $result['counts'],
+            'connection' => $result['connection'],
+            'checks' => $result['checks'],
+            'local_durable_integration_completed' => false,
+            'automatic_retry_count' => 0,
+            'automatic_reconnect_count' => 0,
+            'manual_reconnect_count' => 0,
+            'raw_audio_persisted' => false,
+            'raw_provider_payload_persisted' => false,
+            'credential_exposed_to_browser_or_evidence' => false,
+        ];
+        $serialized = json_encode($capture, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
+        $this->assertDoesNotMatchRegularExpression('/authorization|api[_-]?key|credential_path|transcript/i', $serialized);
+        file_put_contents($path, $serialized, LOCK_EX);
+    }
+
     private function activeFixture(): array
     {
         config()->set('ai-common-realtime.enabled', true);

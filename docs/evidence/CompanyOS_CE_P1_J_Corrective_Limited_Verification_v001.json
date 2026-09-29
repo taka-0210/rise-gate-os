@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "stage": "CE-P1-J_CORRECTIVE_LIMITED_PROVIDER_VERIFICATION",
+  "recorded_at_jst": "2026-09-30T07:07:55+09:00",
+  "status": "INCONCLUSIVE_LOCAL_INTEGRATION_EVIDENCE_PERSISTENCE_FAILURE",
+  "provider_failure": "NOT_ESTABLISHED",
+  "p1_i": "INCONCLUSIVE_TECHNICAL_VERIFICATION_REQUIRED",
+  "p1_j": "AUTHORIZED_WITH_KNOWN_P1_I_LIMITATION",
+  "approved_request": {
+    "provider": "Deepgram Nova-3 Streaming",
+    "maximum_requests": 1,
+    "consumed_requests": 1,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend": 0,
+    "mip_opt_out": true,
+    "cost_limit_usd": 0.01
+  },
+  "source": {
+    "kind": "approved_synthetic_japanese_wav",
+    "duration_seconds": 18.9016875,
+    "sample_frames": 302427,
+    "sha256": "396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A"
+  },
+  "live_control_flow_evidence": {
+    "harness_pass_contract_reached": true,
+    "http_400_corrective_resolved": "verified_by_executed_pass_contract",
+    "provider_acceptance": "verified_by_executed_pass_contract",
+    "provider_request_count": 1,
+    "mip_opt_out": true,
+    "reconnect_attempts": 0,
+    "source_sample_frames": 302427,
+    "partial_final_timing_speaker_metadata_contract": "satisfied_by_pass_contract_exact_counts_not_persisted",
+    "estimated_cost_within_usd_0_01": true,
+    "detailed_sanitized_provider_payload_persisted": false
+  },
+  "failure": {
+    "failure_stage": "local_durable_integration_lease_issue",
+    "safe_reason": "Unsafe lease TTL/refresh configuration.",
+    "request_parameter_class": "corrected_diarize_model_only",
+    "provider_connection_attempted": true,
+    "provider_failure": false,
+    "evidence_completeness": "incomplete",
+    "local_durable_final_integration_completed": false
+  },
+  "root_cause": {
+    "ttl_configured_seconds": 120,
+    "ttl_allowed_min_seconds": 6,
+    "ttl_allowed_max_seconds": 30,
+    "evidence_write_order": "provider_capture_was_written_after_local_durable_integration",
+    "classification": "provider_free_test_harness_integration_defect"
+  },
+  "provider_free_corrective": {
+    "lease_ttl_seconds": 30,
+    "evidence_write_order": "persist_sanitized_provider_capture_before_local_durable_integration",
+    "unknown_inferred": false,
+    "additional_provider_requests": 0,
+    "additional_audio_sends": 0
+  },
+  "verification": {
+    "node_relay": "15 PASS",
+    "ce_p1_focused": "10 PASS / 1 Provider gate skip / 128 assertions",
+    "secret_or_raw_credential_persisted": false,
+    "normal_env_unchanged": true,
+    "normal_database_unchanged": true,
+    "loopback_listeners_remaining": 0
+  },
+  "recommended_decision": {
+    "recommendation": "DO_NOT_REPEAT_SYNTHETIC_REQUEST; AUTHORIZE_AT_MOST_ONE_P1_J_MINIMUM_HUMAN_UX_START",
+    "reason": "The corrected request reached the Harness PASS contract and resolved the HTTP 400 path, while the remaining failure was local Evidence ordering and invalid test TTL. The next useful evidence is the actual Product-path Human UX gate.",
+    "next_goal": "Mic -> same-origin WSS -> Relay -> Provider acceptance -> Partial, then continue the approved Human UX checks only if the minimum path passes.",
+    "human_gate_required": true,
+    "stop_after_single_outcome": true
+  },
+  "public_push": false,
+  "production_database": false,
+  "production_credential": false,
+  "deploy": false
+}

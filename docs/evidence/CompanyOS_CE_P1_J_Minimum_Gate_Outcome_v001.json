@@ -141,6 +141,27 @@
     "stop_condition": "Stop after the single outcome; do not resend for PASS, FAIL, or INCONCLUSIVE.",
     "human_gate_required": true
   },
+  "corrective_limited_verification": {
+    "status": "INCONCLUSIVE_LOCAL_INTEGRATION_EVIDENCE_PERSISTENCE_FAILURE",
+    "provider_requests": 1,
+    "retry": 0,
+    "reconnect": 0,
+    "resend": 0,
+    "http_400_corrective": "resolved_by_executed_pass_contract",
+    "provider_acceptance": "verified_by_executed_pass_contract",
+    "detailed_provider_evidence_persisted": false,
+    "failure_stage": "local_durable_integration_lease_issue",
+    "safe_reason": "Unsafe lease TTL/refresh configuration.",
+    "provider_failure": "NOT_ESTABLISHED",
+    "provider_free_corrective": {
+      "lease_ttl_seconds": 30,
+      "sanitized_provider_capture_persisted_before_local_integration": true,
+      "node_tests": "15 PASS",
+      "ce_p1_focused": "10 PASS / 1 Provider gate skip / 128 assertions"
+    },
+    "additional_provider_requests_after_failure": 0,
+    "evidence_file": "docs/evidence/CompanyOS_CE_P1_J_Corrective_Limited_Verification_v001.json"
+  },
   "public_push": false,
   "production_database": false,
   "production_credential": false,
