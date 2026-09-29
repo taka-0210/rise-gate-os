@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertNetworkFence, buildRequestProjection, SDK_VERSION } from '../src/deepgram-port.js';
+import { assertNetworkFence, buildRequestProjection, createDeepgramSession, SDK_VERSION } from '../src/deepgram-port.js';
 import { ConnectionRegistry } from '../src/connection-registry.js';
 import { assertLimitedPolicy, buildFailureEvidence, encodeEvidenceFrame, validateFrame } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
@@ -80,4 +80,40 @@ test('P1-I child emits a run-specific deterministic evidence frame', () => {
   assert.match(frame, new RegExp(`^@@COMPANY_OS_EVIDENCE_V1:${frameId}:BEGIN@@`));
   assert.match(frame, new RegExp(`@@COMPANY_OS_EVIDENCE_V1:${frameId}:END@@\\n$`));
   assert.throws(() => encodeEvidenceFrame({ status: 'PASS' }, 'predictable'), /frame_id_invalid/);
+});
+
+test('SDK v5 lifecycle starts one socket without explicit connect or reconnect', async () => {
+  const lifecycle = {
+    sdk_socket_created: 0,
+    initial_connection_started: 0,
+    explicit_provider_connect: 0,
+    reconnect: 0,
+    retry: 0,
+    duplicate_socket: 0,
+  };
+  const socket = {
+    connect() { lifecycle.explicit_provider_connect += 1; },
+    reconnect() { lifecycle.reconnect += 1; },
+  };
+  const session = await createDeepgramSession({
+    apiKey: 'synthetic-server-side-key',
+    env: { COMPANY_OS_REALTIME_ENABLED: 'true', COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED: 'true' },
+    clientFactory: () => ({ listen: { v1: { connect: request => {
+      lifecycle.sdk_socket_created += 1;
+      lifecycle.initial_connection_started += 1;
+      lifecycle.retry = request.reconnectAttempts;
+      lifecycle.duplicate_socket = Math.max(0, lifecycle.sdk_socket_created - 1);
+      return socket;
+    } } } }),
+  });
+
+  assert.equal(session, socket);
+  assert.deepEqual(lifecycle, {
+    sdk_socket_created: 1,
+    initial_connection_started: 1,
+    explicit_provider_connect: 0,
+    reconnect: 0,
+    retry: 0,
+    duplicate_socket: 0,
+  });
 });

@@ -35,11 +35,14 @@ export function assertNetworkFence(projection, env = process.env) {
   return true;
 }
 
-export async function createDeepgramSession({ apiKey, signal, env = process.env, projection = null, onRequestProjection = null }) {
+export async function createDeepgramSession({
+  apiKey, signal, env = process.env, projection = null, onRequestProjection = null,
+  clientFactory = options => new DeepgramClient(options),
+}) {
   projection ??= buildRequestProjection({}, env);
   assertNetworkFence(projection, env);
   if (!apiKey || typeof apiKey !== 'string') throw new Error('server_credential_unavailable');
-  const client = new DeepgramClient({ apiKey });
+  const client = clientFactory({ apiKey });
   const request = {
     model: projection.model,
     language: projection.language,

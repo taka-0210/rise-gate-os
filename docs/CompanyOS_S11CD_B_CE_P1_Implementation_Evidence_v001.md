@@ -294,3 +294,22 @@ Detailed outcome:
 - `docs/CompanyOS_S11CD_B_CE_P1_I_Hardened_Verification_Outcome_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_I_Deepgram_Hardened_v001.json`
 - `docs/evidence/CompanyOS_CE_P1_I_Hardened_Verification_Outcome_v001.json`
+
+## 15｜P1-I Runtime Integration Corrective
+
+Provider communication and audio send remained `0 / 0`. The SDK v5 lifecycle corrective removed the redundant explicit `provider.connect()` and now treats the socket returned by `client.listen.v1.connect()` as already starting its initial connection.
+
+Synthetic lifecycle Evidence is `socket 1 / initial start 1 / explicit connect 0 / reconnect 0 / retry 0 / duplicate socket 0`. Parent Evidence now persists sanitized child `safe_reason` and `error_layer_classification`; a non-PASS result with either field Unknown cannot be marked complete.
+
+Verification completed with Node `7 PASS`, Failure Matrix `17 PASS / 418 assertions`, P1 focused `28 PASS / 1 gated SKIP / 529 assertions`, and CE-P1 plus bounded regression `54 PASS / 1 gated SKIP / 757 assertions`. The full Laravel suite reproduced only the known out-of-scope CompanyNavigation stale intended-URL mismatch. Secret review found no real Credential, Authorization value, or private key. Repository `.env` and normal local DB hashes remained unchanged, and remaining Node processes were `0`.
+
+Recommended Decision:
+
+**Authorize exactly one additional Limited Deepgram Request only through a new explicit Human Gate under the unchanged one-request, USD 0.01, zero retry/reconnect/resend, DPAPI Credential, and `mip_opt_out=true` limits.**
+
+This recommendation does not authorize communication. P1-I remains `INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE / STOPPED`, P1-J remains `NOT STARTED`, and the current additional-request authorization remains `NOT AUTHORIZED`.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_I_Runtime_Integration_Corrective_Decision_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_I_Runtime_Integration_Corrective_v001.json`

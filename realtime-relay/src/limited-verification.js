@@ -314,7 +314,6 @@ export async function runLimitedVerification(env = process.env) {
         providerCloseReason = typeof event?.reason === 'string' ? event.reason : '';
         providerClosed.resolve();
       });
-      provider.connect();
       await within(provider.waitForOpen(), 10000, 'provider_open_timeout');
       if (!providerOpened) throw new Error('provider_open_event_missing');
       ws.send(JSON.stringify({ type: 'provider_state', state: 'ready' }));

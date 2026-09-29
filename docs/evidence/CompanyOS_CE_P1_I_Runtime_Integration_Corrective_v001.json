@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "stage": "CE-P1-I_RUNTIME_INTEGRATION_CORRECTIVE",
+  "date_jst": "2026-09-30",
+  "branch": "ce-p1-realtime-corrective",
+  "corrective_status": "PASS",
+  "provider_communication": 0,
+  "audio_send": 0,
+  "p1_i": "INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE_STOPPED",
+  "p1_j": "NOT_STARTED",
+  "additional_provider_request_authorized": false,
+  "corrective": {
+    "redundant_explicit_provider_connect_removed": true,
+    "sdk_socket_returned_as_already_connecting": true,
+    "safe_reason_persisted_to_parent": true,
+    "error_layer_classification_persisted_to_parent": true,
+    "non_pass_diagnostics_required_for_complete": true,
+    "unknown_inferred": false,
+    "parent_secret_redaction": true
+  },
+  "lifecycle_evidence": {
+    "sdk_socket_created": 1,
+    "initial_connection_started": 1,
+    "explicit_provider_connect": 0,
+    "reconnect": 0,
+    "retry": 0,
+    "duplicate_socket": 0
+  },
+  "failure_matrix": {
+    "status": "PASS",
+    "tests": 17,
+    "assertions": 418,
+    "required_cases": [
+      "sdk_open_failure",
+      "provider_rejection",
+      "connection_abort",
+      "lifecycle_mismatch",
+      "child_runtime_failure",
+      "malformed_or_incomplete_evidence"
+    ]
+  },
+  "verification": {
+    "node": "7 PASS / 0 FAIL",
+    "p1_focused": "28 PASS / 1 gated SKIP / 529 assertions",
+    "ce_p1_bounded_regression": "54 PASS / 1 gated SKIP / 757 assertions",
+    "syntax": "PASS",
+    "format": "PASS",
+    "full_laravel_suite": "completed_with_one_known_out_of_scope_company_navigation_failure",
+    "secret_scan": "PASS_NO_REAL_CREDENTIAL_OR_AUTHORIZATION_VALUE"
+  },
+  "known_out_of_scope_failure": {
+    "test": "CompanyNavigationTest::test_regular_login_ignores_a_stale_forbidden_intended_url",
+    "expected": "http://localhost/company",
+    "actual": "http://localhost/system-admin/members",
+    "ce_p1_regression": false
+  },
+  "environment": {
+    "repository_env_sha256": "DC2A0E2A2402229EFA555609FFCEB6A9721F9A2CC1A452D5B7DEEEF3BC6CB0ED",
+    "normal_local_db_sha256": "19278A4B11E3DCBF1B717969C554D7E45919B1C0B362F54EA1BFCA4D9BFC072C",
+    "remaining_node_processes": 0,
+    "production_credential_used": false,
+    "production_db_migration": false,
+    "deploy": false,
+    "public_push": false
+  },
+  "recommended_decision": {
+    "decision": "AUTHORIZE_ONE_ADDITIONAL_LIMITED_REQUEST_AT_A_NEW_EXPLICIT_HUMAN_GATE",
+    "recommendation_only": true,
+    "request_max": 1,
+    "provider": "Deepgram Nova-3 Streaming",
+    "audio_duration_seconds": 18.9016875,
+    "audio_sha256": "396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A",
+    "hard_cost_limit_usd": 0.01,
+    "conservative_cost_estimate_usd": 0.0030557728125,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend": 0,
+    "mip_opt_out": true,
+    "stop_after_single_result": true
+  }
+}

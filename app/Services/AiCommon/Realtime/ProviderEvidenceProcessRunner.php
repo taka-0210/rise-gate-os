@@ -65,11 +65,14 @@ final class ProviderEvidenceProcessRunner
             ],
             'stderr' => $this->captureState($stderr),
         ];
-        $complete = $parsed['state'] === 'valid'
+        $baseComplete = $parsed['state'] === 'valid'
             && ! in_array('unknown', [
                 $provider['connection_state'], $provider['acceptance_state'], $provider['audio_send_state'],
                 $provider['audio_samples'], $provider['event_count'], $provider['close_state'],
             ], true);
+        $diagnosticsComplete = $classification === 'PASS'
+            || ($provider['safe_reason'] !== 'unknown' && $provider['error_layer'] !== 'unknown');
+        $complete = $baseComplete && $diagnosticsComplete;
 
         return [
             'payload' => $parsed['payload'],
@@ -93,6 +96,8 @@ final class ProviderEvidenceProcessRunner
                 'audio_duration_seconds' => $provider['audio_duration_seconds'],
                 'event_count' => $provider['event_count'],
                 'close_state' => $provider['close_state'],
+                'safe_reason' => $provider['safe_reason'],
+                'error_layer_classification' => $provider['error_layer'],
                 'safe_request_projection' => $provider['request'],
                 'evidence_completeness' => $parsed['state'] === 'valid' ? ($complete ? 'complete' : 'partial') : 'missing',
                 'final_classification' => $classification,
@@ -186,6 +191,7 @@ final class ProviderEvidenceProcessRunner
         $counts = is_array($payload['counts'] ?? null) ? $payload['counts'] : [];
         $connection = is_array($payload['connection'] ?? null) ? $payload['connection'] : [];
         $request = is_array($payload['request'] ?? null) ? $payload['request'] : [];
+        $error = is_array(data_get($payload, 'errors.0')) ? data_get($payload, 'errors.0') : [];
         $eventCount = $this->sumKnownIntegers([$counts['partials'] ?? null, $counts['finals'] ?? null, $counts['metadata'] ?? null]);
 
         return [
@@ -197,6 +203,8 @@ final class ProviderEvidenceProcessRunner
             'audio_duration_seconds' => $this->known($source['duration_sent_seconds'] ?? null),
             'event_count' => $eventCount,
             'close_state' => $this->known($connection['provider_close_code'] ?? null),
+            'safe_reason' => $this->sanitizeReason($payload['safe_reason'] ?? ($error['safe_reason'] ?? null)),
+            'error_layer' => $this->known($error['classification'] ?? null),
             'request' => array_intersect_key($request, array_flip([
                 'model', 'language', 'encoding', 'sample_rate', 'channels', 'diarize', 'interim_results',
                 'mip_opt_out', 'reconnectAttempts',
@@ -209,8 +217,23 @@ final class ProviderEvidenceProcessRunner
         return [
             'connection_state' => 'unknown', 'acceptance_state' => 'unknown', 'audio_send_state' => 'unknown',
             'audio_samples' => 'unknown', 'audio_bytes' => 'unknown', 'audio_duration_seconds' => 'unknown',
-            'event_count' => 'unknown', 'close_state' => 'unknown', 'request' => [],
+            'event_count' => 'unknown', 'close_state' => 'unknown', 'safe_reason' => 'unknown',
+            'error_layer' => 'unknown', 'request' => [],
         ];
+    }
+
+    private function sanitizeReason(mixed $value): string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return 'unknown';
+        }
+        $sanitized = preg_replace(
+            ['/(authorization|api[-_ ]?key|token|credential)\s*[:=]\s*\S+/i', '/Bearer\s+\S+/i'],
+            ['$1=[REDACTED]', 'Bearer [REDACTED]'],
+            $value,
+        );
+
+        return mb_substr((string) $sanitized, 0, 240);
     }
 
     private function known(mixed $value): mixed

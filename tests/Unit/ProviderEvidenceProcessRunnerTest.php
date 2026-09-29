@@ -31,6 +31,8 @@ class ProviderEvidenceProcessRunnerTest extends TestCase
         $this->assertSame('RUNTIME_FAILURE', data_get($result, 'evidence.final_classification'));
         $this->assertSame(23, data_get($result, 'evidence.safe_exit_code'));
         $this->assertSame('valid', data_get($result, 'evidence.json_parse_state'));
+        $this->assertSame('partial', data_get($result, 'evidence.evidence_completeness'));
+        $this->assertSame('unknown', data_get($result, 'evidence.safe_reason'));
         $this->assertNotNull($result['payload']);
     }
 
@@ -42,7 +44,60 @@ class ProviderEvidenceProcessRunnerTest extends TestCase
         $this->assertTrue(data_get($result, 'evidence.provider_connection_state'));
         $this->assertFalse(data_get($result, 'evidence.provider_acceptance_state'));
         $this->assertSame(0, data_get($result, 'evidence.audio_samples'));
+        $this->assertSame('synthetic_provider_rejection', data_get($result, 'evidence.safe_reason'));
+        $this->assertSame('provider', data_get($result, 'evidence.error_layer_classification'));
         $this->assertSame('complete', data_get($result, 'evidence.evidence_completeness'));
+    }
+
+    public function test_sdk_open_failure_keeps_complete_sanitized_diagnostics(): void
+    {
+        $result = $this->runScenario('sdk_open_failure');
+
+        $this->assertSame('RUNTIME_FAILURE', data_get($result, 'evidence.final_classification'));
+        $this->assertSame('synthetic_sdk_open_failure', data_get($result, 'evidence.safe_reason'));
+        $this->assertSame('session', data_get($result, 'evidence.error_layer_classification'));
+        $this->assertSame('complete', data_get($result, 'evidence.evidence_completeness'));
+    }
+
+    public function test_connection_abort_is_classified_without_inference(): void
+    {
+        $result = $this->runScenario('connection_abort');
+
+        $this->assertSame('RUNTIME_FAILURE', data_get($result, 'evidence.final_classification'));
+        $this->assertSame('synthetic_connection_abort', data_get($result, 'evidence.safe_reason'));
+        $this->assertSame(1006, data_get($result, 'evidence.close_state'));
+        $this->assertFalse(data_get($result, 'evidence.unknown_inferred'));
+    }
+
+    public function test_lifecycle_mismatch_is_explicit_and_complete(): void
+    {
+        $result = $this->runScenario('lifecycle_mismatch');
+
+        $this->assertSame('RUNTIME_FAILURE', data_get($result, 'evidence.final_classification'));
+        $this->assertSame('synthetic_redundant_connect_detected', data_get($result, 'evidence.safe_reason'));
+        $this->assertSame('runtime', data_get($result, 'evidence.error_layer_classification'));
+        $this->assertSame('complete', data_get($result, 'evidence.evidence_completeness'));
+    }
+
+    public function test_child_runtime_failure_retains_reason_and_layer(): void
+    {
+        $result = $this->runScenario('child_runtime_failure');
+
+        $this->assertSame(70, data_get($result, 'evidence.safe_exit_code'));
+        $this->assertSame('synthetic_child_runtime_failure', data_get($result, 'evidence.safe_reason'));
+        $this->assertSame('runtime', data_get($result, 'evidence.error_layer_classification'));
+        $this->assertSame('complete', data_get($result, 'evidence.evidence_completeness'));
+    }
+
+    public function test_child_reason_is_sanitized_again_at_parent_boundary(): void
+    {
+        $result = $this->runScenario('secret_reason');
+        $reason = (string) data_get($result, 'evidence.safe_reason');
+
+        $this->assertStringContainsString('[REDACTED]', $reason);
+        $this->assertStringNotContainsString('secret-value', $reason);
+        $this->assertStringNotContainsString('second-secret', $reason);
+        $this->assertSame('runtime', data_get($result, 'evidence.error_layer_classification'));
     }
 
     public function test_stdout_noise_is_separated_from_the_run_specific_frame(): void
@@ -137,6 +192,7 @@ class ProviderEvidenceProcessRunnerTest extends TestCase
             'stdout_capture_state', 'stderr_capture_state', 'json_parse_state',
             'provider_connection_state', 'provider_acceptance_state', 'audio_send_state',
             'audio_samples', 'event_count', 'close_state', 'evidence_completeness', 'final_classification',
+            'safe_reason', 'error_layer_classification',
         ] as $required) {
             $this->assertArrayHasKey($required, $result['evidence'], $scenario.' missing '.$required);
         }
