@@ -387,16 +387,42 @@ class RealtimeCorrectiveP1Test extends TestCase
         ]);
         $process->setTimeout(70);
         $process->run();
-        $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        try {
+            $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            $stdout = $process->getOutput();
+            $stderr = $process->getErrorOutput();
+            $failure = [
+                'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION',
+                'status' => 'INCONCLUSIVE_EVIDENCE_FAILURE', 'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(),
+                'provider' => 'Deepgram Nova-3 Streaming', 'safe_exit_state' => 'child_process_ended',
+                'safe_reason' => 'child_stdout_json_parse_failed', 'test_invocation_count' => 1,
+                'provider_request_attempt' => 'unknown', 'provider_accepted' => 'unknown',
+                'audio_send_samples' => 'unknown', 'close_state' => 'unknown',
+                'stdout_bytes' => strlen($stdout), 'stdout_sha256' => hash('sha256', $stdout),
+                'stderr_bytes' => strlen($stderr), 'stderr_sha256' => hash('sha256', $stderr),
+                'retry_performed' => false, 'raw_child_output_persisted' => false,
+                'raw_failure_payload_persisted' => false,
+            ];
+            file_put_contents((string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'),
+                json_encode($failure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL, LOCK_EX);
+
+            throw $exception;
+        }
         if (! $process->isSuccessful() || ($result['status'] ?? 'FAIL') !== 'PASS') {
             $failure = [
                 'schema_version' => 1, 'stage' => 'CE-P1-I_LIMITED_REAL_PROVIDER_VERIFICATION',
                 'status' => 'INCONCLUSIVE_EVIDENCE_FAILURE', 'completed_at_jst' => now('Asia/Tokyo')->toIso8601String(),
                 'provider' => 'Deepgram Nova-3 Streaming', 'checks' => $result['checks'] ?? [],
+                'safe_exit_state' => $result['safe_exit_state'] ?? 'unknown',
+                'safe_reason' => $result['safe_reason'] ?? 'unknown',
+                'request' => $result['request'] ?? null, 'source' => $result['source'] ?? [],
+                'cost' => $result['cost'] ?? [], 'safe_exit' => $result['safe_exit'] ?? [],
                 'counts' => $result['counts'] ?? [], 'connection' => $result['connection'] ?? [],
                 'errors' => collect($result['errors'] ?? [])->map(fn (array $error): array => [
                     'classification' => (string) ($error['classification'] ?? 'unknown'),
-                    'message_sha256' => hash('sha256', (string) ($error['message'] ?? '')),
+                    'safe_reason' => (string) ($error['safe_reason'] ?? 'unknown'),
+                    'reason_sha256' => hash('sha256', (string) ($error['safe_reason'] ?? 'unknown')),
                 ])->all(), 'retry_performed' => false, 'raw_failure_payload_persisted' => false,
             ];
             file_put_contents((string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'),

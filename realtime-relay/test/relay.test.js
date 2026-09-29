@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assertNetworkFence, buildRequestProjection, SDK_VERSION } from '../src/deepgram-port.js';
 import { ConnectionRegistry } from '../src/connection-registry.js';
-import { assertLimitedPolicy, validateFrame } from '../src/limited-verification.js';
+import { assertLimitedPolicy, buildFailureEvidence, validateFrame } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -54,4 +54,22 @@ test('loopback relay frame validation requires contiguous PCM identity', () => {
   assert.equal(validateFrame(metadata, binary, 0), 1600);
   assert.throws(() => validateFrame({ ...metadata, start_sample: 1 }, binary, 0), /failed_closed/);
   assert.throws(() => validateFrame({ ...metadata, content_sha256: '0'.repeat(64) }, binary, 0), /failed_closed/);
+});
+
+test('P1-I failure evidence is persisted before assertion without raw provider data', () => {
+  const evidence = buildFailureEvidence({
+    classification: 'provider', providerRequestCount: 1,
+    actualRequest: { mip_opt_out: 'true', reconnectAttempts: 0 }, providerOpened: true,
+    audioSendStarted: true, audioSendCompleted: false, samplesSent: 1600,
+    frameCount: 1, providerCloseCode: 1011, loopbackListenerOpened: true,
+  }, new Error('Authorization: secret-value provider_runtime_failure'));
+  assert.equal(evidence.status, 'INCONCLUSIVE_EVIDENCE_FAILURE');
+  assert.equal(evidence.checks.provider_connection_attempted, true);
+  assert.equal(evidence.checks.provider_accepted, true);
+  assert.equal(evidence.source.samples_sent, 1600);
+  assert.equal(evidence.source.bytes_sent, 3200);
+  assert.equal(evidence.connection.provider_close_code, 1011);
+  assert.equal(evidence.provider_events.length, 0);
+  assert.equal(evidence.frame_receipts.length, 0);
+  assert.doesNotMatch(JSON.stringify(evidence), /secret-value/);
 });

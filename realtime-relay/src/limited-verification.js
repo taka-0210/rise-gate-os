@@ -25,6 +25,7 @@ function deferred() {
   let resolve;
   let reject;
   const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  promise.catch(() => {});
   return { promise, resolve, reject };
 }
 
@@ -142,6 +143,76 @@ function safeProviderEvent(event, receiveOrder, samplesSent, estimatedCostMicrou
   return result;
 }
 
+function safeFailureReason(error) {
+  const value = error instanceof Error ? error.message : String(error ?? 'unknown_failure');
+  return value
+    .replace(/(authorization|api[-_ ]?key|token|credential)\s*[:=]\s*\S+/gi, '$1=[REDACTED]')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
+    .slice(0, 240);
+}
+
+export function buildFailureEvidence(state = {}, error = new Error('unknown_failure')) {
+  const reason = safeFailureReason(error);
+  const samplesSent = Number.isInteger(state.samplesSent) ? state.samplesSent : 0;
+  const sampleRate = Number.isInteger(state.sampleRate) ? state.sampleRate : 16000;
+  const providerRequestCount = Number.isInteger(state.providerRequestCount) ? state.providerRequestCount : 0;
+  const actualRequest = state.actualRequest ?? null;
+  return {
+    status: 'INCONCLUSIVE_EVIDENCE_FAILURE',
+    safe_exit_state: 'fail_closed',
+    safe_reason: reason,
+    checks: {
+      provider_connection_attempted: providerRequestCount === 1,
+      actual_request_projection_captured: actualRequest !== null,
+      actual_mip_opt_out_true: actualRequest?.mip_opt_out === 'true',
+      provider_accepted: state.providerOpened === true,
+      audio_send_started: state.audioSendStarted === true,
+      audio_send_completed: state.audioSendCompleted === true,
+      normal_provider_close: state.providerCloseCode === 1000,
+      automatic_retry_zero: true,
+      automatic_reconnect_zero: true,
+      manual_reconnect_zero: true,
+    },
+    request: actualRequest,
+    source: {
+      sha256: state.sourceSha256 ?? APPROVED_SOURCE_SHA256,
+      duration_seconds: state.durationSeconds ?? APPROVED_DURATION_SECONDS,
+      sample_rate_hz: sampleRate,
+      bits_per_sample: 16,
+      channels: 1,
+      chunk_ms: 100,
+      samples_sent: samplesSent,
+      bytes_sent: samplesSent * 2,
+      duration_sent_seconds: samplesSent / sampleRate,
+    },
+    cost: {
+      estimated_usd: state.estimatedCostUsd ?? null,
+      actual_usd: null,
+      limit_usd: state.costLimitUsd ?? APPROVED_COST_LIMIT_USD,
+      price_version: 'deepgram-conservative-2026-09',
+    },
+    counts: {
+      provider_requests: providerRequestCount,
+      frames: Number.isInteger(state.frameCount) ? state.frameCount : 0,
+      partials: Number.isInteger(state.partialCount) ? state.partialCount : 0,
+      finals: Number.isInteger(state.finalCount) ? state.finalCount : 0,
+      metadata: Number.isInteger(state.metadataCount) ? state.metadataCount : 0,
+    },
+    connection: {
+      loopback_listener_opened: state.loopbackListenerOpened === true,
+      provider_accepted: state.providerOpened === true,
+      provider_close_code: state.providerCloseCode ?? null,
+      provider_close_reason: safeFailureReason(state.providerCloseReason ?? ''),
+      loopback_close_code: state.localCloseCode ?? null,
+      loopback_close_reason: safeFailureReason(state.localCloseReason ?? ''),
+    },
+    provider_events: [],
+    frame_receipts: [],
+    browser_messages: [],
+    errors: [{ classification: state.classification ?? 'runtime', safe_reason: reason }],
+  };
+}
+
 export async function runLimitedVerification(env = process.env) {
   const audioPath = path.resolve(env.COMPANY_OS_P1_I_AUDIO_PATH ?? '');
   const credentialPath = path.resolve(env.COMPANY_OS_P1_I_CREDENTIAL_PATH ?? '');
@@ -181,6 +252,12 @@ export async function runLimitedVerification(env = process.env) {
   let acceptedConnections = 0;
   let pendingMetadata = null;
   let stopReceived = false;
+  let loopbackListenerOpened = false;
+  let audioSendStarted = false;
+  let audioSendCompleted = false;
+  let localCloseCode = null;
+  let localCloseReason = '';
+  let outcome = null;
 
   const server = https.createServer({ key: fs.readFileSync(tlsKeyPath), cert: fs.readFileSync(tlsCertPath) }, (_request, response) => {
     response.writeHead(404, { 'content-type': 'text/plain' });
@@ -270,7 +347,9 @@ export async function runLimitedVerification(env = process.env) {
           });
           samplesSent = next;
           pendingMetadata = null;
+          audioSendStarted = true;
           provider.sendMedia(binary);
+          if (samplesSent === format.sampleFrames) audioSendCompleted = true;
         } catch (error) {
           errors.push({ classification: 'relay', message: error.message });
           abortController.abort();
@@ -296,6 +375,7 @@ export async function runLimitedVerification(env = process.env) {
     });
     const address = server.address();
     if (!address || address.address !== '127.0.0.1') throw new Error('loopback_listener_guard_failed');
+    loopbackListenerOpened = true;
     const client = new WebSocket(`wss://127.0.0.1:${address.port}/realtime-relay`, {
       origin: expectedOrigin, rejectUnauthorized: false, perMessageDeflate: false,
     });
@@ -332,6 +412,8 @@ export async function runLimitedVerification(env = process.env) {
     client.send(JSON.stringify({ type: 'stop' }));
     await within(serverDone.promise, 15000, 'relay_completion_timeout');
     const localClose = await within(clientClosed.promise, 5000, 'loopback_client_close_timeout');
+    localCloseCode = localClose.code;
+    localCloseReason = localClose.reason;
     const finals = events.filter(event => event.type === 'Results' && event.is_final && event.channel.alternatives[0].transcript);
     const partials = events.filter(event => event.type === 'Results' && !event.is_final && event.channel.alternatives[0].transcript);
     const words = finals.flatMap(event => event.channel.alternatives[0].words);
@@ -353,7 +435,7 @@ export async function runLimitedVerification(env = process.env) {
       automatic_retry_zero: true, automatic_reconnect_zero: true, manual_reconnect_zero: true,
       error_count_zero: errors.length === 0,
     };
-    return {
+    outcome = {
       status: Object.values(checks).every(Boolean) ? 'PASS' : 'FAIL',
       checks,
       request: actualRequest,
@@ -369,6 +451,19 @@ export async function runLimitedVerification(env = process.env) {
       browser_messages: browserMessages,
       errors,
     };
+  } catch (error) {
+    const partials = events.filter(event => event.type === 'Results' && !event.is_final && event.channel.alternatives[0].transcript);
+    const finals = events.filter(event => event.type === 'Results' && event.is_final && event.channel.alternatives[0].transcript);
+    const metadata = events.filter(event => event.type === 'Metadata');
+    outcome = buildFailureEvidence({
+      classification: errors.at(-1)?.classification ?? 'runtime', actualRequest, providerOpened,
+      providerCloseCode, providerCloseReason, providerRequestCount, samplesSent,
+      sampleRate: format.sampleRate, durationSeconds: format.durationSeconds,
+      sourceSha256: APPROVED_SOURCE_SHA256, estimatedCostUsd: policy.estimatedCostUsd,
+      costLimitUsd: policy.limit, frameCount: frameReceipts.length, partialCount: partials.length,
+      finalCount: finals.length, metadataCount: metadata.length, loopbackListenerOpened,
+      audioSendStarted, audioSendCompleted, localCloseCode, localCloseReason,
+    }, error);
   } finally {
     secret = '';
     abortController.abort();
@@ -376,6 +471,12 @@ export async function runLimitedVerification(env = process.env) {
     await new Promise(resolve => wss.close(() => resolve()));
     if (server.listening) await new Promise(resolve => server.close(() => resolve()));
   }
+  outcome.safe_exit = {
+    abort_signalled: abortController.signal.aborted,
+    loopback_server_closed: !server.listening,
+    active_wss_clients: wss.clients.size,
+  };
+  return outcome;
 }
 
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
@@ -385,7 +486,7 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
     process.stdout.write(JSON.stringify(result));
     if (result.status !== 'PASS') process.exitCode = 1;
   } catch (error) {
-    process.stdout.write(JSON.stringify({ status: 'FAIL', checks: {}, errors: [{ classification: 'boundary', message: error.message }] }));
+    process.stdout.write(JSON.stringify(buildFailureEvidence({ classification: 'preflight_boundary' }, error)));
     process.exitCode = 1;
   }
 }

@@ -4,12 +4,12 @@
 - Branch: ce-p1-realtime-corrective
 - Baseline / prior local commits: 9890dc0 / ae95731 / ce49baa / 84bf025
 - Public push / deploy: 0 / 0
-- CE-P1 Deepgram attempt: at most 1 Provider handshake/request attempt; completed audio send and Provider acceptance are not evidenced
+- CE-P1 Deepgram executions: initial authorization 1 + corrective authorization 1; Provider acceptance and completed audio send remain unevidenced
 - Production Credential use: 0
 - Production / normal local / shared DB migration: 0
 - Realtime feature flags: default OFF / audio send OFF
 
-This update records the approved implementation through P1-H and the single authorized P1-I attempt. P1-I did not produce complete Evidence and is not PASS. Human UX is not started.
+This update records the approved implementation through P1-H, the initial P1-I execution, and the one explicitly authorized corrective re-verification. P1-I still did not produce complete Provider Evidence and is not PASS. Human UX is not started.
 
 ## 1｜Phase status
 
@@ -23,7 +23,7 @@ This update records the approved implementation through P1-H and the single auth
 | P1-F Compatibility / Durable Final | IMPLEMENTED / AUTOMATED PASS | Bounded/realtime discriminator and mandatory Commit→Receipt→verified Source Range→Segment/Revision lineage. |
 | P1-G Capture / Waveform | IMPLEMENTED CANDIDATE / AUTOMATED PASS | One microphone stream/Web Audio graph, 100 ms frames, waveform, same-origin WSS lease boundary and lifecycle cleanup. Actual relay runtime and Human UX remain unverified. |
 | P1-H Partial / Final / CO Grace | IMPLEMENTED CANDIDATE / SYNTHETIC PASS | Ephemeral partial, validating final, Durable Final-only canonical UI, exact-target grace and immutable click-time request snapshot. |
-| P1-I Limited Provider Verification | INCONCLUSIVE_EVIDENCE_FAILURE / STOPPED | The one authorized execution returned non-success before complete sanitized Provider Evidence was persisted. No retry was performed. See §10. |
+| P1-I Limited Provider Verification | INCONCLUSIVE_EVIDENCE_FAILURE / STOPPED | The initial execution and the one authorized corrective re-verification both ended before complete sanitized Provider Evidence was persisted. No retry or resend followed the corrective execution. See §10 and §12. |
 | P1-J Human UX / device matrix | NOT STARTED | P1-I did not PASS; no human device or microphone operation started. |
 
 ## 2｜P1-F Compatibility and bounded preservation
@@ -126,7 +126,7 @@ Down refuses an unsafe bounded-only restoration while realtime rows exist. Migra
 | P1 + bounded P3/P4/P5 + Release Hardening | 37 PASS / 339 assertions / gated P1-I 1 SKIP |
 | Release Hardening | 4 PASS / 29 assertions |
 | Isolated migration up / compatibility down / reapply | PASS |
-| Relay synthetic Node / P1-I fences | 4 PASS |
+| Relay synthetic Node / P1-I fences | 5 PASS |
 | Relay and browser JS syntax | PASS |
 | Full Laravel suite after P1-I stop | 648 PASS / 1 existing FAIL / 17 SKIP / 4,995 assertions |
 
@@ -139,14 +139,14 @@ No communication-free CE-P1 automated test failed. The single full-suite failure
 | Product Design | Approved P1-F extension implemented |
 | Repository | P1-A〜P1-H candidate implemented |
 | Automated | Focused, connected regression, race/rollback and migration PASS |
-| Provider | INCONCLUSIVE_EVIDENCE_FAILURE; one authorized execution, no retry |
+| Provider | INCONCLUSIVE_EVIDENCE_FAILURE; initial execution plus one explicitly authorized corrective execution; no retry/resend after the corrective execution |
 | Human UX | NOT STARTED |
 | CE-P1 | IN PROGRESS / stopped after inconclusive P1-I |
 | CE-G01 | CLOSED |
 
 P1-G/H are not promoted to Product/Human PASS from automated evidence alone.
 
-## 10｜P1-I single authorized execution
+## 10｜P1-I initial authorized execution
 
 Execution date: 2026-09-30 JST.
 
@@ -194,12 +194,60 @@ This is not classified as a Deepgram Provider failure. It is not inferred as PAS
 ## 11｜Current stop and next gate
 
 - P1-A through P1-H: repository/automated state retained.
-- P1-I: stopped after the single inconclusive execution.
+- P1-I: stopped after the corrective execution also ended inconclusive.
 - P1-J Human UX: NOT STARTED.
 - Human microphone/device actions: 0.
 - Feature flags: default OFF; execution-scoped enablement ended with the child process.
-- No second Deepgram request is authorized.
+- No third Deepgram request is authorized; the one corrective allowance is consumed conservatively.
 - No P1-J preparation is promoted to PASS.
 - CE-G01 remains CLOSED.
 
-Next action is Human + ChatGPT Review of this P1-I disposition. Any further Provider request requires a new explicit Human authorization. Production DB migration, Production/Demo deploy, public GitHub push, Production Credential use, public port, Tunnel and Firewall changes remain prohibited.
+Next action is Human + ChatGPT Review of the initial and corrective P1-I disposition. Any further Provider request requires a new explicit Human authorization. Production DB migration, Production/Demo deploy, public GitHub push, Production Credential use, public port, Tunnel and Firewall changes remain prohibited.
+## 12｜P1-I Corrective Limited Provider Re-Verification
+
+Execution date: 2026-09-30 JST. Sanitized record: `docs/evidence/CompanyOS_CE_P1_I_Deepgram_Corrective_v001.json`.
+
+The explicitly approved one additional execution was invoked once. No retry, reconnect, resend, Azure request, or other Provider request followed it.
+
+Preflight before the execution:
+
+- portable Node.js `v24.21.0`, `@deepgram/sdk@5.10.0`, and `ws@8.22.0`: PASS;
+- isolated Node verification: 5 PASS;
+- P1 focused communication-free verification: 7 PASS / 98 assertions / gated real test 1 SKIP;
+- DPAPI Evaluation Credential load: PASS without displaying or persisting the secret;
+- approved WAV SHA-256, 604,900-byte identity, 18.9016875-second Contract, cost limit USD `0.01`, attempt `1`, retry/reconnect `0`: PASS;
+- Repository `.env` and normal local DB baseline hashes recorded before execution;
+- loopback-only ephemeral TLS created under the OS temporary directory.
+
+Corrective execution result:
+
+- the gated test was invoked once and ended after 3.12 seconds with exit code `2`;
+- PHP could not decode the child stdout as one JSON Evidence envelope (`child_stdout_json_parse_failed`);
+- no sanitized child Evidence file was produced during that execution;
+- the actual SDK request projection, Provider attempt/acceptance, audio samples/bytes/duration, partial/final events, timing, speaker hint, Provider identity, close state, usage, and actual cost are therefore **Unknown**;
+- application-side normalization, Source Cursor mapping, and Durable Final integration were not reached;
+- no field above is inferred as PASS and this result is not classified as a Deepgram Provider failure.
+
+Post-stop evidence:
+
+- additional execution allowance: conservatively consumed;
+- retry / reconnect / resend after the execution: `0 / 0 / 0`;
+- running Node processes: `0`;
+- ephemeral loopback TLS key/certificate: removed;
+- Repository `.env` SHA-256: unchanged;
+- normal local DB SHA-256: unchanged;
+- raw Credential, Authorization header, raw Provider payload, raw realtime audio, and transcript body persisted in Evidence: none;
+- Production Credential / Production DB migration / deploy / public push: `0 / 0 / 0 / 0`.
+- post-stop full Laravel regression: 648 PASS / 1 pre-existing CE-P1-out-of-scope FAIL / 17 SKIP / 4,995 assertions; no CE-P1 regression detected.
+
+The Harness now records fail-closed state fields before assertion and treats deferred async rejection as handled until the awaiting boundary can serialize it. The PHP gate also persists output length/hash metadata if child stdout is not parseable. These changes were verified without Provider communication. They were **not** used for another Provider request.
+
+Disposition:
+
+**P1-I = INCONCLUSIVE_EVIDENCE_FAILURE / STOPPED**
+
+**P1-J = NOT STARTED**
+
+**Provider Failure = NOT ESTABLISHED**
+
+**Next action = Human + ChatGPT Review**

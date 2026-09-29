@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "stage": "CE-P1-I_CORRECTIVE_LIMITED_REAL_PROVIDER_RE_VERIFICATION",
+  "status": "INCONCLUSIVE_EVIDENCE_FAILURE",
+  "completed_at_jst": "2026-09-30T01:09:43+09:00",
+  "classification": "HARNESS_EVIDENCE_FRAMING_FAILURE",
+  "provider_failure_established": false,
+  "provider": "Deepgram Nova-3 Streaming",
+  "authorization": {
+    "additional_request_max": 1,
+    "test_invocation_count": 1,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend_after_failure": 0,
+    "allowance_consumed_conservatively": true
+  },
+  "approved_source": {
+    "sha256": "396F978F02BB43D22BA69BACB01F13B59F36BA11FF729AFA144549D60CC5141A",
+    "duration_seconds": 18.9016875,
+    "bytes": 604900,
+    "format": "PCM WAV / 16000 Hz / 16-bit / mono",
+    "chunk_ms": 100,
+    "realtime_factor": 1.0
+  },
+  "actual": {
+    "request_projection": "unknown",
+    "provider_connection_attempt": "unknown",
+    "provider_acceptance": "unknown",
+    "audio_send_start": "unknown",
+    "audio_send_completion": "unknown",
+    "samples_sent": "unknown",
+    "bytes_sent": "unknown",
+    "duration_sent_seconds": "unknown",
+    "partial_event": "unknown",
+    "final_event": "unknown",
+    "word_timing": "unknown",
+    "anonymous_speaker_hint": "unknown",
+    "provider_event_identity": "unknown",
+    "provider_event_normalization": "not_reached",
+    "source_cursor_mapping": "not_reached",
+    "durable_final_integration": "not_reached",
+    "close_state": "unknown",
+    "usage": "unknown",
+    "actual_cost_usd": "unknown"
+  },
+  "cost": {
+    "hard_limit_usd": 0.01,
+    "full_audio_conservative_estimate_usd": 0.0030557728125
+  },
+  "harness": {
+    "test_exit_code": 2,
+    "test_reported_duration_seconds": 3.12,
+    "safe_reason": "child_stdout_json_parse_failed",
+    "sanitized_child_evidence_file_created": false,
+    "raw_child_output_persisted": false
+  },
+  "security_privacy": {
+    "credential_store": "Windows CurrentUser DPAPI",
+    "raw_credential_persisted": false,
+    "authorization_header_persisted": false,
+    "raw_provider_payload_persisted": false,
+    "raw_realtime_audio_persisted": false,
+    "transcript_body_persisted_in_evidence": false
+  },
+  "post_stop": {
+    "node_processes": 0,
+    "ephemeral_tls_removed": true,
+    "repository_env_sha256_unchanged": "DC2A0E2A2402229EFA555609FFCEB6A9721F9A2CC1A452D5B7DEEEF3BC6CB0ED",
+    "normal_local_db_sha256_unchanged": "19278A4B11E3DCBF1B717969C554D7E45919B1C0B362F54EA1BFCA4D9BFC072C",
+    "azure_requests": 0,
+    "other_provider_requests": 0,
+    "production_credential_used": false,
+    "production_db_migration": false,
+    "deploy": false,
+    "public_push": false
+  },
+  "verification": {
+    "node_synthetic": "5 PASS",
+    "p1_focused": "7 PASS / 98 assertions / real Provider gate 1 SKIP",
+    "full_laravel": "648 PASS / 1 existing CE-P1-out-of-scope FAIL / 17 SKIP / 4995 assertions",
+    "existing_failure": "CompanyNavigation stale intended URL expectation",
+    "ce_p1_regression_detected": false
+  },
+  "disposition": {
+    "retry_or_resend_authorized": false,
+    "p1_i": "INCONCLUSIVE_EVIDENCE_FAILURE",
+    "p1_j": "NOT_STARTED",
+    "next_gate": "Human + ChatGPT Review"
+  }
+}
