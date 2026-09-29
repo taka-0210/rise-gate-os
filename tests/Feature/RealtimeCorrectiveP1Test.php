@@ -498,6 +498,64 @@ class RealtimeCorrectiveP1Test extends TestCase
         file_put_contents((string) getenv('COMPANY_OS_P1_I_SANITIZED_EVIDENCE_PATH'), $serialized, LOCK_EX);
     }
 
+    public function test_p1_j_internal_relay_bridge_is_loopback_token_guarded_and_commits_verified_final(): void
+    {
+        config()->set('ai-common-realtime.enabled', true);
+        config()->set('ai-common-realtime.audio_send_enabled', true);
+        config()->set('ai-common-realtime.bridge_token', str_repeat('b', 32));
+        [$owner, , $organization, $conversation, $session, $stream] = $this->activeFixture();
+        config()->set('ai-common-realtime.audio_send_enabled', true);
+        $lease = app(RealtimeLeaseManager::class)->issue($owner, $organization, $conversation, $session, $stream);
+        $headers = ['X-CompanyOS-Relay-Token' => str_repeat('b', 32)];
+        $open = ['lease_id' => $lease->public_id, 'stream_id' => $stream->public_id, 'generation' => 1];
+
+        $this->postJson('/api/internal/realtime-relay/open', $open)->assertNotFound();
+        $providerId = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/open', $open)
+            ->assertOk()->assertJsonPath('state', 'connecting')->json('provider_session_id');
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/opened', [
+            'provider_session_id' => $providerId, 'provider_session_reference' => null,
+        ])->assertOk()->assertJsonPath('state', 'open');
+
+        $pcm = str_repeat("\0", 3200);
+        $frame = [
+            'lease_id' => $lease->public_id, 'stream_id' => $stream->public_id, 'generation' => 1, 'sequence' => 1,
+            'client_event_id' => (string) Str::uuid(), 'start_sample' => 0, 'end_sample' => 1600, 'sample_count' => 1600,
+            'sample_rate' => 16000, 'bit_depth' => 16, 'channels' => 1, 'format' => 'pcm_s16le', 'content_sha256' => hash('sha256', $pcm),
+        ];
+        $rangeId = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frame', [
+            'provider_session_id' => $providerId, 'frame' => $frame, 'binary_hash_verified' => true,
+        ])->assertOk()->assertJsonPath('state', 'accepted')->json('source_range_id');
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/sent', [
+            'provider_session_id' => $providerId, 'source_range_id' => $rangeId,
+        ])->assertOk()->assertJsonPath('send_ordinal', 1);
+        $event = [
+            'type' => 'Results', 'request_id' => 'synthetic-p1-j', 'is_final' => true, 'start' => 0, 'duration' => 0.1,
+            'channel' => ['alternatives' => [['transcript' => 'Human verification.', 'words' => [[
+                'start' => 0, 'end' => 0.1, 'confidence' => 0.95, 'speaker' => 0,
+            ]]]]],
+        ];
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/event', [
+            'provider_session_id' => $providerId, 'receive_order' => 1, 'event' => $event,
+        ])->assertOk()->assertJsonPath('type', 'durable_final')->assertJsonPath('speaker_count', 1);
+        $this->assertDatabaseCount('ai_common_shared_durable_final_commits', 1);
+        $this->assertDatabaseHas('ai_common_shared_transcript_segments', ['source_kind' => 'realtime_source']);
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/event', [
+            'provider_session_id' => $providerId, 'receive_order' => 2, 'event' => ['type' => 'Close', 'event_id' => (string) Str::uuid()],
+        ])->assertOk()->assertJsonPath('type', 'close');
+        $this->assertDatabaseHas('ai_common_shared_provider_event_receipts', ['normalized_event_type' => 'close', 'status' => 'accepted']);
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/close', [
+            'provider_session_id' => $providerId, 'normal' => true, 'safe_reason_code' => 'normal_stop',
+        ])->assertOk()->assertJsonPath('state', 'closed');
+    }
+
+    public function test_p1_j_browser_stop_waits_for_relay_finalization_handshake(): void
+    {
+        $script = file_get_contents(public_path('js/ai-common-shared-session.js'));
+        $this->assertStringContainsString("current.socket.send(JSON.stringify({type: mode === 'normal_stop' ? 'stop' : 'cancel'}))", $script);
+        $this->assertStringContainsString("message.type === 'relay_stopped'", $script);
+        $this->assertStringContainsString("mode === 'normal_stop' ? 12000 : 1000", $script);
+        $this->assertLessThan(strpos($script, "current.socket.close(1000, mode)"), strpos($script, "await stopped"));
+    }
     private function activeFixture(): array
     {
         config()->set('ai-common-realtime.enabled', true);

@@ -4,9 +4,9 @@
 - Branch: `ce-p1-realtime-corrective`
 - Result: `INCONCLUSIVE_SESSION_TRANSPORT_ERROR_EVIDENCE_GAP`
 - Provider Failure: `NOT ESTABLISHED`
-- P1-I: `STOPPED`
-- P1-J: `NOT STARTED`
-- Further Provider request: `NOT RECOMMENDED / NOT AUTHORIZED`
+- P1-I: `INCONCLUSIVE / TECHNICAL VERIFICATION REQUIRED`
+- P1-J: `AUTHORIZED WITH KNOWN P1-I LIMITATION / READY FOR HUMAN MICROPHONE GATE`
+- Further Synthetic Provider request: `NOT RECOMMENDED / NOT AUTHORIZED`; P1-J Human Product Path: `AUTHORIZED`
 
 ## 1｜Conclusion
 
@@ -110,7 +110,7 @@ The full-suite failure is the pre-existing `CompanyNavigationTest` stale intende
 - normal local DB SHA-256: `19278A4B11E3DCBF1B717969C554D7E45919B1C0B362F54EA1BFCA4D9BFC072C`
 - Production Credential / Production DB / deploy / public push: `0 / 0 / 0 / 0`
 
-## 8｜Recommended Next Action
+## 8｜Recommendation at Final Limited Run (superseded by Section 10)
 
 **Recommendation: do not authorize another Provider Request at this time. Close this final P1-I attempt as INCONCLUSIVE / Technical Verification Required, keep P1-J NOT STARTED, and submit the accumulated Repository, prior successful E1 Deepgram connectivity, and current final Evidence for Human + ChatGPT disposition.**
 
@@ -129,10 +129,28 @@ If Product Review later determines that current-relay live proof is mandatory, t
 
 **P1-I = INCONCLUSIVE_SESSION_TRANSPORT_ERROR_EVIDENCE_GAP / STOPPED**
 
-**P1-J = NOT STARTED**
+**P1-J = AUTHORIZED WITH KNOWN P1-I LIMITATION / READY FOR HUMAN MICROPHONE GATE**
 
 **Provider Failure = NOT ESTABLISHED**
 
-**Further Provider request = NOT RECOMMENDED / NOT AUTHORIZED**
+**Further Synthetic Provider request = NOT RECOMMENDED / NOT AUTHORIZED**
 
-**Next state = Human + ChatGPT Review**
+**Next state = P1-J Human microphone gate**
+## 10｜Human + ChatGPT Disposition / P1-J Authorization
+
+Human + ChatGPT integrated Review keeps P1-I at **INCONCLUSIVE / Technical Verification Required**. It is not promoted to PASS and is not classified as Provider Failure.
+
+CE-PD08B E1 Deepgram Connectivity Evidence is retained separately as **Provider Capability Evidence** for Nova-3 Streaming connectivity, the approved Japanese synthetic source, Partial, Final, Metadata, Result identity, Word timing, Provider timing, Speaker information, normal close, and `mip_opt_out=true`. It is not reused as Current Company OS Relay Integration PASS.
+
+No additional Synthetic Limited Provider Request will be made merely to pass P1-I. P1-J is **AUTHORIZED WITH KNOWN P1-I LIMITATION** so the real Product Path can collect Human UX Evidence and Current Relay live integration Evidence together.
+
+Preparation completed without Provider communication or audio send:
+
+- local-only HTTPS/WSS gateway bound to `127.0.0.1`;
+- isolated SQLite copy with the two approved additive migrations;
+- normal local DB SHA-256 unchanged at `19278A4B11E3DCBF1B717969C554D7E45919B1C0B362F54EA1BFCA4D9BFC072C`;
+- server-held DPAPI Credential; Browser receives no Provider Credential;
+- `mip_opt_out=true`, retry/reconnect `0`, maximum 3 Provider Sessions, 300 audio seconds, USD 0.05 hard limit;
+- startup Evidence `runtime_ready`, Provider requests `0`, audio seconds `0`.
+
+The authoritative Human package is `docs/CompanyOS_S11CD_B_CE_P1_J_Human_UX_Verification_Package_v001.md`. Work stops at the point where the human must press Start, allow the microphone, and speak.

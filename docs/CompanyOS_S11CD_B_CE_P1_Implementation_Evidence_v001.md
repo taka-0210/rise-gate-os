@@ -24,7 +24,7 @@ This update records the approved implementation through P1-H and every authorize
 | P1-G Capture / Waveform | IMPLEMENTED CANDIDATE / AUTOMATED PASS | One microphone stream/Web Audio graph, 100 ms frames, waveform, same-origin WSS lease boundary and lifecycle cleanup. Actual relay runtime and Human UX remain unverified. |
 | P1-H Partial / Final / CO Grace | IMPLEMENTED CANDIDATE / SYNTHETIC PASS | Ephemeral partial, validating final, Durable Final-only canonical UI, exact-target grace and immutable click-time request snapshot. |
 | P1-I Limited Provider Verification | INCONCLUSIVE / TECHNICAL VERIFICATION REQUIRED / STOPPED | Final authorized Request stopped before Provider acceptance/audio send. Exact transport reason remains Unknown because the SDK ErrorEvent was flattened before persistence. Provider Failure is not established. No retry or resend followed. See Section 17. |
-| P1-J Human UX / device matrix | NOT STARTED | P1-I did not PASS; no human device or microphone operation started. |
+| P1-J Human UX / device matrix | AUTHORIZED WITH KNOWN P1-I LIMITATION / READY FOR HUMAN MICROPHONE GATE | Local-only Product Path, isolated DB, WSS Relay and Human package are prepared. Provider communication/audio remain 0/0 until the human starts the microphone. P1-I is not promoted. |
 
 ## 2｜P1-F Compatibility and bounded preservation
 
@@ -140,7 +140,7 @@ No communication-free CE-P1 automated test failed. The single full-suite failure
 | Repository | P1-A〜P1-H candidate implemented |
 | Automated | Focused, connected regression, race/rollback and migration PASS |
 | Provider | INCONCLUSIVE_EVIDENCE_FAILURE; initial execution plus one explicitly authorized corrective execution; no retry/resend after the corrective execution |
-| Human UX | NOT STARTED |
+| Human UX | AUTHORIZED WITH KNOWN P1-I LIMITATION / human operation not yet started |
 | CE-P1 | IN PROGRESS / stopped after inconclusive P1-I |
 | CE-G01 | CLOSED |
 
@@ -191,11 +191,11 @@ Disposition:
 
 This is not classified as a Deepgram Provider failure. It is not inferred as PASS. The maximum-one-attempt rule is treated as consumed conservatively because Provider acceptance cannot be proven either way. Actual cost is unknown; the approved full-audio conservative estimate is an upper planning value, not actual usage Evidence.
 
-## 11｜Current stop and next gate
+## 11｜Historical stop and next gate (superseded by Section 18)
 
 - P1-A through P1-H: repository/automated state retained.
 - P1-I: stopped after the corrective execution also ended inconclusive.
-- P1-J Human UX: NOT STARTED.
+- P1-J Human UX: NOT STARTED at this historical checkpoint; superseded by Section 18.
 - Human microphone/device actions: 0.
 - Feature flags: default OFF; execution-scoped enablement ended with the child process.
 - No third Deepgram request is authorized; the one corrective allowance is consumed conservatively.
@@ -246,7 +246,7 @@ Disposition:
 
 **P1-I = INCONCLUSIVE_EVIDENCE_FAILURE / STOPPED**
 
-**P1-J = NOT STARTED**
+**P1-J = NOT STARTED AT THIS HISTORICAL CHECKPOINT (superseded by Section 18)**
 
 **Provider Failure = NOT ESTABLISHED**
 
@@ -269,7 +269,7 @@ Decision recommendation:
 
 **Authorize exactly one additional Limited Deepgram Request only through a new explicit Human Gate.**
 
-No request is authorized by this recommendation. Until a new approval is supplied, P1-I remains `INCONCLUSIVE_EVIDENCE_FAILURE`, P1-J remains `NOT STARTED`, and Provider communication/audio send remain disabled.
+No request is authorized by this recommendation. Until a new approval is supplied, P1-I remains `INCONCLUSIVE_EVIDENCE_FAILURE`, P1-J was `NOT STARTED` at that historical checkpoint (superseded by Section 18), and Provider communication/audio send remain disabled.
 
 ## 14｜P1-I Hardened Limited Provider Verification outcome
 
@@ -283,7 +283,7 @@ Disposition:
 
 **P1-I = INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE / STOPPED**
 
-**P1-J = NOT STARTED**
+**P1-J = NOT STARTED AT THIS HISTORICAL CHECKPOINT (superseded by Section 18)**
 
 **Additional Provider request = NOT AUTHORIZED**
 
@@ -307,7 +307,7 @@ Recommended Decision:
 
 **Authorize exactly one additional Limited Deepgram Request only through a new explicit Human Gate under the unchanged one-request, USD 0.01, zero retry/reconnect/resend, DPAPI Credential, and `mip_opt_out=true` limits.**
 
-This recommendation does not authorize communication. P1-I remains `INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE / STOPPED`, P1-J remains `NOT STARTED`, and the current additional-request authorization remains `NOT AUTHORIZED`.
+This recommendation does not authorize communication. P1-I remains `INCONCLUSIVE_RUNTIME_INTEGRATION_FAILURE / STOPPED`, P1-J was `NOT STARTED` at that historical checkpoint (superseded by Section 18), and the current additional-request authorization remains `NOT AUTHORIZED`.
 
 Detailed package:
 
@@ -326,7 +326,7 @@ Recommended Decision:
 
 **Authorize one final Limited Deepgram Request only through a new explicit Human Gate under the unchanged one-request, USD 0.01, zero retry/reconnect/resend, DPAPI Credential, and `mip_opt_out=true` limits.**
 
-This recommendation is not authorization. P1-I remains `INCONCLUSIVE_RUNTIME_LIFECYCLE_FAILURE / STOPPED`, P1-J remains `NOT STARTED`, and further Provider communication remains `NOT AUTHORIZED`.
+This recommendation is not authorization. P1-I remains `INCONCLUSIVE_RUNTIME_LIFECYCLE_FAILURE / STOPPED`, P1-J was `NOT STARTED` at that historical checkpoint (superseded by Section 18), and further Provider communication remains `NOT AUTHORIZED`.
 
 Detailed package:
 
@@ -345,7 +345,7 @@ A Provider-free Corrective now normalizes SDK ErrorEvent and nested error messag
 
 Recommended Decision:
 
-**Do not authorize another Provider Request at this time. Keep P1-I INCONCLUSIVE / Technical Verification Required and P1-J NOT STARTED, then submit the accumulated Repository, prior successful E1 Deepgram connectivity, and current final Evidence for Human + ChatGPT disposition.**
+**Do not authorize another Provider Request at this time. Keep P1-I INCONCLUSIVE / Technical Verification Required and P1-J NOT STARTED at that historical checkpoint, then submit the accumulated Repository, prior successful E1 Deepgram connectivity, and current final Evidence for Human + ChatGPT disposition.**
 
 Any later requirement for current-relay live proof needs a new explicit Human Gate. No Request is authorized by this recommendation.
 
@@ -354,3 +354,28 @@ Detailed package:
 - `docs/CompanyOS_S11CD_B_CE_P1_I_Final_Limited_Verification_Outcome_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_I_Deepgram_Final_Limited_v001.json`
 - `docs/evidence/CompanyOS_CE_P1_I_Final_Limited_Verification_Outcome_v001.json`
+## 18 | P1-I Disposition and P1-J Human UX preparation
+
+Human + ChatGPT integrated Review issued the following authoritative disposition:
+
+- P1-I remains **INCONCLUSIVE / Technical Verification Required**;
+- Provider Failure remains **NOT ESTABLISHED**;
+- prior CE-PD08B E1 live Evidence is **Provider Capability Evidence**, not Current Relay PASS Evidence;
+- no additional Synthetic Limited Request is planned;
+- P1-J is **AUTHORIZED WITH KNOWN P1-I LIMITATION**.
+
+Provider-free P1-J preparation added a loopback-only HTTPS/WSS Product relay, token-guarded Laravel bridge, server-held DPAPI Credential boundary, source-frame integrity validation, current Source/Send ledger integration, normalized Provider Event handling, Durable Final commit integration, and a browser stop handshake that waits for bounded finalization before closing the socket. The runtime uses an isolated copy of the normal local SQLite DB. The normal DB and repository `.env` remain unchanged.
+
+Preparation verification:
+
+- Node: `12 PASS`;
+- P1 focused Laravel: `13 PASS / 1 gated SKIP / 134 assertions`;
+- isolated migrations `2026_09_29_000001` and `000002`: Ran;
+- loopback gateway health: HTTP `302` to authentication;
+- secret scan: PASS;
+- full Laravel regression: 667 PASS / 1 known out-of-scope FAIL / 17 SKIP / 5,431 assertions; the sole failure is the unchanged CompanyNavigation stale intended-URL mismatch;
+- runtime-ready Provider request / audio send: `0 / 0`.
+
+Safety bounds are retry/reconnect `0 / 0`, maximum 3 Provider Sessions, maximum 300 seconds total audio, USD 0.05 hard limit, `mip_opt_out=true`, loopback listener only, no Browser Credential, no raw audio persistence, no Public Port/Tunnel/Firewall change, no Production DB/Credential/Deploy/Public Push.
+
+Human instructions and PASS/FAIL criteria are in `docs/CompanyOS_S11CD_B_CE_P1_J_Human_UX_Verification_Package_v001.md`. The next action is the Human microphone gate; failure before Partial must stop without an additional request.

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "recorded_at_jst": "2026-09-30T05:04:47+09:00",
+  "p1_i": {
+    "status": "INCONCLUSIVE_TECHNICAL_VERIFICATION_REQUIRED",
+    "provider_failure": "NOT_ESTABLISHED",
+    "current_relay_live_pass": false
+  },
+  "evidence_separation": {
+    "prior_e1_provider_capability": {
+      "status": "ESTABLISHED",
+      "capabilities": [
+        "deepgram_nova_3_streaming_connectivity",
+        "approved_japanese_synthetic_wav_streaming",
+        "partial",
+        "final",
+        "metadata",
+        "result_identity",
+        "word_timing",
+        "provider_timing",
+        "speaker_information",
+        "normal_close",
+        "mip_opt_out_true"
+      ],
+      "reused_as_p1_i_pass": false
+    },
+    "current_company_os_relay_integration": "INCONCLUSIVE"
+  },
+  "p1_j": {
+    "status": "AUTHORIZED_WITH_KNOWN_P1_I_LIMITATION",
+    "preparation": "READY_FOR_HUMAN_MICROPHONE_GATE",
+    "minimum_gate": "MIC_CAPTURE_WSS_RELAY_PROVIDER_ACCEPTANCE_PARTIAL",
+    "additional_synthetic_request": false
+  },
+  "runtime": {
+    "listener": "127.0.0.1:8443",
+    "url": "https://localhost:8443/company/co",
+    "database_mode": "isolated_copy",
+    "normal_local_database_changed": false,
+    "provider_requests_at_ready": 0,
+    "audio_seconds_at_ready": 0,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "max_provider_sessions": 3,
+    "max_audio_seconds": 300,
+    "cost_limit_usd": 0.05,
+    "projected_max_cost_usd": 0.0485,
+    "credential_store": "Windows CurrentUser DPAPI server-side only",
+    "raw_credential_persisted": false,
+    "raw_realtime_audio_persisted": false
+  },
+  "automated_verification": {
+    "node": "12 PASS",
+    "p1_focused": "13 PASS / 1 gated SKIP / 134 assertions",
+    "isolated_migrations": [
+      "2026_09_29_000001 Ran",
+      "2026_09_29_000002 Ran"
+    ],
+    "loopback_health_http_status": 302,
+    "secret_scan": "PASS",
+    "full_laravel_regression": "667 PASS / 1 known out-of-scope FAIL / 17 SKIP / 5431 assertions"
+  },
+  "human_action_started": false,
+  "public_push": false,
+  "production_database": false,
+  "production_credential": false,
+  "deploy": false
+}

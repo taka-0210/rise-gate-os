@@ -8,6 +8,7 @@ import {
   assertLimitedPolicy, buildFailureEvidence, encodeEvidenceFrame, safeFailureReason, validateFrame,
 } from '../src/limited-verification.js';
 import crypto from 'node:crypto';
+import { assertHumanRuntimePolicy, HumanGateController, sanitizeProviderEvent, validateProductFrame } from '../src/product-relay.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
   assert.equal(SDK_VERSION, '5.10.0');
@@ -161,4 +162,50 @@ test('SDK v5 startClosed lifecycle performs one initial start and rejects duplic
     retry: 0,
     duplicate_socket: 0,
   });
+});
+test('P1-J Product relay policy is loopback-bounded, zero-retry and cost-limited', () => {
+  const approved = {
+    COMPANY_OS_P1_J_APPROVED: 'true', COMPANY_OS_REALTIME_ENABLED: 'true', COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED: 'true',
+    COMPANY_OS_REALTIME_RETRY_MAX: '0', COMPANY_OS_REALTIME_RECONNECT_MAX: '0', COMPANY_OS_REALTIME_MAX_PROVIDER_SESSIONS: '3',
+    COMPANY_OS_REALTIME_MAX_AUDIO_SECONDS: '300', COMPANY_OS_REALTIME_COST_LIMIT_USD: '0.05', COMPANY_OS_REALTIME_BRIDGE_TOKEN: 'a'.repeat(32),
+  };
+  const policy = assertHumanRuntimePolicy(approved);
+  assert.equal(policy.maxSessions, 3);
+  assert.ok(policy.projectedCost < policy.costLimit);
+  assert.throws(() => assertHumanRuntimePolicy({ ...approved, COMPANY_OS_REALTIME_RETRY_MAX: '1' }), /fence_closed/);
+  assert.throws(() => assertHumanRuntimePolicy({ ...approved, COMPANY_OS_REALTIME_MAX_AUDIO_SECONDS: '301' }), /cost_or_attempt/);
+  assert.throws(() => assertHumanRuntimePolicy({ ...approved, COMPANY_OS_REALTIME_BRIDGE_TOKEN: 'short' }), /bridge_token/);
+});
+
+test('P1-J Product relay validates live PCM identity and sanitizes Provider events', () => {
+  const binary = Buffer.alloc(3200);
+  const frame = {
+    type: 'audio_frame', lease_id: crypto.randomUUID(), stream_id: crypto.randomUUID(), generation: 2, sequence: 1,
+    client_event_id: crypto.randomUUID(), start_sample: 0, end_sample: 1600, sample_count: 1600,
+    sample_rate: 16000, bit_depth: 16, channels: 1, format: 'pcm_s16le', content_sha256: crypto.createHash('sha256').update(binary).digest('hex'),
+  };
+  assert.equal(validateProductFrame(frame, binary, 0), 1600);
+  assert.throws(() => validateProductFrame({ ...frame, start_sample: 1 }, binary, 0), /failed_closed/);
+  assert.throws(() => validateProductFrame({ ...frame, content_sha256: 'bad' }, binary, 0), /failed_closed/);
+  const event = sanitizeProviderEvent({
+    type: 'Results', request_id: 'request', is_final: true, start: 0, duration: 0.1,
+    channel: { alternatives: [{ transcript: 'テスト', words: [{ start: 0, end: 0.1, confidence: 0.9, speaker: 0 }] }] },
+  }, 1600, 2);
+  assert.equal(event.channel.alternatives[0].transcript, 'テスト');
+  assert.equal(event.channel.alternatives[0].words[0].speaker, 0);
+  assert.equal(Object.hasOwn(event, 'authorization'), false);
+});
+test('P1-J minimum Human Gate permits continuation only after a real Partial and halts after failure', () => {
+  const failed = new HumanGateController();
+  failed.markFailure();
+  assert.throws(() => failed.assertStartAllowed(), /halted_after_failure/);
+
+  const incomplete = new HumanGateController();
+  incomplete.markSessionEnded();
+  assert.throws(() => incomplete.assertStartAllowed(), /halted_after_failure/);
+
+  const passed = new HumanGateController();
+  passed.markPartial('確認できました');
+  passed.markSessionEnded();
+  assert.doesNotThrow(() => passed.assertStartAllowed());
 });

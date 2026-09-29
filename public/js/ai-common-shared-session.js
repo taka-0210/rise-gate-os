@@ -36,7 +36,15 @@
         current.processor?.port.postMessage({type: 'active', value: false});
         clearInterval(current.leaseTimer);
         cancelAnimationFrame(current.waveformFrame);
-        current.socket?.close(1000, mode);
+        if (current.socket?.readyState === WebSocket.OPEN) {
+            const stopped = new Promise(resolve => {
+                const timeout = setTimeout(resolve, mode === 'normal_stop' ? 12000 : 1000);
+                current.resolveRelayStop = () => { clearTimeout(timeout); resolve(); };
+            });
+            current.socket.send(JSON.stringify({type: mode === 'normal_stop' ? 'stop' : 'cancel'}));
+            await stopped;
+            current.socket.close(1000, mode);
+        }
         current.source?.disconnect();
         current.processor?.disconnect();
         current.gain?.disconnect();
@@ -111,6 +119,8 @@
             if (labels.finals) { const item = document.createElement('li'); item.textContent = message.content || ''; labels.finals.append(item); }
         } else if (message.type === 'provider_state') {
             label('provider', message.state || 'unknown');
+        } else if (message.type === 'relay_stopped') {
+            state?.resolveRelayStop?.();
         } else if (message.type === 'rejected') {
             label('partial', ''); label('transcript', `rejected: ${message.safe_reason_code || 'unverified'}`);
         }

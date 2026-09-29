@@ -4,6 +4,12 @@ return [
     'enabled' => (bool) env('COMPANY_OS_REALTIME_ENABLED', false),
     'audio_send_enabled' => (bool) env('COMPANY_OS_REALTIME_AUDIO_SEND_ENABLED', false),
     'relay_url' => env('COMPANY_OS_REALTIME_RELAY_URL'),
+    'bridge_token' => env('COMPANY_OS_REALTIME_BRIDGE_TOKEN'),
+    'human_verification' => [
+        'max_provider_sessions' => (int) env('COMPANY_OS_REALTIME_MAX_PROVIDER_SESSIONS', 3),
+        'max_audio_seconds' => (int) env('COMPANY_OS_REALTIME_MAX_AUDIO_SECONDS', 300),
+        'cost_limit_usd' => (float) env('COMPANY_OS_REALTIME_COST_LIMIT_USD', 0.05),
+    ],
     'lease_ttl_seconds' => (int) env('COMPANY_OS_REALTIME_LEASE_TTL_SECONDS', 12),
     'lease_refresh_seconds' => (int) env('COMPANY_OS_REALTIME_LEASE_REFRESH_SECONDS', 4),
     'reorder_window_frames' => (int) env('COMPANY_OS_REALTIME_REORDER_WINDOW_FRAMES', 5),
