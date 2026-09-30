@@ -11,7 +11,8 @@ import crypto from 'node:crypto';
 import {
   assertHumanRuntimePolicy, buildSessionFailureEvidence, FAILURE_EVIDENCE_CONTRACT, HumanGateController,
   LEDGER_BATCH_FRAMES, MAX_QUEUED_FRAMES, normalizeProxyResponseHeaders, safeReason,
-  sanitizeProviderEvent, SentEvidenceGate, stageBridgeError, takeLedgerBatch, validateProductFrame,
+  assertSentBatchEvidence, sanitizeProviderEvent, SentEvidenceGate, stageBridgeError, stageRuntimeError,
+  takeLedgerBatch, validateProductFrame,
 } from '../src/product-relay.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -273,6 +274,19 @@ test('P1-J bridge failures retain their action stage across concurrent work', ()
     providerAccepted: true,
     samplesSent: 32000,
   }).failure_stage, 'bridge_event');
+});
+test('P1-J runtime failures retain an exact non-bridge stage', () => {
+  const failure = stageRuntimeError(new Error('relay_frame_backlog_failed_closed'), 'frame_queue_admission');
+  assert.equal(failure.failureStage, 'frame_queue_admission');
+  assert.equal(failure.message, 'relay_frame_backlog_failed_closed');
+});
+test('P1-J piggyback send Evidence is complete and fail closed', () => {
+  assert.deepEqual(assertSentBatchEvidence({sent: [
+    {send_ordinal: 1, state: 'sent'},
+    {send_ordinal: 2, state: 'sent'},
+  ]}, 2).map(item => item.send_ordinal), [1, 2]);
+  assert.throws(() => assertSentBatchEvidence({sent: [{send_ordinal: 1, state: 'sent'}]}, 2), /evidence_incomplete/);
+  assert.throws(() => assertSentBatchEvidence({sent: [{send_ordinal: 1, state: 'accepted'}]}, 1), /evidence_incomplete/);
 });
 test('P1-J ledger batching preserves 100 ms frame identity with a bounded memory queue', () => {
   const queue = Array.from({length: LEDGER_BATCH_FRAMES * 2 + 3}, (_, index) => ({

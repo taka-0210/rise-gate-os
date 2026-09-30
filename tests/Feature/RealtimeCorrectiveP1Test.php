@@ -650,6 +650,40 @@ class RealtimeCorrectiveP1Test extends TestCase
         $this->assertSame(range(1, 10), array_column($sent, 'send_ordinal'));
         $this->assertDatabaseCount('ai_common_shared_provider_send_ranges', 10);
 
+        $nextBatch = [];
+        for ($index = 10; $index < 20; $index++) {
+            $pcm = str_repeat(chr($index), 3200);
+            $nextBatch[] = ['frame' => [
+                'lease_id' => $lease->public_id, 'stream_id' => $stream->public_id, 'generation' => 1,
+                'sequence' => $index + 1, 'client_event_id' => (string) Str::uuid(),
+                'start_sample' => $index * 1600, 'end_sample' => ($index + 1) * 1600, 'sample_count' => 1600,
+                'sample_rate' => 16000, 'bit_depth' => 16, 'channels' => 1, 'format' => 'pcm_s16le',
+                'content_sha256' => hash('sha256', $pcm),
+            ], 'pcm_base64' => base64_encode($pcm)];
+        }
+        $thirdBatch = [];
+        for ($index = 20; $index < 30; $index++) {
+            $pcm = str_repeat(chr($index), 3200);
+            $thirdBatch[] = ['frame' => [
+                'lease_id' => $lease->public_id, 'stream_id' => $stream->public_id, 'generation' => 1,
+                'sequence' => $index + 1, 'client_event_id' => (string) Str::uuid(),
+                'start_sample' => $index * 1600, 'end_sample' => ($index + 1) * 1600, 'sample_count' => 1600,
+                'sample_rate' => 16000, 'bit_depth' => 16, 'channels' => 1, 'format' => 'pcm_s16le',
+                'content_sha256' => hash('sha256', $pcm),
+            ], 'pcm_base64' => base64_encode($pcm)];
+        }
+        $nextRanges = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frames', [
+            'provider_session_id' => $providerId, 'frames' => $nextBatch,
+        ])->assertOk()->assertJsonCount(0, 'sent')->assertJsonCount(10, 'ranges')->json('ranges');
+        $piggyback = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frames', [
+            'provider_session_id' => $providerId,
+            'previous_source_range_ids' => array_column($nextRanges, 'source_range_id'),
+            'frames' => $thirdBatch,
+        ])->assertOk()->assertJsonCount(10, 'sent')->assertJsonCount(10, 'ranges');
+        $this->assertSame(range(11, 20), array_column($piggyback->json('sent'), 'send_ordinal'));
+        $this->assertDatabaseCount('ai_common_shared_source_ranges', 30);
+        $this->assertDatabaseCount('ai_common_shared_provider_send_ranges', 20);
+
         $provider = AiCommonSharedProviderSession::query()->where('public_id', $providerId)->firstOrFail();
         $this->assertSame(
             ['verification_state' => 'verified', 'start_sample' => 0, 'end_sample' => 16000],

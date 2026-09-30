@@ -35,15 +35,31 @@ export class SentEvidenceGate {
   }
 }
 
-export function stageBridgeError(error, action) {
+export function stageRuntimeError(error, stage) {
   const failure = error instanceof Error ? error : new Error(safeFailureReason(error));
+  const normalizedStage = typeof stage === 'string' && /^[a-z0-9_-]+$/.test(stage)
+    ? stage.replaceAll('-', '_')
+    : 'unknown';
+  Object.defineProperty(failure, 'failureStage', {
+    value: normalizedStage, configurable: true, enumerable: false, writable: false,
+  });
+  return failure;
+}
+
+export function stageBridgeError(error, action) {
   const normalizedAction = typeof action === 'string' && /^[a-z-]+$/.test(action)
     ? action.replaceAll('-', '_')
     : 'unknown';
-  Object.defineProperty(failure, 'failureStage', {
-    value: `bridge_${normalizedAction}`, configurable: true, enumerable: false, writable: false,
-  });
-  return failure;
+  return stageRuntimeError(error, `bridge_${normalizedAction}`);
+}
+
+export function assertSentBatchEvidence(response, expectedCount) {
+  const receipts = Array.isArray(response?.sent) ? response.sent : [];
+  if (!Number.isInteger(expectedCount) || expectedCount < 1 || receipts.length !== expectedCount
+    || receipts.some(receipt => receipt?.state !== 'sent' || !Number.isInteger(receipt?.send_ordinal))) {
+    throw new Error('bridge_sent_batch_evidence_incomplete');
+  }
+  return receipts;
 }
 
 function sleep(milliseconds) {
@@ -267,6 +283,7 @@ export async function createProductRelay(env = process.env) {
     let nextQueuedSample = 0;
     let batchTimer = null;
     let batchFlushChain = Promise.resolve();
+    let pendingSentBatch = null;
     const sentEvidenceGate = new SentEvidenceGate();
     const abortController = new AbortController();
     const providerClosed = deferred();
@@ -274,17 +291,22 @@ export async function createProductRelay(env = process.env) {
     const fail = async error => {
       if (closing) return;
       closing = true;
+      const reportedStage = typeof error?.failureStage === 'string' ? error.failureStage : failureStage;
+      hardAborted = true;
+      if (batchTimer) clearTimeout(batchTimer);
+      frameQueue = [];
+      await batchFlushChain.catch(() => {});
+      if (pendingSentBatch) {
+        await settlePendingSentBatch().catch(() => {});
+      }
       const failureEvidence = buildSessionFailureEvidence({
         error,
-        failureStage: typeof error?.failureStage === 'string' ? error.failureStage : failureStage,
+        failureStage: reportedStage,
         providerConnectionAttempted, providerAccepted: opened, samplesSent,
       });
       const reason = failureEvidence.reason;
       humanGate.markFailure();
       appendEvidence(evidencePath, failureEvidence);
-      hardAborted = true;
-      if (batchTimer) clearTimeout(batchTimer);
-      frameQueue = [];
       abortController.abort();
       if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal: false, safe_reason_code: reason }).catch(() => {});
       sendBrowser({ type: 'rejected', safe_reason_code: reason });
@@ -339,6 +361,43 @@ export async function createProductRelay(env = process.env) {
       secret = '';
     };
 
+    const recordSettledBatch = pending => {
+      appendEvidence(evidencePath, {
+        type: 'ledger_batch', frame_count: pending.frameCount,
+        start_sample: pending.startSample,
+        end_sample: pending.endSample,
+        raw_audio_persisted: false,
+      });
+    };
+
+    const completePendingSentBatch = (pending, response) => {
+      assertSentBatchEvidence(response, pending.sourceRangeIds.length);
+      pending.evidence.resolve();
+      recordSettledBatch(pending);
+      if (pendingSentBatch === pending) pendingSentBatch = null;
+    };
+
+    const rejectPendingSentBatch = (pending, error) => {
+      pending.evidence.reject(error);
+      if (pendingSentBatch === pending) pendingSentBatch = null;
+    };
+
+    const settlePendingSentBatch = async () => {
+      if (!pendingSentBatch) return;
+      const pending = pendingSentBatch;
+      failureStage = 'bridge_sent_batch';
+      try {
+        const response = await bridge('sent-batch', {
+          provider_session_id: providerSessionId,
+          source_range_ids: pending.sourceRangeIds,
+        });
+        completePendingSentBatch(pending, response);
+      } catch (error) {
+        rejectPendingSentBatch(pending, error);
+        throw error;
+      }
+    };
+
     const flushFrames = (flushAll = false) => {
       if (batchTimer) {
         clearTimeout(batchTimer);
@@ -349,14 +408,24 @@ export async function createProductRelay(env = process.env) {
           const batch = takeLedgerBatch(frameQueue, flushAll);
           if (batch.length === 0) break;
 
+          const previous = pendingSentBatch;
           failureStage = 'bridge_frames';
-          const accepted = await bridge('frames', {
-            provider_session_id: providerSessionId,
-            frames: batch.map(item => ({
-              frame: item.metadata,
-              pcm_base64: item.binary.toString('base64'),
-            })),
-          });
+          let accepted;
+          try {
+            accepted = await bridge('frames', {
+              provider_session_id: providerSessionId,
+              previous_source_range_ids: previous?.sourceRangeIds ?? [],
+              frames: batch.map(item => ({
+                frame: item.metadata,
+                pcm_base64: item.binary.toString('base64'),
+              })),
+            });
+            if (previous) completePendingSentBatch(previous, accepted);
+            else if (Array.isArray(accepted?.sent) && accepted.sent.length !== 0) throw new Error('bridge_unexpected_sent_batch_evidence');
+          } catch (error) {
+            if (previous && pendingSentBatch === previous) rejectPendingSentBatch(previous, error);
+            throw error;
+          }
           const ranges = Array.isArray(accepted?.ranges) ? accepted.ranges : [];
           if (ranges.length !== batch.length || ranges.some(range => range?.state !== 'accepted' || typeof range?.source_range_id !== 'string')) {
             throw new Error('bridge_frame_batch_evidence_incomplete');
@@ -369,23 +438,15 @@ export async function createProductRelay(env = process.env) {
           samplesSent = batch.at(-1).metadata.end_sample;
           totalSamplesSent += batchSamples;
 
-          failureStage = 'bridge_sent_batch';
-          const sentPromise = bridge('sent-batch', {
-            provider_session_id: providerSessionId,
-            source_range_ids: ranges.map(range => range.source_range_id),
-          });
-          sentEvidenceGate.advance(sentPromise);
-          const sent = await sentPromise;
-          const receipts = Array.isArray(sent?.sent) ? sent.sent : [];
-          if (receipts.length !== batch.length || receipts.some(receipt => receipt?.state !== 'sent')) {
-            throw new Error('bridge_sent_batch_evidence_incomplete');
-          }
-          appendEvidence(evidencePath, {
-            type: 'ledger_batch', frame_count: batch.length,
-            start_sample: batch[0].metadata.start_sample,
-            end_sample: batch.at(-1).metadata.end_sample,
-            raw_audio_persisted: false,
-          });
+          const evidence = deferred();
+          pendingSentBatch = {
+            sourceRangeIds: ranges.map(range => range.source_range_id),
+            frameCount: batch.length,
+            startSample: batch[0].metadata.start_sample,
+            endSample: batch.at(-1).metadata.end_sample,
+            evidence,
+          };
+          sentEvidenceGate.advance(evidence.promise);
           failureStage = 'provider_ready';
         }
       });
@@ -411,6 +472,7 @@ export async function createProductRelay(env = process.env) {
       try {
         if (provider && normal) {
           await flushFrames(true);
+          await settlePendingSentBatch();
           await sentEvidenceGate.snapshot();
           provider.sendFinalize({ type: 'Finalize' });
           await sleep(1500);
@@ -427,6 +489,8 @@ export async function createProductRelay(env = process.env) {
           hardAborted = true;
           if (batchTimer) clearTimeout(batchTimer);
           frameQueue = [];
+          await batchFlushChain.catch(() => {});
+          await settlePendingSentBatch().catch(() => {});
           abortController.abort();
         }
         if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal, safe_reason_code: normal ? 'normal_stop' : 'hard_abort' });
@@ -457,7 +521,9 @@ export async function createProductRelay(env = process.env) {
         nextQueuedSample = nextSample;
         totalSamplesAdmitted += pendingMetadata.sample_count;
         pendingMetadata = null;
-        if (frameQueue.length > MAX_QUEUED_FRAMES) throw new Error('relay_frame_backlog_failed_closed');
+        if (frameQueue.length > MAX_QUEUED_FRAMES) {
+          throw stageRuntimeError(new Error('relay_frame_backlog_failed_closed'), 'frame_queue_admission');
+        }
         scheduleFrameFlush();
       }).catch(fail);
     });

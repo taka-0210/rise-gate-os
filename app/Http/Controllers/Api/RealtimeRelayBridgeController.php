@@ -84,11 +84,18 @@ final class RealtimeRelayBridgeController extends Controller
         $this->authorizeBridge($request);
         $input = $request->validate([
             'provider_session_id' => ['required', 'uuid'],
+            'previous_source_range_ids' => ['sometimes', 'array', 'max:10'],
+            'previous_source_range_ids.*' => ['required', 'uuid', 'distinct'],
             'frames' => ['required', 'array', 'min:1', 'max:10'],
             'frames.*.frame' => ['required', 'array'],
             'frames.*.pcm_base64' => ['required', 'string', 'max:5000'],
         ]);
         $provider = $this->provider($input['provider_session_id']);
+        $previousRanges = array_map(
+            static fn (string $publicId): AiCommonSharedSourceRange => AiCommonSharedSourceRange::query()->where('public_id', $publicId)->firstOrFail(),
+            $input['previous_source_range_ids'] ?? [],
+        );
+        $sent = $previousRanges === [] ? [] : $ledger->sentBatch($provider, $previousRanges);
         $lease = AiCommonSharedRelayLease::query()->findOrFail($provider->relay_lease_id);
         $stream = AiCommonSharedCaptureStream::query()->findOrFail($provider->ai_common_shared_capture_stream_id);
         $frames = array_map(static function (array $entry) use ($provider, $stream): CanonicalAudioFrame {
@@ -105,10 +112,16 @@ final class RealtimeRelayBridgeController extends Controller
         }, $input['frames']);
         $ranges = $ledger->acceptBatch($frames, $lease);
 
-        return response()->json(['ranges' => array_map(static fn (AiCommonSharedSourceRange $range): array => [
-            'source_range_id' => $range->public_id,
-            'state' => $range->state,
-        ], $ranges)]);
+        return response()->json([
+            'sent' => array_map(static fn ($range): array => [
+                'send_ordinal' => $range->send_ordinal,
+                'state' => $range->state,
+            ], $sent),
+            'ranges' => array_map(static fn (AiCommonSharedSourceRange $range): array => [
+                'source_range_id' => $range->public_id,
+                'state' => $range->state,
+            ], $ranges),
+        ]);
     }
 
     public function sent(Request $request, RealtimeSourceLedger $ledger): JsonResponse

@@ -413,3 +413,24 @@ Detailed package:
 
 - `docs/CompanyOS_S11CD_B_CE_P1_J_Empty_Final_Corrective_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_J_Empty_Final_Corrective_v001.json`
+
+## 21 | P1-J relay backpressure corrective
+
+The explicitly approved First E2E Human Start was consumed once without retry, reconnect, resend, or a second Start. The Product Path established Provider acceptance, `mip_opt_out=true`, 48,000 samples / 3.0 seconds sent, correct Metadata handling for the contentless final, and a real Partial at receive order 2. Human-visible Partial was not separately confirmed before the truthful WSS 1011 safe stop, and no Final, Durable Final, or Normal End was reached.
+
+The failure reason was `relay_frame_backlog_failed_closed`. Thirty Source Ranges and thirty Provider Send Ranges were persisted; Durable Final Commits and realtime Transcript Segments remained zero. Provider Failure is not established.
+
+Root Cause was Current Relay local bridge backpressure. The serial Laravel development server required one `frames` and one `sent-batch` request per one-second batch, while Provider Events used the same queue. This consumed the available realtime latency budget and exceeded the bounded 30-frame memory queue.
+
+The Provider-free Corrective piggybacks the previous batch's send receipt persistence onto the next `frames` call, reducing steady-state internal requests from two per batch to one while preserving every 100 ms Source Range, PCM length/SHA-256 verification, atomic ten-frame acceptance, send ordinals, and event sent-Evidence watermarks. The final already-sent batch is settled at Normal End or safe abort. The queue limit was not relaxed, and overflow is now attributed to `frame_queue_admission`.
+
+Verification is Relay Node `20 PASS`, CE-P1 focused `11 PASS / 1 gated live SKIP / 155 assertions`, Pint PASS, and full Laravel `671 PASS / 17 SKIP / 1 known out-of-scope FAIL / 5,488 assertions`. The known CompanyNavigation intended-URL mismatch is unchanged. A repository-wide Node invocation also reproduced one unrelated pre-existing Blade-template parsing failure; the Relay suite itself passed. Repository `.env` and the normal local DB hashes remain unchanged, and loopback listeners are stopped. No Provider communication or audio send occurred during the Corrective.
+
+P1-I remains `INCONCLUSIVE / Technical Verification Required`. P1-J remains `AUTHORIZED WITH KNOWN P1-I LIMITATION / FIRST E2E HUMAN PASS NOT ESTABLISHED`.
+
+Recommended next action is one newly authorized P1-J Human Start through an explicit Human + ChatGPT Gate using the corrected Runtime. No Synthetic Provider Request is recommended. The single Session should first confirm visible Waveform and visible Partial, then continue through Final, Durable Final, and Normal End if the minimum path passes. This recommendation is not authorization.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_J_Backpressure_Corrective_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_J_Backpressure_Corrective_v001.json`
