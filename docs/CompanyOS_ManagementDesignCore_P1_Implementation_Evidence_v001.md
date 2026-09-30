@@ -3,8 +3,9 @@
 - Evidence date: 2026-10-01 JST
 - Scope: `MDC-P1 Foundation + Text Experience`
 - Gate: `MDC-G01 = OPEN`
-- Recommended decision: **P1 CLOSE CANDIDATE**
-- Review state: **Human + ChatGPT Review required**
+- Recommended decision: **MDC-P1 FORMAL CLOSE**
+- Human Visual / UX Review: **PASS**
+- Review state: **Final Human + ChatGPT Close Review**
 - P2: **NOT STARTED**
 
 ## 1｜Product Contract
@@ -197,6 +198,35 @@ Human Visual Review isolated DB application:
 
 ## 7｜Verification
 
+### Human Visual / UX Review
+
+Human reviewed the isolated Product UI in a real browser and registered, edited and read Philosophy / Vision / Policy.
+
+- Human result: **PASS**
+- Philosophy: accepted as the place to read the company's root and existence
+- Vision: accepted as the place to read the company's future
+- Policy: accepted as the place to read the company's judgment direction
+- ROOT / FUTURE / DIRECTION remain clearly distinct from Project / Action execution
+- `Statement = Official Statement`
+- `Explanation = Official Interpretation Context`
+- overall and Section-level Statement / Explanation separation: formally accepted for all three types
+- Vision Horizon, Revision / History, Archive / Reopen and View / Edit / Manage Permission were exercised in the Human Review journey
+
+Read-only verification of the actual Human Review records:
+
+- fixed types present: `3 / 3`
+- Philosophy: current `Revision 4`, active Sections `3`, Section explanations `3`
+- Vision: current `Revision 4`, active Sections `5`, Section explanations `5`
+- Policy: current `Revision 1`, active Sections `6`, Section explanations `6`
+- Revision histories: Philosophy `4` (schema v2: Revision 4), Vision `4` (schema v2: Revisions 3–4), Policy `1` (schema v2: Revision 1)
+- current Statement and Explanation present for every type
+- each current projection exactly matches its immutable current Revision snapshot
+- every schema v2 snapshot contains the overall and per-Section explanation keys
+- historical schema v1 Revisions remain unchanged and readable
+- verification used hashes/boolean results; Human content was not copied into this Evidence
+
+The Human Review data is Evidence-only. It will not be imported into the later normal local environment. Formal integration is expected to begin with zero MDC records and use fresh manual entry after the separately authorized code/migration integration.
+
 ### Focused
 
 - `ManagementDesignCoreP1Test`: **13 passed / 125 assertions**
@@ -252,13 +282,14 @@ Related regression run:
 - one P1-I real Provider gate skip
 - one known CompanyNavigation failure
 
-Latest full suite after the Explanation corrective:
+Final Close full suite after Human Review:
 
 - **684 passed / 5615 assertions**
 - **17 skipped** (closed Provider/MariaDB gates)
 - **1 known failure**: `CompanyNavigationTest::test_regular_login_ignores_a_stale_forbidden_intended_url`
 - MDC failures: `0`
 - the remaining failure is the same scope-external baseline reproduced before the corrective
+- duration: `406.64s`
 
 Full suite run before the migration ledger expectation corrective:
 
@@ -317,7 +348,7 @@ Frontend production build:
 ## 11｜Remaining / Conditional
 
 - Known scope-external failure: stale forbidden intended URL in `CompanyNavigationTest`; reproduced on base SHA.
-- Human visual review of the three text experiences remains active; the isolated review environment now exposes the explanation fields without changing its existing content.
+- Human visual / UX review is complete with PASS; no MDC-P1 acceptance item remains open.
 - Actual isolated MariaDB execution was not opened as a new environment because P1 introduced no engine-specific behavior. It remains part of the later approved DB application gate if Human requires it.
 - No image, AI, relation or delivery function should be inferred from P1.
 
@@ -329,14 +360,16 @@ P2 is not implemented and no P2 permission, AI or image contract is pre-decided 
 
 ## 13｜Recommended Decision
 
-**P1 CLOSE CANDIDATE**
+**MDC-P1 FORMAL CLOSE**
 
 Reason:
 
 - the text master can be created, read, corrected, versioned, archived and reopened under the approved permission contract;
 - ROOT / FUTURE / DIRECTION are usable as distinct reading experiences;
+- Human Visual / UX Review passed for all three types using actual Statement, Explanation and Section data;
+- the Human Review current projections exactly match their immutable Revision snapshots;
 - focused, responsive Browser repeatability, related regression, build and isolated migration Evidence are established;
 - no new Product Decision or Human Authority boundary was encountered;
 - the only residual automated failure is proven pre-existing and scope-external.
 
-Do not start P2 from this recommendation. Stop for Human + ChatGPT Review.
+P2 remains NOT STARTED. Do not start P2 from this recommendation. Stop for Human + ChatGPT Final Close Review.
