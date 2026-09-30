@@ -119,6 +119,25 @@ try {
     await page.getByRole('button', { name: '保管する' }).waitFor();
     assert(await page.getByRole('button', { name: '保管する' }).isVisible(), 'Reopened state is not reflected.');
 
+    await page.setViewportSize({ width: 3200, height: 1000 });
+    await page.goto(`${baseUrl}/company/management-design/philosophy`);
+    const widePhilosophy = await page.evaluate(() => {
+        const hero = document.querySelector('.mdc-read--philosophy .mdc-hero').getBoundingClientRect();
+        const heading = document.querySelector('.mdc-read--philosophy .mdc-hero h1').getBoundingClientRect();
+        const statement = document.querySelector('.mdc-read--philosophy .mdc-hero__statement').getBoundingClientRect();
+
+        return {
+            heroCenter: hero.left + (hero.width / 2),
+            headingHeight: heading.height,
+            statementCenter: statement.left + (statement.width / 2),
+            statementWidth: statement.width,
+        };
+    });
+    assert(widePhilosophy.headingHeight < 150, 'Philosophy heading collapsed vertically at a zoomed-out equivalent viewport.');
+    assert(widePhilosophy.statementWidth >= 700, 'Philosophy statement collapsed into a narrow column at a zoomed-out equivalent viewport.');
+    assert(Math.abs(widePhilosophy.statementCenter - widePhilosophy.heroCenter) <= 2, 'Philosophy statement drifted away from center at a zoomed-out equivalent viewport.');
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'Zoomed-out equivalent ROOT view overflows horizontally.');
+
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${baseUrl}/company/management-design/philosophy`);
     assert(await page.locator('.mdc-read--philosophy').isVisible(), '390px ROOT view is unavailable.');

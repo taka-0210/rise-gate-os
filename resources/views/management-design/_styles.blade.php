@@ -20,7 +20,7 @@
     .mdc-directory__arrow { font-size:28px; }
     .mdc-directory__item--locked { opacity:.72; }
     .mdc-read { width:100%; overflow:hidden; }
-    .mdc-hero { position:relative; padding:70px max(28px, calc((100vw - 1080px) / 2)) 62px; }
+    .mdc-hero { position:relative; padding:70px max(28px, calc((100% - 1080px) / 2)) 62px; }
     .mdc-hero h1 { margin:0; font-size:clamp(52px, 8vw, 94px); line-height:1.02; letter-spacing:-.055em; }
     .mdc-hero__statement { max-width:900px; margin:34px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:clamp(24px, 3.4vw, 46px); line-height:1.55; letter-spacing:-.02em; }
     .mdc-hero--long .mdc-hero__statement { max-width:760px; font-size:clamp(18px, 1.8vw, 26px); line-height:1.9; letter-spacing:0; }
@@ -31,8 +31,8 @@
     .mdc-section h2 { font-size:clamp(25px, 3.4vw, 42px); line-height:1.35; }
     .mdc-section__body { white-space:pre-wrap; color:#334b55; font-size:clamp(18px, 1.55vw, 21px); line-height:1.9; }
     .mdc-section__horizon { color:#51717a; font-size:13px; letter-spacing:.08em; }
-    .mdc-read--philosophy .mdc-hero { min-height:68vh; display:grid; align-content:center; text-align:center; background:#f4f0e8; }
-    .mdc-read--philosophy .mdc-hero__statement { margin-inline:auto; font-weight:700; }
+    .mdc-read--philosophy .mdc-hero { min-height:68vh; display:grid; grid-template-columns:minmax(0,1fr); align-content:center; text-align:center; background:#f4f0e8; }
+    .mdc-read--philosophy .mdc-hero__statement { width:min(900px, 100%); margin-inline:auto; font-weight:700; }
     .mdc-read--philosophy .mdc-sections { width:min(760px, calc(100% - 40px)); }
     .mdc-read--philosophy .mdc-section { position:relative; padding:54px 0 54px 48px; border-left:1px solid #b9afa1; }
     .mdc-read--philosophy .mdc-section::before { content:''; position:absolute; left:-4px; top:66px; width:7px; height:7px; border-radius:50%; background:#6e6254; }
