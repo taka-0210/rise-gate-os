@@ -472,3 +472,28 @@ Detailed package:
 
 - `docs/CompanyOS_S11CD_B_CE_P1_J_Mixed_Upstream_Backpressure_Corrective_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_J_Mixed_Upstream_Backpressure_Corrective_v001.json`
+
+## 24 | P1-J First E2E Human PASS outcome
+
+The explicitly approved single Human Start completed on the corrected Current Company OS Relay Path. Human Evidence established a moving same-stream Waveform, six visible Japanese committed items, and the truthful message `Stopped normally. Final evidence is server-authoritative.` No Safe Stop, WSS 1011, unavailable, rejected, or backlog failure was shown.
+
+Sanitized Runtime Evidence establishes one Provider acceptance with `mip_opt_out=true`, 569,600 samples / 35.6 seconds sent, 23 Provider Partial events, six Durable Final events, thirteen Metadata events, scheduler maximum depth 6 with final depth 0, and `normal=true` close. Retry / reconnect / resend remained `0 / 0 / 0`.
+
+The isolated DB contains 356 continuous accepted Source Ranges and 356 continuous sent Provider ranges over samples `0..569600`, six verified Final receipts, six committed Durable Final records, six commit items, and six realtime Transcript Segments. Provider Session and Relay Lease closed with `normal_stop`; Capture stopped without interruption or safe error. No fictitious AudioWindow was created.
+
+Security and non-change checks found no raw audio, raw Provider payload, Credential, Authorization Header, or Transcript body in repository Evidence. Repository `.env` and the normal local DB hashes are unchanged. The loopback runtime is stopped and ports 8443 / 8765 have zero listeners. Public Push / Production DB / Production Credential / Deploy remain `0 / 0 / 0 / 0`.
+
+Disposition:
+
+**P1-J = FIRST E2E HUMAN PASS ESTABLISHED / STABILITY VERIFICATION REQUIRED**
+
+**P1-J Formal PASS / Formal Close = NOT ESTABLISHED**
+
+**P1-I = INCONCLUSIVE / Technical Verification Required**
+
+Recommended Repeatability is two additional independent core Sessions with a `2 / 2` PASS requirement, followed only then by one scoped lifecycle Session covering Pause/Resume, Background/Foreground, explicit CO consultation, bounded finalization grace, and End. No additional Provider communication is authorized by this Evidence.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_J_First_E2E_Human_PASS_Outcome_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_J_First_E2E_Human_PASS_Outcome_v001.json`

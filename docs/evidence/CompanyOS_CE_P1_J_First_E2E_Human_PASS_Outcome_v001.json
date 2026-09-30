@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "recorded_at_jst": "2026-09-30T13:02:32+09:00",
+  "base_head": "a6b1073",
+  "scope": "approved_single_p1_j_human_start_after_mixed_upstream_backpressure_corrective",
+  "disposition": {
+    "p1_i": "INCONCLUSIVE_TECHNICAL_VERIFICATION_REQUIRED",
+    "p1_j": "FIRST_E2E_HUMAN_PASS_ESTABLISHED_STABILITY_VERIFICATION_REQUIRED",
+    "formal_pass": false,
+    "formal_close": false,
+    "provider_failure_established": false,
+    "approved_human_start_consumed": "1/1",
+    "additional_provider_request_after_result": 0
+  },
+  "human_evidence": {
+    "waveform_moved": true,
+    "japanese_committed_items_visible": 6,
+    "normal_stop_message_visible": true,
+    "unexpected_safe_stop_visible": false
+  },
+  "runtime_evidence": {
+    "provider_sessions": 1,
+    "provider_accepted": true,
+    "mip_opt_out": true,
+    "retry": 0,
+    "automatic_reconnect": 0,
+    "manual_reconnect": 0,
+    "resend": 0,
+    "samples_sent": 569600,
+    "duration_seconds": 35.6,
+    "ledger_batches": 36,
+    "provider_partial_events": 23,
+    "partial_flow": {
+      "received": 10,
+      "forwarded": 6,
+      "coalesced": 6
+    },
+    "durable_final_events": 6,
+    "metadata_events": 13,
+    "scheduler_maximum_queue_depth": 6,
+    "scheduler_final_queue_depth": 0,
+    "normal_close": true,
+    "conservative_cost_usd_per_minute": 0.0097,
+    "estimated_cost_usd": 0.005755,
+    "actual_billed_cost": "Unknown"
+  },
+  "isolated_db_lineage": {
+    "provider_session_state": "closed",
+    "provider_session_reason": "normal_stop",
+    "relay_lease_state": "closed",
+    "relay_lease_reason": "normal_stop",
+    "capture_stream_state": "stopped",
+    "capture_stream_interrupted": false,
+    "source_ranges": 356,
+    "source_range_sequence": [1, 356],
+    "source_range_samples": [0, 569600],
+    "source_range_state": "accepted",
+    "provider_send_ranges": 356,
+    "send_ordinals": [1, 356],
+    "provider_send_samples": [0, 569600],
+    "provider_send_state": "sent",
+    "verified_final_receipts": 6,
+    "durable_final_commits": 6,
+    "durable_final_commit_items": 6,
+    "realtime_transcript_segments": 6,
+    "segments_with_fictitious_audio_window": 0
+  },
+  "security": {
+    "raw_audio_persisted": false,
+    "raw_provider_payload_persisted": false,
+    "raw_credential_persisted_or_displayed": false,
+    "authorization_header_persisted": false,
+    "transcript_body_duplicated_in_repository_evidence": false,
+    "sanitized_evidence_sha256": "879AE8F7554CEEF48B5D646DF64B721F6B1B5309C42DDA2C5185F4AFE426338E",
+    "secret_pattern_hits": 0
+  },
+  "non_change": {
+    "repository_env_sha256": "DC2A0E2A2402229EFA555609FFCEB6A9721F9A2CC1A452D5B7DEEEF3BC6CB0ED",
+    "normal_local_db_sha256": "CC0F4A7B176B3284D1768D73B689E9DE87CDB68CC4E89FB5F69471F27995AF4A",
+    "loopback_runtime_stopped": true,
+    "remaining_loopback_listeners": 0,
+    "public_push": false,
+    "production_db": false,
+    "production_credential": false,
+    "deploy": false
+  },
+  "repeatability_plan": {
+    "authorized_by_this_record": false,
+    "gate_a": {
+      "purpose": "core_repeatability",
+      "independent_new_sessions": 2,
+      "provider_starts_per_session": 1,
+      "seconds_per_session_max": 45,
+      "required_passes": "2/2",
+      "stop_on_first_non_pass": true
+    },
+    "gate_b": {
+      "purpose": "lifecycle_and_product_interaction",
+      "run_only_after_gate_a_pass": true,
+      "provider_generations_max": 3,
+      "coverage": [
+        "pause_resume",
+        "background_foreground",
+        "explicit_co_consultation",
+        "bounded_finalization_grace",
+        "end_session"
+      ]
+    },
+    "additional_audio_seconds_max": 180,
+    "aggregate_estimated_cost_usd_max": 0.0291,
+    "retry_reconnect_resend": "0/0/0"
+  },
+  "recommended_decision": "ACCEPT_FIRST_E2E_HUMAN_PASS_KEEP_P1_J_OPEN_FOR_STABILITY_VERIFICATION"
+}
