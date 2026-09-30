@@ -6,17 +6,23 @@ use App\Models\BusinessDomain;
 use App\Models\CompanyFinancialPeriod;
 use App\Models\CompanyLoan;
 use App\Models\CompanyObservation;
-use App\Models\Workspace;
+use App\Models\ManagementDesignItem;
 use App\Models\Project;
+use App\Models\Workspace;
 use App\Services\BusinessDomain\BusinessDomainAccess;
+use App\Services\ManagementDesign\ManagementDesignAccess;
 use App\Services\ProjectExecution\ProjectExecutionAccess;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CompanyHomeController extends Controller
 {
-    public function __invoke(Request $request, BusinessDomainAccess $businessDomainAccess, ProjectExecutionAccess $projectExecutionAccess): View
-    {
+    public function __invoke(
+        Request $request,
+        BusinessDomainAccess $businessDomainAccess,
+        ManagementDesignAccess $managementDesignAccess,
+        ProjectExecutionAccess $projectExecutionAccess,
+    ): View {
         $company = $request->attributes->get('currentCompany');
         $workspaces = $request->user()
             ->workspaces()
@@ -55,6 +61,9 @@ class CompanyHomeController extends Controller
                 ->where('execution_contract_version', Project::EXECUTION_CONTRACT)
                 ->get()->filter(fn (Project $project) => $projectExecutionAccess->canRead($request->user(), $project))->count(),
             'canEditBusinessDomains' => $businessDomainAccess->canEdit($request->user(), $company),
+            'canViewManagementDesign' => collect(ManagementDesignItem::TYPES)
+                ->contains(fn (string $type): bool => $managementDesignAccess->canView($request->user(), $company, $type)),
+            'canManageManagementDesign' => $managementDesignAccess->canManage($request->user(), $company),
         ]);
     }
 }

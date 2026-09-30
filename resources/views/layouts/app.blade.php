@@ -304,7 +304,12 @@
 </head>
 <body @class([
     'company-finance-screen' => request()->routeIs('company-finance.*'),
-    'company-context-read-page' => request()->routeIs('business-domains.index', 'business-domains.show'),
+    'company-context-read-page' => request()->routeIs(
+        'business-domains.index',
+        'business-domains.show',
+        'management-design.index',
+        'management-design.show',
+    ),
 ])>
 <div class="shell">
     <header class="topbar">
@@ -392,6 +397,7 @@
             @php
                 $module = match (true) {
                     request()->routeIs('business-domains.*') => ['事業領域', route('business-domains.index')],
+                    request()->routeIs('management-design.*') => ['理念・Vision・方針', route('management-design.index')],
                     request()->routeIs('ai-common.*') => ['COに相談', route('ai-common.index')],
                     request()->routeIs('company-finance.*') => ['経営数値', route('company-finance.index')],
                     request()->routeIs('company-loans.*') => ['借入管理', route('company-loans.index')],
