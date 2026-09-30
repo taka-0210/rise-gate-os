@@ -166,6 +166,99 @@ class ManagementDesignCoreP1Test extends TestCase
         $revisionOne->update(['change_reason' => '書き換え不可']);
     }
 
+    public function test_optional_explanations_are_versioned_without_backfilling_existing_content(): void
+    {
+        $organization = $this->organization('explanations');
+        [$owner, $membership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $this->permissions($owner, $organization, 'philosophy', 'explicit', [
+            $membership->id => ['can_view' => true, 'can_edit' => true],
+        ]);
+        $writer = app(ManagementDesignWriter::class);
+        $first = $writer->saveOfficial($owner, $organization, 'philosophy', [
+            'statement' => '関わるすべての人に笑顔と信頼を届ける',
+            'statement_explanation' => '会社がこのStatementに込めた固有の意味です。',
+            'sections' => [[
+                'title' => 'MISSION',
+                'body' => '飲食店オーナーの夢を叶える',
+                'explanation' => '事業を通じて果たす使命の説明です。',
+            ]],
+        ], 0, '説明を含む初回正本', (string) Str::uuid());
+        $firstRevision = $first->currentRevision;
+        $sectionId = $first->sections->first()->public_id;
+
+        $this->assertSame('会社がこのStatementに込めた固有の意味です。', $first->statement_explanation);
+        $this->assertSame('事業を通じて果たす使命の説明です。', $first->sections->first()->explanation);
+        $this->assertSame(2, $firstRevision->snapshot_schema_version);
+        $this->assertSame('会社がこのStatementに込めた固有の意味です。', $firstRevision->snapshot['item']['statement_explanation']);
+        $this->assertSame('事業を通じて果たす使命の説明です。', $firstRevision->snapshot['item']['sections'][0]['explanation']);
+
+        $second = $writer->saveOfficial($owner, $organization, 'philosophy', [
+            'statement' => '関わるすべての人と共に成長する',
+            'statement_explanation' => null,
+            'sections' => [[
+                'public_id' => $sectionId,
+                'title' => 'MISSION',
+                'body' => '地域の未来を創る',
+                'explanation' => null,
+            ]],
+        ], 1, null, (string) Str::uuid());
+
+        $this->assertNull($second->statement_explanation);
+        $this->assertNull($second->sections->first()->explanation);
+        $this->assertSame('会社がこのStatementに込めた固有の意味です。', $firstRevision->fresh()->snapshot['item']['statement_explanation']);
+        $this->asCompany($owner, $organization)
+            ->get(route('management-design.revisions.show', ['philosophy', 1]))
+            ->assertOk()
+            ->assertSee('会社がこのStatementに込めた固有の意味です。')
+            ->assertSee('事業を通じて果たす使命の説明です。');
+    }
+
+    public function test_explanation_capability_is_optional_for_every_type_with_type_specific_presentation(): void
+    {
+        $organization = $this->organization('explanation-presentation');
+        [$user, $membership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        foreach (ManagementDesignItem::TYPES as $type) {
+            $this->permissions($user, $organization, $type, 'explicit', [
+                $membership->id => ['can_view' => true, 'can_edit' => true],
+            ]);
+        }
+
+        $labels = [
+            ManagementDesignItem::TYPE_PHILOSOPHY => ['この理念に込めた意味（任意）', 'このSectionの説明（任意）'],
+            ManagementDesignItem::TYPE_VISION => ['このVisionが示す意味（任意）', 'このSectionが描く未来の説明（任意）'],
+            ManagementDesignItem::TYPE_POLICY => ['この方針の背景・意図（任意）', 'このSectionの判断意図（任意）'],
+        ];
+
+        foreach ($labels as $type => [$statementLabel, $sectionLabel]) {
+            $this->asCompany($user, $organization)
+                ->get(route('management-design.edit', $type))
+                ->assertOk()
+                ->assertSee($statementLabel)
+                ->assertSee($sectionLabel);
+
+            app(ManagementDesignWriter::class)->saveOfficial(
+                $user,
+                $organization,
+                $type,
+                [
+                    'statement' => $type.' statement',
+                    'sections' => [['title' => 'Section', 'body' => 'Statement']],
+                ],
+                0,
+                null,
+                (string) Str::uuid(),
+            );
+
+            $item = ManagementDesignItem::query()
+                ->where('organization_id', $organization->id)
+                ->where('type', $type)
+                ->with('sections')
+                ->firstOrFail();
+            $this->assertNull($item->statement_explanation);
+            $this->assertNull($item->sections->first()->explanation);
+        }
+    }
+
     public function test_stale_foreign_section_and_reused_request_with_different_payload_fail_closed(): void
     {
         $organization = $this->organization('stale');
@@ -283,7 +376,9 @@ class ManagementDesignCoreP1Test extends TestCase
             $ownerMembership->id => ['can_view' => true, 'can_edit' => true],
         ]);
         $item = app(ManagementDesignWriter::class)->saveOfficial($owner, $first, 'philosophy', [
-            'statement' => '他社へ漏らさない理念', 'sections' => [['title' => '秘密', 'body' => '本文']],
+            'statement' => '他社へ漏らさない理念',
+            'statement_explanation' => '他社へ漏らさない理念説明',
+            'sections' => [['title' => '秘密', 'body' => '本文', 'explanation' => '他社へ漏らさないSection説明']],
         ], 0, '監査へ本文を複製しない', (string) Str::uuid());
 
         $second = $this->organization('tenant-b');
@@ -300,6 +395,8 @@ class ManagementDesignCoreP1Test extends TestCase
             ->get()
             ->toJson(JSON_UNESCAPED_UNICODE);
         $this->assertStringNotContainsString('他社へ漏らさない理念', $auditJson);
+        $this->assertStringNotContainsString('他社へ漏らさない理念説明', $auditJson);
+        $this->assertStringNotContainsString('他社へ漏らさないSection説明', $auditJson);
         $this->assertStringNotContainsString('監査へ本文を複製しない', $auditJson);
         $this->assertSame($item->id, ManagementDesignRevision::first()->management_design_item_id);
     }

@@ -24,15 +24,18 @@
     .mdc-hero h1 { margin:0; font-size:clamp(52px, 8vw, 94px); line-height:1.02; letter-spacing:-.055em; }
     .mdc-hero__statement { max-width:900px; margin:34px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:clamp(24px, 3.4vw, 46px); line-height:1.55; letter-spacing:-.02em; }
     .mdc-hero--long .mdc-hero__statement { max-width:760px; font-size:clamp(18px, 1.8vw, 26px); line-height:1.9; letter-spacing:0; }
+    .mdc-hero__explanation { max-width:760px; margin:28px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; color:inherit; font-size:18px; line-height:2; opacity:.82; }
     .mdc-hero__horizon { margin:24px 0 0; color:inherit; font-size:14px; letter-spacing:.08em; }
     .mdc-archive { padding:13px 20px; color:#713f12; background:#fff7dc; border-block:1px solid #ead59d; text-align:center; }
     .mdc-sections { width:min(1040px, calc(100% - 40px)); margin:0 auto; padding:64px 0 100px; }
     .mdc-section { overflow-wrap:anywhere; }
     .mdc-section h2 { font-size:clamp(25px, 3.4vw, 42px); line-height:1.35; }
     .mdc-section__body { white-space:pre-wrap; color:#334b55; font-size:clamp(18px, 1.55vw, 21px); line-height:1.9; }
+    .mdc-section__explanation { margin:18px 0 0; white-space:pre-wrap; color:#526873; font-size:18px; line-height:2; }
     .mdc-section__horizon { color:#51717a; font-size:13px; letter-spacing:.08em; }
     .mdc-read--philosophy .mdc-hero { min-height:68vh; display:grid; grid-template-columns:minmax(0,1fr); align-content:center; text-align:center; background:#f4f0e8; }
     .mdc-read--philosophy .mdc-hero__statement { width:min(900px, 100%); margin-inline:auto; font-weight:700; }
+    .mdc-read--philosophy .mdc-hero__explanation { width:min(760px, 100%); margin-inline:auto; }
     .mdc-read--philosophy .mdc-sections { width:min(760px, calc(100% - 40px)); }
     .mdc-read--philosophy .mdc-section { position:relative; padding:54px 0 54px 48px; border-left:1px solid #b9afa1; }
     .mdc-read--philosophy .mdc-section::before { content:''; position:absolute; left:-4px; top:66px; width:7px; height:7px; border-radius:50%; background:#6e6254; }
@@ -44,7 +47,8 @@
     .mdc-read--policy .mdc-hero { min-height:52vh; color:#17202a; background:#e8eeeb; border-bottom:8px solid #244f55; }
     .mdc-read--policy .mdc-sections { counter-reset:policy; }
     .mdc-read--policy .mdc-section { counter-increment:policy; display:grid; grid-template-columns:90px minmax(0,1fr); gap:28px; padding:42px 0; border-bottom:1px solid #b9c8cb; }
-    .mdc-read--policy .mdc-section::before { content:counter(policy, decimal-leading-zero); color:#315e66; font-size:34px; font-weight:800; }
+    .mdc-read--policy .mdc-section::before { content:counter(policy, decimal-leading-zero); grid-column:1; grid-row:1 / span 4; color:#315e66; font-size:34px; font-weight:800; }
+    .mdc-read--policy .mdc-section > * { grid-column:2; }
     .mdc-section--empty { color:#667b83; text-align:center; padding:44px 0; border-block:1px solid #d6dfe1; }
     .mdc-form { display:grid; gap:22px; }
     .mdc-form__intro { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:22px; align-items:end; }

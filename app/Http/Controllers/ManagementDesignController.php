@@ -88,6 +88,7 @@ class ManagementDesignController extends Controller
             $type,
             [
                 'statement' => $validated['statement'] ?? null,
+                'statement_explanation' => $validated['statement_explanation'] ?? null,
                 'horizon' => $validated['horizon'] ?? null,
                 'sections' => $validated['sections'] ?? [],
             ],
@@ -218,12 +219,14 @@ class ManagementDesignController extends Controller
             'request_id' => ['required', 'uuid'],
             'expected_version' => ['required', 'integer', 'min:0'],
             'statement' => ['nullable', 'string', 'max:50000'],
+            'statement_explanation' => ['nullable', 'string', 'max:50000'],
             'horizon' => ['nullable', 'string', 'max:255'],
             'change_reason' => ['nullable', 'string', 'max:2000'],
             'sections' => ['nullable', 'array', 'max:100'],
             'sections.*.public_id' => ['nullable', 'string', 'size:26'],
             'sections.*.title' => ['required', 'string', 'max:255'],
             'sections.*.body' => ['required', 'string', 'max:50000'],
+            'sections.*.explanation' => ['nullable', 'string', 'max:50000'],
             'sections.*.horizon' => ['nullable', 'string', 'max:255'],
         ];
     }

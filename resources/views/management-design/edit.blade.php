@@ -7,6 +7,7 @@
         'public_id' => $section->public_id,
         'title' => $section->title,
         'body' => $section->body,
+        'explanation' => $section->explanation,
         'horizon' => $section->horizon,
     ])->values()->all() ?? []);
 @endphp
@@ -21,6 +22,7 @@
         <input type="hidden" name="request_id" value="{{ old('request_id', $requestId) }}">
         <input type="hidden" name="expected_version" value="{{ $item?->version ?? 0 }}">
         <div class="field"><label for="mdc-statement">全体Statement</label><textarea id="mdc-statement" name="statement" maxlength="50000">{{ old('statement', $item?->statement) }}</textarea><small>会社の言葉を主役にする全体Statementです。空でも保存できます。</small></div>
+        <div class="field"><label for="mdc-statement-explanation">{{ $presentation['statement_explanation_label'] }}</label><textarea id="mdc-statement-explanation" name="statement_explanation" maxlength="50000">{{ old('statement_explanation', $item?->statement_explanation) }}</textarea><small>{{ $presentation['statement_explanation_help'] }}</small></div>
         @if($type === 'vision')<div class="field"><label for="mdc-horizon">Horizon（任意）</label><input id="mdc-horizon" name="horizon" maxlength="255" value="{{ old('horizon', $item?->horizon) }}"><small>期限・KPI・進捗・自動失効には使用しません。</small></div>@endif
         <section class="stack" aria-labelledby="mdc-sections-heading">
             <div class="actions" style="justify-content:space-between"><div><p class="mdc-kicker">SECTIONS / 0..N</p><h2 id="mdc-sections-heading">Section</h2></div><button class="secondary" type="button" data-add-section>Sectionを追加</button></div>
@@ -30,7 +32,8 @@
                         <div class="mdc-form__section-head"><legend>Section {{ $loop->iteration }}</legend><button class="danger-outline" type="button" data-remove-section>削除</button></div>
                         @if(filled($section['public_id'] ?? null))<input type="hidden" name="sections[{{ $index }}][public_id]" value="{{ $section['public_id'] }}">@endif
                         <div class="field"><label for="section-title-{{ $index }}">Section名</label><input id="section-title-{{ $index }}" name="sections[{{ $index }}][title]" maxlength="255" required value="{{ $section['title'] ?? '' }}"></div>
-                        <div class="field"><label for="section-body-{{ $index }}">本文</label><textarea id="section-body-{{ $index }}" name="sections[{{ $index }}][body]" maxlength="50000" required>{{ $section['body'] ?? '' }}</textarea></div>
+                        <div class="field"><label for="section-body-{{ $index }}">Section Statement</label><textarea id="section-body-{{ $index }}" name="sections[{{ $index }}][body]" maxlength="50000" required>{{ $section['body'] ?? '' }}</textarea></div>
+                        <div class="field"><label for="section-explanation-{{ $index }}">{{ $presentation['section_explanation_label'] }}</label><textarea id="section-explanation-{{ $index }}" name="sections[{{ $index }}][explanation]" maxlength="50000">{{ $section['explanation'] ?? '' }}</textarea></div>
                         @if($type === 'vision')<div class="field"><label for="section-horizon-{{ $index }}">Section Horizon（任意）</label><input id="section-horizon-{{ $index }}" name="sections[{{ $index }}][horizon]" maxlength="255" value="{{ $section['horizon'] ?? '' }}"></div>@endif
                     </fieldset>
                 @endforeach
@@ -44,7 +47,8 @@
     <fieldset class="mdc-form__section" data-section>
         <div class="mdc-form__section-head"><legend>New Section</legend><button class="danger-outline" type="button" data-remove-section>削除</button></div>
         <div class="field"><label>Section名<input name="sections[__INDEX__][title]" maxlength="255" required></label></div>
-        <div class="field"><label>本文<textarea name="sections[__INDEX__][body]" maxlength="50000" required></textarea></label></div>
+        <div class="field"><label>Section Statement<textarea name="sections[__INDEX__][body]" maxlength="50000" required></textarea></label></div>
+        <div class="field"><label>{{ $presentation['section_explanation_label'] }}<textarea name="sections[__INDEX__][explanation]" maxlength="50000"></textarea></label></div>
         @if($type === 'vision')<div class="field"><label>Section Horizon（任意）<input name="sections[__INDEX__][horizon]" maxlength="255"></label></div>@endif
     </fieldset>
 </template>

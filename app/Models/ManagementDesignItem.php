@@ -21,9 +21,30 @@ class ManagementDesignItem extends Model
     public const TYPES = [self::TYPE_PHILOSOPHY, self::TYPE_VISION, self::TYPE_POLICY];
 
     public const PRESENTATION = [
-        self::TYPE_PHILOSOPHY => ['label' => '理念', 'direction' => 'ROOT', 'description' => '会社が存在する根本思想を読む'],
-        self::TYPE_VISION => ['label' => 'Vision', 'direction' => 'FUTURE', 'description' => '会社が向かう未来を眺める'],
-        self::TYPE_POLICY => ['label' => '方針', 'direction' => 'DIRECTION', 'description' => '会社として優先する判断方向を辿る'],
+        self::TYPE_PHILOSOPHY => [
+            'label' => '理念',
+            'direction' => 'ROOT',
+            'description' => '会社が存在する根本思想を読む',
+            'statement_explanation_label' => 'この理念に込めた意味（任意）',
+            'statement_explanation_help' => '正式なStatementとは分けて、理念の背景・意図・会社としての解釈を説明できます。',
+            'section_explanation_label' => 'このSectionの説明（任意）',
+        ],
+        self::TYPE_VISION => [
+            'label' => 'Vision',
+            'direction' => 'FUTURE',
+            'description' => '会社が向かう未来を眺める',
+            'statement_explanation_label' => 'このVisionが示す意味（任意）',
+            'statement_explanation_help' => '正式なStatementとは分けて、描く未来の背景・意図・会社としての解釈を説明できます。',
+            'section_explanation_label' => 'このSectionが描く未来の説明（任意）',
+        ],
+        self::TYPE_POLICY => [
+            'label' => '方針',
+            'direction' => 'DIRECTION',
+            'description' => '会社として優先する判断方向を辿る',
+            'statement_explanation_label' => 'この方針の背景・意図（任意）',
+            'statement_explanation_help' => '正式なStatementとは分けて、判断方向の背景・意図・会社としての解釈を説明できます。',
+            'section_explanation_label' => 'このSectionの判断意図（任意）',
+        ],
     ];
 
     public const STATUS_ACTIVE = 'active';
@@ -31,7 +52,7 @@ class ManagementDesignItem extends Model
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
-        'public_id', 'organization_id', 'type', 'statement', 'horizon', 'status', 'version',
+        'public_id', 'organization_id', 'type', 'statement', 'statement_explanation', 'horizon', 'status', 'version',
         'current_revision_id', 'created_by_user_id', 'updated_by_user_id', 'archived_at',
     ];
 

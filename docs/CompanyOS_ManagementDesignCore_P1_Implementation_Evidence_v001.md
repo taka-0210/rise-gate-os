@@ -26,6 +26,7 @@ P1 IN was kept to the common text foundation and text experience:
 - fixed item types: Philosophy / Vision / Policy
 - Organization boundary and stable IDs
 - free `0..N` Sections and ordering
+- optional overall/Section explanations shared by all fixed types while keeping official wording separate
 - immutable Revision, one current official, optional change reason
 - Archive / Reopen
 - View / Edit / Manage Permission separation
@@ -55,6 +56,7 @@ P1 OUT remains out:
 Changed paths are limited to:
 
 - `database/migrations/2026_10_01_000001_create_management_design_core_p1.php`
+- `database/migrations/2026_10_01_000002_add_explanations_to_management_design_core_p1.php`
 - `app/Models/ManagementDesign*`
 - `app/Services/ManagementDesign/*`
 - `app/Http/Controllers/ManagementDesignController.php`
@@ -62,11 +64,11 @@ Changed paths are limited to:
 - `resources/views/management-design/*`
 - `routes/web.php`
 - MDC P1 Feature, Browser and Browser setup tests
-- Release Hardening migration ledger expectation (`108 → 109`)
+- Release Hardening migration ledger expectation (`108 → 110`)
 
 ## 3｜Schema / Migration
 
-The migration is additive. It creates six tables and does not update, delete or backfill existing records:
+The migrations are additive. The foundation migration creates six tables, and the Human Visual Review corrective adds only nullable explanation columns. Neither migration updates, deletes or fabricates content in existing records:
 
 1. `management_design_access_settings`
 2. `management_design_grants`
@@ -75,6 +77,14 @@ The migration is additive. It creates six tables and does not update, delete or 
 5. `management_design_operations`
 6. `management_design_revisions`
 
+Explanation corrective:
+
+- `management_design_items.statement_explanation`: nullable long text
+- `management_design_sections.explanation`: nullable long text
+- Philosophy / Vision / Policy use the same Technical Data Model capability.
+- The fields remain optional for every type.
+- Existing records receive `null`; no inferred or fabricated explanation is backfilled.
+
 Isolated SQLite verification:
 
 - up: PASS
@@ -82,7 +92,7 @@ Isolated SQLite verification:
 - step-down: PASS
 - existing schema preserved after down: PASS
 - reapply: PASS
-- migration repository count: `109`
+- migration repository count: `110`
 - MDC table count after reapply: `6`
 - Section FK count: `3`
 - Item index count: `4`
@@ -91,6 +101,16 @@ Isolated SQLite verification:
 - Production DB migration: `0`
 
 No P1 behavior depends on a SQLite-only query or trigger. The migration uses Laravel portable FK, unique, index, boolean, JSON and text primitives. A dedicated isolated MariaDB profile was not introduced or used because no engine-specific semantic branch was required; real MariaDB/Production application remains a separate gate.
+
+Human Visual Review isolated DB application:
+
+- pre-migration backup: SHA-matched copy created before application
+- migration ledger: `109 → 110`
+- Item / Section / Revision counts before and after: `2 / 5 / 5`
+- new overall / Section explanation columns: present and nullable
+- non-null explanations after migration: `0 / 0` (no backfill)
+- normal local DB / Production DB application: `0 / 0`
+- loopback Human Review runtime restored at `http://127.0.0.1:8461`
 
 ## 4｜Foundation
 
@@ -109,11 +129,13 @@ No P1 behavior depends on a SQLite-only query or trigger. The migration uses Lar
 - Removed Sections are archived rather than destructively deleted.
 - Cross-item and unknown Section IDs fail closed.
 - Vision alone accepts optional whole/Section Horizon.
+- Every fixed type accepts optional Section explanation through the shared schema.
 
 ### Revision / lifecycle
 
 - Every official save, Archive and Reopen creates a new immutable snapshot.
-- Snapshot contains the complete ordered Section set and schema version.
+- Snapshot schema v2 contains the overall explanation and complete ordered Section set including optional explanations.
+- Historical schema v1 Revisions remain readable without rewriting or backfill.
 - Old Revisions remain readable and are not rewritten by correction.
 - Archive retains stable ID, current text and History.
 - Reopen uses the same stable ID.
@@ -163,18 +185,28 @@ No P1 behavior depends on a SQLite-only query or trigger. The migration uses Lar
 - mobile layout collapses grids without horizontal overflow
 - no images and no motion were added
 
+### Explanation capability
+
+- The need was discovered through Philosophy, but the Technical Data Model is not Philosophy-specific.
+- Philosophy / Vision / Policy may all use optional overall and Section explanations.
+- Official `Statement` / `Section Statement` remain distinct from their explanations and retain primary visual weight.
+- Presentation labels are configured by type: Philosophy explains meaning, Vision explains the future it depicts, and Policy explains decision background/intent.
+- Type-specific labels and display strength can evolve in the Presentation layer without changing the shared storage or Revision contract.
+- Explanation remains optional; an Item and its Sections are valid without it.
+- This creates richer future Company Context without implementing or pre-authorizing P2 AI READ.
+
 ## 7｜Verification
 
 ### Focused
 
-- `ManagementDesignCoreP1Test`: **11 passed / 97 assertions**
-- post-corrective MDC + ReleaseHardening: **15 passed / 126 assertions**
+- `ManagementDesignCoreP1Test`: **13 passed / 125 assertions**
+- post-corrective MDC + ReleaseHardening: **17 passed / 154 assertions**
 - PHP syntax: PASS
 - Node Browser script syntax: PASS
 - Pint: PASS
 - `git diff --check`: PASS
 
-Covered contracts include Organization isolation, fixed types, logical uniqueness, 0/many Sections, order, long Japanese, immutable old Revision, one current official, optional reason, stale rejection, foreign Section rejection, idempotency, transaction rollback, Owner non-bypass, explicit/all-staff grants, membership lifecycle, archive/reopen and Horizon type rejection.
+Covered contracts include Organization isolation, fixed types, logical uniqueness, 0/many Sections, order, long Japanese, immutable old Revision, one current official, optional reason, shared optional explanations for all types, type-specific explanation presentation, stale rejection, foreign Section rejection, idempotency, transaction rollback, Owner non-bypass, explicit/all-staff grants, membership lifecycle, archive/reopen and Horizon type rejection.
 
 ### Browser / responsive / repeatability
 
@@ -195,6 +227,18 @@ After the long-text corrective, the full Browser Journey passed in **2 independe
 - external requests: `0`
 - each loopback server stopped after verification
 
+The Explanation corrective then passed a fresh isolated Browser Journey:
+
+- overall and Section explanations: visible in current View
+- immutable History/Revision explanation: visible
+- desktop `1440 × 1000`: PASS
+- mobile `390 × 844`: PASS
+- `3200px` zoom-out equivalent width assertion: PASS
+- HTTP 5xx: `0`
+- external requests: `0`
+- `desktop-explanation-presentation.png` SHA-256: `4EC53609D8F4FF948722252149922B08A768964A41873995F176CD3168863A44`
+- `mobile-explanation-presentation.png` SHA-256: `83EA3153E39A96BC5B3464DA278118F6652E0CEC96D33C75354E88CBB57A0C0E`
+
 Final screenshot artifacts (gitignored local Evidence):
 
 - `storage/app/mdc-p1-evidence/desktop-final.png`, `1440 × 3582`, SHA-256 `586036964B53523093F28A109DC19E1686458F2BE83896D998EA66BAAA1D0337`
@@ -207,6 +251,14 @@ Related regression run:
 - **104 passed / 1091 assertions**
 - one P1-I real Provider gate skip
 - one known CompanyNavigation failure
+
+Latest full suite after the Explanation corrective:
+
+- **684 passed / 5615 assertions**
+- **17 skipped** (closed Provider/MariaDB gates)
+- **1 known failure**: `CompanyNavigationTest::test_regular_login_ignores_a_stale_forbidden_intended_url`
+- MDC failures: `0`
+- the remaining failure is the same scope-external baseline reproduced before the corrective
 
 Full suite run before the migration ledger expectation corrective:
 
@@ -235,6 +287,7 @@ Frontend production build:
 - Owner bypass is absent.
 - Audit stores actor, operation, stable ID, type, revision/version/status, request/operation IDs and grant counts.
 - Audit does not copy statement, Section body, Horizon or change reason.
+- Audit does not copy overall or Section explanations.
 - Revision content remains protected by current View permission.
 - No Secret, credential, `.env` value or external Provider payload was added to source/Evidence.
 - External Service and Provider calls: `0`
@@ -257,11 +310,14 @@ Frontend production build:
 2. Browser harness assertions were aligned to the actual editorial heading, Horizon prefix and same-URL Archive/Reopen navigation.
 3. Long statement typography was reduced and constrained for desktop/mobile reading; computed-style assertions prevent regression.
 4. ReleaseHardening migration count was updated from `108` to `109` after the additive migration.
+5. Human Visual Review identified the need to explain abstract official wording without weakening it. Optional overall and Section explanations were added as a shared Philosophy / Vision / Policy capability, with type-specific Presentation labels.
+6. Snapshot schema was advanced to v2 for new Revisions; v1 history remains readable and untouched.
+7. The current ReleaseHardening migration count was advanced from `109` to `110` for the explanation-only additive migration.
 
 ## 11｜Remaining / Conditional
 
 - Known scope-external failure: stale forbidden intended URL in `CompanyNavigationTest`; reproduced on base SHA.
-- Human visual review of the three text experiences remains the final acceptance activity; P1 instructions do not require Formal Human UX PASS before candidate review.
+- Human visual review of the three text experiences remains active; the isolated review environment now exposes the explanation fields without changing its existing content.
 - Actual isolated MariaDB execution was not opened as a new environment because P1 introduced no engine-specific behavior. It remains part of the later approved DB application gate if Human requires it.
 - No image, AI, relation or delivery function should be inferred from P1.
 

@@ -43,15 +43,17 @@ try {
     }
     assert(await page.locator('.mdc-directory img').count() === 0, 'P1 added an image despite the scope exclusion.');
 
-    const create = async (type, statement, sections, horizon = null) => {
+    const create = async (type, statement, sections, horizon = null, statementExplanation = null) => {
         await page.goto(`${baseUrl}/company/management-design/${type}/edit`);
         await page.locator('#mdc-statement').fill(statement);
+        if (statementExplanation !== null) await page.locator('#mdc-statement-explanation').fill(statementExplanation);
         if (horizon !== null) await page.locator('#mdc-horizon').fill(horizon);
         for (const section of sections) {
             await page.locator('[data-add-section]').click();
             const row = page.locator('[data-section]').last();
             await row.locator('input[name$="[title]"]').fill(section.title);
             await row.locator('textarea[name$="[body]"]').fill(section.body);
+            if (section.explanation) await row.locator('textarea[name$="[explanation]"]').fill(section.explanation);
             if (section.horizon) await row.locator('input[name$="[horizon]"]').fill(section.horizon);
         }
         await Promise.all([
@@ -63,10 +65,12 @@ try {
 
     const longJapanese = '理念は日々の判断に立ち返る根です。'.repeat(80);
     await create('philosophy', longJapanese, [
-        { title: '存在理由', body: '人と会社の可能性を、誠実な判断によってひらきます。' },
+        { title: '存在理由', body: '人と会社の可能性を、誠実な判断によってひらきます。', explanation: 'この言葉を日々の判断へつなげるためのSection説明です。' },
         { title: '大切にする姿勢', body: '短期の便利さより、長期の信頼を選びます。' },
-    ]);
+    ], null, '抽象度の高い理念に込めた会社固有の意味を説明します。');
     assert(await page.locator('.mdc-read--philosophy').isVisible(), 'ROOT composition is missing.');
+    assert(await page.getByText('抽象度の高い理念に込めた会社固有の意味を説明します。', { exact: true }).isVisible(), 'Statement explanation is missing.');
+    assert(await page.getByText('この言葉を日々の判断へつなげるためのSection説明です。', { exact: true }).isVisible(), 'Section explanation is missing.');
     assert(await page.locator('.mdc-hero--long').isVisible(), 'Long statement presentation was not selected.');
     assert(await page.locator('.mdc-hero__statement').evaluate(element => parseInt(getComputedStyle(element).fontWeight, 10) >= 700), 'Philosophy statement is not visually strong enough.');
     assert(await page.locator('.mdc-section__body').first().evaluate(element => parseFloat(getComputedStyle(element).fontSize) >= 20), 'Section body remains too small on desktop.');
@@ -94,6 +98,8 @@ try {
     assert(await page.getByText('Revision 1', { exact: false }).isVisible(), 'Immutable Revision 1 is absent.');
     const revisionResponse = await page.locator('a[href*="/revisions/"]').first().click();
     assert(await page.getByText('存在理由', { exact: true }).isVisible(), 'Revision snapshot is unreadable.');
+    assert(await page.getByText('抽象度の高い理念に込めた会社固有の意味を説明します。', { exact: true }).isVisible(), 'Statement explanation is missing from immutable history.');
+    assert(await page.getByText('この言葉を日々の判断へつなげるためのSection説明です。', { exact: true }).isVisible(), 'Section explanation is missing from immutable history.');
 
     const stalePage = await context.newPage();
     await page.goto(`${baseUrl}/company/management-design/philosophy/edit`);
@@ -159,7 +165,7 @@ try {
         externalRequests: externalRequests.length,
         journeys: [
             'login', 'company-entry', 'fixed-types', 'philosophy-root', 'vision-future',
-            'policy-direction', 'long-japanese', 'continuous-sections', 'history-revision',
+            'policy-direction', 'official-explanations', 'long-japanese', 'continuous-sections', 'history-revision',
             'stale-fail-closed', 'archive-reopen', 'mobile-390', 'keyboard-focus',
         ],
     }));

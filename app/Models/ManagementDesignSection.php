@@ -16,7 +16,7 @@ class ManagementDesignSection extends Model
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
-        'public_id', 'management_design_item_id', 'title', 'body', 'horizon', 'sort_order',
+        'public_id', 'management_design_item_id', 'title', 'body', 'explanation', 'horizon', 'sort_order',
         'status', 'created_by_user_id', 'updated_by_user_id',
     ];
 

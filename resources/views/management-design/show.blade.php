@@ -19,6 +19,7 @@
         @else
             <p class="mdc-hero__statement">{{ $item ? 'Sectionとともに、この会社の言葉を残します。' : '正本はまだ登録されていません。' }}</p>
         @endif
+        @if(filled($item?->statement_explanation))<p class="mdc-hero__explanation">{{ $item->statement_explanation }}</p>@endif
         @if($type === 'vision' && filled($item?->horizon))<p class="mdc-hero__horizon">HORIZON / {{ $item->horizon }}</p>@endif
     </header>
     <div class="mdc-sections">
@@ -28,6 +29,7 @@
                     @if($type === 'vision' && filled($section->horizon))<p class="mdc-section__horizon">HORIZON / {{ $section->horizon }}</p>@endif
                     <h2>{{ $section->title }}</h2>
                     <p class="mdc-section__body">{{ $section->body }}</p>
+                    @if(filled($section->explanation))<p class="mdc-section__explanation">{{ $section->explanation }}</p>@endif
                 </section>
             @endforeach
         @else

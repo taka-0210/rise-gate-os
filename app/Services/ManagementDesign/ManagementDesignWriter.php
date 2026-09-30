@@ -84,6 +84,7 @@ class ManagementDesignWriter
             $beforeVersion = (int) $item->version;
             $item->fill([
                 'statement' => $this->nullableText($input['statement'] ?? null),
+                'statement_explanation' => $this->nullableText($input['statement_explanation'] ?? null),
                 'horizon' => $type === ManagementDesignItem::TYPE_VISION
                     ? $this->nullableText($input['horizon'] ?? null)
                     : null,
@@ -241,6 +242,7 @@ class ManagementDesignWriter
             $section->fill([
                 'title' => $data['title'],
                 'body' => $data['body'],
+                'explanation' => $this->nullableText($data['explanation'] ?? null),
                 'horizon' => $item->type === ManagementDesignItem::TYPE_VISION
                     ? $this->nullableText($data['horizon'] ?? null)
                     : null,
