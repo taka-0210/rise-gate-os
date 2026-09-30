@@ -31,7 +31,43 @@ final class RealtimeSourceLedger
         }
 
         return DB::transaction(function () use ($frames, $lease): array {
-            return array_map(fn (CanonicalAudioFrame $frame): AiCommonSharedSourceRange => $this->acceptLocked($frame, $lease), $frames);
+            $lockedStream = AiCommonSharedCaptureStream::query()->lockForUpdate()->findOrFail($lease->ai_common_shared_capture_stream_id);
+            $lockedLease = AiCommonSharedRelayLease::query()->lockForUpdate()->findOrFail($lease->id);
+            foreach ($frames as $frame) {
+                $this->assertFrameScope($frame, $lockedLease, $lockedStream);
+            }
+
+            $sequences = array_map(static fn (CanonicalAudioFrame $frame): int => $frame->sequence, $frames);
+            $clientEventIds = array_map(static fn (CanonicalAudioFrame $frame): string => $frame->clientEventId, $frames);
+            $identities = AiCommonSharedSourceRange::query()
+                ->where('ai_common_shared_capture_stream_id', $lockedLease->ai_common_shared_capture_stream_id)
+                ->where('generation', $lockedLease->generation)
+                ->where(fn ($query) => $query->whereIn('frame_sequence', $sequences)->orWhereIn('client_event_id', $clientEventIds))
+                ->lockForUpdate()->get();
+            $previousEnd = (int) (AiCommonSharedSourceRange::query()
+                ->where('ai_common_shared_capture_stream_id', $lockedLease->ai_common_shared_capture_stream_id)
+                ->where('state', 'accepted')->max('end_sample') ?? 0);
+            $accepted = [];
+            foreach ($frames as $frame) {
+                $identity = $identities->first(fn (AiCommonSharedSourceRange $range): bool => $range->frame_sequence === $frame->sequence || $range->client_event_id === $frame->clientEventId);
+                if ($identity) {
+                    if (! $this->sameFrame($identity, $frame)) {
+                        throw ValidationException::withMessages(['frame' => SafeRealtimeReason::IntegrityConflict->value]);
+                    }
+                    $accepted[] = $identity;
+
+                    continue;
+                }
+                if ($frame->startSample !== $previousEnd) {
+                    throw ValidationException::withMessages(['frame' => $frame->startSample > $previousEnd ? SafeRealtimeReason::SourceGap->value : SafeRealtimeReason::SourceOverlap->value]);
+                }
+                $identity = $this->createRange($frame, $lockedLease);
+                $identities->push($identity);
+                $accepted[] = $identity;
+                $previousEnd = $frame->endSample;
+            }
+
+            return $accepted;
         }, 3);
     }
 
@@ -39,24 +75,13 @@ final class RealtimeSourceLedger
     {
         $lockedStream = AiCommonSharedCaptureStream::query()->lockForUpdate()->findOrFail($lease->ai_common_shared_capture_stream_id);
         $locked = AiCommonSharedRelayLease::query()->lockForUpdate()->findOrFail($lease->id);
-        if ($locked->state !== AiCommonSharedRelayLease::STATE_ACTIVE || $locked->expires_at_utc->lte(now())
-            || $lockedStream->state !== AiCommonSharedCaptureStream::STATE_RECORDING
-            || $lockedStream->generation !== $locked->generation
-            || $lockedStream->id !== $locked->ai_common_shared_capture_stream_id
-            || ! hash_equals($locked->public_id, $frame->leaseId)
-            || ! hash_equals($lockedStream->public_id, $frame->streamId)
-            || $locked->generation !== $frame->generation) {
-            throw ValidationException::withMessages(['frame' => SafeRealtimeReason::LeaseExpired->value]);
-        }
+        $this->assertFrameScope($frame, $locked, $lockedStream);
         $identity = AiCommonSharedSourceRange::query()->where('ai_common_shared_capture_stream_id', $locked->ai_common_shared_capture_stream_id)
             ->where('generation', $frame->generation)
             ->where(fn ($query) => $query->where('frame_sequence', $frame->sequence)->orWhere('client_event_id', $frame->clientEventId))
             ->lockForUpdate()->first();
         if ($identity) {
-            if ($identity->client_event_id === $frame->clientEventId
-                && $identity->frame_sequence === $frame->sequence
-                && $identity->start_sample === $frame->startSample && $identity->end_sample === $frame->endSample
-                && hash_equals($identity->content_sha256, $frame->contentSha256)) {
+            if ($this->sameFrame($identity, $frame)) {
                 return $identity;
             }
             throw ValidationException::withMessages(['frame' => SafeRealtimeReason::IntegrityConflict->value]);
@@ -67,17 +92,43 @@ final class RealtimeSourceLedger
             throw ValidationException::withMessages(['frame' => $frame->startSample > $previousEnd ? SafeRealtimeReason::SourceGap->value : SafeRealtimeReason::SourceOverlap->value]);
         }
 
+        return $this->createRange($frame, $locked);
+    }
+
+    private function assertFrameScope(CanonicalAudioFrame $frame, AiCommonSharedRelayLease $lease, AiCommonSharedCaptureStream $stream): void
+    {
+        if ($lease->state !== AiCommonSharedRelayLease::STATE_ACTIVE || $lease->expires_at_utc->lte(now())
+            || $stream->state !== AiCommonSharedCaptureStream::STATE_RECORDING
+            || $stream->generation !== $lease->generation
+            || $stream->id !== $lease->ai_common_shared_capture_stream_id
+            || ! hash_equals($lease->public_id, $frame->leaseId)
+            || ! hash_equals($stream->public_id, $frame->streamId)
+            || $lease->generation !== $frame->generation) {
+            throw ValidationException::withMessages(['frame' => SafeRealtimeReason::LeaseExpired->value]);
+        }
+    }
+
+    private function sameFrame(AiCommonSharedSourceRange $range, CanonicalAudioFrame $frame): bool
+    {
+        return $range->client_event_id === $frame->clientEventId
+            && $range->frame_sequence === $frame->sequence
+            && $range->start_sample === $frame->startSample && $range->end_sample === $frame->endSample
+            && hash_equals($range->content_sha256, $frame->contentSha256);
+    }
+
+    private function createRange(CanonicalAudioFrame $frame, AiCommonSharedRelayLease $lease): AiCommonSharedSourceRange
+    {
         return AiCommonSharedSourceRange::query()->create([
-            'ai_common_shared_session_id' => $locked->ai_common_shared_session_id,
-            'ai_common_shared_capture_stream_id' => $locked->ai_common_shared_capture_stream_id,
-            'relay_lease_id' => $locked->id, 'generation' => $frame->generation,
+            'ai_common_shared_session_id' => $lease->ai_common_shared_session_id,
+            'ai_common_shared_capture_stream_id' => $lease->ai_common_shared_capture_stream_id,
+            'relay_lease_id' => $lease->id, 'generation' => $frame->generation,
             'frame_sequence' => $frame->sequence, 'client_event_id' => $frame->clientEventId,
             'start_sample' => $frame->startSample, 'end_sample' => $frame->endSample,
             'sample_rate' => $frame->sampleRate, 'bit_depth' => $frame->bitDepth,
             'channels' => $frame->channels, 'format' => $frame->format,
             'content_sha256' => $frame->contentSha256,
-            'authorization_fingerprint' => $locked->audience_fingerprint,
-            'consent_fingerprint' => $locked->consent_fingerprint,
+            'authorization_fingerprint' => $lease->audience_fingerprint,
+            'consent_fingerprint' => $lease->consent_fingerprint,
             'state' => 'accepted', 'received_at_utc' => now(), 'accepted_at_utc' => now(),
         ]);
     }
@@ -98,7 +149,37 @@ final class RealtimeSourceLedger
         }
 
         return DB::transaction(function () use ($providerSession, $ranges): array {
-            return array_map(fn (AiCommonSharedSourceRange $range): AiCommonSharedProviderSendRange => $this->sentLocked($providerSession, $range), $ranges);
+            $lockedProvider = AiCommonSharedProviderSession::query()->lockForUpdate()->findOrFail($providerSession->id);
+            foreach ($ranges as $range) {
+                if ($lockedProvider->ai_common_shared_capture_stream_id !== $range->ai_common_shared_capture_stream_id
+                    || $lockedProvider->generation !== $range->generation || $range->state !== 'accepted') {
+                    throw ValidationException::withMessages(['range' => SafeRealtimeReason::ProviderMappingUnverified->value]);
+                }
+            }
+            $rangeIds = array_map(static fn (AiCommonSharedSourceRange $range): int => $range->id, $ranges);
+            $existing = AiCommonSharedProviderSendRange::query()->where('provider_session_id', $lockedProvider->id)
+                ->whereIn('source_range_id', $rangeIds)->lockForUpdate()->get()->keyBy('source_range_id');
+            $nextOrdinal = (int) AiCommonSharedProviderSendRange::query()->where('provider_session_id', $lockedProvider->id)->max('send_ordinal') + 1;
+            $nextOffset = (int) (AiCommonSharedProviderSendRange::query()->where('provider_session_id', $lockedProvider->id)->max('provider_offset_end_sample') ?? 0);
+            $sent = [];
+            foreach ($ranges as $range) {
+                $row = $existing->get($range->id);
+                if (! $row) {
+                    $row = AiCommonSharedProviderSendRange::query()->create([
+                        'provider_session_id' => $lockedProvider->id, 'source_range_id' => $range->id,
+                        'send_ordinal' => $nextOrdinal,
+                        'provider_offset_start_sample' => $nextOffset,
+                        'provider_offset_end_sample' => $nextOffset + ($range->end_sample - $range->start_sample),
+                        'state' => 'sent', 'sent_at_utc' => now(),
+                    ]);
+                    $nextOrdinal += 1;
+                    $nextOffset = $row->provider_offset_end_sample;
+                    $existing->put($range->id, $row);
+                }
+                $sent[] = $row;
+            }
+
+            return $sent;
         }, 3);
     }
 

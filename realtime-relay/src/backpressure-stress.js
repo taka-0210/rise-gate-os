@@ -5,6 +5,7 @@ import {
   SentEvidenceGate, takeLedgerBatch, validateProductFrame,
 } from './product-relay.js';
 import { PartialEventCoalescer } from './partial-event-coalescer.js';
+import { PriorityRequestScheduler } from './priority-request-scheduler.js';
 
 const FRAME_SAMPLES = 1600;
 const FRAME_INTERVAL_MS = 100;
@@ -22,11 +23,12 @@ function deferred() {
 }
 
 class SerialBridge {
-  #lane = Promise.resolve();
   #aborted = false;
 
-  constructor(serviceMs) {
+  constructor(serviceMs, eventServiceMs = 80, pollingServiceMs = 20) {
     this.serviceMs = serviceMs;
+    this.eventServiceMs = eventServiceMs;
+    this.pollingServiceMs = pollingServiceMs;
     this.nextAcceptedSample = 0;
     this.nextSendOrdinal = 1;
     this.sentEndSample = 0;
@@ -34,25 +36,27 @@ class SerialBridge {
     this.sendReceipts = [];
     this.partialWatermarks = [];
     this.sha256Checks = 0;
+    this.providerEvents = 0;
+    this.leaseRefreshes = 0;
+    this.snapshots = 0;
+    this.scheduler = new PriorityRequestScheduler();
   }
 
   abort() {
     this.#aborted = true;
   }
 
-  request(work) {
-    const operation = this.#lane.then(async () => {
+  request(priority, work, serviceMs = this.serviceMs) {
+    return this.scheduler.run(priority, async () => {
       if (this.#aborted) throw new Error('stress_bridge_aborted');
-      await sleep(this.serviceMs);
+      await sleep(serviceMs);
       if (this.#aborted) throw new Error('stress_bridge_aborted');
       return work();
     });
-    this.#lane = operation.catch(() => {});
-    return operation;
   }
 
   frames(previousIds, batch) {
-    return this.request(() => {
+    return this.request('critical', () => {
       const sent = previousIds.map(id => {
         const range = this.sourceRanges.find(item => item.source_range_id === id);
         if (!range) throw new Error('stress_source_range_missing');
@@ -79,7 +83,7 @@ class SerialBridge {
   }
 
   sentBatch(ids) {
-    return this.request(() => ({ sent: ids.map(id => {
+    return this.request('critical', () => ({ sent: ids.map(id => {
       const range = this.sourceRanges.find(item => item.source_range_id === id);
       if (!range) throw new Error('stress_source_range_missing');
       const receipt = { send_ordinal: this.nextSendOrdinal, state: 'sent', end_sample: range.end_sample };
@@ -91,11 +95,23 @@ class SerialBridge {
   }
 
   partial(item) {
-    return this.request(() => {
+    return this.request('normal', () => {
       if (this.sentEndSample < item.samplesAtReceive) throw new Error('stress_partial_watermark_unverified');
       this.partialWatermarks.push(this.sentEndSample);
       return { type: 'partial' };
-    });
+    }, this.eventServiceMs);
+  }
+
+  providerEvent() {
+    return this.request('normal', () => { this.providerEvents += 1; }, this.eventServiceMs);
+  }
+
+  leaseRefresh() {
+    return this.request('critical', () => { this.leaseRefreshes += 1; }, this.pollingServiceMs);
+  }
+
+  snapshot() {
+    return this.request('background', () => { this.snapshots += 1; }, this.pollingServiceMs);
   }
 }
 
@@ -127,8 +143,13 @@ export async function runBackpressureStress({
   bridgeServiceMs = 510,
   providerPartialIntervalMs = 250,
   partialForwardIntervalMs = 2000,
+  providerDurableIntervalMs = 2250,
+  leaseRefreshIntervalMs = 4000,
+  snapshotIntervalMs = 5000,
+  eventServiceMs = 80,
+  pollingServiceMs = 20,
 } = {}) {
-  const bridge = new SerialBridge(bridgeServiceMs);
+  const bridge = new SerialBridge(bridgeServiceMs, eventServiceMs, pollingServiceMs);
   const coalescer = new PartialEventCoalescer(partialForwardIntervalMs);
   const sentGate = new SentEvidenceGate();
   let queue = [];
@@ -143,6 +164,7 @@ export async function runBackpressureStress({
   let rawPartials = 0;
   let forwardedPartials = 0;
   let coalescedPartials = 0;
+  let providerDurableEvents = 0;
   let failure = null;
   let failureResolve;
   const failureSignal = new Promise(resolve => { failureResolve = resolve; });
@@ -242,9 +264,29 @@ export async function runBackpressureStress({
   };
   scheduleFrame();
   const partialTimer = setInterval(offerPartial, providerPartialIntervalMs);
+  const durableTimer = setInterval(() => {
+    if (failure) return;
+    providerDurableEvents += 1;
+    coalescer.discardPending();
+    eventChain = eventChain.then(() => bridge.providerEvent());
+    eventChain.catch(fail);
+  }, providerDurableIntervalMs);
+  let controlChain = Promise.resolve();
+  const leaseTimer = setInterval(() => {
+    controlChain = controlChain.then(() => bridge.leaseRefresh());
+    controlChain.catch(fail);
+  }, leaseRefreshIntervalMs);
+  let pollingChain = Promise.resolve();
+  const snapshotTimer = setInterval(() => {
+    pollingChain = pollingChain.then(() => bridge.snapshot());
+    pollingChain.catch(fail);
+  }, snapshotIntervalMs);
   await Promise.race([sleep(durationSeconds * 1000), failureSignal]);
   clearTimeout(frameTimer);
   clearInterval(partialTimer);
+  clearInterval(durableTimer);
+  clearInterval(leaseTimer);
+  clearInterval(snapshotTimer);
   const captureElapsedSeconds = (performance.now() - startedAt) / 1000;
   const captureFrames = sequence;
   const captureCadence = [...cadence];
@@ -255,6 +297,8 @@ export async function runBackpressureStress({
     const finalPartial = coalescer.takeDue(performance.now(), true);
     if (finalPartial) dispatchPartial(finalPartial);
     await eventChain;
+    await controlChain;
+    await pollingChain;
     for (let index = 0; index < 20; index += 1) admit(false);
     const boundedBurstDepth = queue.length;
     await flush(true);
@@ -292,8 +336,15 @@ export async function runBackpressureStress({
       forwarded_partial_events: forwardedPartials,
       coalesced_partial_events: coalescedPartials,
       partial_watermark_progressive: watermarkProgressive,
+      provider_durable_events: providerDurableEvents,
+      provider_events_processed: bridge.providerEvents,
+      lease_refreshes: bridge.leaseRefreshes,
+      snapshots: bridge.snapshots,
+      upstream_scheduler: bridge.scheduler.snapshot(),
       backlog_fail_closed_threshold: thresholdAt,
       bridge_service_ms: bridgeServiceMs,
+      event_service_ms: eventServiceMs,
+      polling_service_ms: pollingServiceMs,
       partial_forward_interval_ms: partialForwardIntervalMs,
     };
     const valid = result.actual_capture_duration_seconds >= durationSeconds
@@ -307,6 +358,12 @@ export async function runBackpressureStress({
       && result.send_ordinal_continuous && result.source_range_continuous
       && result.sha256_checks === result.frames_admitted
       && result.forwarded_partial_events > 0 && result.partial_watermark_progressive
+      && result.provider_events_processed === result.provider_durable_events
+      && result.lease_refreshes > 0 && result.snapshots > 0
+      && result.upstream_scheduler.current_queue_depth === 0
+      && result.upstream_scheduler.submitted.critical === result.upstream_scheduler.completed.critical
+      && result.upstream_scheduler.submitted.normal === result.upstream_scheduler.completed.normal
+      && result.upstream_scheduler.submitted.background === result.upstream_scheduler.completed.background
       && result.backlog_fail_closed_threshold === MAX_QUEUED_FRAMES + 1;
     result.status = valid ? 'PASS' : 'FAIL';
     if (!valid) result.safe_reason = 'stress_throughput_evidence_incomplete';
@@ -327,6 +384,11 @@ export async function runBackpressureStress({
     raw_partial_events: rawPartials,
     forwarded_partial_events: forwardedPartials,
     partial_forward_interval_ms: partialForwardIntervalMs,
+    provider_durable_interval_ms: providerDurableIntervalMs,
+    lease_refresh_interval_ms: leaseRefreshIntervalMs,
+    snapshot_interval_ms: snapshotIntervalMs,
+    event_service_ms: eventServiceMs,
+    polling_service_ms: pollingServiceMs,
   };
 }
 
@@ -341,6 +403,11 @@ if (process.argv[1] && process.argv[1].endsWith('backpressure-stress.js')) {
     bridgeServiceMs: readNumber('bridge-service-ms', 510),
     providerPartialIntervalMs: readNumber('provider-partial-ms', 250),
     partialForwardIntervalMs: readNumber('partial-forward-ms', 2000),
+    providerDurableIntervalMs: readNumber('provider-durable-ms', 2250),
+    leaseRefreshIntervalMs: readNumber('lease-refresh-ms', 4000),
+    snapshotIntervalMs: readNumber('snapshot-ms', 5000),
+    eventServiceMs: readNumber('event-service-ms', 80),
+    pollingServiceMs: readNumber('polling-service-ms', 20),
   });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (result.status !== 'PASS') process.exitCode = 1;

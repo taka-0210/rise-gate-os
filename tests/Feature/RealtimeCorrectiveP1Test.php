@@ -675,12 +675,17 @@ class RealtimeCorrectiveP1Test extends TestCase
         $nextRanges = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frames', [
             'provider_session_id' => $providerId, 'frames' => $nextBatch,
         ])->assertOk()->assertJsonCount(0, 'sent')->assertJsonCount(10, 'ranges')->json('ranges');
+        DB::flushQueryLog();
+        DB::enableQueryLog();
         $piggyback = $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/frames', [
             'provider_session_id' => $providerId,
             'previous_source_range_ids' => array_column($nextRanges, 'source_range_id'),
             'frames' => $thirdBatch,
         ])->assertOk()->assertJsonCount(10, 'sent')->assertJsonCount(10, 'ranges');
+        $piggybackQueryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
         $this->assertSame(range(11, 20), array_column($piggyback->json('sent'), 'send_ordinal'));
+        $this->assertLessThanOrEqual(40, $piggybackQueryCount, '10-frame piggyback must not regress to per-frame lock/max N+1 queries.');
         $this->assertDatabaseCount('ai_common_shared_source_ranges', 30);
         $this->assertDatabaseCount('ai_common_shared_provider_send_ranges', 20);
 

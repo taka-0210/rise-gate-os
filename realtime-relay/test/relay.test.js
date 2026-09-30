@@ -12,11 +12,12 @@ import {
   assertHumanRuntimePolicy, buildSessionFailureEvidence, FAILURE_EVIDENCE_CONTRACT, HumanGateController,
   LEDGER_BATCH_FRAMES, MAX_QUEUED_FRAMES, normalizeProxyResponseHeaders, safeReason,
   assertSentBatchEvidence, sanitizeProviderEvent, SentEvidenceGate, stageBridgeError, stageRuntimeError,
-  takeLedgerBatch, validateProductFrame,
+  takeLedgerBatch, upstreamPriority, validateProductFrame,
 } from '../src/product-relay.js';
 import {
   isEphemeralPartial, PartialEventCoalescer, PARTIAL_FORWARD_INTERVAL_MS,
 } from '../src/partial-event-coalescer.js';
+import { PriorityRequestScheduler } from '../src/priority-request-scheduler.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
   assert.equal(SDK_VERSION, '5.10.0');
@@ -341,6 +342,40 @@ test('P1-J ledger batching preserves 100 ms frame identity with a bounded memory
   assert.equal(queue.length, 0);
   assert.deepEqual(takeLedgerBatch([{metadata: {sequence: 24}}]), []);
   assert.throws(() => takeLedgerBatch(null), /queue_invalid/);
+});
+test('P1-J loopback upstream classification prioritizes lineage and lease control', () => {
+  assert.equal(upstreamPriority('', 'frames'), 'critical');
+  assert.equal(upstreamPriority('', 'sent-batch'), 'critical');
+  assert.equal(upstreamPriority('', 'event'), 'normal');
+  assert.equal(upstreamPriority('/company/co/shared-conversations/c/sessions/s/leases/l/refresh'), 'critical');
+  assert.equal(upstreamPriority('/company/co/shared-conversations/c/sessions/s/snapshot'), 'background');
+  assert.equal(upstreamPriority('/company/co'), 'normal');
+});
+test('P1-J loopback upstream requests are single-flight and critical work overtakes queued polling', async () => {
+  const scheduler = new PriorityRequestScheduler();
+  const order = [];
+  let releaseFirst;
+  const firstGate = new Promise(resolve => { releaseFirst = resolve; });
+  const first = scheduler.run('normal', async () => {
+    order.push('first:start');
+    await firstGate;
+    order.push('first:end');
+  });
+  const background = scheduler.run('background', async () => { order.push('background'); });
+  const normal = scheduler.run('normal', async () => { order.push('normal'); });
+  const critical = scheduler.run('critical', async () => { order.push('critical'); });
+  releaseFirst();
+  await Promise.all([first, background, normal, critical]);
+
+  assert.deepEqual(order, ['first:start', 'first:end', 'critical', 'normal', 'background']);
+  assert.deepEqual(scheduler.snapshot(), {
+    submitted: {critical: 1, normal: 2, background: 1},
+    completed: {critical: 1, normal: 2, background: 1},
+    maximum_queue_depth: 3,
+    current_queue_depth: 0,
+    running: false,
+  });
+  await assert.rejects(scheduler.run('unknown', async () => {}), /scheduler_input_invalid/);
 });
 test('P1-J Provider events wait only for the sent Evidence watermark captured at arrival', async () => {
   const gate = new SentEvidenceGate();

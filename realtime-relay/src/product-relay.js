@@ -11,6 +11,7 @@ import { safeFailureReason } from './limited-verification.js';
 import {
   isEphemeralPartial, PartialEventCoalescer, PARTIAL_FORWARD_INTERVAL_MS,
 } from './partial-event-coalescer.js';
+import { PriorityRequestScheduler } from './priority-request-scheduler.js';
 
 export const CONSERVATIVE_COST_USD_PER_MINUTE = 0.0097;
 export const FAILURE_EVIDENCE_CONTRACT = 'p1-j-failure-v2';
@@ -213,6 +214,14 @@ export function normalizeProxyResponseHeaders(headers, expectedOrigin) {
   return normalized;
 }
 
+export function upstreamPriority(pathname, bridgeAction = null) {
+  if (bridgeAction && ['frames', 'sent-batch', 'open', 'opened', 'close'].includes(bridgeAction)) return 'critical';
+  if (bridgeAction === 'event') return 'normal';
+  if (/\/leases\/[^/]+\/refresh(?:\?|$)/.test(pathname)) return 'critical';
+  if (/\/snapshot(?:\?|$)/.test(pathname)) return 'background';
+  return 'normal';
+}
+
 export async function createProductRelay(env = process.env) {
   const policy = assertHumanRuntimePolicy(env);
   const host = env.COMPANY_OS_REALTIME_RELAY_HOST ?? '127.0.0.1';
@@ -232,12 +241,18 @@ export async function createProductRelay(env = process.env) {
   let totalSamplesSent = 0;
   let totalSamplesAdmitted = 0;
   const humanGate = new HumanGateController();
+  // The local PHP verification server is single-process. Sending browser polling,
+  // audio ledger, and Provider event requests concurrently makes its socket
+  // backlog—not the Product frame queue—the effective scheduler. Keep exactly
+  // one upstream request in flight and prioritize audio lineage / lease control
+  // without weakening the 30-frame fail-closed boundary.
+  const upstreamRequests = new PriorityRequestScheduler();
   const bridge = async (action, payload) => {
     try {
-      const response = await fetch(new URL(`/api/internal/realtime-relay/${action}`, upstream), {
+      const response = await upstreamRequests.run(upstreamPriority('', action), () => fetch(new URL(`/api/internal/realtime-relay/${action}`, upstream), {
         method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json', 'x-companyos-relay-token': bridgeToken },
         body: JSON.stringify(payload), signal: AbortSignal.timeout(5000),
-      });
+      }));
       if (!response.ok) throw new Error(`bridge_${action}_rejected_${response.status}`);
       return response.json();
     } catch (error) {
@@ -247,18 +262,22 @@ export async function createProductRelay(env = process.env) {
 
   const server = https.createServer({ key: fs.readFileSync(tlsKeyPath), cert: fs.readFileSync(tlsCertPath) }, (request, response) => {
     if (!['127.0.0.1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress)) { response.writeHead(404); response.end(); return; }
-    const proxy = http.request({ hostname: upstream.hostname, port: upstream.port, path: request.url, method: request.method, headers: {
-      ...request.headers, host: `localhost:${port}`, 'x-forwarded-proto': 'https', 'x-forwarded-host': `localhost:${port}`,
-      'x-forwarded-port': String(port),
-    } }, upstreamResponse => {
-      response.writeHead(
-        upstreamResponse.statusCode ?? 502,
-        normalizeProxyResponseHeaders(upstreamResponse.headers, expectedOrigin),
-      );
-      upstreamResponse.pipe(response);
-    });
-    proxy.on('error', () => { if (!response.headersSent) response.writeHead(502); response.end('Local application unavailable.'); });
-    request.pipe(proxy);
+    request.on('error', () => { if (!response.headersSent) response.writeHead(400); response.end(); });
+    upstreamRequests.run(upstreamPriority(request.url ?? '/'), () => new Promise((resolve, reject) => {
+      const proxy = http.request({ hostname: upstream.hostname, port: upstream.port, path: request.url, method: request.method, headers: {
+        ...request.headers, host: `localhost:${port}`, 'x-forwarded-proto': 'https', 'x-forwarded-host': `localhost:${port}`,
+        'x-forwarded-port': String(port),
+      } }, upstreamResponse => {
+        response.writeHead(
+          upstreamResponse.statusCode ?? 502,
+          normalizeProxyResponseHeaders(upstreamResponse.headers, expectedOrigin),
+        );
+        upstreamResponse.pipe(response);
+        resolve();
+      });
+      proxy.on('error', reject);
+      request.pipe(proxy);
+    })).catch(() => { if (!response.headersSent) response.writeHead(502); response.end('Local application unavailable.'); });
   });
   const wss = new WebSocketServer({ noServer: true, clientTracking: true, perMessageDeflate: false, maxPayload: 32768 });
   server.on('upgrade', (request, socket, head) => {
@@ -365,6 +384,7 @@ export async function createProductRelay(env = process.env) {
       humanGate.markFailure();
       discardPendingPartial();
       recordPartialFlow();
+      appendEvidence(evidencePath, { type: 'upstream_scheduler', ...upstreamRequests.snapshot() });
       appendEvidence(evidencePath, failureEvidence);
       abortController.abort();
       if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal: false, safe_reason_code: reason }).catch(() => {});
@@ -563,6 +583,7 @@ export async function createProductRelay(env = process.env) {
         if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal, safe_reason_code: normal ? 'normal_stop' : 'hard_abort' });
         humanGate.markSessionEnded();
         recordPartialFlow();
+        appendEvidence(evidencePath, { type: 'upstream_scheduler', ...upstreamRequests.snapshot() });
         appendEvidence(evidencePath, { type: 'session_close', normal, samples_sent: samplesSent, duration_seconds: samplesSent / SAMPLE_RATE });
         sendBrowser({ type: 'provider_state', state: 'closed' });
         sendBrowser({ type: 'relay_stopped', normal });

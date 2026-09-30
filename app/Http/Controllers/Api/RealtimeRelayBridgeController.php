@@ -17,6 +17,7 @@ use App\Services\AiCommon\Realtime\RealtimeDurableFinalCommitter;
 use App\Services\AiCommon\Realtime\RealtimeProviderEventStore;
 use App\Services\AiCommon\Realtime\RealtimeSourceLedger;
 use App\Services\AiCommon\Realtime\SafeRealtimeReason;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -91,9 +92,14 @@ final class RealtimeRelayBridgeController extends Controller
             'frames.*.pcm_base64' => ['required', 'string', 'max:5000'],
         ]);
         $provider = $this->provider($input['provider_session_id']);
+        $previousIds = $input['previous_source_range_ids'] ?? [];
+        $previousByPublicId = AiCommonSharedSourceRange::query()->whereIn('public_id', $previousIds)->get()->keyBy('public_id');
+        if ($previousByPublicId->count() !== count($previousIds)) {
+            throw (new ModelNotFoundException)->setModel(AiCommonSharedSourceRange::class);
+        }
         $previousRanges = array_map(
-            static fn (string $publicId): AiCommonSharedSourceRange => AiCommonSharedSourceRange::query()->where('public_id', $publicId)->firstOrFail(),
-            $input['previous_source_range_ids'] ?? [],
+            static fn (string $publicId): AiCommonSharedSourceRange => $previousByPublicId->get($publicId),
+            $previousIds,
         );
         $sent = $previousRanges === [] ? [] : $ledger->sentBatch($provider, $previousRanges);
         $lease = AiCommonSharedRelayLease::query()->findOrFail($provider->relay_lease_id);
@@ -144,8 +150,12 @@ final class RealtimeRelayBridgeController extends Controller
             'source_range_ids.*' => ['required', 'uuid', 'distinct'],
         ]);
         $provider = $this->provider($input['provider_session_id']);
+        $rangesByPublicId = AiCommonSharedSourceRange::query()->whereIn('public_id', $input['source_range_ids'])->get()->keyBy('public_id');
+        if ($rangesByPublicId->count() !== count($input['source_range_ids'])) {
+            throw (new ModelNotFoundException)->setModel(AiCommonSharedSourceRange::class);
+        }
         $ranges = array_map(
-            static fn (string $publicId): AiCommonSharedSourceRange => AiCommonSharedSourceRange::query()->where('public_id', $publicId)->firstOrFail(),
+            static fn (string $publicId): AiCommonSharedSourceRange => $rangesByPublicId->get($publicId),
             $input['source_range_ids'],
         );
         $sent = $ledger->sentBatch($provider, $ranges);

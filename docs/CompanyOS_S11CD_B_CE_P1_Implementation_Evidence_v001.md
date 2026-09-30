@@ -451,3 +451,24 @@ Detailed package:
 
 - `docs/CompanyOS_S11CD_B_CE_P1_J_Backpressure_Stress_Verification_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_J_Backpressure_Stress_Verification_v001.json`
+
+## 23 | P1-J mixed upstream backpressure corrective
+
+The conditionally approved Human Start was consumed once. The Human read the approved Japanese sentence and the screen displayed numbered Japanese recognition results before truthfully stopping with WSS 1011 and `relay_frame_backlog_failed_closed`. Together with four sanitized `durable_final` records, this establishes Human-visible Japanese Durable Final output. The post-stop image does not separately prove that an ephemeral Partial was visible while speaking; Runtime Partial processing is technically established. Runtime Evidence also establishes Provider acceptance, `mip_opt_out=true`, 368,000 samples / 23.0 seconds sent, five forwarded non-empty Partials, seven Metadata events, and complete `frame_queue_admission` failure Evidence. Normal End was not reached, so First E2E Human PASS is not established. Provider Failure is not established.
+
+The prior Stress omitted Final/Metadata, lease-refresh, and snapshot traffic sharing the single-process Laravel development server. Live access logs showed concurrent requests turning the PHP socket queue into an accidental scheduler, starving audio lineage long enough to cross the unchanged 30-frame bound.
+
+The Provider-free Corrective serializes loopback upstream access through a priority lane: audio lineage/lifecycle/lease control are critical, Provider Events and normal page work are normal, and snapshot polling is background. Request bodies remain streamed. The ten-frame atomic DB path removes per-frame lock/max N+1 work while retaining frame identity, SHA-256, continuity, authorization/Consent, ordinal, idempotency, and rollback checks. A query-budget regression prevents N+1 recurrence.
+
+The mixed-load Stress ran 120.008 seconds at 100.002 ms mean cadence, admitted 1,200 realtime frames plus a 20-frame burst, and held the queue at 20/30. All 1,220 Source/Send Ranges and hashes were continuous. It completed 53 Provider-event-equivalent operations, 29 lease refreshes, and 23 snapshots; all 287 scheduler requests completed, final scheduler depth was zero, drain/burst was 2.697 seconds, and fail-closed remained frame 31. Provider communication/audio send/Credential load during Corrective was `0 / 0 / 0`.
+
+Regression is Relay Node `24 PASS`, CE-P1 focused plus proxy `12 PASS / 1 gated live SKIP / 160 assertions`, Pint PASS, and full Laravel `671 PASS / 17 SKIP / 1 known out-of-scope FAIL / 5,490 assertions`. The known CompanyNavigation failure is unchanged; new CE-P1 regressions are zero. Repository `.env` and normal local DB hashes remain unchanged. Runtime is stopped.
+
+P1-I remains `INCONCLUSIVE / Technical Verification Required`. P1-J remains `AUTHORIZED WITH KNOWN P1-I LIMITATION / FIRST E2E HUMAN PASS NOT ESTABLISHED`.
+
+Recommended next action is one newly authorized P1-J Human Start using the corrected runtime, with no Synthetic Provider Request. The single stream should confirm Waveform and visible Partial, continue through Final and Durable Final, and use Normal Stop. This recommendation is not authorization; a new Human + ChatGPT Gate is required.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_J_Mixed_Upstream_Backpressure_Corrective_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_J_Mixed_Upstream_Backpressure_Corrective_v001.json`
