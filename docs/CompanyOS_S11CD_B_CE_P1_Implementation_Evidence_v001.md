@@ -396,3 +396,20 @@ Detailed package:
 
 - `docs/CompanyOS_S11CD_B_CE_P1_J_Minimum_Human_UX_Throughput_Corrective_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_J_Minimum_Human_UX_Throughput_Corrective_v001.json`
+
+## 20 | P1-J empty-final event corrective
+
+The newly authorized P1-J Human Start was consumed once without retry, reconnect, resend, or a second Start. Human Evidence established microphone speech and same-stream Waveform movement. Runtime Evidence established same-origin WSS, Provider acceptance, `mip_opt_out=true`, and 32,000 samples / 2.0 seconds sent. Partial was not displayed, so the Minimum Gate did not pass.
+
+The Relay truthfully stopped with WSS 1011 and `bridge_event_rejected_500`. Sanitized Laravel Evidence identified the exact local failure: the first Deepgram `Results` event was `is_final=true` with a verified `0..11840` Source Range but without durable Transcript content. The Adapter incorrectly classified every Provider final as a Durable Final, while the provider-neutral envelope correctly rejected a contentless Durable Final. This is a Current Relay normalization defect; Deepgram Provider Failure is not established.
+
+The Provider-free Corrective requires non-empty trimmed content for a Durable Final. A contentless Provider final is now Metadata, cannot create a Transcript, and advances receipt ordering without inventing speech. A subsequent non-empty final continues through the existing verified lineage. Bridge errors also carry an immutable action-specific failure stage, fixing the concurrent stage race that reported `bridge_sent_batch` instead of `bridge_event`.
+
+Verification is Node `18 PASS`, Realtime focused `16 PASS / 1 gated live SKIP / 174 assertions`, and full Laravel `671 PASS / 17 SKIP / 1 known out-of-scope FAIL / 5,479 assertions`. The sole failure is the unchanged CompanyNavigation stale intended-URL mismatch. Repository `.env` and the normal local DB remain unchanged, real Credential hits are 0, and loopback listeners are stopped. No Provider communication or audio send occurred during the Corrective.
+
+P1-I remains `INCONCLUSIVE / Technical Verification Required`. P1-J remains `AUTHORIZED WITH KNOWN P1-I LIMITATION / MINIMUM GATE NOT PASSED`. Recommended next action is one newly authorized P1-J Human Start through an explicit Human + ChatGPT Gate using the corrected Runtime and unchanged zero retry/reconnect/resend conditions. This recommendation is not authorization.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_J_Empty_Final_Corrective_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_J_Empty_Final_Corrective_v001.json`

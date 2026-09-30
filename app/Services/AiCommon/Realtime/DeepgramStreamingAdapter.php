@@ -9,8 +9,10 @@ final class DeepgramStreamingAdapter implements ProviderStreamingPort
         $type = (string) ($providerEvent['type'] ?? '');
         $alternative = $providerEvent['channel']['alternatives'][0] ?? [];
         $content = isset($alternative['transcript']) ? trim((string) $alternative['transcript']) : null;
+        $hasDurableContent = is_string($content) && $content !== '';
         $eventType = match (true) {
-            $type === 'Results' && ($providerEvent['is_final'] ?? false) === true => ProviderStreamingEventEnvelope::FINAL,
+            $type === 'Results' && ($providerEvent['is_final'] ?? false) === true && $hasDurableContent => ProviderStreamingEventEnvelope::FINAL,
+            $type === 'Results' && ($providerEvent['is_final'] ?? false) === true => ProviderStreamingEventEnvelope::METADATA,
             $type === 'Results' => ProviderStreamingEventEnvelope::PARTIAL,
             in_array($type, ['Metadata', 'UtteranceEnd', 'SpeechStarted'], true) => ProviderStreamingEventEnvelope::METADATA,
             $type === 'Error' => ProviderStreamingEventEnvelope::ERROR,
@@ -40,7 +42,7 @@ final class DeepgramStreamingAdapter implements ProviderStreamingPort
             $identity,
             isset($providerEvent['sequence']) ? (int) $providerEvent['sequence'] : null,
             $receiveOrder,
-            $content,
+            in_array($eventType, [ProviderStreamingEventEnvelope::PARTIAL, ProviderStreamingEventEnvelope::FINAL], true) ? $content : null,
             $eventType === ProviderStreamingEventEnvelope::FINAL && $content !== null ? hash('sha256', $content) : null,
             $verified ? (int) $sourceMapping['start_sample'] : null,
             $verified ? (int) $sourceMapping['end_sample'] : null,

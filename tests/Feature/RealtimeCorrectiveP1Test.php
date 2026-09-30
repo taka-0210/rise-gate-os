@@ -566,6 +566,16 @@ class RealtimeCorrectiveP1Test extends TestCase
         $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/sent', [
             'provider_session_id' => $providerId, 'source_range_id' => $rangeId,
         ])->assertOk()->assertJsonPath('send_ordinal', 1);
+        $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/event', [
+            'provider_session_id' => $providerId, 'receive_order' => 1, 'event' => [
+                'type' => 'Results', 'request_id' => 'synthetic-p1-j-empty-final', 'is_final' => true,
+                'start' => 0, 'duration' => 0.1, 'channel' => ['alternatives' => []],
+            ],
+        ])->assertOk()->assertJsonPath('type', 'metadata');
+        $this->assertDatabaseHas('ai_common_shared_provider_event_receipts', [
+            'normalized_event_type' => 'metadata', 'status' => 'accepted',
+        ]);
+        $this->assertDatabaseCount('ai_common_shared_durable_final_commits', 0);
         $event = [
             'type' => 'Results', 'request_id' => 'synthetic-p1-j', 'is_final' => true, 'start' => 0, 'duration' => 0.1,
             'channel' => ['alternatives' => [['transcript' => 'Human verification.', 'words' => [[
@@ -573,12 +583,12 @@ class RealtimeCorrectiveP1Test extends TestCase
             ]]]]],
         ];
         $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/event', [
-            'provider_session_id' => $providerId, 'receive_order' => 1, 'event' => $event,
+            'provider_session_id' => $providerId, 'receive_order' => 2, 'event' => $event,
         ])->assertOk()->assertJsonPath('type', 'durable_final')->assertJsonPath('speaker_count', 1);
         $this->assertDatabaseCount('ai_common_shared_durable_final_commits', 1);
         $this->assertDatabaseHas('ai_common_shared_transcript_segments', ['source_kind' => 'realtime_source']);
         $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/event', [
-            'provider_session_id' => $providerId, 'receive_order' => 2, 'event' => ['type' => 'Close', 'event_id' => (string) Str::uuid()],
+            'provider_session_id' => $providerId, 'receive_order' => 3, 'event' => ['type' => 'Close', 'event_id' => (string) Str::uuid()],
         ])->assertOk()->assertJsonPath('type', 'close');
         $this->assertDatabaseHas('ai_common_shared_provider_event_receipts', ['normalized_event_type' => 'close', 'status' => 'accepted']);
         $this->withHeaders($headers)->postJson('/api/internal/realtime-relay/close', [

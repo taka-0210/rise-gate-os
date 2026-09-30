@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import {
   assertHumanRuntimePolicy, buildSessionFailureEvidence, FAILURE_EVIDENCE_CONTRACT, HumanGateController,
   LEDGER_BATCH_FRAMES, MAX_QUEUED_FRAMES, normalizeProxyResponseHeaders, safeReason,
-  sanitizeProviderEvent, SentEvidenceGate, takeLedgerBatch, validateProductFrame,
+  sanitizeProviderEvent, SentEvidenceGate, stageBridgeError, takeLedgerBatch, validateProductFrame,
 } from '../src/product-relay.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
@@ -254,6 +254,25 @@ test('P1-J Product relay validates live PCM identity and sanitizes Provider even
   assert.equal(event.channel.alternatives[0].transcript, 'テスト');
   assert.equal(event.channel.alternatives[0].words[0].speaker, 0);
   assert.equal(Object.hasOwn(event, 'authorization'), false);
+  const emptyFinal = sanitizeProviderEvent({
+    type: 'Results', request_id: 'empty-final', is_final: true, start: 0, duration: 0.74,
+  }, 11840, 2);
+  assert.equal(emptyFinal.channel.alternatives[0].transcript, '');
+  assert.deepEqual(emptyFinal.channel.alternatives[0].words, []);
+});
+test('P1-J bridge failures retain their action stage across concurrent work', () => {
+  const eventFailure = stageBridgeError(new Error('bridge_event_rejected_500'), 'event');
+  assert.equal(eventFailure.failureStage, 'bridge_event');
+  assert.equal(eventFailure.message, 'bridge_event_rejected_500');
+  const sentFailure = stageBridgeError(new Error('bridge_sent-batch_rejected_500'), 'sent-batch');
+  assert.equal(sentFailure.failureStage, 'bridge_sent_batch');
+  assert.equal(buildSessionFailureEvidence({
+    error: eventFailure,
+    failureStage: eventFailure.failureStage,
+    providerConnectionAttempted: true,
+    providerAccepted: true,
+    samplesSent: 32000,
+  }).failure_stage, 'bridge_event');
 });
 test('P1-J ledger batching preserves 100 ms frame identity with a bounded memory queue', () => {
   const queue = Array.from({length: LEDGER_BATCH_FRAMES * 2 + 3}, (_, index) => ({

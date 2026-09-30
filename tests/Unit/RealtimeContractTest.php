@@ -83,6 +83,33 @@ class RealtimeContractTest extends TestCase
         $this->assertNotSame('provider-raw-identity', $receipt['provider_event_identity_hash']);
     }
 
+    public function test_deepgram_final_results_without_text_are_metadata_and_never_durable_finals(): void
+    {
+        foreach ([
+            [],
+            ['channel' => ['alternatives' => [['transcript' => null, 'words' => []]]]],
+            ['channel' => ['alternatives' => [['transcript' => '   ', 'words' => []]]]],
+        ] as $index => $shape) {
+            $event = app(DeepgramStreamingAdapter::class)->normalize([
+                'type' => 'Results',
+                'request_id' => 'empty-final-'.$index,
+                'is_final' => true,
+                'start' => 0,
+                'duration' => 0.74,
+                ...$shape,
+            ], 'internal-provider-session', $index + 1, [
+                'verification_state' => 'verified', 'start_sample' => 0, 'end_sample' => 11840,
+            ]);
+
+            $receipt = $event->durableReceipt();
+            $this->assertSame(ProviderStreamingEventEnvelope::METADATA, $event->eventType);
+            $this->assertNull($event->content);
+            $this->assertNull($event->contentSha256);
+            $this->assertSame(ProviderStreamingEventEnvelope::METADATA, $receipt['normalized_event_type']);
+            $this->assertNull($receipt['normalized_final_metadata']);
+        }
+    }
+
     private function frame(): array
     {
         return [

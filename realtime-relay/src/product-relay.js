@@ -35,6 +35,17 @@ export class SentEvidenceGate {
   }
 }
 
+export function stageBridgeError(error, action) {
+  const failure = error instanceof Error ? error : new Error(safeFailureReason(error));
+  const normalizedAction = typeof action === 'string' && /^[a-z-]+$/.test(action)
+    ? action.replaceAll('-', '_')
+    : 'unknown';
+  Object.defineProperty(failure, 'failureStage', {
+    value: `bridge_${normalizedAction}`, configurable: true, enumerable: false, writable: false,
+  });
+  return failure;
+}
+
 function sleep(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
@@ -203,12 +214,16 @@ export async function createProductRelay(env = process.env) {
   let totalSamplesAdmitted = 0;
   const humanGate = new HumanGateController();
   const bridge = async (action, payload) => {
-    const response = await fetch(new URL(`/api/internal/realtime-relay/${action}`, upstream), {
-      method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json', 'x-companyos-relay-token': bridgeToken },
-      body: JSON.stringify(payload), signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) throw new Error(`bridge_${action}_rejected_${response.status}`);
-    return response.json();
+    try {
+      const response = await fetch(new URL(`/api/internal/realtime-relay/${action}`, upstream), {
+        method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json', 'x-companyos-relay-token': bridgeToken },
+        body: JSON.stringify(payload), signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) throw new Error(`bridge_${action}_rejected_${response.status}`);
+      return response.json();
+    } catch (error) {
+      throw stageBridgeError(error, action);
+    }
   };
 
   const server = https.createServer({ key: fs.readFileSync(tlsKeyPath), cert: fs.readFileSync(tlsCertPath) }, (request, response) => {
@@ -260,7 +275,9 @@ export async function createProductRelay(env = process.env) {
       if (closing) return;
       closing = true;
       const failureEvidence = buildSessionFailureEvidence({
-        error, failureStage, providerConnectionAttempted, providerAccepted: opened, samplesSent,
+        error,
+        failureStage: typeof error?.failureStage === 'string' ? error.failureStage : failureStage,
+        providerConnectionAttempted, providerAccepted: opened, samplesSent,
       });
       const reason = failureEvidence.reason;
       humanGate.markFailure();
