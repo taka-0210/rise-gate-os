@@ -14,6 +14,9 @@ import {
   assertSentBatchEvidence, sanitizeProviderEvent, SentEvidenceGate, stageBridgeError, stageRuntimeError,
   takeLedgerBatch, validateProductFrame,
 } from '../src/product-relay.js';
+import {
+  isEphemeralPartial, PartialEventCoalescer, PARTIAL_FORWARD_INTERVAL_MS,
+} from '../src/partial-event-coalescer.js';
 
 test('SDK is pinned and request projection fixes MIP and retry policy', () => {
   assert.equal(SDK_VERSION, '5.10.0');
@@ -287,6 +290,36 @@ test('P1-J piggyback send Evidence is complete and fail closed', () => {
   ]}, 2).map(item => item.send_ordinal), [1, 2]);
   assert.throws(() => assertSentBatchEvidence({sent: [{send_ordinal: 1, state: 'sent'}]}, 2), /evidence_incomplete/);
   assert.throws(() => assertSentBatchEvidence({sent: [{send_ordinal: 1, state: 'accepted'}]}, 1), /evidence_incomplete/);
+});
+test('P1-J ephemeral Partials are latest-value coalesced without touching Finals', () => {
+  const coalescer = new PartialEventCoalescer();
+  const partial = sequence => ({
+    type: 'Results', sequence, is_final: false,
+    channel: {alternatives: [{transcript: `partial-${sequence}`}]},
+  });
+  assert.equal(PARTIAL_FORWARD_INTERVAL_MS, 2000);
+  assert.equal(isEphemeralPartial(partial(1)), true);
+  assert.equal(isEphemeralPartial({...partial(2), is_final: true}), false);
+  assert.equal(coalescer.offer(partial(1), 1000).sequence, 1);
+  assert.equal(coalescer.offer(partial(2), 1250), null);
+  assert.equal(coalescer.offer(partial(3), 1500), null);
+  assert.equal(coalescer.nextDelay(1500), 1500);
+  assert.equal(coalescer.takeDue(2999), null);
+  assert.equal(coalescer.takeDue(3000).sequence, 3);
+  assert.equal(coalescer.hasPending, false);
+});
+test('P1-J pending Partial can be discarded before a Final or force-flushed at Normal End', () => {
+  const item = {type: 'Results', is_final: false, channel: {alternatives: [{transcript: 'latest'}]}};
+  const discarded = new PartialEventCoalescer();
+  discarded.offer({...item, sequence: 1}, 1000);
+  discarded.offer({...item, sequence: 2}, 1100);
+  discarded.discardPending();
+  assert.equal(discarded.takeDue(5000, true), null);
+
+  const flushed = new PartialEventCoalescer();
+  flushed.offer({...item, sequence: 1}, 1000);
+  flushed.offer({...item, sequence: 2}, 1100);
+  assert.equal(flushed.takeDue(1200, true).sequence, 2);
 });
 test('P1-J ledger batching preserves 100 ms frame identity with a bounded memory queue', () => {
   const queue = Array.from({length: LEDGER_BATCH_FRAMES * 2 + 3}, (_, index) => ({

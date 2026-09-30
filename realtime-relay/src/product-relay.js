@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { buildRequestProjection, createDeepgramSession, startDeepgramSession } from './deepgram-port.js';
 import { safeFailureReason } from './limited-verification.js';
+import {
+  isEphemeralPartial, PartialEventCoalescer, PARTIAL_FORWARD_INTERVAL_MS,
+} from './partial-event-coalescer.js';
 
 export const CONSERVATIVE_COST_USD_PER_MINUTE = 0.0097;
 export const FAILURE_EVIDENCE_CONTRACT = 'p1-j-failure-v2';
@@ -284,10 +287,64 @@ export async function createProductRelay(env = process.env) {
     let batchTimer = null;
     let batchFlushChain = Promise.resolve();
     let pendingSentBatch = null;
+    let partialTimer = null;
+    let partialEventsReceived = 0;
+    let partialEventsForwarded = 0;
+    let partialEventsCoalesced = 0;
+    const partialCoalescer = new PartialEventCoalescer(PARTIAL_FORWARD_INTERVAL_MS);
     const sentEvidenceGate = new SentEvidenceGate();
     const abortController = new AbortController();
     const providerClosed = deferred();
     const sendBrowser = message => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
+    const enqueueProviderEvent = item => {
+      partialEventsForwarded += item.isPartial ? 1 : 0;
+      eventChain = eventChain.then(async () => {
+        await item.framesSettled;
+        const result = await bridge('event', {
+          provider_session_id: providerSessionId,
+          receive_order: item.order,
+          event: item.safe,
+        });
+        if (result.type === 'partial') humanGate.markPartial(result.content);
+        if (['partial', 'durable_final', 'rejected'].includes(result.type)) sendBrowser(result);
+        appendEvidence(evidencePath, {
+          type: 'provider_event', event_type: result.type,
+          receive_order: item.order, durable: result.type === 'durable_final',
+        });
+      }).catch(fail);
+    };
+    const discardPendingPartial = () => {
+      if (partialTimer) clearTimeout(partialTimer);
+      partialTimer = null;
+      partialCoalescer.discardPending();
+    };
+    const schedulePendingPartial = () => {
+      if (partialTimer || !partialCoalescer.hasPending) return;
+      partialTimer = setTimeout(() => {
+        partialTimer = null;
+        if (closing || hardAborted) {
+          partialCoalescer.discardPending();
+          return;
+        }
+        const item = partialCoalescer.takeDue(Date.now());
+        if (item) enqueueProviderEvent(item);
+        schedulePendingPartial();
+      }, partialCoalescer.nextDelay(Date.now()));
+    };
+    const flushPendingPartial = () => {
+      if (partialTimer) clearTimeout(partialTimer);
+      partialTimer = null;
+      const item = partialCoalescer.takeDue(Date.now(), true);
+      if (item) enqueueProviderEvent(item);
+    };
+    const recordPartialFlow = () => appendEvidence(evidencePath, {
+      type: 'partial_flow',
+      received: partialEventsReceived,
+      forwarded: partialEventsForwarded,
+      coalesced: partialEventsCoalesced,
+      forward_interval_ms: PARTIAL_FORWARD_INTERVAL_MS,
+      raw_provider_payload_persisted: false,
+    });
     const fail = async error => {
       if (closing) return;
       closing = true;
@@ -306,6 +363,8 @@ export async function createProductRelay(env = process.env) {
       });
       const reason = failureEvidence.reason;
       humanGate.markFailure();
+      discardPendingPartial();
+      recordPartialFlow();
       appendEvidence(evidencePath, failureEvidence);
       abortController.abort();
       if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal: false, safe_reason_code: reason }).catch(() => {});
@@ -337,13 +396,19 @@ export async function createProductRelay(env = process.env) {
         // already sent to that Provider. It must not wait for future Browser
         // frames that happened to be queued when the event arrived.
         const framesSettled = sentEvidenceGate.snapshot();
-        eventChain = eventChain.then(async () => {
-          await framesSettled;
-          const result = await bridge('event', { provider_session_id: providerSessionId, receive_order: order, event: safe });
-          if (result.type === 'partial') humanGate.markPartial(result.content);
-          if (['partial', 'durable_final', 'rejected'].includes(result.type)) sendBrowser(result);
-          appendEvidence(evidencePath, { type: 'provider_event', event_type: result.type, receive_order: order, durable: result.type === 'durable_final' });
-        }).catch(fail);
+        const item = { safe, order, framesSettled, isPartial: isEphemeralPartial(safe) };
+        if (item.isPartial) {
+          partialEventsReceived += 1;
+          const ready = partialCoalescer.offer(item, Date.now());
+          if (ready) enqueueProviderEvent(ready);
+          else {
+            partialEventsCoalesced += 1;
+            schedulePendingPartial();
+          }
+        } else {
+          if (safe.type === 'Results' && safe.is_final === true) discardPendingPartial();
+          enqueueProviderEvent(item);
+        }
       });
       provider.on('error', error => providerClosed.reject(error));
       provider.on('close', event => providerClosed.resolve({ code: event?.code ?? null }));
@@ -474,6 +539,7 @@ export async function createProductRelay(env = process.env) {
           await flushFrames(true);
           await settlePendingSentBatch();
           await sentEvidenceGate.snapshot();
+          flushPendingPartial();
           provider.sendFinalize({ type: 'Finalize' });
           await sleep(1500);
           await eventChain;
@@ -486,6 +552,7 @@ export async function createProductRelay(env = process.env) {
           });
           await eventChain;
         } else {
+          discardPendingPartial();
           hardAborted = true;
           if (batchTimer) clearTimeout(batchTimer);
           frameQueue = [];
@@ -495,6 +562,7 @@ export async function createProductRelay(env = process.env) {
         }
         if (providerSessionId) await bridge('close', { provider_session_id: providerSessionId, normal, safe_reason_code: normal ? 'normal_stop' : 'hard_abort' });
         humanGate.markSessionEnded();
+        recordPartialFlow();
         appendEvidence(evidencePath, { type: 'session_close', normal, samples_sent: samplesSent, duration_seconds: samplesSent / SAMPLE_RATE });
         sendBrowser({ type: 'provider_state', state: 'closed' });
         sendBrowser({ type: 'relay_stopped', normal });

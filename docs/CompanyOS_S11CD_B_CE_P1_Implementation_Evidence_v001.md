@@ -434,3 +434,20 @@ Detailed package:
 
 - `docs/CompanyOS_S11CD_B_CE_P1_J_Backpressure_Corrective_v001.md`
 - `docs/evidence/CompanyOS_CE_P1_J_Backpressure_Corrective_v001.json`
+
+## 22 | P1-J backpressure / throughput stress verification
+
+The conditionally required Provider-free Stress Verification initially rejected the uncoalesced event flow: a ten-second 100 ms input required 15.337 seconds of post-capture drain when all 250 ms Partial events used separate 510 ms serial Laravel requests.
+
+The Provider-free Corrective forwards the first non-empty Partial immediately and latest-value coalesces later ephemeral Partials to a two-second interval. Provider Final, Metadata, Close, rejected events, and Durable lineage are never coalesced. Pending Partial data remains memory-only, and the queue limit remains 30.
+
+The final drift-corrected realtime Stress ran for 120.012 seconds at a 100.004 ms mean cadence, admitted 1,200 realtime frames plus a bounded 20-frame burst, and completed drain/burst in 3.135 seconds. Maximum queue depth was 20/30. All 1,220 Source Ranges, Provider Send Ranges, send ordinals, and SHA-256 checks were continuous. Partial watermarks progressed monotonically, and the fail-closed boundary remained exactly frame 31. Provider communication/audio send and Credential load were `0 / 0 / 0`.
+
+Regression is Relay Node `22 PASS`, CE-P1 focused `11 PASS / 1 gated live SKIP / 155 assertions`, and P1-J loopback proxy `1 PASS / 3 assertions`. The prior full Laravel Evidence at `7b83489` remains applicable because no Laravel code changed in this Stress delta.
+
+Stress disposition is `PASS / READY FOR THE APPROVED SINGLE HUMAN START`. The next single Session must confirm Waveform -> visible Partial -> Final -> Durable Final -> Normal End. First E2E Human PASS, if established, is not Stable PASS and must be followed by a Repeatability Verification Plan rather than Formal Close.
+
+Detailed package:
+
+- `docs/CompanyOS_S11CD_B_CE_P1_J_Backpressure_Stress_Verification_v001.md`
+- `docs/evidence/CompanyOS_CE_P1_J_Backpressure_Stress_Verification_v001.json`
