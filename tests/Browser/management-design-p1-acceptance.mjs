@@ -68,11 +68,14 @@ try {
     ]);
     assert(await page.locator('.mdc-read--philosophy').isVisible(), 'ROOT composition is missing.');
     assert(await page.locator('.mdc-hero--long').isVisible(), 'Long statement presentation was not selected.');
+    assert(await page.locator('.mdc-hero__statement').evaluate(element => parseInt(getComputedStyle(element).fontWeight, 10) >= 700), 'Philosophy statement is not visually strong enough.');
+    assert(await page.locator('.mdc-section__body').first().evaluate(element => parseFloat(getComputedStyle(element).fontSize) >= 20), 'Section body remains too small on desktop.');
     assert(await page.locator('.mdc-hero__statement').evaluate(element => parseFloat(getComputedStyle(element).fontSize) <= 26), 'Long statement remains oversized on desktop.');
     assert(await page.locator('.mdc-hero__statement').evaluate(element => parseFloat(getComputedStyle(element).lineHeight) >= 45), 'Long statement line height is not readable.');
     await page.screenshot({ path: desktopShot, fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     assert(await page.locator('.mdc-hero__statement').evaluate(element => parseFloat(getComputedStyle(element).fontSize) <= 18), 'Long statement remains oversized at 390px.');
+    assert(await page.locator('.mdc-section__body').first().evaluate(element => parseFloat(getComputedStyle(element).fontSize) >= 18), 'Section body remains too small at 390px.');
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'Long statement overflows at 390px.');
     await page.setViewportSize({ width: 1440, height: 1000 });
 

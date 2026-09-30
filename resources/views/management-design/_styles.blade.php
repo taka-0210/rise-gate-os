@@ -29,10 +29,10 @@
     .mdc-sections { width:min(1040px, calc(100% - 40px)); margin:0 auto; padding:64px 0 100px; }
     .mdc-section { overflow-wrap:anywhere; }
     .mdc-section h2 { font-size:clamp(25px, 3.4vw, 42px); line-height:1.35; }
-    .mdc-section__body { white-space:pre-wrap; color:#334b55; font-size:17px; line-height:2.05; }
+    .mdc-section__body { white-space:pre-wrap; color:#334b55; font-size:clamp(18px, 1.55vw, 21px); line-height:1.9; }
     .mdc-section__horizon { color:#51717a; font-size:13px; letter-spacing:.08em; }
     .mdc-read--philosophy .mdc-hero { min-height:68vh; display:grid; align-content:center; text-align:center; background:#f4f0e8; }
-    .mdc-read--philosophy .mdc-hero__statement { margin-inline:auto; }
+    .mdc-read--philosophy .mdc-hero__statement { margin-inline:auto; font-weight:700; }
     .mdc-read--philosophy .mdc-sections { width:min(760px, calc(100% - 40px)); }
     .mdc-read--philosophy .mdc-section { position:relative; padding:54px 0 54px 48px; border-left:1px solid #b9afa1; }
     .mdc-read--philosophy .mdc-section::before { content:''; position:absolute; left:-4px; top:66px; width:7px; height:7px; border-radius:50%; background:#6e6254; }
