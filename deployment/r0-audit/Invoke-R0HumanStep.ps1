@@ -16,9 +16,12 @@ $script:R0BundleSha256 = 'a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18a
 $script:R0SshAlias = 'company-os-production'
 $script:R0IdentityFile = 'codex-company-os-production'
 $script:R0ProtocolVersion = 1
+$script:R0ExecutionGeneration = 'corrective-1'
 $script:R0CurrentStep = $Step
 $script:R0State = $null
 $script:R0StatePath = $null
+$script:R0FailureStage = 'BOOTSTRAP'
+$script:R0ProductionConnectionAttempted = $false
 
 function Write-R0Stop {
     param([Parameter(Mandatory = $true)][string] $SafeErrorCode)
@@ -26,6 +29,8 @@ function Write-R0Stop {
     Write-Output "R0_STEP_$script:R0CurrentStep=STOP"
     Write-Output "safe_error_code=$SafeErrorCode"
     Write-Output 'retry_performed=false'
+    Write-Output ('failure_stage=' + $script:R0FailureStage)
+    Write-Output ('production_connection_attempted=' + $script:R0ProductionConnectionAttempted.ToString().ToLowerInvariant())
     Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'
 }
 
@@ -59,6 +64,43 @@ function Get-RepositoryRoot {
 
 function Get-HelperSha256 {
     return (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Write-SanitizedFailureReceipt {
+    param(
+        [Parameter(Mandatory = $true)][string] $RepositoryRoot,
+        [Parameter(Mandatory = $true)][string] $SafeErrorCode,
+        [Parameter(Mandatory = $true)][string] $ExceptionType,
+        [AllowEmptyString()][string] $ExceptionMessage
+    )
+
+    $safeExceptionType = if ($ExceptionType -match '^[A-Za-z0-9_.]+$') {
+        $ExceptionType
+    }
+    else {
+        'UnknownExceptionType'
+    }
+    $receiptPath = Join-Path $RepositoryRoot (
+        'storage\app\release-audit\r0-human-helper-failure-' + $script:R0Candidate + '.json'
+    )
+    $receipt = [pscustomobject]@{
+        schema_version = 1
+        candidate = $script:R0Candidate
+        execution_generation = $script:R0ExecutionGeneration
+        step = $script:R0CurrentStep
+        status = 'STOP'
+        safe_error_code = $SafeErrorCode
+        failure_stage = $script:R0FailureStage
+        exception_type = $safeExceptionType
+        exception_message_sha256 = Get-Sha256Text $ExceptionMessage
+        production_connection_attempted = $script:R0ProductionConnectionAttempted
+        raw_exception_stored = $false
+        recorded_at_jst = Get-JstTimestamp
+    }
+    $json = $receipt | ConvertTo-Json -Depth 4
+    $temporaryPath = $receiptPath + '.tmp'
+    [IO.File]::WriteAllText($temporaryPath, $json + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $temporaryPath -Destination $receiptPath -Force
 }
 
 function Save-R0State {
@@ -538,7 +580,9 @@ function Assert-HelperContract {
 }
 
 try {
+    $script:R0FailureStage = 'REPOSITORY_ROOT'
     $repositoryRoot = Get-RepositoryRoot
+    $script:R0FailureStage = 'HELPER_INTEGRITY'
     $helperSha256 = Get-HelperSha256
     Assert-HelperContract -RepositoryRoot $repositoryRoot
 
@@ -556,13 +600,20 @@ try {
         exit 0
     }
 
+    $script:R0FailureStage = 'LOCAL_PRECONDITIONS'
     $preconditions = Get-LocalPreconditions -RepositoryRoot $repositoryRoot
     $executionRoot = Join-Path $repositoryRoot "storage\app\release-audit\production-r0-human-$script:R0Candidate"
+    $executionRoot = Join-Path $repositoryRoot (
+        'storage\app\release-audit\production-r0-human-' + $script:R0Candidate + '-' + $script:R0ExecutionGeneration
+    )
     $statePath = Join-Path $executionRoot 'execution-state.json'
+    $script:R0FailureStage = 'ATTEMPT_STATE'
     Start-R0Attempt -ExecutionRoot $executionRoot -StatePath $statePath -HelperSha256 $helperSha256
 
     switch ($Step) {
         2 {
+            $script:R0FailureStage = 'STEP_2_REMOTE_PREPARATION'
+            $script:R0ProductionConnectionAttempted = $true
             $result = Invoke-RemoteScript -SshPath $preconditions.SshPath -Script (Get-Step2Script)
             if ($result.ExitCode -ne 0) {
                 Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_2_REMOTE_PREPARATION_FAILED' -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
@@ -577,12 +628,15 @@ try {
             Write-Output 'production_change_scope=isolated_audit_directories_only'
         }
         3 {
+            $script:R0FailureStage = 'STEP_3_REMOTE_PRECHECK'
+            $script:R0ProductionConnectionAttempted = $true
             $precheck = Invoke-RemoteScript -SshPath $preconditions.SshPath -Script (Get-Step3PrecheckScript)
             if ($precheck.ExitCode -ne 0) {
                 Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_3_REMOTE_PRECONDITION_FAILED' -RemoteExitCode $precheck.ExitCode -Stderr $precheck.Stderr
                 Stop-R0 'STEP_3_REMOTE_PRECONDITION_FAILED'
             }
             Assert-FixedSuccessOutput -Actual $precheck.Stdout -ExpectedLines @('R0_STEP_3_PRECHECK=PASS')
+            $script:R0FailureStage = 'STEP_3_BUNDLE_UPLOAD'
             $remoteDestination = "$script:R0SshAlias`:.ir1-r0-audit/$script:R0Candidate/$($preconditions.BundleName)"
             $scpArguments = @(Get-CommonSshArguments) + @($preconditions.BundlePath, $remoteDestination)
             $upload = Invoke-CapturedProcess -FilePath $preconditions.ScpPath -Arguments $scpArguments -StandardInput $null
@@ -595,6 +649,8 @@ try {
             Write-Output 'production_change_scope=single_audit_archive_upload_only'
         }
         4 {
+            $script:R0FailureStage = 'STEP_4_VERIFY_AND_EXTRACT'
+            $script:R0ProductionConnectionAttempted = $true
             $result = Invoke-RemoteScript -SshPath $preconditions.SshPath -Script (Get-Step4Script)
             if ($result.ExitCode -ne 0) {
                 Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_4_VERIFY_OR_EXTRACT_FAILED' -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
@@ -610,6 +666,8 @@ try {
             Write-Output 'production_change_scope=isolated_bundle_extraction_only'
         }
         5 {
+            $script:R0FailureStage = 'STEP_5_APPLICATION_DB_AUDIT'
+            $script:R0ProductionConnectionAttempted = $true
             $result = Invoke-RemoteScript -SshPath $preconditions.SshPath -Script (Get-Step5Script)
             if (-not (Test-SafeJsonEvidence -Value $result.Stdout)) {
                 Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_5_EVIDENCE_OUTPUT_REJECTED' -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
@@ -626,6 +684,8 @@ try {
             Write-Output 'production_change_scope=none_read_only_application_db_audit'
         }
         6 {
+            $script:R0FailureStage = 'STEP_6_HOST_AUDIT'
+            $script:R0ProductionConnectionAttempted = $true
             $result = Invoke-RemoteScript -SshPath $preconditions.SshPath -Script (Get-Step6Script)
             if (-not (Test-SafeJsonEvidence -Value $result.Stdout)) {
                 Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_6_EVIDENCE_OUTPUT_REJECTED' -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
@@ -649,8 +709,9 @@ try {
     exit 0
 }
 catch {
-    $safeErrorCode = if ($_.Exception.Message -match '^[A-Z0-9_]+$') {
-        $_.Exception.Message
+    $caughtException = $_.Exception
+    $safeErrorCode = if ($caughtException.Message -match '^[A-Z0-9_]+$') {
+        $caughtException.Message
     }
     else {
         'UNEXPECTED_LOCAL_FAILURE'
@@ -663,6 +724,20 @@ catch {
         }
         catch {
             $safeErrorCode = 'LOCAL_STATE_FINALIZATION_FAILED'
+        }
+    }
+
+    if (-not $VerifyOnly) {
+        try {
+            $receiptRepositoryRoot = Get-RepositoryRoot
+            Write-SanitizedFailureReceipt `
+                -RepositoryRoot $receiptRepositoryRoot `
+                -SafeErrorCode $safeErrorCode `
+                -ExceptionType $caughtException.GetType().FullName `
+                -ExceptionMessage $caughtException.Message
+        }
+        catch {
+            $safeErrorCode = 'FAILURE_RECEIPT_WRITE_FAILED'
         }
     }
 

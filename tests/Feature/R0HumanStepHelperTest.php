@@ -27,6 +27,11 @@ class R0HumanStepHelperTest extends TestCase
             'ClearAllForwardings=yes',
             'STEP_RETRY_FORBIDDEN',
             'PREVIOUS_STEP_NOT_PASS',
+            'corrective-1',
+            'Write-SanitizedFailureReceipt',
+            'failure_stage',
+            'production_connection_attempted',
+            'raw_exception_stored',
             'secret_output=false',
             'next_action=RETURN_TO_HUMAN_CHATGPT',
         ] as $required) {
