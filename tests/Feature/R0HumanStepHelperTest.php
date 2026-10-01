@@ -53,6 +53,15 @@ class R0HumanStepHelperTest extends TestCase
             'step_3_eligible=true',
             'step_3_executed=false',
             'step_3_eligibility_contract_verified=true',
+            'Assert-Step3AdoptedCandidateContract',
+            'STEP_3_ADOPTED_CANDIDATE_CONTRACT_MISMATCH',
+            '.step3-placement',
+            'STEP_3_PLACEMENT_PREPARE_FAILED',
+            'STEP_3_PLACEMENT_FINALIZE_FAILED',
+            'bundle_sha256_verified=true',
+            'overwrite_performed=false',
+            'production_change_scope=single_audit_archive_placement_only',
+            'step_3_placement_guard_verified=true',
             'raw_exception_stored',
             'secret_output=false',
             'next_action=RETURN_TO_HUMAN_CHATGPT',
@@ -74,5 +83,6 @@ class R0HumanStepHelperTest extends TestCase
         $this->assertStringNotContainsString('rm -rf', $source);
         $this->assertStringNotContainsString('migrate --force', $source);
         $this->assertStringNotContainsString('git push', $source);
+        $this->assertStringNotContainsString('ln -f', $source);
     }
 }

@@ -178,6 +178,34 @@ function Assert-StepEligibility {
     }
 }
 
+function Assert-Step3AdoptedCandidateContract {
+    param([Parameter(Mandatory = $true)] $State)
+
+    $attempts = @($State.attempts)
+    if ($State.PSObject.Properties.Name -contains 'evidence_reconciliations') {
+        $reconciliations = @($State.evidence_reconciliations)
+    }
+    else {
+        $reconciliations = @()
+    }
+    if ($attempts.Count -ne 1 -or
+        $attempts[0].step -ne 2 -or
+        $attempts[0].status -ne 'STOP' -or
+        $attempts[0].safe_error_code -ne 'STEP_2_REMOTE_PREPARATION_FAILED' -or
+        $reconciliations.Count -ne 1 -or
+        $reconciliations[0].record_type -ne 'EVIDENCE_RECONCILIATION' -or
+        $reconciliations[0].disposition -ne 'ADOPTED_EXISTING_EMPTY_DIRECTORIES' -or
+        $reconciliations[0].status -ne 'PASS' -or
+        $reconciliations[0].attempt_performed -ne $false -or
+        $reconciliations[0].production_connection_attempted -ne $false -or
+        $reconciliations[0].production_mutation -ne $false -or
+        $reconciliations[0].step_2_retry -ne $false -or
+        $reconciliations[0].cleanup_performed -ne $false -or
+        $reconciliations[0].directory_recreated -ne $false) {
+        Stop-R0 'STEP_3_ADOPTED_CANDIDATE_CONTRACT_MISMATCH'
+    }
+}
+
 function Start-R0Attempt {
     param(
         [Parameter(Mandatory = $true)][string] $ExecutionRoot,
@@ -208,6 +236,9 @@ function Start-R0Attempt {
     }
 
     Assert-StepEligibility -State $script:R0State -RequestedStep $Step
+    if ($Step -eq 3) {
+        Assert-Step3AdoptedCandidateContract -State $script:R0State
+    }
 
     $attempt = [pscustomobject]@{
         step = $Step
@@ -454,11 +485,27 @@ function Invoke-HelperSelfTest {
     }
 
     $reconciledState = [pscustomobject]@{
-        attempts = @([pscustomobject]@{ step = 2; status = 'STOP' })
+        attempts = @([pscustomobject]@{
+            step = 2
+            status = 'STOP'
+            safe_error_code = 'STEP_2_REMOTE_PREPARATION_FAILED'
+        })
         last_step = 2
         last_status = 'PASS'
+        evidence_reconciliations = @([pscustomobject]@{
+            record_type = 'EVIDENCE_RECONCILIATION'
+            disposition = 'ADOPTED_EXISTING_EMPTY_DIRECTORIES'
+            status = 'PASS'
+            attempt_performed = $false
+            production_connection_attempted = $false
+            production_mutation = $false
+            step_2_retry = $false
+            cleanup_performed = $false
+            directory_recreated = $false
+        })
     }
     Assert-StepEligibility -State $reconciledState -RequestedStep 3
+    Assert-Step3AdoptedCandidateContract -State $reconciledState
 
     $safeEvidence = @{ status = 'PASS' } | ConvertTo-Json -Compress
     $secretEvidence = @{ DB_PASSWORD = 'secret-output-canary' } | ConvertTo-Json -Compress
@@ -531,6 +578,46 @@ function Invoke-HelperSelfTest {
             Stop-R0 'SELF_TEST_STEP_2_CONTENT_INSPECTION_MUTATION_PRESENT'
         }
     }
+
+    $step3PrepareScript = Get-Step3PrecheckScript
+    foreach ($required in @(
+        '.step3-placement',
+        'test $(find ${AUDIT_DIR} -mindepth 1 -maxdepth 1 -print | wc -l) -eq 0',
+        'mkdir ${STAGE_DIR}',
+        'overwrite_performed=false'
+    )) {
+        if (-not $step3PrepareScript.Contains($required)) {
+            Stop-R0 'SELF_TEST_STEP_3_PREPARE_INCOMPLETE'
+        }
+    }
+    $step3PrepareLines = @($step3PrepareScript.Split([char] 10) | ForEach-Object { $_.Trim() })
+    if (@($step3PrepareLines | Where-Object { $_.StartsWith('mkdir ') }).Count -ne 1) {
+        Stop-R0 'SELF_TEST_STEP_3_PREPARE_SCOPE_EXPANDED'
+    }
+    foreach ($prefix in @('rm ', 'chmod ', 'chown ', 'ln ', 'mv ', 'cp ', 'touch ', 'tar ')) {
+        if ($step3PrepareLines | Where-Object { $_.StartsWith($prefix) }) {
+            Stop-R0 'SELF_TEST_STEP_3_PREPARE_SCOPE_EXPANDED'
+        }
+    }
+
+    $step3FinalizeScript = Get-Step3FinalizeScript
+    foreach ($required in @(
+        $script:R0BundleSha256,
+        'sha256sum --check --strict',
+        'test ! -e ${FINAL_BUNDLE}',
+        'ln ${STAGED_BUNDLE} ${FINAL_BUNDLE}',
+        'bundle_sha256_verified=true',
+        'overwrite_performed=false'
+    )) {
+        if (-not $step3FinalizeScript.Contains($required)) {
+            Stop-R0 'SELF_TEST_STEP_3_FINALIZE_INCOMPLETE'
+        }
+    }
+    $step3FinalizeLines = @($step3FinalizeScript.Split([char] 10) | ForEach-Object { $_.Trim() })
+    if (@($step3FinalizeLines | Where-Object { $_.StartsWith('ln ') }).Count -ne 1 -or
+        @($step3FinalizeLines | Where-Object { $_.StartsWith('ln -') }).Count -gt 0) {
+        Stop-R0 'SELF_TEST_STEP_3_OVERWRITE_GUARD_FAILED'
+    }
 }
 
 function Get-Step2Script {
@@ -568,7 +655,50 @@ test -d "$AUDIT_DIR"
 test ! -L "$AUDIT_DIR"
 test ! -e "$AUDIT_DIR/ir1-r0-audit-bundle-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz"
 test ! -e "$AUDIT_DIR/bundle"
-printf 'R0_STEP_3_PRECHECK=PASS\n'
+STAGE_DIR=${AUDIT_DIR}/.step3-placement
+test $(find ${AUDIT_DIR} -mindepth 1 -maxdepth 1 -print | wc -l) -eq 0
+test ! -e ${STAGE_DIR}
+umask 077
+mkdir ${STAGE_DIR}
+test -d ${STAGE_DIR}
+test ! -L ${STAGE_DIR}
+printf 'R0_STEP_3_PREPARE=PASS\n'
+printf 'overwrite_performed=false\n'
+'@
+}
+
+function Get-Step3FinalizeScript {
+    return @'
+set -eu
+ACTUAL_HOME=$(cd ${HOME} && pwd -P)
+case ${ACTUAL_HOME} in /home/[A-Za-z0-9._-]*) ;; *) exit 41 ;; esac
+AUDIT_DIR=${ACTUAL_HOME}/.ir1-r0-audit/924af91188cc60d33ff87c91b94ecc1d539566e6
+BUNDLE_NAME=ir1-r0-audit-bundle-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz
+EXPECTED_HASH=a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d
+STAGE_DIR=${AUDIT_DIR}/.step3-placement
+STAGED_BUNDLE=${STAGE_DIR}/${BUNDLE_NAME}
+FINAL_BUNDLE=${AUDIT_DIR}/${BUNDLE_NAME}
+test -d ${AUDIT_DIR}
+test ! -L ${AUDIT_DIR}
+test -d ${STAGE_DIR}
+test ! -L ${STAGE_DIR}
+test $(find ${STAGE_DIR} -mindepth 1 -maxdepth 1 -print | wc -l) -eq 1
+test -f ${STAGED_BUNDLE}
+test ! -L ${STAGED_BUNDLE}
+printf '%s  %s\n' ${EXPECTED_HASH} ${STAGED_BUNDLE} | sha256sum --check --strict - >/dev/null
+test ! -e ${FINAL_BUNDLE}
+test ! -e ${AUDIT_DIR}/bundle
+ln ${STAGED_BUNDLE} ${FINAL_BUNDLE}
+test -f ${FINAL_BUNDLE}
+test ! -L ${FINAL_BUNDLE}
+printf '%s  %s\n' ${EXPECTED_HASH} ${FINAL_BUNDLE} | sha256sum --check --strict - >/dev/null
+rm ${STAGED_BUNDLE}
+rmdir ${STAGE_DIR}
+test ! -e ${STAGE_DIR}
+test $(find ${AUDIT_DIR} -mindepth 1 -maxdepth 1 -print | wc -l) -eq 1
+printf 'R0_STEP_3_FINALIZE=PASS\n'
+printf 'bundle_sha256_verified=true\n'
+printf 'overwrite_performed=false\n'
 '@
 }
 
@@ -813,6 +943,7 @@ try {
         Write-Output 'production_scope_guard_verified=true'
         Write-Output 'native_stderr_capture_verified=true'
         Write-Output 'step_3_eligibility_contract_verified=true'
+        Write-Output 'step_3_placement_guard_verified=true'
         Write-Output "candidate=$script:R0Candidate"
         Write-Output "helper_sha256=$helperSha256"
         Write-Output 'network_connection_attempted=false'
@@ -1252,25 +1383,41 @@ try {
             Write-Output 'production_change_scope=isolated_audit_directories_only'
         }
         3 {
-            $script:R0FailureStage = 'STEP_3_REMOTE_PRECHECK'
+            $script:R0FailureStage = 'STEP_3_PLACEMENT_PREPARE'
             $script:R0ProductionConnectionAttempted = $true
             $precheck = Invoke-RemoteScript -SshPath $preconditions.SshPath -Script (Get-Step3PrecheckScript)
             if ($precheck.ExitCode -ne 0) {
-                Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_3_REMOTE_PRECONDITION_FAILED' -RemoteExitCode $precheck.ExitCode -Stderr $precheck.Stderr
-                Stop-R0 'STEP_3_REMOTE_PRECONDITION_FAILED'
+                Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_3_PLACEMENT_PREPARE_FAILED' -RemoteExitCode $precheck.ExitCode -Stderr $precheck.Stderr
+                Stop-R0 'STEP_3_PLACEMENT_PREPARE_FAILED'
             }
-            Assert-FixedSuccessOutput -Actual $precheck.Stdout -ExpectedLines @('R0_STEP_3_PRECHECK=PASS')
+            Assert-FixedSuccessOutput -Actual $precheck.Stdout -ExpectedLines @(
+                'R0_STEP_3_PREPARE=PASS',
+                'overwrite_performed=false'
+            )
             $script:R0FailureStage = 'STEP_3_BUNDLE_UPLOAD'
-            $remoteDestination = "$script:R0SshAlias`:.ir1-r0-audit/$script:R0Candidate/$($preconditions.BundleName)"
+            $remoteDestination = "$script:R0SshAlias`:.ir1-r0-audit/$script:R0Candidate/.step3-placement/$($preconditions.BundleName)"
             $scpArguments = @(Get-CommonSshArguments) + @($preconditions.BundlePath, $remoteDestination)
             $upload = Invoke-CapturedProcess -FilePath $preconditions.ScpPath -Arguments $scpArguments -StandardInput $null
             if ($upload.ExitCode -ne 0) {
                 Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_3_BUNDLE_UPLOAD_FAILED' -RemoteExitCode $upload.ExitCode -Stderr $upload.Stderr
                 Stop-R0 'STEP_3_BUNDLE_UPLOAD_FAILED'
             }
-            Complete-R0Attempt -Status PASS -RemoteExitCode $upload.ExitCode -Stderr $upload.Stderr
+            $script:R0FailureStage = 'STEP_3_PLACEMENT_FINALIZE'
+            $finalize = Invoke-RemoteScript -SshPath $preconditions.SshPath -Script (Get-Step3FinalizeScript)
+            if ($finalize.ExitCode -ne 0) {
+                Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_3_PLACEMENT_FINALIZE_FAILED' -RemoteExitCode $finalize.ExitCode -Stderr $finalize.Stderr
+                Stop-R0 'STEP_3_PLACEMENT_FINALIZE_FAILED'
+            }
+            Assert-FixedSuccessOutput -Actual $finalize.Stdout -ExpectedLines @(
+                'R0_STEP_3_FINALIZE=PASS',
+                'bundle_sha256_verified=true',
+                'overwrite_performed=false'
+            )
+            Complete-R0Attempt -Status PASS -RemoteExitCode $finalize.ExitCode -Stderr $finalize.Stderr
             Write-Output 'R0_STEP_3=PASS'
-            Write-Output 'production_change_scope=single_audit_archive_upload_only'
+            Write-Output 'bundle_sha256_verified=true'
+            Write-Output 'overwrite_performed=false'
+            Write-Output 'production_change_scope=single_audit_archive_placement_only'
         }
         4 {
             $script:R0FailureStage = 'STEP_4_VERIFY_AND_EXTRACT'

@@ -16,6 +16,18 @@ The bundle contains an exact `git archive` of the candidate plus the allowlisted
 - Host audit: standalone PHP; does not bootstrap Laravel or connect to the DB. An explicit `legacy-fixed-root` or `immutable-release` profile observes only that topology, PHP extensions, process counts, user cron availability and bounded backup metadata.
 - Restore readiness and external writers remain `UNSUPPORTED` and must never be inferred as PASS.
 
+## Human execution gate
+
+- Step 2 is reconciled by additive Evidence as ADOPTED_EXISTING_EMPTY_DIRECTORIES.
+- Step 3 is separately authorized only for placement of the exact audit archive.
+- The Human runs one command through Invoke-R0HumanStep.ps1 -Step 3.
+- The helper rechecks the exact candidate, local archive SHA-256, reconciled Step 2 state and empty candidate boundary before connection.
+- Remote preparation atomically creates a private .step3-placement directory only after confirming the candidate directory remains empty.
+- SCP targets only that private staging directory.
+- Finalization verifies the staged archive SHA-256, uses a non-forcing hard link to fail closed if the final name exists, verifies the final archive again, and removes only its own staging file and directory.
+- Step 3 never extracts the archive, loads .env, connects to the DB, runs an audit or deploys the application.
+- PASS or STOP is terminal for this authorization. Retry requires a new Human + ChatGPT decision.
+
 ## Future Human operation — not currently authorized
 
 1. Verify the archive SHA-256 against the approved Decision Package.
