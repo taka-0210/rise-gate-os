@@ -23,6 +23,9 @@ $script:R0BundleId = '5ba3c0fd459cabe885249d85dd13ffafbe087693435a5e24a483f5ad4a
 $script:R0BundleSha256 = 'a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d'
 $script:R0Step3PlacementHelperSha256 = 'c979f7d3b90fc224ccab34644c35e5f1319154da291dcdd506e39c8101352330'
 $script:R0Step4ExtractionHelperSha256 = '026a5eb062378b5a46ad50c299047119d4a636b89d02acf3a699437b0c447a58'
+$script:R0Step5ApplicationDbHelperSha256 = '7daaaecab427e69828a68bd5fa162ea6f7516b19f7152fee60dd5e70f7db2336'
+$script:R0Step5EvidenceSha256 = '4cb2f91d7d12e1083e8edaee41a3a408d0b2577d46fa1c69ad7a978a83c84be9'
+$script:R0ManifestSha256 = 'a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7'
 $script:R0SshAlias = 'company-os-production'
 $script:R0IdentityFile = 'codex-company-os-production'
 $script:R0ProtocolVersion = 1
@@ -251,6 +254,41 @@ function Assert-Step5ExtractedBundleContract {
     }
 }
 
+function Assert-Step6ApplicationDbStateContract {
+    param([Parameter(Mandatory = $true)] $State)
+
+    Assert-Step5ExtractedBundleContract -State $State
+    $step5Attempts = @($State.attempts | Where-Object { [int] $_.step -eq 5 })
+    if ($step5Attempts.Count -ne 1 -or
+        $step5Attempts[0].status -ne 'PASS' -or
+        $step5Attempts[0].helper_sha256 -ne $script:R0Step5ApplicationDbHelperSha256 -or
+        $step5Attempts[0].remote_exit_code -ne 0 -or
+        $step5Attempts[0].stderr_bytes -ne 0 -or
+        $null -ne $step5Attempts[0].safe_error_code) {
+        Stop-R0 'STEP_6_APPLICATION_DB_CONTRACT_MISMATCH'
+    }
+}
+
+function Assert-Step6ApplicationDbContract {
+    param(
+        [Parameter(Mandatory = $true)] $State,
+        [Parameter(Mandatory = $true)][string] $ExecutionRoot
+    )
+
+    Assert-Step6ApplicationDbStateContract -State $State
+
+    $evidencePath = Join-Path $ExecutionRoot 'application-db.stdout.json'
+    if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $script:R0Step5EvidenceSha256) {
+        Stop-R0 'STEP_6_APPLICATION_DB_EVIDENCE_MISMATCH'
+    }
+    $evidenceJson = Get-Content -Raw -LiteralPath $evidencePath
+    if (-not (Test-SafeJsonEvidence -Value $evidenceJson) -or
+        -not (Test-Step5PassEvidence -Value $evidenceJson)) {
+        Stop-R0 'STEP_6_APPLICATION_DB_EVIDENCE_REJECTED'
+    }
+}
+
 function Start-R0Attempt {
     param(
         [Parameter(Mandatory = $true)][string] $ExecutionRoot,
@@ -289,6 +327,9 @@ function Start-R0Attempt {
     }
     elseif ($Step -eq 5) {
         Assert-Step5ExtractedBundleContract -State $script:R0State
+    }
+    elseif ($Step -eq 6) {
+        Assert-Step6ApplicationDbContract -State $script:R0State -ExecutionRoot $ExecutionRoot
     }
 
     $attempt = [pscustomobject]@{
@@ -563,6 +604,58 @@ function Test-Step5PassEvidence {
     return $true
 }
 
+function Test-Step6PassEvidence {
+    param([Parameter(Mandatory = $true)][string] $Value)
+
+    try {
+        $evidence = $Value | ConvertFrom-Json
+    }
+    catch {
+        return $false
+    }
+
+    if ($evidence.output_schema_version -ne 2 -or
+        $evidence.status -ne 'PASS' -or
+        $evidence.audit_mode -ne 'read-only' -or
+        $evidence.evidence_completeness -ne 'complete_for_supported_capabilities' -or
+        $null -ne $evidence.failure -or
+        $evidence.evidence.bundle.source_commit -ne $script:R0Candidate -or
+        $evidence.evidence.bundle.bundle_id -ne $script:R0BundleId -or
+        $evidence.evidence.bundle.bundle_manifest_sha256 -ne $script:R0ManifestSha256 -or
+        $evidence.evidence.topology.profile -ne 'legacy-fixed-root' -or
+        $evidence.evidence.topology.legacy_marker_scope_binding -ne 'UNKNOWN' -or
+        $evidence.evidence.topology.public_backup_exposure -ne 'UNKNOWN' -or
+        $evidence.evidence.external_writers.status -ne 'UNKNOWN') {
+        return $false
+    }
+
+    if ([string] $evidence.evidence.php_cli.version -notmatch '^8\.[23]\.' -or
+        @($evidence.evidence.php_cli.extensions).Count -eq 0) {
+        return $false
+    }
+    if ([string] $evidence.evidence.release_marker.status -notin @('SUPPORTED', 'UNKNOWN')) {
+        return $false
+    }
+    if ($evidence.evidence.capabilities.release_marker -ne 'SUPPORTED_IF_PRESENT' -or
+        $evidence.evidence.capabilities.filesystem_topology -ne 'SUPPORTED' -or
+        $evidence.evidence.capabilities.legacy_fixed_root_topology -ne 'SUPPORTED' -or
+        $evidence.evidence.capabilities.php_cli_extensions -ne 'SUPPORTED' -or
+        $evidence.evidence.capabilities.disk_and_permissions -ne 'SUPPORTED' -or
+        [string] $evidence.evidence.capabilities.queue_worker_process_snapshot -notin @('SUPPORTED', 'UNKNOWN') -or
+        [string] $evidence.evidence.capabilities.user_cron_snapshot -notin @('SUPPORTED_IF_AVAILABLE', 'UNSUPPORTED') -or
+        $evidence.evidence.capabilities.backup_inventory -ne 'SUPPORTED_IF_PATH_SUPPLIED' -or
+        $evidence.evidence.backup.restore_readiness -ne 'UNKNOWN' -or
+        $evidence.evidence.capabilities.immutable_current_links -ne 'UNSUPPORTED' -or
+        $evidence.evidence.capabilities.application_production_url_migration -ne 'OUT_OF_SCOPE' -or
+        $evidence.evidence.capabilities.restore_readiness -ne 'UNSUPPORTED' -or
+        $evidence.evidence.capabilities.public_backup_exposure -ne 'UNSUPPORTED' -or
+        $evidence.evidence.capabilities.external_writers -ne 'UNSUPPORTED') {
+        return $false
+    }
+
+    return $true
+}
+
 function Invoke-HelperSelfTest {
     $retryState = [pscustomobject]@{
         attempts = @([pscustomobject]@{ step = 2 })
@@ -706,6 +799,77 @@ function Invoke-HelperSelfTest {
     $step5Evidence.evidence.sql_safety.total_statements = 49
     if (Test-Step5PassEvidence -Value ($step5Evidence | ConvertTo-Json -Depth 8 -Compress)) {
         Stop-R0 'SELF_TEST_STEP_5_SQL_LIMIT_NOT_ENFORCED'
+    }
+
+    $step5CompletedState = [pscustomobject]@{
+        attempts = @(
+            $extractedState.attempts[0],
+            $extractedState.attempts[1],
+            $extractedState.attempts[2],
+            [pscustomobject]@{
+                step = 5
+                status = 'PASS'
+                helper_sha256 = $script:R0Step5ApplicationDbHelperSha256
+                remote_exit_code = 0
+                stderr_bytes = 0
+                safe_error_code = $null
+            }
+        )
+        last_step = 5
+        last_status = 'PASS'
+        evidence_reconciliations = $extractedState.evidence_reconciliations
+    }
+    Assert-StepEligibility -State $step5CompletedState -RequestedStep 6
+    Assert-Step6ApplicationDbStateContract -State $step5CompletedState
+
+    $step6Evidence = [pscustomobject]@{
+        output_schema_version = 2
+        status = 'PASS'
+        audit_mode = 'read-only'
+        evidence_completeness = 'complete_for_supported_capabilities'
+        failure = $null
+        evidence = [pscustomobject]@{
+            bundle = [pscustomobject]@{
+                source_commit = $script:R0Candidate
+                bundle_id = $script:R0BundleId
+                bundle_manifest_sha256 = $script:R0ManifestSha256
+            }
+            php_cli = [pscustomobject]@{
+                version = '8.3.0'
+                extensions = @('json')
+            }
+            topology = [pscustomobject]@{
+                profile = 'legacy-fixed-root'
+                legacy_marker_scope_binding = 'UNKNOWN'
+                public_backup_exposure = 'UNKNOWN'
+            }
+            release_marker = [pscustomobject]@{ status = 'UNKNOWN' }
+            backup = [pscustomobject]@{ restore_readiness = 'UNKNOWN' }
+            external_writers = [pscustomobject]@{ status = 'UNKNOWN' }
+            capabilities = [pscustomobject]@{
+                release_marker = 'SUPPORTED_IF_PRESENT'
+                filesystem_topology = 'SUPPORTED'
+                legacy_fixed_root_topology = 'SUPPORTED'
+                immutable_current_links = 'UNSUPPORTED'
+                application_production_url_migration = 'OUT_OF_SCOPE'
+                php_cli_extensions = 'SUPPORTED'
+                disk_and_permissions = 'SUPPORTED'
+                queue_worker_process_snapshot = 'SUPPORTED'
+                user_cron_snapshot = 'SUPPORTED_IF_AVAILABLE'
+                backup_inventory = 'SUPPORTED_IF_PATH_SUPPLIED'
+                restore_readiness = 'UNSUPPORTED'
+                public_backup_exposure = 'UNSUPPORTED'
+                external_writers = 'UNSUPPORTED'
+            }
+        }
+    }
+    $step6EvidenceJson = $step6Evidence | ConvertTo-Json -Depth 8 -Compress
+    if (-not (Test-Step6PassEvidence -Value $step6EvidenceJson)) {
+        Stop-R0 'SELF_TEST_STEP_6_PASS_EVIDENCE_REJECTED'
+    }
+    $step6Evidence.evidence.capabilities.restore_readiness = 'SUPPORTED'
+    if (Test-Step6PassEvidence -Value ($step6Evidence | ConvertTo-Json -Depth 8 -Compress)) {
+        Stop-R0 'SELF_TEST_STEP_6_UNSUPPORTED_BOUNDARY_NOT_ENFORCED'
     }
 
     $nativeStderr = Invoke-CapturedProcess `
@@ -859,6 +1023,29 @@ function Invoke-HelperSelfTest {
     foreach ($prefix in @('mkdir ', 'rm ', 'chmod ', 'chown ', 'ln ', 'mv ', 'cp ', 'touch ', 'tar ')) {
         if ($step5Lines | Where-Object { $_.StartsWith($prefix) }) {
             Stop-R0 'SELF_TEST_STEP_5_MUTATION_PRESENT'
+        }
+    }
+
+    $step6Script = Get-Step6Script
+    foreach ($required in @(
+        $script:R0BundleSha256,
+        $script:R0ManifestSha256,
+        'test ! -L "$CANDIDATE_DIR"',
+        'test ! -L "$ARCHIVE_PATH"',
+        'test ! -L "$AUDIT_DIR"',
+        'test "$(find "$AUDIT_DIR" -type l -print | wc -l)" -eq 0',
+        'test ! -e "$AUDIT_DIR/.env"',
+        'test ! -L "$HOST_AUDIT_PATH"',
+        '--topology-profile=legacy-fixed-root'
+    )) {
+        if (-not $step6Script.Contains($required)) {
+            Stop-R0 'SELF_TEST_STEP_6_PREFLIGHT_INCOMPLETE'
+        }
+    }
+    $step6Lines = @($step6Script.Split([char] 10) | ForEach-Object { $_.Trim() })
+    foreach ($prefix in @('mkdir ', 'rm ', 'chmod ', 'chown ', 'ln ', 'mv ', 'cp ', 'touch ', 'tar ')) {
+        if ($step6Lines | Where-Object { $_.StartsWith($prefix) }) {
+            Stop-R0 'SELF_TEST_STEP_6_MUTATION_PRESENT'
         }
     }
 }
@@ -1152,7 +1339,26 @@ function Get-Step6Script {
 set -eu
 ACTUAL_HOME="$(cd "$HOME" && pwd -P)"
 case "$ACTUAL_HOME" in /home/[A-Za-z0-9._-]*) ;; *) exit 41 ;; esac
-AUDIT_DIR="$ACTUAL_HOME/.ir1-r0-audit/924af91188cc60d33ff87c91b94ecc1d539566e6/bundle"
+CANDIDATE_DIR="$ACTUAL_HOME/.ir1-r0-audit/924af91188cc60d33ff87c91b94ecc1d539566e6"
+AUDIT_DIR="$CANDIDATE_DIR/bundle"
+ARCHIVE_PATH="$CANDIDATE_DIR/ir1-r0-audit-bundle-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz"
+MANIFEST_PATH="$AUDIT_DIR/r0-bundle-manifest.json"
+HOST_AUDIT_PATH="$AUDIT_DIR/deployment/r0-audit/r0-host-audit.php"
+test -d "$CANDIDATE_DIR"
+test ! -L "$CANDIDATE_DIR"
+test "$(find "$CANDIDATE_DIR" -mindepth 1 -maxdepth 1 -print | wc -l)" -eq 2
+test -f "$ARCHIVE_PATH"
+test ! -L "$ARCHIVE_PATH"
+printf '%s  %s\n' a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d "$ARCHIVE_PATH" | sha256sum --check --strict - >/dev/null
+test -d "$AUDIT_DIR"
+test ! -L "$AUDIT_DIR"
+test "$(find "$AUDIT_DIR" -type l -print | wc -l)" -eq 0
+test -f "$MANIFEST_PATH"
+test ! -L "$MANIFEST_PATH"
+printf '%s  %s\n' a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7 "$MANIFEST_PATH" | sha256sum --check --strict - >/dev/null
+test ! -e "$AUDIT_DIR/.env"
+test -f "$HOST_AUDIT_PATH"
+test ! -L "$HOST_AUDIT_PATH"
 R0_PHP="$(command -v php8.3 || command -v php8.2 || command -v php || true)"
 test -n "$R0_PHP"
 cd "$AUDIT_DIR"
@@ -1221,6 +1427,9 @@ try {
         Write-Output 'step_5_read_only_preflight_verified=true'
         Write-Output 'step_5_pass_evidence_contract_verified=true'
         Write-Output 'step_5_sql_statement_ceiling=48'
+        Write-Output 'step_6_application_db_contract_verified=true'
+        Write-Output 'step_6_read_only_preflight_verified=true'
+        Write-Output 'step_6_pass_evidence_contract_verified=true'
         Write-Output "candidate=$script:R0Candidate"
         Write-Output "helper_sha256=$helperSha256"
         Write-Output 'network_connection_attempted=false'
@@ -1754,6 +1963,10 @@ try {
             if ($result.ExitCode -ne 0) {
                 Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_6_HOST_AUDIT_NONZERO' -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
                 Stop-R0 'STEP_6_HOST_AUDIT_NONZERO'
+            }
+            if (-not (Test-Step6PassEvidence -Value $result.Stdout)) {
+                Complete-R0Attempt -Status STOP -SafeErrorCode 'STEP_6_SUCCESS_EVIDENCE_REJECTED' -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
+                Stop-R0 'STEP_6_SUCCESS_EVIDENCE_REJECTED'
             }
             Complete-R0Attempt -Status PASS -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
             Write-Output 'R0_STEP_6=PASS'
