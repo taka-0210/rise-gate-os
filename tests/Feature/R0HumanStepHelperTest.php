@@ -62,6 +62,14 @@ class R0HumanStepHelperTest extends TestCase
             'overwrite_performed=false',
             'production_change_scope=single_audit_archive_placement_only',
             'step_3_placement_guard_verified=true',
+            'c979f7d3b90fc224ccab34644c35e5f1319154da291dcdd506e39c8101352330',
+            'Assert-Step4PlacedBundleContract',
+            'STEP_4_PLACED_BUNDLE_CONTRACT_MISMATCH',
+            'a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7',
+            'bundle_manifest_sha256_verified=true',
+            'bundle_symlink_count=0',
+            'step_4_placed_bundle_contract_verified=true',
+            'step_4_extraction_guard_verified=true',
             'raw_exception_stored',
             'secret_output=false',
             'next_action=RETURN_TO_HUMAN_CHATGPT',
@@ -84,5 +92,6 @@ class R0HumanStepHelperTest extends TestCase
         $this->assertStringNotContainsString('migrate --force', $source);
         $this->assertStringNotContainsString('git push', $source);
         $this->assertStringNotContainsString('ln -f', $source);
+        $this->assertStringNotContainsString('tar --overwrite', $source);
     }
 }

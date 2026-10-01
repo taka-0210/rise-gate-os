@@ -21,6 +21,7 @@ $ErrorActionPreference = 'Stop'
 $script:R0Candidate = '924af91188cc60d33ff87c91b94ecc1d539566e6'
 $script:R0BundleId = '5ba3c0fd459cabe885249d85dd13ffafbe087693435a5e24a483f5ad4a24a4c0'
 $script:R0BundleSha256 = 'a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d'
+$script:R0Step3PlacementHelperSha256 = 'c979f7d3b90fc224ccab34644c35e5f1319154da291dcdd506e39c8101352330'
 $script:R0SshAlias = 'company-os-production'
 $script:R0IdentityFile = 'codex-company-os-production'
 $script:R0ProtocolVersion = 1
@@ -206,6 +207,34 @@ function Assert-Step3AdoptedCandidateContract {
     }
 }
 
+function Assert-Step4PlacedBundleContract {
+    param([Parameter(Mandatory = $true)] $State)
+
+    $step2Attempts = @($State.attempts | Where-Object { [int] $_.step -eq 2 })
+    $step3Attempts = @($State.attempts | Where-Object { [int] $_.step -eq 3 })
+    if ($State.PSObject.Properties.Name -contains 'evidence_reconciliations') {
+        $reconciliations = @($State.evidence_reconciliations)
+    }
+    else {
+        $reconciliations = @()
+    }
+    if ($step2Attempts.Count -ne 1 -or
+        $step2Attempts[0].status -ne 'STOP' -or
+        $step2Attempts[0].safe_error_code -ne 'STEP_2_REMOTE_PREPARATION_FAILED' -or
+        $reconciliations.Count -ne 1 -or
+        $reconciliations[0].record_type -ne 'EVIDENCE_RECONCILIATION' -or
+        $reconciliations[0].disposition -ne 'ADOPTED_EXISTING_EMPTY_DIRECTORIES' -or
+        $reconciliations[0].status -ne 'PASS' -or
+        $step3Attempts.Count -ne 1 -or
+        $step3Attempts[0].status -ne 'PASS' -or
+        $step3Attempts[0].helper_sha256 -ne $script:R0Step3PlacementHelperSha256 -or
+        $step3Attempts[0].remote_exit_code -ne 0 -or
+        $step3Attempts[0].stderr_bytes -ne 0 -or
+        $null -ne $step3Attempts[0].safe_error_code) {
+        Stop-R0 'STEP_4_PLACED_BUNDLE_CONTRACT_MISMATCH'
+    }
+}
+
 function Start-R0Attempt {
     param(
         [Parameter(Mandatory = $true)][string] $ExecutionRoot,
@@ -238,6 +267,9 @@ function Start-R0Attempt {
     Assert-StepEligibility -State $script:R0State -RequestedStep $Step
     if ($Step -eq 3) {
         Assert-Step3AdoptedCandidateContract -State $script:R0State
+    }
+    elseif ($Step -eq 4) {
+        Assert-Step4PlacedBundleContract -State $script:R0State
     }
 
     $attempt = [pscustomobject]@{
@@ -507,6 +539,25 @@ function Invoke-HelperSelfTest {
     Assert-StepEligibility -State $reconciledState -RequestedStep 3
     Assert-Step3AdoptedCandidateContract -State $reconciledState
 
+    $placedState = [pscustomobject]@{
+        attempts = @(
+            $reconciledState.attempts[0],
+            [pscustomobject]@{
+                step = 3
+                status = 'PASS'
+                helper_sha256 = $script:R0Step3PlacementHelperSha256
+                remote_exit_code = 0
+                stderr_bytes = 0
+                safe_error_code = $null
+            }
+        )
+        last_step = 3
+        last_status = 'PASS'
+        evidence_reconciliations = $reconciledState.evidence_reconciliations
+    }
+    Assert-StepEligibility -State $placedState -RequestedStep 4
+    Assert-Step4PlacedBundleContract -State $placedState
+
     $safeEvidence = @{ status = 'PASS' } | ConvertTo-Json -Compress
     $secretEvidence = @{ DB_PASSWORD = 'secret-output-canary' } | ConvertTo-Json -Compress
     if (-not (Test-SafeJsonEvidence -Value $safeEvidence)) {
@@ -617,6 +668,33 @@ function Invoke-HelperSelfTest {
     if (@($step3FinalizeLines | Where-Object { $_.StartsWith('ln ') }).Count -ne 1 -or
         @($step3FinalizeLines | Where-Object { $_.StartsWith('ln -') }).Count -gt 0) {
         Stop-R0 'SELF_TEST_STEP_3_OVERWRITE_GUARD_FAILED'
+    }
+
+    $step4Script = Get-Step4Script
+    foreach ($required in @(
+        $script:R0BundleSha256,
+        'a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7',
+        'test ! -L ${ARCHIVE_PATH}',
+        'test ! -L bundle',
+        'tar --extract --gzip',
+        '--no-same-owner --no-same-permissions',
+        'test $(find bundle -type l -print | wc -l) -eq 0',
+        'bundle_manifest_sha256_verified=true',
+        'bundle_symlink_count=0'
+    )) {
+        if (-not $step4Script.Contains($required)) {
+            Stop-R0 'SELF_TEST_STEP_4_EXTRACTION_CONTRACT_INCOMPLETE'
+        }
+    }
+    $step4Lines = @($step4Script.Split([char] 10) | ForEach-Object { $_.Trim() })
+    if (@($step4Lines | Where-Object { $_.StartsWith('mkdir ') }).Count -ne 1 -or
+        @($step4Lines | Where-Object { $_.StartsWith('tar ') }).Count -ne 1) {
+        Stop-R0 'SELF_TEST_STEP_4_EXTRACTION_SCOPE_MISMATCH'
+    }
+    foreach ($prefix in @('rm ', 'chmod ', 'chown ', 'ln ', 'mv ', 'cp ', 'touch ')) {
+        if ($step4Lines | Where-Object { $_.StartsWith($prefix) }) {
+            Stop-R0 'SELF_TEST_STEP_4_EXTRACTION_SCOPE_EXPANDED'
+        }
     }
 }
 
@@ -759,15 +837,25 @@ AUDIT_DIR="$ACTUAL_HOME/.ir1-r0-audit/924af91188cc60d33ff87c91b94ecc1d539566e6"
 BUNDLE_NAME="ir1-r0-audit-bundle-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz"
 EXPECTED_HASH="a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d"
 cd "$AUDIT_DIR"
+ARCHIVE_PATH=${AUDIT_DIR}/${BUNDLE_NAME}
+test $(find ${AUDIT_DIR} -mindepth 1 -maxdepth 1 -print | wc -l) -eq 1
+test -f ${ARCHIVE_PATH}
+test ! -L ${ARCHIVE_PATH}
 printf '%s  %s\n' "$EXPECTED_HASH" "$BUNDLE_NAME" | sha256sum --check --strict - >/dev/null
 test ! -e bundle
 umask 077
 mkdir bundle
+test -d bundle
+test ! -L bundle
 tar --extract --gzip --file "$BUNDLE_NAME" --directory bundle --no-same-owner --no-same-permissions
 test -f bundle/r0-bundle-manifest.json
 test -f bundle/deployment/r0-audit/r0-artisan.php
 test -f bundle/deployment/r0-audit/r0-host-audit.php
 test ! -e bundle/.env
+EXPECTED_MANIFEST_HASH=a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7
+printf '%s  %s\n' ${EXPECTED_MANIFEST_HASH} bundle/r0-bundle-manifest.json | sha256sum --check --strict - >/dev/null
+test $(find bundle -type l -print | wc -l) -eq 0
+test $(find ${AUDIT_DIR} -mindepth 1 -maxdepth 1 -print | wc -l) -eq 2
 R0_PHP="$(command -v php8.3 || command -v php8.2 || command -v php || true)"
 test -n "$R0_PHP"
 R0_VERSION_ID="$("$R0_PHP" -r 'echo PHP_VERSION_ID;')"
@@ -775,6 +863,8 @@ test "$R0_VERSION_ID" -ge 80200
 test "$R0_VERSION_ID" -lt 90000
 printf 'R0_STEP_4=PASS\n'
 printf 'bundle_integrity=PASS\n'
+printf 'bundle_manifest_sha256_verified=true\n'
+printf 'bundle_symlink_count=0\n'
 printf 'php_cli_compatible=true\n'
 '@
 }
@@ -944,6 +1034,8 @@ try {
         Write-Output 'native_stderr_capture_verified=true'
         Write-Output 'step_3_eligibility_contract_verified=true'
         Write-Output 'step_3_placement_guard_verified=true'
+        Write-Output 'step_4_placed_bundle_contract_verified=true'
+        Write-Output 'step_4_extraction_guard_verified=true'
         Write-Output "candidate=$script:R0Candidate"
         Write-Output "helper_sha256=$helperSha256"
         Write-Output 'network_connection_attempted=false'
@@ -1430,10 +1522,16 @@ try {
             Assert-FixedSuccessOutput -Actual $result.Stdout -ExpectedLines @(
                 'R0_STEP_4=PASS',
                 'bundle_integrity=PASS',
+                'bundle_manifest_sha256_verified=true',
+                'bundle_symlink_count=0',
                 'php_cli_compatible=true'
             )
             Complete-R0Attempt -Status PASS -RemoteExitCode $result.ExitCode -Stderr $result.Stderr
             Write-Output 'R0_STEP_4=PASS'
+            Write-Output 'bundle_integrity=PASS'
+            Write-Output 'bundle_manifest_sha256_verified=true'
+            Write-Output 'bundle_symlink_count=0'
+            Write-Output 'php_cli_compatible=true'
             Write-Output 'production_change_scope=isolated_bundle_extraction_only'
         }
         5 {
