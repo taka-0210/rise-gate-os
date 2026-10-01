@@ -4,7 +4,9 @@ param(
     [ValidateSet(2, 3, 4, 5, 6)]
     [int] $Step,
 
-    [switch] $VerifyOnly
+    [switch] $VerifyOnly,
+
+    [switch] $VerifyLocalPreconditionsOnly
 )
 
 Set-StrictMode -Version Latest
@@ -16,7 +18,7 @@ $script:R0BundleSha256 = 'a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18a
 $script:R0SshAlias = 'company-os-production'
 $script:R0IdentityFile = 'codex-company-os-production'
 $script:R0ProtocolVersion = 1
-$script:R0ExecutionGeneration = 'corrective-1'
+$script:R0ExecutionGeneration = 'corrective-2'
 $script:R0CurrentStep = $Step
 $script:R0State = $null
 $script:R0StatePath = $null
@@ -237,7 +239,13 @@ function Invoke-CapturedProcess {
 
     $stdoutPath = [IO.Path]::GetTempFileName()
     $stderrPath = [IO.Path]::GetTempFileName()
+    $previousErrorActionPreference = $ErrorActionPreference
     try {
+        # Windows PowerShell 5.1 can promote native stderr to a terminating
+        # RemoteException when the caller uses ErrorActionPreference=Stop.
+        # Capture stderr and decide from ExitCode instead of allowing that
+        # promotion to bypass the sanitized failure contract.
+        $ErrorActionPreference = 'Continue'
         if ($null -eq $StandardInput) {
             & $FilePath @Arguments 1> $stdoutPath 2> $stderrPath
         }
@@ -252,6 +260,7 @@ function Invoke-CapturedProcess {
         }
     }
     finally {
+        $ErrorActionPreference = $previousErrorActionPreference
         Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
@@ -259,6 +268,7 @@ function Invoke-CapturedProcess {
 function Get-LocalPreconditions {
     param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
 
+    $script:R0FailureStage = 'LOCAL_BUNDLE_INTEGRITY'
     $bundleName = "ir1-r0-audit-bundle-$script:R0Candidate.tar.gz"
     $bundlePath = Join-Path $RepositoryRoot "storage\app\release-audit\$bundleName"
     if (-not (Test-Path -LiteralPath $bundlePath -PathType Leaf)) {
@@ -268,6 +278,7 @@ function Get-LocalPreconditions {
         Stop-R0 'AUDIT_BUNDLE_HASH_MISMATCH'
     }
 
+    $script:R0FailureStage = 'LOCAL_OPENSSH_TOOL_DISCOVERY'
     $ssh = Get-Command 'ssh.exe' -ErrorAction SilentlyContinue
     $scp = Get-Command 'scp.exe' -ErrorAction SilentlyContinue
     $sshKeygen = Get-Command 'ssh-keygen.exe' -ErrorAction SilentlyContinue
@@ -275,6 +286,7 @@ function Get-LocalPreconditions {
         Stop-R0 'OPENSSH_CLIENT_UNAVAILABLE'
     }
 
+    $script:R0FailureStage = 'LOCAL_SSH_CONFIG_PARSE'
     $configResult = Invoke-CapturedProcess -FilePath $ssh.Source -Arguments @('-G', $script:R0SshAlias) -StandardInput $null
     if ($configResult.ExitCode -ne 0) {
         Stop-R0 'SSH_CONFIG_UNAVAILABLE'
@@ -287,6 +299,7 @@ function Get-LocalPreconditions {
         }
     }
 
+    $script:R0FailureStage = 'LOCAL_SSH_CONFIG_CONTRACT'
     foreach ($required in @('hostname', 'user', 'port', 'identityfile')) {
         if (-not $config.ContainsKey($required) -or [string]::IsNullOrWhiteSpace($config[$required])) {
             Stop-R0 'SSH_CONFIG_INCOMPLETE'
@@ -302,11 +315,13 @@ function Get-LocalPreconditions {
         }
     }
 
+    $script:R0FailureStage = 'LOCAL_KNOWN_HOSTS_FILE'
     $knownHosts = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ssh\known_hosts'
     if (-not (Test-Path -LiteralPath $knownHosts -PathType Leaf)) {
         Stop-R0 'KNOWN_HOSTS_MISSING'
     }
     $lookup = "[$($config.hostname)]:$($config.port)"
+    $script:R0FailureStage = 'LOCAL_HOST_KEY_LOOKUP'
     $knownResult = Invoke-CapturedProcess -FilePath $sshKeygen.Source -Arguments @('-F', $lookup, '-f', $knownHosts) -StandardInput $null
     if ($knownResult.ExitCode -ne 0) {
         Stop-R0 'HOST_KEY_NOT_REGISTERED'
@@ -315,10 +330,12 @@ function Get-LocalPreconditions {
         Where-Object { $_ -and -not $_.StartsWith('#') } |
         ForEach-Object { ($_ -split '\s+')[1] } |
         Sort-Object -Unique)
+    $script:R0FailureStage = 'LOCAL_HOST_KEY_CONTRACT'
     if (($knownTypes -join ',') -ne 'ecdsa-sha2-nistp256,ssh-ed25519,ssh-rsa') {
         Stop-R0 'HOST_KEY_CONTRACT_MISMATCH'
     }
 
+    $script:R0FailureStage = 'LOCAL_PRECONDITIONS_COMPLETE'
     return [pscustomobject]@{
         BundleName = $bundleName
         BundlePath = $bundlePath
@@ -423,6 +440,16 @@ function Invoke-HelperSelfTest {
     }
     if (Test-SafeJsonEvidence -Value $secretEvidence) {
         Stop-R0 'SELF_TEST_SECRET_EVIDENCE_ACCEPTED'
+    }
+
+    $nativeStderr = Invoke-CapturedProcess `
+        -FilePath $env:ComSpec `
+        -Arguments @('/d', '/c', 'echo r0-native-stderr-canary 1>&2') `
+        -StandardInput $null
+    if ($nativeStderr.ExitCode -ne 0 -or
+        $nativeStderr.Stdout -ne '' -or
+        -not $nativeStderr.Stderr.Contains('r0-native-stderr-canary')) {
+        Stop-R0 'SELF_TEST_NATIVE_STDERR_CAPTURE_FAILED'
     }
 
     $step2Script = Get-Step2Script
@@ -593,6 +620,7 @@ try {
         Write-Output 'sequence_guard_verified=true'
         Write-Output 'secret_output_guard_verified=true'
         Write-Output 'production_scope_guard_verified=true'
+        Write-Output 'native_stderr_capture_verified=true'
         Write-Output "candidate=$script:R0Candidate"
         Write-Output "helper_sha256=$helperSha256"
         Write-Output 'network_connection_attempted=false'
@@ -602,6 +630,12 @@ try {
 
     $script:R0FailureStage = 'LOCAL_PRECONDITIONS'
     $preconditions = Get-LocalPreconditions -RepositoryRoot $repositoryRoot
+    if ($VerifyLocalPreconditionsOnly) {
+        Write-Output 'R0_LOCAL_PRECONDITIONS=PASS'
+        Write-Output 'production_connection_attempted=false'
+        Write-Output 'production_change=false'
+        exit 0
+    }
     $executionRoot = Join-Path $repositoryRoot "storage\app\release-audit\production-r0-human-$script:R0Candidate"
     $executionRoot = Join-Path $repositoryRoot (
         'storage\app\release-audit\production-r0-human-' + $script:R0Candidate + '-' + $script:R0ExecutionGeneration
@@ -712,6 +746,10 @@ catch {
     $caughtException = $_.Exception
     $safeErrorCode = if ($caughtException.Message -match '^[A-Z0-9_]+$') {
         $caughtException.Message
+    }
+    elseif ($caughtException -is [System.Management.Automation.RemoteException] -and
+        $script:R0FailureStage.StartsWith('LOCAL_')) {
+        'LOCAL_NATIVE_PROCESS_CAPTURE_FAILURE'
     }
     else {
         'UNEXPECTED_LOCAL_FAILURE'
