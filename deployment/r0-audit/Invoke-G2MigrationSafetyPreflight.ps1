@@ -4,7 +4,8 @@ param(
     [switch] $VerifyLocalPreconditionsOnly,
     [switch] $Corrective1,
     [switch] $Corrective2,
-    [switch] $Corrective3
+    [switch] $Corrective3,
+    [switch] $Corrective4
 )
 
 Set-StrictMode -Version Latest
@@ -29,6 +30,12 @@ $script:Corrective1AttemptStateSha256 = '81795b54e7419f8fb29e0d5de306d6768b76ab2
 $script:Corrective2HelperSha256 = '1b086b5c9414c469361382b4d76fb0d7475bef5f649833609b02d8a6e4edb56a'
 $script:Corrective2PreflightPhpSha256 = '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f88e0a9eef0a03c'
 $script:Corrective2AttemptStateSha256 = 'd2223bc7edb8db419fe275e086b0ba1589090e7873c8b279b1166dc75f871068'
+$script:Corrective3HelperSha256 = 'c9c873929fb8533118d428751aa4987aa72921e3dabe45175a5c53158b34abdc'
+$script:Corrective3PreflightPhpSha256 = '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f88e0a9eef0a03c'
+$script:Corrective3AttemptStateSha256 = '83469c014b729870a9331894a8fd8eef25994103fa9246357afab077f0a61b70'
+$script:RuntimeDiagnosticHelperSha256 = '77a4720ec377afaee740f74708eb76b46e598cf4416118b0435c28413f349882'
+$script:RuntimeDiagnosticStateSha256 = 'af10dfc9166c63e200e340f92409648c56ef7ece449f18675826d9aa61441501'
+$script:RuntimeDiagnosticEvidenceSha256 = 'dfb4629417fce372a2678b5554bf72809b80ab5c9559660d1d15198e405d748d'
 $script:SshAlias = 'company-os-production'
 $script:IdentityFile = 'codex-company-os-production'
 $script:FailureStage = 'BOOTSTRAP'
@@ -120,6 +127,42 @@ function Invoke-CapturedProcess {
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
         Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-Utf8CapturedProcess {
+    param(
+        [Parameter(Mandatory = $true)][string] $FilePath,
+        [Parameter(Mandatory = $true)][string[]] $Arguments,
+        [AllowEmptyString()][string] $StandardInput
+    )
+
+    foreach ($argument in $Arguments) {
+        if ($argument -match '\s') { Stop-G2 'G2_NATIVE_ARGUMENT_REJECTED' }
+    }
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.Arguments = $Arguments -join ' '
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) { Stop-G2 'G2_NATIVE_PROCESS_START_FAILED' }
+        $inputBytes = [Text.UTF8Encoding]::new($false).GetBytes($StandardInput)
+        $process.StandardInput.BaseStream.Write($inputBytes, 0, $inputBytes.Length)
+        $process.StandardInput.BaseStream.Flush()
+        $process.StandardInput.Close()
+        $stdout = $process.StandardOutput.ReadToEnd()
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; Stdout = $stdout; Stderr = $stderr }
+    }
+    finally {
+        $process.Dispose()
     }
 }
 
@@ -244,12 +287,76 @@ function Assert-Corrective2AttemptForCorrective3 {
     }
 }
 
+function Assert-Corrective3AttemptForCorrective4 {
+    param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
+
+    $corrective3Root = Join-Path $RepositoryRoot ('storage\app\release-audit\production-g2-migration-preflight-corrective-3-' + $script:Candidate)
+    $corrective3StatePath = Join-Path $corrective3Root 'execution-state.json'
+    Assert-EvidenceFile $corrective3StatePath $script:Corrective3AttemptStateSha256 'G2_CORRECTIVE3_ATTEMPT_MISSING' 'G2_CORRECTIVE3_ATTEMPT_HASH_MISMATCH'
+    try { $corrective3 = Get-Content -Raw -LiteralPath $corrective3StatePath | ConvertFrom-Json }
+    catch { Stop-G2 'G2_CORRECTIVE3_ATTEMPT_INVALID' }
+
+    if ($corrective3.execution_generation -ne 'corrective-3' -or
+        $corrective3.status -ne 'STOP' -or
+        $corrective3.candidate -ne $script:Candidate -or
+        $corrective3.helper_sha256 -ne $script:Corrective3HelperSha256 -or
+        $corrective3.preflight_php_sha256 -ne $script:Corrective3PreflightPhpSha256 -or
+        $corrective3.safe_error_code -ne 'UNEXPECTED_LOCAL_FAILURE' -or
+        $corrective3.failure_stage -ne 'PRODUCTION_READ_ONLY_G2_PREFLIGHT' -or
+        $corrective3.production_connection_attempted -ne $true -or
+        $corrective3.production_mutation -ne $false -or
+        $corrective3.retry_performed -ne $false -or
+        $corrective3.remote_exit_code -ne 1 -or
+        $corrective3.stdout_bytes -ne 0 -or
+        $corrective3.stderr_bytes -ne 808 -or
+        $corrective3.local_processing_substage -ne 'remote_stdout_validation') {
+        Stop-G2 'G2_CORRECTIVE3_ATTEMPT_CONTRACT_MISMATCH'
+    }
+}
+
+function Assert-RuntimeDiagnosticPassForCorrective4 {
+    param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
+
+    $diagnosticRoot = Join-Path $RepositoryRoot ('storage\app\release-audit\production-g2-remote-runtime-diagnostic-' + $script:Candidate)
+    $diagnosticStatePath = Join-Path $diagnosticRoot 'execution-state.json'
+    $diagnosticEvidencePath = Join-Path $diagnosticRoot 'runtime-diagnostic-evidence.json'
+    Assert-EvidenceFile $diagnosticStatePath $script:RuntimeDiagnosticStateSha256 'G2_RUNTIME_DIAGNOSTIC_STATE_MISSING' 'G2_RUNTIME_DIAGNOSTIC_STATE_HASH_MISMATCH'
+    Assert-EvidenceFile $diagnosticEvidencePath $script:RuntimeDiagnosticEvidenceSha256 'G2_RUNTIME_DIAGNOSTIC_EVIDENCE_MISSING' 'G2_RUNTIME_DIAGNOSTIC_EVIDENCE_HASH_MISMATCH'
+    try {
+        $state = Get-Content -Raw -LiteralPath $diagnosticStatePath | ConvertFrom-Json
+        $evidence = Get-Content -Raw -LiteralPath $diagnosticEvidencePath | ConvertFrom-Json
+    }
+    catch { Stop-G2 'G2_RUNTIME_DIAGNOSTIC_EVIDENCE_INVALID' }
+
+    if ($state.status -ne 'PASS' -or
+        $state.candidate -ne $script:Candidate -or
+        $state.helper_sha256 -ne $script:RuntimeDiagnosticHelperSha256 -or
+        $state.production_connection_attempted -ne $true -or
+        $state.production_mutation -ne $false -or
+        $state.retry_performed -ne $false -or
+        $state.remote_exit_code -ne 0 -or
+        $state.stderr_bytes -ne 0 -or
+        $state.stdout_contract_status -ne 'safe_pass' -or
+        $evidence.status -ne 'PASS' -or
+        $evidence.audit_mode -ne 'read-only-runtime-diagnostic' -or
+        $evidence.production_change_scope -ne 'none_read_only_runtime_diagnostic' -or
+        $evidence.secret_output -ne $false -or
+        $evidence.evidence.ssh_remote_shell -ne $true -or
+        $evidence.evidence.php_cli_discovery -ne $true -or
+        $evidence.evidence.php_interpreter_start -ne $true -or
+        $evidence.evidence.php_stdin_execution -ne $true -or
+        $evidence.evidence.fixed_stdout -ne $true -or
+        $evidence.evidence.exit_code_capture -ne $true) {
+        Stop-G2 'G2_RUNTIME_DIAGNOSTIC_PASS_CONTRACT_MISMATCH'
+    }
+}
+
 function Get-LocalPreconditions {
     param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
 
     $script:FailureStage = 'LOCAL_EVIDENCE_BINDING'
     Assert-LocalEvidenceContract -RepositoryRoot $RepositoryRoot
-    if (@(@($Corrective1, $Corrective2, $Corrective3) | Where-Object { $_ }).Count -gt 1) {
+    if (@(@($Corrective1, $Corrective2, $Corrective3, $Corrective4) | Where-Object { $_ }).Count -gt 1) {
         Stop-G2 'G2_CORRECTIVE_GENERATION_AMBIGUOUS'
     }
     if ($Corrective1) {
@@ -263,6 +370,13 @@ function Get-LocalPreconditions {
         Assert-OriginalAttemptForCorrective -RepositoryRoot $RepositoryRoot
         Assert-Corrective1AttemptForCorrective2 -RepositoryRoot $RepositoryRoot
         Assert-Corrective2AttemptForCorrective3 -RepositoryRoot $RepositoryRoot
+    }
+    if ($Corrective4) {
+        Assert-OriginalAttemptForCorrective -RepositoryRoot $RepositoryRoot
+        Assert-Corrective1AttemptForCorrective2 -RepositoryRoot $RepositoryRoot
+        Assert-Corrective2AttemptForCorrective3 -RepositoryRoot $RepositoryRoot
+        Assert-Corrective3AttemptForCorrective4 -RepositoryRoot $RepositoryRoot
+        Assert-RuntimeDiagnosticPassForCorrective4 -RepositoryRoot $RepositoryRoot
     }
 
     $phpScript = Join-Path $RepositoryRoot 'deployment\r0-audit\g2-migration-preflight.php'
@@ -348,7 +462,9 @@ test -n "$G2_PHP" || g2_shell_stop G2_PHP_UNAVAILABLE
 cd "$AUDIT_DIR" || g2_shell_stop G2_AUDIT_DIRECTORY_UNAVAILABLE
 env LOG_CHANNEL=stderr G2_CANDIDATE=924af91188cc60d33ff87c91b94ecc1d539566e6 IR1_R0_ENV_FILE="$ENV_FILE" "$G2_PHP" <<'__G2_PHP_SOURCE_924AF911__'
 '@
-    return $prefix + $PhpSource + [Environment]::NewLine + $delimiter + [Environment]::NewLine
+    $lf = [string][char]10
+    $remote = ($prefix + $PhpSource).Replace(([string][char]13 + [char]10), $lf).Replace(([string][char]13), $lf)
+    return $remote.TrimEnd([char]10) + $lf + $delimiter + $lf
 }
 
 function Test-SafePassEvidence {
@@ -512,11 +628,28 @@ try {
         foreach ($forbidden in $remoteForbiddenOperations) {
             if ($remote.Contains($forbidden)) { Stop-G2 'G2_SELF_TEST_REMOTE_MUTATION_PRESENT' }
         }
+        $lf = [string][char]10
+        if ($remote.Contains([string][char]13) -or
+            -not $remote.Contains('__G2_PHP_SOURCE_924AF911__' + $lf) -or
+            -not $remote.EndsWith($lf)) {
+            Stop-G2 'G2_SELF_TEST_REMOTE_SCRIPT_NOT_LF_ONLY'
+        }
+        $localPhp = Join-Path (Split-Path -Parent (Split-Path -Parent $repositoryRoot)) 'php\php.exe'
+        if (-not (Test-Path -LiteralPath $localPhp -PathType Leaf)) { Stop-G2 'G2_LOCAL_PHP_FIXTURE_MISSING' }
+        $localProgram = '<?php echo ''G2_PREFLIGHT_STDIN_OK'';'
+        $localResult = Invoke-Utf8CapturedProcess -FilePath $localPhp -Arguments @('-n') -StandardInput $localProgram
+        if ($localResult.ExitCode -ne 0 -or $localResult.Stdout -ne 'G2_PREFLIGHT_STDIN_OK' -or
+            -not [string]::IsNullOrEmpty($localResult.Stderr)) {
+            Stop-G2 'G2_UTF8_STDIN_TRANSPORT_REGRESSION'
+        }
         Write-Output 'G2_HELPER_VERIFY=PASS'
         Write-Output ('candidate=' + $script:Candidate)
         Write-Output ('helper_sha256=' + (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant())
         Write-Output ('preflight_php_sha256=' + $script:PreflightPhpSha256)
         Write-Output 'evidence_validator_regression=PASS'
+        Write-Output 'remote_script_lf_only=true'
+        Write-Output 'utf8_byte_stream_transport=PASS'
+        if ($Corrective4) { Write-Output 'runtime_diagnostic_pass_binding_verified=true' }
         Write-Output 'r0_g1_evidence_binding_verified=true'
         Write-Output 'production_connection_attempted=false'
         Write-Output 'production_change=false'
@@ -530,8 +663,11 @@ try {
         exit 0
     }
 
-    $executionGeneration = if ($Corrective3) { 'corrective-3' } elseif ($Corrective2) { 'corrective-2' } elseif ($Corrective1) { 'corrective-1' } else { 'initial' }
-    $rootName = if ($Corrective3) {
+    $executionGeneration = if ($Corrective4) { 'corrective-4' } elseif ($Corrective3) { 'corrective-3' } elseif ($Corrective2) { 'corrective-2' } elseif ($Corrective1) { 'corrective-1' } else { 'initial' }
+    $rootName = if ($Corrective4) {
+        'production-g2-migration-preflight-corrective-4-' + $script:Candidate
+    }
+    elseif ($Corrective3) {
         'production-g2-migration-preflight-corrective-3-' + $script:Candidate
     }
     elseif ($Corrective2) {
@@ -595,7 +731,13 @@ try {
     $phpSource = Get-Content -Raw -LiteralPath $preconditions.PhpScriptPath
     $script:State.local_processing_substage = 'remote_process_execution'
     Save-G2State
-    $result = Invoke-CapturedProcess -FilePath $preconditions.SshPath -Arguments $sshArguments -StandardInput (Get-RemoteScript -PhpSource $phpSource)
+    $remoteScript = Get-RemoteScript -PhpSource $phpSource
+    $result = if ($Corrective4) {
+        Invoke-Utf8CapturedProcess -FilePath $preconditions.SshPath -Arguments $sshArguments -StandardInput $remoteScript
+    }
+    else {
+        Invoke-CapturedProcess -FilePath $preconditions.SshPath -Arguments $sshArguments -StandardInput $remoteScript
+    }
     $script:State.local_processing_substage = 'remote_result_captured'
     $script:State.remote_exit_code = $result.ExitCode
     $script:State.stdout_sha256 = if ([string]::IsNullOrEmpty($result.Stdout)) { $null } else { Get-Sha256Text $result.Stdout }
