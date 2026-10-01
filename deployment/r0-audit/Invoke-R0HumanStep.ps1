@@ -6,7 +6,9 @@ param(
 
     [switch] $VerifyOnly,
 
-    [switch] $VerifyLocalPreconditionsOnly
+    [switch] $VerifyLocalPreconditionsOnly,
+
+    [switch] $InspectStep2RemoteStateOnly
 )
 
 Set-StrictMode -Version Latest
@@ -24,6 +26,8 @@ $script:R0State = $null
 $script:R0StatePath = $null
 $script:R0FailureStage = 'BOOTSTRAP'
 $script:R0ProductionConnectionAttempted = $false
+$script:R0InspectionEvidencePath = $null
+$script:R0InspectionEvidence = $null
 
 function Write-R0Stop {
     param([Parameter(Mandatory = $true)][string] $SafeErrorCode)
@@ -114,6 +118,18 @@ function Save-R0State {
     $temporaryPath = "$script:R0StatePath.tmp"
     [IO.File]::WriteAllText($temporaryPath, $json + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
     Move-Item -LiteralPath $temporaryPath -Destination $script:R0StatePath -Force
+}
+
+function Save-R0InspectionEvidence {
+    if ($null -eq $script:R0InspectionEvidence -or
+        [string]::IsNullOrWhiteSpace($script:R0InspectionEvidencePath)) {
+        Stop-R0 'LOCAL_INSPECTION_STATE_NOT_INITIALIZED'
+    }
+
+    $json = $script:R0InspectionEvidence | ConvertTo-Json -Depth 6
+    $temporaryPath = $script:R0InspectionEvidencePath + '.tmp'
+    [IO.File]::WriteAllText($temporaryPath, $json + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $temporaryPath -Destination $script:R0InspectionEvidencePath -Force
 }
 
 function Read-R0State {
@@ -470,6 +486,23 @@ function Invoke-HelperSelfTest {
             Stop-R0 'SELF_TEST_STEP_2_SCOPE_EXPANDED'
         }
     }
+
+    $inspectionScript = Get-Step2StateInspectionScript
+    foreach ($required in @(
+        'ssh_authentication=established',
+        'home_identity=pass',
+        'production_change_scope=none_read_only_state_inspection'
+    )) {
+        if (-not $inspectionScript.Contains($required)) {
+            Stop-R0 'SELF_TEST_STEP_2_INSPECTION_INCOMPLETE'
+        }
+    }
+    $inspectionLines = @($inspectionScript -split '\r?\n' | ForEach-Object { $_.Trim() })
+    foreach ($prefix in @('mkdir ', 'rm ', 'chmod ', 'chown ', 'ln ', 'mv ', 'cp ', 'touch ')) {
+        if ($inspectionLines | Where-Object { $_.StartsWith($prefix) }) {
+            Stop-R0 'SELF_TEST_STEP_2_INSPECTION_MUTATION_PRESENT'
+        }
+    }
 }
 
 function Get-Step2Script {
@@ -508,6 +541,54 @@ test ! -L "$AUDIT_DIR"
 test ! -e "$AUDIT_DIR/ir1-r0-audit-bundle-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz"
 test ! -e "$AUDIT_DIR/bundle"
 printf 'R0_STEP_3_PRECHECK=PASS\n'
+'@
+}
+
+function Get-Step2StateInspectionScript {
+    return @'
+set -eu
+ACTUAL_HOME=$(cd -- ${HOME} && pwd -P)
+case ${ACTUAL_HOME} in
+  /home/[A-Za-z0-9._-]*) ;;
+  *) exit 41 ;;
+esac
+classify_path() {
+  if test -L ${1}; then
+    printf 'symlink'
+  elif test -d ${1}; then
+    printf 'directory'
+  elif test -e ${1}; then
+    printf 'other'
+  else
+    printf 'absent'
+  fi
+}
+if test -d ${ACTUAL_HOME}/rise-gate.com/rise-gate-os; then
+  APPLICATION_ROOT=present
+else
+  APPLICATION_ROOT=missing
+fi
+if test -d ${ACTUAL_HOME}/rise-gate.com/public_html/os.rise-gate.com; then
+  PUBLIC_ROOT=present
+else
+  PUBLIC_ROOT=missing
+fi
+AUDIT_ROOT=${ACTUAL_HOME}/.ir1-r0-audit
+CANDIDATE_DIR=${AUDIT_ROOT}/924af91188cc60d33ff87c91b94ecc1d539566e6
+AUDIT_ROOT_STATE=$(classify_path ${AUDIT_ROOT})
+if test ${AUDIT_ROOT_STATE} = directory; then
+  CANDIDATE_STATE=$(classify_path ${CANDIDATE_DIR})
+else
+  CANDIDATE_STATE=not_inspected
+fi
+printf 'R0_STEP_2_STATE_INSPECTION=PASS\n'
+printf 'ssh_authentication=established\n'
+printf 'home_identity=pass\n'
+printf 'legacy_application_root=%s\n' ${APPLICATION_ROOT}
+printf 'legacy_public_root=%s\n' ${PUBLIC_ROOT}
+printf 'audit_root=%s\n' ${AUDIT_ROOT_STATE}
+printf 'candidate_directory=%s\n' ${CANDIDATE_STATE}
+printf 'production_change_scope=none_read_only_state_inspection\n'
 '@
 }
 
@@ -641,6 +722,125 @@ try {
         'storage\app\release-audit\production-r0-human-' + $script:R0Candidate + '-' + $script:R0ExecutionGeneration
     )
     $statePath = Join-Path $executionRoot 'execution-state.json'
+
+    if ($InspectStep2RemoteStateOnly) {
+        $script:R0FailureStage = 'STEP_2_STATE_INSPECTION_PRECONDITIONS'
+        if ($Step -ne 2) {
+            Stop-R0 'STEP_2_STATE_INSPECTION_STEP_MISMATCH'
+        }
+        $priorState = Read-R0State -Path $statePath
+        $priorAttempts = @($priorState.attempts)
+        if ($priorState.last_step -ne 2 -or
+            $priorState.last_status -ne 'STOP' -or
+            $priorAttempts.Count -ne 1 -or
+            $priorAttempts[0].safe_error_code -ne 'STEP_2_REMOTE_PREPARATION_FAILED') {
+            Stop-R0 'STEP_2_STATE_INSPECTION_PRIOR_STATE_MISMATCH'
+        }
+
+        $script:R0InspectionEvidencePath = Join-Path $executionRoot 'step2-remote-state-inspection.json'
+        if (Test-Path -LiteralPath $script:R0InspectionEvidencePath) {
+            Stop-R0 'STEP_2_STATE_INSPECTION_RETRY_FORBIDDEN'
+        }
+        $script:R0InspectionEvidence = [pscustomobject]@{
+            schema_version = 1
+            candidate = $script:R0Candidate
+            execution_generation = $script:R0ExecutionGeneration
+            inspection_id = 'step2-state-inspection-1'
+            helper_sha256 = $helperSha256
+            status = 'ATTEMPT_STARTED'
+            started_at_jst = Get-JstTimestamp
+            completed_at_jst = $null
+            production_connection_attempted = $false
+            production_change_scope = 'none_read_only_state_inspection'
+            remote_exit_code = $null
+            stderr_sha256 = $null
+            stderr_bytes = 0
+            safe_error_code = $null
+            retry_performed = $false
+            raw_stdout_stored = $false
+            raw_stderr_stored = $false
+            result = $null
+        }
+        Save-R0InspectionEvidence
+
+        $script:R0FailureStage = 'STEP_2_REMOTE_STATE_INSPECTION'
+        $script:R0ProductionConnectionAttempted = $true
+        $script:R0InspectionEvidence.production_connection_attempted = $true
+        Save-R0InspectionEvidence
+        $inspectionResult = Invoke-RemoteScript `
+            -SshPath $preconditions.SshPath `
+            -Script (Get-Step2StateInspectionScript)
+        $script:R0InspectionEvidence.remote_exit_code = $inspectionResult.ExitCode
+        $script:R0InspectionEvidence.stderr_sha256 = if ([string]::IsNullOrEmpty($inspectionResult.Stderr)) {
+            $null
+        }
+        else {
+            Get-Sha256Text $inspectionResult.Stderr
+        }
+        $script:R0InspectionEvidence.stderr_bytes = if ([string]::IsNullOrEmpty($inspectionResult.Stderr)) {
+            0
+        }
+        else {
+            [Text.Encoding]::UTF8.GetByteCount($inspectionResult.Stderr)
+        }
+        if ($inspectionResult.ExitCode -ne 0) {
+            Stop-R0 'STEP_2_REMOTE_STATE_INSPECTION_FAILED'
+        }
+
+        $expectedKeys = @(
+            'R0_STEP_2_STATE_INSPECTION',
+            'ssh_authentication',
+            'home_identity',
+            'legacy_application_root',
+            'legacy_public_root',
+            'audit_root',
+            'candidate_directory',
+            'production_change_scope'
+        )
+        $actualLines = @($inspectionResult.Stdout -split '\r?\n' | Where-Object { $_ -ne '' })
+        if ($actualLines.Count -ne $expectedKeys.Count) {
+            Stop-R0 'STEP_2_STATE_INSPECTION_OUTPUT_REJECTED'
+        }
+        $values = @{}
+        for ($index = 0; $index -lt $expectedKeys.Count; $index++) {
+            $parts = $actualLines[$index] -split '=', 2
+            if ($parts.Count -ne 2 -or $parts[0] -ne $expectedKeys[$index]) {
+                Stop-R0 'STEP_2_STATE_INSPECTION_OUTPUT_REJECTED'
+            }
+            $values[$parts[0]] = $parts[1]
+        }
+        if ($values.R0_STEP_2_STATE_INSPECTION -ne 'PASS' -or
+            $values.ssh_authentication -ne 'established' -or
+            $values.home_identity -ne 'pass' -or
+            $values.legacy_application_root -notin @('present', 'missing') -or
+            $values.legacy_public_root -notin @('present', 'missing') -or
+            $values.audit_root -notin @('absent', 'directory', 'symlink', 'other') -or
+            $values.candidate_directory -notin @('absent', 'directory', 'symlink', 'other', 'not_inspected') -or
+            $values.production_change_scope -ne 'none_read_only_state_inspection' -or
+            (($values.audit_root -eq 'directory') -ne ($values.candidate_directory -ne 'not_inspected'))) {
+            Stop-R0 'STEP_2_STATE_INSPECTION_OUTPUT_REJECTED'
+        }
+
+        $script:R0InspectionEvidence.status = 'PASS'
+        $script:R0InspectionEvidence.completed_at_jst = Get-JstTimestamp
+        $script:R0InspectionEvidence.result = [pscustomobject]@{
+            ssh_authentication = $values.ssh_authentication
+            home_identity = $values.home_identity
+            legacy_application_root = $values.legacy_application_root
+            legacy_public_root = $values.legacy_public_root
+            audit_root = $values.audit_root
+            candidate_directory = $values.candidate_directory
+        }
+        Save-R0InspectionEvidence
+        foreach ($key in $expectedKeys) {
+            Write-Output ($key + '=' + $values[$key])
+        }
+        Write-Output 'retry_available=false'
+        Write-Output 'secret_output=false'
+        Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'
+        exit 0
+    }
+
     $script:R0FailureStage = 'ATTEMPT_STATE'
     Start-R0Attempt -ExecutionRoot $executionRoot -StatePath $statePath -HelperSha256 $helperSha256
 
@@ -753,6 +953,19 @@ catch {
     }
     else {
         'UNEXPECTED_LOCAL_FAILURE'
+    }
+
+    if ($null -ne $script:R0InspectionEvidence -and
+        $script:R0InspectionEvidence.status -eq 'ATTEMPT_STARTED') {
+        try {
+            $script:R0InspectionEvidence.status = 'STOP'
+            $script:R0InspectionEvidence.completed_at_jst = Get-JstTimestamp
+            $script:R0InspectionEvidence.safe_error_code = $safeErrorCode
+            Save-R0InspectionEvidence
+        }
+        catch {
+            $safeErrorCode = 'LOCAL_INSPECTION_STATE_FINALIZATION_FAILED'
+        }
     }
 
     if ($null -ne $script:R0State -and
