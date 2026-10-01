@@ -114,9 +114,13 @@ $manifest = [
     'capability_contract' => [
         'application_db' => 'SUPPORTED',
         'filesystem_topology' => 'SUPPORTED',
+        'legacy_fixed_root_topology' => 'SUPPORTED',
+        'immutable_release_topology' => 'SUPPORTED',
+        'application_production_url_migration' => 'OUT_OF_SCOPE',
         'process_snapshot' => 'SUPPORTED_IF_PROC_AVAILABLE',
         'user_cron_snapshot' => 'SUPPORTED_IF_CRONTAB_AVAILABLE',
         'backup_inventory' => 'SUPPORTED_IF_PATH_SUPPLIED',
+        'public_backup_exposure' => 'UNSUPPORTED',
         'restore_readiness' => 'UNSUPPORTED',
         'external_writers' => 'UNSUPPORTED',
     ],

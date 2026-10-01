@@ -144,6 +144,7 @@ class R0AuditCorrectiveTest extends TestCase
             PHP_BINARY,
             $script,
             '--bundle-manifest='.$manifest,
+            '--topology-profile=immutable-release',
             '--current-link='.$current,
             '--previous-link='.$root.'/current.previous',
             '--shared-root='.$shared,
@@ -163,6 +164,98 @@ class R0AuditCorrectiveTest extends TestCase
         foreach (['file_put_contents(', 'unlink(', 'rename(', 'chmod(', 'chown(', 'symlink(', 'mkdir(', 'touch('] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $source);
         }
+    }
+
+    public function test_host_audit_supports_legacy_fixed_root_without_claiming_immutable_or_url_migration(): void
+    {
+        $root = storage_path('framework/testing/r0-host-audit-legacy');
+        $siteRoot = $root.'/rise-gate.com';
+        $application = $siteRoot.'/rise-gate-os';
+        $publicContainer = $siteRoot.'/public_html';
+        $public = $publicContainer.'/os.rise-gate.com';
+        $staging = $root.'/.rise-gate-os-deploy';
+        $backup = $publicContainer.'/_backup';
+        foreach ([$application, $application.'/storage', $public, $staging, $backup] as $directory) {
+            if (! is_dir($directory)) {
+                mkdir($directory, 0775, true);
+            }
+        }
+        file_put_contents($application.'/.env', 'APP_KEY=legacy-secret-output-canary');
+        file_put_contents($public.'/index.php', <<<'PHP'
+<?php
+$applicationRoot = dirname(__DIR__, 2).'/rise-gate-os';
+PHP);
+        $legacyCommit = '3e5b6b3c613f5bc41892da6613fcc323306f95fc';
+        $legacyMarker = $publicContainer.'/.rise-gate-deploy-revision';
+        file_put_contents($legacyMarker, $legacyCommit.PHP_EOL);
+        file_put_contents($backup.'/private-backup-name-canary.bin', 'synthetic');
+
+        $script = base_path('deployment/r0-audit/r0-host-audit.php');
+        $manifest = $root.'/r0-bundle-manifest.json';
+        file_put_contents($manifest, json_encode([
+            'schema_version' => 1,
+            'output_schema_version' => 2,
+            'source_commit' => R0AuditBundleVerifier::EXACT_CANDIDATE_COMMIT,
+            'bundle_id' => str_repeat('b', 64),
+            'critical_files' => [
+                'deployment/r0-audit/r0-host-audit.php' => hash_file('sha256', $script),
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $before = R0BundleHash::tree($root);
+        $process = new Process([
+            PHP_BINARY,
+            $script,
+            '--bundle-manifest='.$manifest,
+            '--topology-profile=legacy-fixed-root',
+            '--application-root='.$application,
+            '--public-root='.$public,
+            '--legacy-revision-marker='.$legacyMarker,
+            '--legacy-staging-root='.$staging,
+            '--backup-root='.$backup,
+        ], base_path());
+        $process->mustRun();
+        $after = R0BundleHash::tree($root);
+        $output = $process->getOutput();
+        $evidence = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($before, $after);
+        $this->assertSame('PASS', $evidence['status']);
+        $this->assertSame('legacy-fixed-root', $evidence['evidence']['topology']['profile']);
+        $this->assertTrue($evidence['evidence']['topology']['legacy_public_bridge']['legacy_bridge_contract_matches']);
+        $this->assertTrue($evidence['evidence']['topology']['legacy_public_bridge']['derived_application_root_matches']);
+        $this->assertSame('UNSUPPORTED', $evidence['evidence']['filesystem']['current']['status']);
+        $this->assertSame('UNSUPPORTED', $evidence['evidence']['filesystem']['shared']['status']);
+        $this->assertSame($legacyCommit, $evidence['evidence']['release_marker']['commit_sha']);
+        $this->assertFalse($evidence['evidence']['release_marker']['matches_ir1_candidate']);
+        $this->assertSame('UNKNOWN', $evidence['evidence']['release_marker']['application_scope_binding']);
+        $this->assertSame('OUT_OF_SCOPE', $evidence['evidence']['capabilities']['application_production_url_migration']);
+        $this->assertSame('UNKNOWN', $evidence['evidence']['topology']['public_backup_exposure']);
+        $this->assertStringNotContainsString('legacy-secret-output-canary', $output);
+        $this->assertStringNotContainsString('private-backup-name-canary.bin', $output);
+        $this->assertStringNotContainsString(str_replace('\\', '/', $root), str_replace('\\', '/', $output));
+
+        file_put_contents($legacyMarker, 'raw-invalid-marker-secret-canary');
+        $beforeInvalid = R0BundleHash::tree($root);
+        $invalidProcess = new Process([
+            PHP_BINARY,
+            $script,
+            '--bundle-manifest='.$manifest,
+            '--topology-profile=legacy-fixed-root',
+            '--application-root='.$application,
+            '--public-root='.$public,
+            '--legacy-revision-marker='.$legacyMarker,
+            '--legacy-staging-root='.$staging,
+            '--backup-root='.$backup,
+        ], base_path());
+        $invalidProcess->mustRun();
+        $invalidOutput = $invalidProcess->getOutput();
+        $invalidEvidence = json_decode($invalidOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame($beforeInvalid, R0BundleHash::tree($root));
+        $this->assertSame('UNKNOWN', $invalidEvidence['evidence']['release_marker']['status']);
+        $this->assertSame('legacy_release_marker_invalid', $invalidEvidence['evidence']['release_marker']['reason']);
+        $this->assertStringNotContainsString('raw-invalid-marker-secret-canary', $invalidOutput);
     }
 
     public function test_bundle_builder_is_pinned_to_exact_candidate_and_excludes_later_migrations(): void

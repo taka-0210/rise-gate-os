@@ -4,38 +4,44 @@ Status: Human approval required before any Production placement or execution.
 
 Exact candidate: `924af91188cc60d33ff87c91b94ecc1d539566e6`
 
+## Production Architecture boundary
+
+Master v054 has an approved target split: the Service Site is `company-os.jp`, the Application Production URL is `app.company-os.jp`, and `os.rise-gate.com` is the pre-migration Production environment. This R0 procedure audits the current `os.rise-gate.com` state only. It does not create the immutable release topology, configure `app.company-os.jp`, change DNS or certificates, deploy, migrate the database, edit `.env`, or switch a symlink.
+
 The bundle contains an exact `git archive` of the candidate plus the allowlisted R0 corrective overlay recorded in `r0-bundle-manifest.json`. It contains no `.env`, Git metadata, later Scope migration, CE code or MDC code.
 
 ## Responsibility split
 
 - Application / DB audit: Laravel bootstrap with Production `.env` loaded into process memory only; DB SQL is blocked before execution unless classified as `SELECT`, `SHOW`, `DESCRIBE` or `PRAGMA`.
-- Host audit: standalone PHP; does not bootstrap Laravel or connect to the DB. It observes filesystem, symlinks, PHP extensions, process counts, user cron availability and backup inventory.
+- Host audit: standalone PHP; does not bootstrap Laravel or connect to the DB. An explicit `legacy-fixed-root` or `immutable-release` profile observes only that topology, PHP extensions, process counts, user cron availability and bounded backup metadata.
 - Restore readiness and external writers remain `UNSUPPORTED` and must never be inferred as PASS.
 
 ## Future Human operation — not currently authorized
 
 1. Verify the archive SHA-256 against the approved Decision Package.
-2. Extract it into a new non-public, non-current audit directory. Never overwrite `current`, `current.previous`, shared storage or `.env`.
-3. Run the Application / DB command once, with `LOG_CHANNEL=stderr` and the existing Production `.env` supplied only through `IR1_R0_ENV_FILE`:
+2. Extract it into a new non-public, non-current audit directory. Do not place it in `public_html`, `_backup`, the legacy application root, a future release root, shared storage or `.env`.
+3. Run the Application / DB command once, with `LOG_CHANNEL=stderr` and the existing legacy Production `.env` supplied only through `IR1_R0_ENV_FILE`:
 
    ```sh
-   IR1_R0_ENV_FILE=/approved/shared/.env php deployment/r0-audit/r0-artisan.php \
+   IR1_R0_ENV_FILE=/approved/home/rise-gate.com/rise-gate-os/.env php deployment/r0-audit/r0-artisan.php \
      release:audit-r0 \
      --confirm-read-only=IR1-R0-READ-ONLY \
      --bundle-manifest=r0-bundle-manifest.json
    ```
 
-4. Run the standalone host command once:
+4. Run the standalone host command once with the legacy profile:
 
    ```sh
    php deployment/r0-audit/r0-host-audit.php \
      --bundle-manifest=r0-bundle-manifest.json \
-     --current-link=/approved/current \
-     --previous-link=/approved/current.previous \
-     --shared-root=/approved/shared \
-     --backup-root=/approved/backup
+     --topology-profile=legacy-fixed-root \
+     --application-root=/approved/home/rise-gate.com/rise-gate-os \
+     --public-root=/approved/home/rise-gate.com/public_html/os.rise-gate.com \
+     --legacy-revision-marker=/approved/home/rise-gate.com/public_html/.rise-gate-deploy-revision \
+     --legacy-staging-root=/approved/home/.rise-gate-os-deploy \
+     --backup-root=/approved/home/rise-gate.com/public_html/_backup
    ```
 
 5. Capture stdout only. Do not redirect stderr into the Evidence file. Do not retry a failed audit without a new Human review.
 
-The paths above are placeholders until sanitized topology evidence and Human approval establish the exact Production values.
+The `/approved/home` prefix remains a placeholder until the single R0 execution is separately approved. The legacy marker is not treated as site-bound merely because it contains a Git-shaped value, and `_backup` inventory does not establish restore readiness or non-public exposure. R0 results feed a later, separate immutable topology and `app.company-os.jp` migration plan.

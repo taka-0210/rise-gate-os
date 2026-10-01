@@ -26,6 +26,7 @@ function pathEvidence(string $path): array
     $target = is_link($path) ? readlink($path) : false;
     $resolved = realpath($path);
     $permissions = $exists ? fileperms($path) : false;
+    $diskPath = is_dir($path) ? $path : dirname($path);
 
     return [
         'exists' => $exists,
@@ -38,13 +39,34 @@ function pathEvidence(string $path): array
         'permissions_octal' => is_int($permissions) ? substr(sprintf('%o', $permissions), -4) : null,
         'owner_uid' => $exists ? fileowner($path) : null,
         'group_gid' => $exists ? filegroup($path) : null,
-        'disk_total_bytes' => $exists ? disk_total_space($path) : null,
-        'disk_free_bytes' => $exists ? disk_free_space($path) : null,
+        'disk_total_bytes' => $exists ? @disk_total_space($diskPath) : null,
+        'disk_free_bytes' => $exists ? @disk_free_space($diskPath) : null,
     ];
 }
 
+/** @return array<string, string> */
+function unsupportedEvidence(string $reason): array
+{
+    return ['status' => 'UNSUPPORTED', 'reason' => $reason];
+}
+
+function isSafeAuditPath(string $path): bool
+{
+    $normalized = str_replace('\\', '/', trim($path));
+    if ($normalized === '' || str_contains($normalized, chr(0))) {
+        return false;
+    }
+
+    $isAbsolute = str_starts_with($normalized, '/')
+        || preg_match('/\A[A-Za-z]:\//', $normalized) === 1;
+    $isRoot = $normalized === '/'
+        || preg_match('/\A[A-Za-z]:\/?\z/', rtrim($normalized, '/')) === 1;
+
+    return $isAbsolute && ! $isRoot;
+}
+
 /** @return array<string, mixed> */
-function releaseMarker(string $currentPath): array
+function immutableReleaseMarker(string $currentPath): array
 {
     $target = realpath($currentPath);
     if ($target === false) {
@@ -77,6 +99,80 @@ function releaseMarker(string $currentPath): array
         'rc_sha' => preg_match('/\A[a-f0-9]{40}\z/', $rcSha) ? $rcSha : null,
         'artifact_sha256' => preg_match('/\A[a-f0-9]{64}\z/', $artifactSha) ? $artifactSha : null,
         'release_case' => preg_match('/\A[A-Za-z0-9._-]{1,100}\z/', $releaseCase) ? $releaseCase : null,
+    ];
+}
+
+/** @return array<string, mixed> */
+function legacyReleaseMarker(string $markerPath, string $publicRoot): array
+{
+    if (! is_file($markerPath) || ! is_readable($markerPath)) {
+        return ['status' => 'UNKNOWN', 'reason' => 'legacy_release_marker_unavailable'];
+    }
+
+    $size = filesize($markerPath);
+    if (! is_int($size) || $size > 4096) {
+        return ['status' => 'UNKNOWN', 'reason' => 'legacy_release_marker_unsafe_size'];
+    }
+
+    $value = file_get_contents($markerPath);
+    if (! is_string($value)) {
+        return ['status' => 'UNKNOWN', 'reason' => 'legacy_release_marker_unreadable'];
+    }
+
+    $commit = strtolower(trim($value));
+    if (preg_match('/\A[a-f0-9]{40}\z/', $commit) !== 1) {
+        return ['status' => 'UNKNOWN', 'reason' => 'legacy_release_marker_invalid'];
+    }
+
+    $markerContainer = realpath(dirname($markerPath));
+    $publicContainer = realpath(dirname($publicRoot));
+
+    return [
+        'status' => 'SUPPORTED',
+        'commit_sha' => $commit,
+        'matches_ir1_candidate' => hash_equals(R0_HOST_EXACT_CANDIDATE, $commit),
+        'marker_in_public_container_parent' => is_string($markerContainer)
+            && is_string($publicContainer)
+            && hash_equals(str_replace('\\', '/', $publicContainer), str_replace('\\', '/', $markerContainer)),
+        'application_scope_binding' => 'UNKNOWN',
+    ];
+}
+
+/** @return array<string, mixed> */
+function legacyBridgeEvidence(string $applicationRoot, string $publicRoot): array
+{
+    $indexPath = $publicRoot.DIRECTORY_SEPARATOR.'index.php';
+    if (! is_file($indexPath) || ! is_readable($indexPath)) {
+        return ['status' => 'UNKNOWN', 'reason' => 'legacy_public_index_unavailable'];
+    }
+
+    $size = filesize($indexPath);
+    if (! is_int($size) || $size > 1048576) {
+        return ['status' => 'UNKNOWN', 'reason' => 'legacy_public_index_unsafe_size'];
+    }
+
+    $source = file_get_contents($indexPath);
+    if (! is_string($source)) {
+        return ['status' => 'UNKNOWN', 'reason' => 'legacy_public_index_unreadable'];
+    }
+
+    return legacyBridgeResult($applicationRoot, $publicRoot, $source);
+}
+
+/** @return array<string, mixed> */
+function legacyBridgeResult(string $applicationRoot, string $publicRoot, string $source): array
+{
+    $actualApplication = realpath($applicationRoot);
+    $derivedApplication = realpath(dirname($publicRoot, 2).DIRECTORY_SEPARATOR.'rise-gate-os');
+    $expectedBridge = preg_match('~dirname\(__DIR__, 2\).*rise-gate-os~', $source) === 1;
+
+    return [
+        'status' => 'SUPPORTED',
+        'public_index_sha256' => hash('sha256', $source),
+        'legacy_bridge_contract_matches' => $expectedBridge,
+        'derived_application_root_matches' => is_string($actualApplication)
+            && is_string($derivedApplication)
+            && hash_equals(str_replace('\\', '/', $actualApplication), str_replace('\\', '/', $derivedApplication)),
     ];
 }
 
@@ -177,11 +273,41 @@ function backupEvidence(?string $path): array
     ];
 }
 
-$options = getopt('', ['bundle-manifest:', 'current-link:', 'previous-link:', 'shared-root:', 'backup-root::']);
-foreach (['bundle-manifest', 'current-link', 'previous-link', 'shared-root'] as $required) {
+$options = getopt('', [
+    'bundle-manifest:',
+    'topology-profile:',
+    'current-link:',
+    'previous-link:',
+    'shared-root:',
+    'application-root:',
+    'public-root:',
+    'legacy-revision-marker:',
+    'legacy-staging-root:',
+    'backup-root::',
+]);
+foreach (['bundle-manifest', 'topology-profile'] as $required) {
     if (! isset($options[$required]) || ! is_string($options[$required]) || trim($options[$required]) === '') {
         failSafe('R0_HOST_REQUIRED_OPTION_MISSING', 'host_preflight');
     }
+}
+
+$profile = (string) $options['topology-profile'];
+$profileRequirements = match ($profile) {
+    'immutable-release' => ['current-link', 'previous-link', 'shared-root'],
+    'legacy-fixed-root' => ['application-root', 'public-root', 'legacy-revision-marker', 'legacy-staging-root'],
+    default => null,
+};
+if ($profileRequirements === null) {
+    failSafe('R0_HOST_TOPOLOGY_PROFILE_INVALID', 'host_preflight');
+}
+foreach ($profileRequirements as $required) {
+    if (! isset($options[$required]) || ! is_string($options[$required]) || ! isSafeAuditPath($options[$required])) {
+        failSafe('R0_HOST_TOPOLOGY_PATH_INVALID', 'host_preflight');
+    }
+}
+if (isset($options['backup-root'])
+    && (! is_string($options['backup-root']) || ! isSafeAuditPath($options['backup-root']))) {
+    failSafe('R0_HOST_BACKUP_PATH_INVALID', 'host_preflight');
 }
 
 try {
@@ -207,9 +333,49 @@ try {
         failSafe('R0_HOST_SCRIPT_HASH_MISMATCH', 'host_preflight');
     }
 
-    $current = (string) $options['current-link'];
     $extensions = get_loaded_extensions();
     sort($extensions);
+
+    if ($profile === 'immutable-release') {
+        $current = (string) $options['current-link'];
+        $filesystem = [
+            'current' => pathEvidence($current),
+            'current_previous' => pathEvidence((string) $options['previous-link']),
+            'shared' => pathEvidence((string) $options['shared-root']),
+            'backup' => isset($options['backup-root']) && is_string($options['backup-root'])
+                ? pathEvidence($options['backup-root']) : ['status' => 'UNKNOWN'],
+        ];
+        $marker = immutableReleaseMarker($current);
+        $topology = [
+            'profile' => 'immutable-release',
+            'legacy_public_bridge' => unsupportedEvidence('immutable_release_profile'),
+            'legacy_marker_scope_binding' => 'UNSUPPORTED',
+            'public_backup_exposure' => 'UNKNOWN',
+        ];
+    } else {
+        $applicationRoot = (string) $options['application-root'];
+        $publicRoot = (string) $options['public-root'];
+        $markerPath = (string) $options['legacy-revision-marker'];
+        $filesystem = [
+            'current' => unsupportedEvidence('legacy_fixed_root_profile'),
+            'current_previous' => unsupportedEvidence('legacy_fixed_root_profile'),
+            'shared' => unsupportedEvidence('legacy_state_is_not_separated'),
+            'application' => pathEvidence($applicationRoot),
+            'application_env' => pathEvidence($applicationRoot.DIRECTORY_SEPARATOR.'.env'),
+            'application_storage' => pathEvidence($applicationRoot.DIRECTORY_SEPARATOR.'storage'),
+            'public' => pathEvidence($publicRoot),
+            'legacy_staging' => pathEvidence((string) $options['legacy-staging-root']),
+            'backup' => isset($options['backup-root']) && is_string($options['backup-root'])
+                ? pathEvidence($options['backup-root']) : ['status' => 'UNKNOWN'],
+        ];
+        $marker = legacyReleaseMarker($markerPath, $publicRoot);
+        $topology = [
+            'profile' => 'legacy-fixed-root',
+            'legacy_public_bridge' => legacyBridgeEvidence($applicationRoot, $publicRoot),
+            'legacy_marker_scope_binding' => 'UNKNOWN',
+            'public_backup_exposure' => 'UNKNOWN',
+        ];
+    }
 
     fwrite(STDOUT, json_encode([
         'output_schema_version' => R0_HOST_OUTPUT_SCHEMA_VERSION,
@@ -224,14 +390,9 @@ try {
                 'bundle_manifest_sha256' => hash_file('sha256', $manifestPath),
             ],
             'php_cli' => ['version' => PHP_VERSION, 'extensions' => $extensions],
-            'filesystem' => [
-                'current' => pathEvidence($current),
-                'current_previous' => pathEvidence((string) $options['previous-link']),
-                'shared' => pathEvidence((string) $options['shared-root']),
-                'backup' => isset($options['backup-root']) && is_string($options['backup-root'])
-                    ? pathEvidence($options['backup-root']) : ['status' => 'UNKNOWN'],
-            ],
-            'release_marker' => releaseMarker($current),
+            'topology' => $topology,
+            'filesystem' => $filesystem,
+            'release_marker' => $marker,
             'processes' => processEvidence(),
             'cron' => cronEvidence(),
             'backup' => backupEvidence(isset($options['backup-root']) && is_string($options['backup-root']) ? $options['backup-root'] : null),
@@ -239,12 +400,16 @@ try {
             'capabilities' => [
                 'release_marker' => 'SUPPORTED_IF_PRESENT',
                 'filesystem_topology' => 'SUPPORTED',
+                'legacy_fixed_root_topology' => $profile === 'legacy-fixed-root' ? 'SUPPORTED' : 'UNSUPPORTED',
+                'immutable_current_links' => $profile === 'immutable-release' ? 'SUPPORTED' : 'UNSUPPORTED',
+                'application_production_url_migration' => 'OUT_OF_SCOPE',
                 'php_cli_extensions' => 'SUPPORTED',
                 'disk_and_permissions' => 'SUPPORTED',
                 'queue_worker_process_snapshot' => is_dir('/proc') ? 'SUPPORTED' : 'UNKNOWN',
                 'user_cron_snapshot' => function_exists('proc_open') ? 'SUPPORTED_IF_AVAILABLE' : 'UNSUPPORTED',
                 'backup_inventory' => 'SUPPORTED_IF_PATH_SUPPLIED',
                 'restore_readiness' => 'UNSUPPORTED',
+                'public_backup_exposure' => 'UNSUPPORTED',
                 'external_writers' => 'UNSUPPORTED',
             ],
         ],

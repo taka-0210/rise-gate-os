@@ -1,5 +1,7 @@
 # Company OS｜IR-1 R0 Production Read-only Audit Corrective v001
 
+Execution note: the later Human-confirmed legacy fixed-root topology and Master v054 Production URL boundary are incorporated in `CompanyOS_IR1_R0_Legacy_Topology_Corrective_Decision_v001.md`. Use that package and its updated procedure for any future R0 approval; do not execute the earlier placeholder host command.
+
 Date: 2026-10-01 JST
 
 Status: Provider-free Corrective complete / Production execution not authorized
