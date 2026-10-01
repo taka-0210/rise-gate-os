@@ -10,7 +10,9 @@ param(
 
     [switch] $InspectStep2RemoteStateOnly,
 
-    [switch] $InspectStep2RemoteContentsOnly
+    [switch] $InspectStep2RemoteContentsOnly,
+
+    [switch] $ReconcileStep2PreparedStateOnly
 )
 
 Set-StrictMode -Version Latest
@@ -451,6 +453,13 @@ function Invoke-HelperSelfTest {
         }
     }
 
+    $reconciledState = [pscustomobject]@{
+        attempts = @([pscustomobject]@{ step = 2; status = 'STOP' })
+        last_step = 2
+        last_status = 'PASS'
+    }
+    Assert-StepEligibility -State $reconciledState -RequestedStep 3
+
     $safeEvidence = @{ status = 'PASS' } | ConvertTo-Json -Compress
     $secretEvidence = @{ DB_PASSWORD = 'secret-output-canary' } | ConvertTo-Json -Compress
     if (-not (Test-SafeJsonEvidence -Value $safeEvidence)) {
@@ -803,6 +812,7 @@ try {
         Write-Output 'secret_output_guard_verified=true'
         Write-Output 'production_scope_guard_verified=true'
         Write-Output 'native_stderr_capture_verified=true'
+        Write-Output 'step_3_eligibility_contract_verified=true'
         Write-Output "candidate=$script:R0Candidate"
         Write-Output "helper_sha256=$helperSha256"
         Write-Output 'network_connection_attempted=false'
@@ -823,6 +833,133 @@ try {
         'storage\app\release-audit\production-r0-human-' + $script:R0Candidate + '-' + $script:R0ExecutionGeneration
     )
     $statePath = Join-Path $executionRoot 'execution-state.json'
+
+    if ($ReconcileStep2PreparedStateOnly) {
+        $script:R0FailureStage = 'STEP_2_EVIDENCE_RECONCILIATION'
+        if ($Step -ne 2) {
+            Stop-R0 'STEP_2_RECONCILIATION_STEP_MISMATCH'
+        }
+
+        $priorState = Read-R0State -Path $statePath
+        $priorAttempts = @($priorState.attempts)
+        if ($priorState.last_step -ne 2 -or
+            $priorState.last_status -ne 'STOP' -or
+            $priorAttempts.Count -ne 1 -or
+            $priorAttempts[0].step -ne 2 -or
+            $priorAttempts[0].status -ne 'STOP' -or
+            $priorAttempts[0].safe_error_code -ne 'STEP_2_REMOTE_PREPARATION_FAILED') {
+            Stop-R0 'STEP_2_RECONCILIATION_PRIOR_STATE_MISMATCH'
+        }
+        if ($priorState.PSObject.Properties.Name -contains 'evidence_reconciliations') {
+            $existingReconciliations = @($priorState.evidence_reconciliations)
+            if ($existingReconciliations.Count -gt 0) {
+                Stop-R0 'STEP_2_RECONCILIATION_ALREADY_APPLIED'
+            }
+        }
+
+        $stateInspectionPath = Join-Path $executionRoot 'step2-remote-state-inspection.json'
+        $contentInspectionPath = Join-Path $executionRoot 'step2-remote-content-inspection.json'
+        if (-not (Test-Path -LiteralPath $stateInspectionPath -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $contentInspectionPath -PathType Leaf)) {
+            Stop-R0 'STEP_2_RECONCILIATION_EVIDENCE_MISSING'
+        }
+        try {
+            $stateInspection = Get-Content -Raw -LiteralPath $stateInspectionPath | ConvertFrom-Json
+            $contentInspection = Get-Content -Raw -LiteralPath $contentInspectionPath | ConvertFrom-Json
+        }
+        catch {
+            Stop-R0 'STEP_2_RECONCILIATION_EVIDENCE_INVALID'
+        }
+
+        if ($stateInspection.schema_version -ne 1 -or
+            $stateInspection.candidate -ne $script:R0Candidate -or
+            $stateInspection.execution_generation -ne $script:R0ExecutionGeneration -or
+            $stateInspection.inspection_id -ne 'step2-state-inspection-1' -or
+            $stateInspection.status -ne 'PASS' -or
+            $stateInspection.production_change_scope -ne 'none_read_only_state_inspection' -or
+            $stateInspection.retry_performed -ne $false -or
+            $stateInspection.raw_stdout_stored -ne $false -or
+            $stateInspection.raw_stderr_stored -ne $false -or
+            $stateInspection.result.ssh_authentication -ne 'established' -or
+            $stateInspection.result.home_identity -ne 'pass' -or
+            $stateInspection.result.legacy_application_root -ne 'present' -or
+            $stateInspection.result.legacy_public_root -ne 'present' -or
+            $stateInspection.result.audit_root -ne 'directory' -or
+            $stateInspection.result.candidate_directory -ne 'directory') {
+            Stop-R0 'STEP_2_RECONCILIATION_STATE_EVIDENCE_MISMATCH'
+        }
+
+        if ($contentInspection.schema_version -ne 1 -or
+            $contentInspection.candidate -ne $script:R0Candidate -or
+            $contentInspection.execution_generation -ne $script:R0ExecutionGeneration -or
+            $contentInspection.inspection_id -ne 'step2-content-inspection-1' -or
+            $contentInspection.status -ne 'PASS' -or
+            $contentInspection.production_change_scope -ne 'none_read_only_content_inspection' -or
+            $contentInspection.retry_performed -ne $false -or
+            $contentInspection.raw_stdout_stored -ne $false -or
+            $contentInspection.raw_stderr_stored -ne $false -or
+            $contentInspection.result.audit_root_writable -ne 'yes' -or
+            $contentInspection.result.candidate_directory_writable -ne 'yes' -or
+            $contentInspection.result.audit_root_entry_count -ne 1 -or
+            $contentInspection.result.audit_root_unexpected_entry_count -ne 0 -or
+            $contentInspection.result.candidate_entry_count -ne 0 -or
+            $contentInspection.result.candidate_unexpected_entry_count -ne 0 -or
+            $contentInspection.result.candidate_symlink_count -ne 0 -or
+            $contentInspection.result.bundle_archive_state -ne 'absent' -or
+            $contentInspection.result.bundle_archive_integrity -ne 'not_applicable' -or
+            $contentInspection.result.bundle_directory_state -ne 'absent' -or
+            $contentInspection.result.bundle_manifest_integrity -ne 'not_inspected' -or
+            $contentInspection.result.bundle_env_present -ne 'not_inspected') {
+            Stop-R0 'STEP_2_RECONCILIATION_CONTENT_EVIDENCE_MISMATCH'
+        }
+
+        $reconciledAt = Get-JstTimestamp
+        $reconciliation = [pscustomobject]@{
+            record_type = 'EVIDENCE_RECONCILIATION'
+            step = 2
+            disposition = 'ADOPTED_EXISTING_EMPTY_DIRECTORIES'
+            status = 'PASS'
+            reconciled_at_jst = $reconciledAt
+            helper_sha256 = $helperSha256
+            state_inspection_sha256 = (Get-FileHash -LiteralPath $stateInspectionPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            content_inspection_sha256 = (Get-FileHash -LiteralPath $contentInspectionPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            prior_attempt_preserved = $true
+            attempt_performed = $false
+            production_connection_attempted = $false
+            production_mutation = $false
+            step_2_retry = $false
+            cleanup_performed = $false
+            directory_recreated = $false
+            state_transition = 'STEP_2_STOP_TO_RECONCILED_PASS'
+        }
+        if ($priorState.PSObject.Properties.Name -contains 'evidence_reconciliations') {
+            $priorState.evidence_reconciliations = @($priorState.evidence_reconciliations) + @($reconciliation)
+        }
+        else {
+            $priorState | Add-Member -NotePropertyName evidence_reconciliations -NotePropertyValue @($reconciliation)
+        }
+        $priorState.last_step = 2
+        $priorState.last_status = 'PASS'
+
+        $script:R0StatePath = $statePath
+        $script:R0State = $priorState
+        Save-R0State
+        Assert-StepEligibility -State $script:R0State -RequestedStep 3
+
+        Write-Output 'R0_STEP_2_RECONCILIATION=PASS'
+        Write-Output 'record_type=EVIDENCE_RECONCILIATION'
+        Write-Output 'disposition=ADOPTED_EXISTING_EMPTY_DIRECTORIES'
+        Write-Output 'attempt_performed=false'
+        Write-Output 'production_connection_attempted=false'
+        Write-Output 'production_mutation=false'
+        Write-Output 'step_2_retry=false'
+        Write-Output 'cleanup_performed=false'
+        Write-Output 'directory_recreated=false'
+        Write-Output 'step_3_eligible=true'
+        Write-Output 'step_3_executed=false'
+        Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'
+        exit 0
+    }
 
     if ($InspectStep2RemoteStateOnly) {
         $script:R0FailureStage = 'STEP_2_STATE_INSPECTION_PRECONDITIONS'
