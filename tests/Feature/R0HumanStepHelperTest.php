@@ -33,6 +33,7 @@ class R0HumanStepHelperTest extends TestCase
             'production_connection_attempted',
             'VerifyLocalPreconditionsOnly',
             'InspectStep2RemoteStateOnly',
+            'InspectStep2RemoteContentsOnly',
             'LOCAL_SSH_CONFIG_PARSE',
             'LOCAL_HOST_KEY_LOOKUP',
             'LOCAL_NATIVE_PROCESS_CAPTURE_FAILURE',
@@ -40,6 +41,8 @@ class R0HumanStepHelperTest extends TestCase
             'native_stderr_capture_verified=true',
             'STEP_2_STATE_INSPECTION_RETRY_FORBIDDEN',
             'production_change_scope=none_read_only_state_inspection',
+            'STEP_2_CONTENT_INSPECTION_RETRY_FORBIDDEN',
+            'production_change_scope=none_read_only_content_inspection',
             'raw_exception_stored',
             'secret_output=false',
             'next_action=RETURN_TO_HUMAN_CHATGPT',
@@ -53,6 +56,8 @@ class R0HumanStepHelperTest extends TestCase
         $this->assertStringContainsString('production_change_scope=isolated_audit_directories_only', $source);
         $this->assertStringContainsString('Get-Step2StateInspectionScript', $source);
         $this->assertStringContainsString('SELF_TEST_STEP_2_INSPECTION_MUTATION_PRESENT', $source);
+        $this->assertStringContainsString('Get-Step2ContentInspectionScript', $source);
+        $this->assertStringContainsString('SELF_TEST_STEP_2_CONTENT_INSPECTION_MUTATION_PRESENT', $source);
         $this->assertStringNotContainsString('Write-Output $result.Stdout', $source);
         $this->assertStringNotContainsString('Write-Output $result.Stderr', $source);
         $this->assertStringNotContainsString('Remove-Item -Recurse', $source);

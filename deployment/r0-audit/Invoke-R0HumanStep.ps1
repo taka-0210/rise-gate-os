@@ -8,7 +8,9 @@ param(
 
     [switch] $VerifyLocalPreconditionsOnly,
 
-    [switch] $InspectStep2RemoteStateOnly
+    [switch] $InspectStep2RemoteStateOnly,
+
+    [switch] $InspectStep2RemoteContentsOnly
 )
 
 Set-StrictMode -Version Latest
@@ -503,6 +505,23 @@ function Invoke-HelperSelfTest {
             Stop-R0 'SELF_TEST_STEP_2_INSPECTION_MUTATION_PRESENT'
         }
     }
+
+    $contentInspectionScript = Get-Step2ContentInspectionScript
+    foreach ($required in @(
+        'bundle_archive_integrity=',
+        'candidate_unexpected_entry_count=',
+        'production_change_scope=none_read_only_content_inspection'
+    )) {
+        if (-not $contentInspectionScript.Contains($required)) {
+            Stop-R0 'SELF_TEST_STEP_2_CONTENT_INSPECTION_INCOMPLETE'
+        }
+    }
+    $contentInspectionLines = @($contentInspectionScript -split '\r?\n' | ForEach-Object { $_.Trim() })
+    foreach ($prefix in @('mkdir ', 'rm ', 'chmod ', 'chown ', 'ln ', 'mv ', 'cp ', 'touch ', 'tar ')) {
+        if ($contentInspectionLines | Where-Object { $_.StartsWith($prefix) }) {
+            Stop-R0 'SELF_TEST_STEP_2_CONTENT_INSPECTION_MUTATION_PRESENT'
+        }
+    }
 }
 
 function Get-Step2Script {
@@ -618,6 +637,88 @@ test "$R0_VERSION_ID" -lt 90000
 printf 'R0_STEP_4=PASS\n'
 printf 'bundle_integrity=PASS\n'
 printf 'php_cli_compatible=true\n'
+'@
+}
+
+function Get-Step2ContentInspectionScript {
+    return @'
+set -eu
+ACTUAL_HOME=$(cd -- ${HOME} && pwd -P)
+case ${ACTUAL_HOME} in
+  /home/[A-Za-z0-9._-]*) ;;
+  *) exit 41 ;;
+esac
+AUDIT_ROOT=${ACTUAL_HOME}/.ir1-r0-audit
+CANDIDATE_NAME=924af91188cc60d33ff87c91b94ecc1d539566e6
+CANDIDATE_DIR=${AUDIT_ROOT}/${CANDIDATE_NAME}
+BUNDLE_NAME=ir1-r0-audit-bundle-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz
+BUNDLE_PATH=${CANDIDATE_DIR}/${BUNDLE_NAME}
+BUNDLE_DIR=${CANDIDATE_DIR}/bundle
+EXPECTED_BUNDLE_HASH=a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d
+EXPECTED_MANIFEST_HASH=a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7
+test -d ${AUDIT_ROOT}
+test ! -L ${AUDIT_ROOT}
+test -d ${CANDIDATE_DIR}
+test ! -L ${CANDIDATE_DIR}
+if test -w ${AUDIT_ROOT}; then ROOT_WRITABLE=yes; else ROOT_WRITABLE=no; fi
+if test -w ${CANDIDATE_DIR}; then CANDIDATE_WRITABLE=yes; else CANDIDATE_WRITABLE=no; fi
+ROOT_ENTRY_COUNT=$(find ${AUDIT_ROOT} -mindepth 1 -maxdepth 1 -print | wc -l | tr -d '[:space:]')
+ROOT_UNEXPECTED_COUNT=$(find ${AUDIT_ROOT} -mindepth 1 -maxdepth 1 ! -name ${CANDIDATE_NAME} -print | wc -l | tr -d '[:space:]')
+CANDIDATE_ENTRY_COUNT=$(find ${CANDIDATE_DIR} -mindepth 1 -maxdepth 1 -print | wc -l | tr -d '[:space:]')
+CANDIDATE_UNEXPECTED_COUNT=$(find ${CANDIDATE_DIR} -mindepth 1 -maxdepth 1 ! -name ${BUNDLE_NAME} ! -name bundle -print | wc -l | tr -d '[:space:]')
+SYMLINK_COUNT=$(find ${CANDIDATE_DIR} -type l -print | wc -l | tr -d '[:space:]')
+if test -L ${BUNDLE_PATH}; then
+  ARCHIVE_STATE=symlink
+  ARCHIVE_INTEGRITY=not_applicable
+elif test -f ${BUNDLE_PATH}; then
+  ARCHIVE_STATE=regular_file
+  ACTUAL_BUNDLE_HASH=$(sha256sum ${BUNDLE_PATH} | awk '{print $1}')
+  if test ${ACTUAL_BUNDLE_HASH} = ${EXPECTED_BUNDLE_HASH}; then ARCHIVE_INTEGRITY=match; else ARCHIVE_INTEGRITY=mismatch; fi
+elif test -e ${BUNDLE_PATH}; then
+  ARCHIVE_STATE=other
+  ARCHIVE_INTEGRITY=not_applicable
+else
+  ARCHIVE_STATE=absent
+  ARCHIVE_INTEGRITY=not_applicable
+fi
+if test -L ${BUNDLE_DIR}; then
+  BUNDLE_DIR_STATE=symlink
+elif test -d ${BUNDLE_DIR}; then
+  BUNDLE_DIR_STATE=directory
+elif test -e ${BUNDLE_DIR}; then
+  BUNDLE_DIR_STATE=other
+else
+  BUNDLE_DIR_STATE=absent
+fi
+if test ${BUNDLE_DIR_STATE} = directory; then
+  MANIFEST_PATH=${BUNDLE_DIR}/r0-bundle-manifest.json
+  if test -L ${MANIFEST_PATH}; then
+    MANIFEST_INTEGRITY=symlink
+  elif test -f ${MANIFEST_PATH}; then
+    ACTUAL_MANIFEST_HASH=$(sha256sum ${MANIFEST_PATH} | awk '{print $1}')
+    if test ${ACTUAL_MANIFEST_HASH} = ${EXPECTED_MANIFEST_HASH}; then MANIFEST_INTEGRITY=match; else MANIFEST_INTEGRITY=mismatch; fi
+  else
+    MANIFEST_INTEGRITY=missing
+  fi
+  if test -e ${BUNDLE_DIR}/.env || test -L ${BUNDLE_DIR}/.env; then BUNDLE_ENV_PRESENT=yes; else BUNDLE_ENV_PRESENT=no; fi
+else
+  MANIFEST_INTEGRITY=not_inspected
+  BUNDLE_ENV_PRESENT=not_inspected
+fi
+printf 'R0_STEP_2_CONTENT_INSPECTION=PASS\n'
+printf 'audit_root_writable=%s\n' ${ROOT_WRITABLE}
+printf 'candidate_directory_writable=%s\n' ${CANDIDATE_WRITABLE}
+printf 'audit_root_entry_count=%s\n' ${ROOT_ENTRY_COUNT}
+printf 'audit_root_unexpected_entry_count=%s\n' ${ROOT_UNEXPECTED_COUNT}
+printf 'candidate_entry_count=%s\n' ${CANDIDATE_ENTRY_COUNT}
+printf 'candidate_unexpected_entry_count=%s\n' ${CANDIDATE_UNEXPECTED_COUNT}
+printf 'candidate_symlink_count=%s\n' ${SYMLINK_COUNT}
+printf 'bundle_archive_state=%s\n' ${ARCHIVE_STATE}
+printf 'bundle_archive_integrity=%s\n' ${ARCHIVE_INTEGRITY}
+printf 'bundle_directory_state=%s\n' ${BUNDLE_DIR_STATE}
+printf 'bundle_manifest_integrity=%s\n' ${MANIFEST_INTEGRITY}
+printf 'bundle_env_present=%s\n' ${BUNDLE_ENV_PRESENT}
+printf 'production_change_scope=none_read_only_content_inspection\n'
 '@
 }
 
@@ -830,6 +931,158 @@ try {
             legacy_public_root = $values.legacy_public_root
             audit_root = $values.audit_root
             candidate_directory = $values.candidate_directory
+        }
+        Save-R0InspectionEvidence
+        foreach ($key in $expectedKeys) {
+            Write-Output ($key + '=' + $values[$key])
+        }
+        Write-Output 'retry_available=false'
+        Write-Output 'secret_output=false'
+        Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'
+        exit 0
+    }
+
+    if ($InspectStep2RemoteContentsOnly) {
+        $script:R0FailureStage = 'STEP_2_CONTENT_INSPECTION_PRECONDITIONS'
+        if ($Step -ne 2) {
+            Stop-R0 'STEP_2_CONTENT_INSPECTION_STEP_MISMATCH'
+        }
+        $stateInspectionPath = Join-Path $executionRoot 'step2-remote-state-inspection.json'
+        if (-not (Test-Path -LiteralPath $stateInspectionPath -PathType Leaf)) {
+            Stop-R0 'STEP_2_CONTENT_INSPECTION_STATE_EVIDENCE_MISSING'
+        }
+        try {
+            $stateInspection = Get-Content -Raw -LiteralPath $stateInspectionPath | ConvertFrom-Json
+        }
+        catch {
+            Stop-R0 'STEP_2_CONTENT_INSPECTION_STATE_EVIDENCE_INVALID'
+        }
+        if ($stateInspection.status -ne 'PASS' -or
+            $stateInspection.inspection_id -ne 'step2-state-inspection-1' -or
+            $stateInspection.result.audit_root -ne 'directory' -or
+            $stateInspection.result.candidate_directory -ne 'directory') {
+            Stop-R0 'STEP_2_CONTENT_INSPECTION_STATE_EVIDENCE_MISMATCH'
+        }
+
+        $script:R0InspectionEvidencePath = Join-Path $executionRoot 'step2-remote-content-inspection.json'
+        if (Test-Path -LiteralPath $script:R0InspectionEvidencePath) {
+            Stop-R0 'STEP_2_CONTENT_INSPECTION_RETRY_FORBIDDEN'
+        }
+        $script:R0InspectionEvidence = [pscustomobject]@{
+            schema_version = 1
+            candidate = $script:R0Candidate
+            execution_generation = $script:R0ExecutionGeneration
+            inspection_id = 'step2-content-inspection-1'
+            helper_sha256 = $helperSha256
+            status = 'ATTEMPT_STARTED'
+            started_at_jst = Get-JstTimestamp
+            completed_at_jst = $null
+            production_connection_attempted = $false
+            production_change_scope = 'none_read_only_content_inspection'
+            remote_exit_code = $null
+            stderr_sha256 = $null
+            stderr_bytes = 0
+            safe_error_code = $null
+            retry_performed = $false
+            raw_stdout_stored = $false
+            raw_stderr_stored = $false
+            result = $null
+        }
+        Save-R0InspectionEvidence
+
+        $script:R0FailureStage = 'STEP_2_REMOTE_CONTENT_INSPECTION'
+        $script:R0ProductionConnectionAttempted = $true
+        $script:R0InspectionEvidence.production_connection_attempted = $true
+        Save-R0InspectionEvidence
+        $contentResult = Invoke-RemoteScript `
+            -SshPath $preconditions.SshPath `
+            -Script (Get-Step2ContentInspectionScript)
+        $script:R0InspectionEvidence.remote_exit_code = $contentResult.ExitCode
+        $script:R0InspectionEvidence.stderr_sha256 = if ([string]::IsNullOrEmpty($contentResult.Stderr)) {
+            $null
+        }
+        else {
+            Get-Sha256Text $contentResult.Stderr
+        }
+        $script:R0InspectionEvidence.stderr_bytes = if ([string]::IsNullOrEmpty($contentResult.Stderr)) {
+            0
+        }
+        else {
+            [Text.Encoding]::UTF8.GetByteCount($contentResult.Stderr)
+        }
+        if ($contentResult.ExitCode -ne 0) {
+            Stop-R0 'STEP_2_REMOTE_CONTENT_INSPECTION_FAILED'
+        }
+
+        $expectedKeys = @(
+            'R0_STEP_2_CONTENT_INSPECTION',
+            'audit_root_writable',
+            'candidate_directory_writable',
+            'audit_root_entry_count',
+            'audit_root_unexpected_entry_count',
+            'candidate_entry_count',
+            'candidate_unexpected_entry_count',
+            'candidate_symlink_count',
+            'bundle_archive_state',
+            'bundle_archive_integrity',
+            'bundle_directory_state',
+            'bundle_manifest_integrity',
+            'bundle_env_present',
+            'production_change_scope'
+        )
+        $actualLines = @($contentResult.Stdout -split '\r?\n' | Where-Object { $_ -ne '' })
+        if ($actualLines.Count -ne $expectedKeys.Count) {
+            Stop-R0 'STEP_2_CONTENT_INSPECTION_OUTPUT_REJECTED'
+        }
+        $values = @{}
+        for ($index = 0; $index -lt $expectedKeys.Count; $index++) {
+            $parts = $actualLines[$index] -split '=', 2
+            if ($parts.Count -ne 2 -or $parts[0] -ne $expectedKeys[$index]) {
+                Stop-R0 'STEP_2_CONTENT_INSPECTION_OUTPUT_REJECTED'
+            }
+            $values[$parts[0]] = $parts[1]
+        }
+        foreach ($numericKey in @(
+            'audit_root_entry_count',
+            'audit_root_unexpected_entry_count',
+            'candidate_entry_count',
+            'candidate_unexpected_entry_count',
+            'candidate_symlink_count'
+        )) {
+            if ($values[$numericKey] -notmatch '^\d+$') {
+                Stop-R0 'STEP_2_CONTENT_INSPECTION_OUTPUT_REJECTED'
+            }
+        }
+        if ($values.R0_STEP_2_CONTENT_INSPECTION -ne 'PASS' -or
+            $values.audit_root_writable -notin @('yes', 'no') -or
+            $values.candidate_directory_writable -notin @('yes', 'no') -or
+            $values.bundle_archive_state -notin @('absent', 'regular_file', 'symlink', 'other') -or
+            $values.bundle_archive_integrity -notin @('match', 'mismatch', 'not_applicable') -or
+            $values.bundle_directory_state -notin @('absent', 'directory', 'symlink', 'other') -or
+            $values.bundle_manifest_integrity -notin @('match', 'mismatch', 'missing', 'symlink', 'not_inspected') -or
+            $values.bundle_env_present -notin @('yes', 'no', 'not_inspected') -or
+            $values.production_change_scope -ne 'none_read_only_content_inspection' -or
+            (($values.bundle_archive_state -eq 'regular_file') -ne ($values.bundle_archive_integrity -in @('match', 'mismatch'))) -or
+            (($values.bundle_directory_state -eq 'directory') -ne ($values.bundle_manifest_integrity -ne 'not_inspected')) -or
+            (($values.bundle_directory_state -eq 'directory') -ne ($values.bundle_env_present -ne 'not_inspected'))) {
+            Stop-R0 'STEP_2_CONTENT_INSPECTION_OUTPUT_REJECTED'
+        }
+
+        $script:R0InspectionEvidence.status = 'PASS'
+        $script:R0InspectionEvidence.completed_at_jst = Get-JstTimestamp
+        $script:R0InspectionEvidence.result = [pscustomobject]@{
+            audit_root_writable = $values.audit_root_writable
+            candidate_directory_writable = $values.candidate_directory_writable
+            audit_root_entry_count = [int] $values.audit_root_entry_count
+            audit_root_unexpected_entry_count = [int] $values.audit_root_unexpected_entry_count
+            candidate_entry_count = [int] $values.candidate_entry_count
+            candidate_unexpected_entry_count = [int] $values.candidate_unexpected_entry_count
+            candidate_symlink_count = [int] $values.candidate_symlink_count
+            bundle_archive_state = $values.bundle_archive_state
+            bundle_archive_integrity = $values.bundle_archive_integrity
+            bundle_directory_state = $values.bundle_directory_state
+            bundle_manifest_integrity = $values.bundle_manifest_integrity
+            bundle_env_present = $values.bundle_env_present
         }
         Save-R0InspectionEvidence
         foreach ($key in $expectedKeys) {
