@@ -132,4 +132,38 @@ class Ir1G2MigrationSafetyTest extends TestCase
             strpos($source, '$safePass = Test-SafePassEvidence'),
         );
     }
+
+    public function test_remote_runtime_diagnostic_is_separate_lf_only_and_database_free(): void
+    {
+        $path = base_path('deployment/r0-audit/Invoke-G2RemoteRuntimeDiagnostic.ps1');
+        $this->assertFileExists($path);
+        $source = (string) file_get_contents($path);
+
+        foreach ([
+            '83469c014b729870a9331894a8fd8eef25994103fa9246357afab077f0a61b70',
+            'Invoke-Utf8CapturedProcess',
+            'StandardInput.BaseStream',
+            'remote_script_lf_only=true',
+            'existing_g2_heredoc_delimiter_crlf_detected=true',
+            'database_boundary_absent=true',
+            'read-only-runtime-diagnostic',
+            'ssh_remote_shell',
+            'php_cli_discovery',
+            'php_interpreter_start',
+            'php_stdin_execution',
+            'fixed_stdout',
+            'exit_code_capture',
+            'BatchMode=yes',
+            'StrictHostKeyChecking=yes',
+            'STEP_RETRY_FORBIDDEN',
+            'production_mutation = $false',
+            'retry_performed = $false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $source);
+        }
+
+        $this->assertStringNotContainsString('$StandardInput | &', $source);
+        $this->assertStringNotContainsString('scp.exe', $source);
+        $this->assertStringNotContainsString('sftp.exe', $source);
+    }
 }
