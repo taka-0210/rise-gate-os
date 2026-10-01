@@ -95,15 +95,18 @@ class Ir1G2MigrationSafetyTest extends TestCase
             '83469c014b729870a9331894a8fd8eef25994103fa9246357afab077f0a61b70',
             'af10dfc9166c63e200e340f92409648c56ef7ece449f18675826d9aa61441501',
             'dfb4629417fce372a2678b5554bf72809b80ab5c9559660d1d15198e405d748d',
+            'e81e8f59a2e8b8bd1fcd082ec20ffd24949535cca6dcba70498eedfa40d571a8',
             'G2_ORIGINAL_ATTEMPT_CONTRACT_MISMATCH',
             'G2_CORRECTIVE1_ATTEMPT_CONTRACT_MISMATCH',
             'G2_CORRECTIVE2_ATTEMPT_CONTRACT_MISMATCH',
             'G2_CORRECTIVE3_ATTEMPT_CONTRACT_MISMATCH',
             'G2_RUNTIME_DIAGNOSTIC_PASS_CONTRACT_MISMATCH',
+            'G2_CORRECTIVE4_ATTEMPT_CONTRACT_MISMATCH',
             'production-g2-migration-preflight-corrective-1-',
             'production-g2-migration-preflight-corrective-2-',
             'production-g2-migration-preflight-corrective-3-',
             'production-g2-migration-preflight-corrective-4-',
+            'production-g2-migration-preflight-corrective-5-',
             'G2_REMOTE_REPORTED_STOP',
             'G2_SAFE_PASS_WITH_STDERR',
             'Test-SafeFailureEvidence',
@@ -118,6 +121,9 @@ class Ir1G2MigrationSafetyTest extends TestCase
             'remote_script_lf_only=true',
             'utf8_byte_stream_transport=PASS',
             'runtime_diagnostic_pass_binding_verified=true',
+            'native_argument_tokenization=PASS',
+            '$script:SshAlias,\'bash\',\'-s\'',
+            'native_argument_contract = \'validated\'',
             'BatchMode=yes',
             'StrictHostKeyChecking=yes',
             'NumberOfPasswordPrompts=0',
@@ -130,6 +136,13 @@ class Ir1G2MigrationSafetyTest extends TestCase
         ] as $required) {
             $this->assertStringContainsString($required, $source);
         }
+
+        $argumentValidationOffset = strpos($source, '$sshArguments = @(Get-SshArguments');
+        $connectionAttemptOffset = strpos($source, '$script:ProductionConnectionAttempted = $true');
+        $this->assertNotFalse($argumentValidationOffset);
+        $this->assertNotFalse($connectionAttemptOffset);
+        $this->assertTrue($argumentValidationOffset < $connectionAttemptOffset);
+        $this->assertStringNotContainsString('$script:SshAlias,\'bash -s\'', $source);
 
         foreach (['New-Item -ItemType Directory -Path $evidenceRoot', '[IO.File]::WriteAllText'] as $localEvidenceWrite) {
             $this->assertStringContainsString($localEvidenceWrite, $source);

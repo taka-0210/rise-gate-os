@@ -5,7 +5,8 @@ param(
     [switch] $Corrective1,
     [switch] $Corrective2,
     [switch] $Corrective3,
-    [switch] $Corrective4
+    [switch] $Corrective4,
+    [switch] $Corrective5
 )
 
 Set-StrictMode -Version Latest
@@ -36,6 +37,9 @@ $script:Corrective3AttemptStateSha256 = '83469c014b729870a9331894a8fd8eef2599410
 $script:RuntimeDiagnosticHelperSha256 = '77a4720ec377afaee740f74708eb76b46e598cf4416118b0435c28413f349882'
 $script:RuntimeDiagnosticStateSha256 = 'af10dfc9166c63e200e340f92409648c56ef7ece449f18675826d9aa61441501'
 $script:RuntimeDiagnosticEvidenceSha256 = 'dfb4629417fce372a2678b5554bf72809b80ab5c9559660d1d15198e405d748d'
+$script:Corrective4HelperSha256 = '734a386f6f7a48bc3653b81b65a4c6692e904a381bc9bd9af986012ef06155a8'
+$script:Corrective4PreflightPhpSha256 = '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f88e0a9eef0a03c'
+$script:Corrective4AttemptStateSha256 = 'e81e8f59a2e8b8bd1fcd082ec20ffd24949535cca6dcba70498eedfa40d571a8'
 $script:SshAlias = 'company-os-production'
 $script:IdentityFile = 'codex-company-os-production'
 $script:FailureStage = 'BOOTSTRAP'
@@ -130,6 +134,16 @@ function Invoke-CapturedProcess {
     }
 }
 
+function Assert-NativeArguments {
+    param([Parameter(Mandatory = $true)][string[]] $Arguments)
+
+    foreach ($argument in $Arguments) {
+        if ([string]::IsNullOrWhiteSpace($argument) -or $argument -match '\s') {
+            Stop-G2 'G2_NATIVE_ARGUMENT_REJECTED'
+        }
+    }
+}
+
 function Invoke-Utf8CapturedProcess {
     param(
         [Parameter(Mandatory = $true)][string] $FilePath,
@@ -137,9 +151,7 @@ function Invoke-Utf8CapturedProcess {
         [AllowEmptyString()][string] $StandardInput
     )
 
-    foreach ($argument in $Arguments) {
-        if ($argument -match '\s') { Stop-G2 'G2_NATIVE_ARGUMENT_REJECTED' }
-    }
+    Assert-NativeArguments -Arguments $Arguments
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $FilePath
     $startInfo.Arguments = $Arguments -join ' '
@@ -164,6 +176,18 @@ function Invoke-Utf8CapturedProcess {
     finally {
         $process.Dispose()
     }
+}
+
+function Get-SshArguments {
+    param([Parameter(Mandatory = $true)][string] $KnownHostsPath)
+
+    $arguments = @(
+        '-T','-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','NumberOfPasswordPrompts=0',
+        '-o','ConnectionAttempts=1','-o','ClearAllForwardings=yes','-o','ForwardAgent=no','-o','PermitLocalCommand=no',
+        '-o',('UserKnownHostsFile=' + $KnownHostsPath),$script:SshAlias,'bash','-s'
+    )
+    Assert-NativeArguments -Arguments $arguments
+    return $arguments
 }
 
 function Assert-EvidenceFile {
@@ -351,12 +375,39 @@ function Assert-RuntimeDiagnosticPassForCorrective4 {
     }
 }
 
+function Assert-Corrective4AttemptForCorrective5 {
+    param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
+
+    $corrective4Root = Join-Path $RepositoryRoot ('storage\app\release-audit\production-g2-migration-preflight-corrective-4-' + $script:Candidate)
+    $corrective4StatePath = Join-Path $corrective4Root 'execution-state.json'
+    Assert-EvidenceFile $corrective4StatePath $script:Corrective4AttemptStateSha256 'G2_CORRECTIVE4_ATTEMPT_MISSING' 'G2_CORRECTIVE4_ATTEMPT_HASH_MISMATCH'
+    try { $corrective4 = Get-Content -Raw -LiteralPath $corrective4StatePath | ConvertFrom-Json }
+    catch { Stop-G2 'G2_CORRECTIVE4_ATTEMPT_INVALID' }
+
+    if ($corrective4.execution_generation -ne 'corrective-4' -or
+        $corrective4.status -ne 'STOP' -or
+        $corrective4.candidate -ne $script:Candidate -or
+        $corrective4.helper_sha256 -ne $script:Corrective4HelperSha256 -or
+        $corrective4.preflight_php_sha256 -ne $script:Corrective4PreflightPhpSha256 -or
+        $corrective4.safe_error_code -ne 'G2_NATIVE_ARGUMENT_REJECTED' -or
+        $corrective4.failure_stage -ne 'PRODUCTION_READ_ONLY_G2_PREFLIGHT' -or
+        $corrective4.production_connection_attempted -ne $true -or
+        $corrective4.production_mutation -ne $false -or
+        $corrective4.retry_performed -ne $false -or
+        $null -ne $corrective4.remote_exit_code -or
+        $corrective4.stdout_bytes -ne 0 -or
+        $corrective4.stderr_bytes -ne 27 -or
+        $corrective4.local_processing_substage -ne 'remote_process_execution') {
+        Stop-G2 'G2_CORRECTIVE4_ATTEMPT_CONTRACT_MISMATCH'
+    }
+}
+
 function Get-LocalPreconditions {
     param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
 
     $script:FailureStage = 'LOCAL_EVIDENCE_BINDING'
     Assert-LocalEvidenceContract -RepositoryRoot $RepositoryRoot
-    if (@(@($Corrective1, $Corrective2, $Corrective3, $Corrective4) | Where-Object { $_ }).Count -gt 1) {
+    if (@(@($Corrective1, $Corrective2, $Corrective3, $Corrective4, $Corrective5) | Where-Object { $_ }).Count -gt 1) {
         Stop-G2 'G2_CORRECTIVE_GENERATION_AMBIGUOUS'
     }
     if ($Corrective1) {
@@ -377,6 +428,14 @@ function Get-LocalPreconditions {
         Assert-Corrective2AttemptForCorrective3 -RepositoryRoot $RepositoryRoot
         Assert-Corrective3AttemptForCorrective4 -RepositoryRoot $RepositoryRoot
         Assert-RuntimeDiagnosticPassForCorrective4 -RepositoryRoot $RepositoryRoot
+    }
+    if ($Corrective5) {
+        Assert-OriginalAttemptForCorrective -RepositoryRoot $RepositoryRoot
+        Assert-Corrective1AttemptForCorrective2 -RepositoryRoot $RepositoryRoot
+        Assert-Corrective2AttemptForCorrective3 -RepositoryRoot $RepositoryRoot
+        Assert-Corrective3AttemptForCorrective4 -RepositoryRoot $RepositoryRoot
+        Assert-RuntimeDiagnosticPassForCorrective4 -RepositoryRoot $RepositoryRoot
+        Assert-Corrective4AttemptForCorrective5 -RepositoryRoot $RepositoryRoot
     }
 
     $phpScript = Join-Path $RepositoryRoot 'deployment\r0-audit\g2-migration-preflight.php'
@@ -642,6 +701,13 @@ try {
             -not [string]::IsNullOrEmpty($localResult.Stderr)) {
             Stop-G2 'G2_UTF8_STDIN_TRANSPORT_REGRESSION'
         }
+        $sshArgumentFixture = @(Get-SshArguments -KnownHostsPath $preconditions.KnownHostsPath)
+        if ($sshArgumentFixture.Count -lt 2 -or
+            $sshArgumentFixture[-2] -ne 'bash' -or
+            $sshArgumentFixture[-1] -ne '-s' -or
+            $sshArgumentFixture -contains 'bash -s') {
+            Stop-G2 'G2_NATIVE_ARGUMENT_TOKENIZATION_REGRESSION'
+        }
         Write-Output 'G2_HELPER_VERIFY=PASS'
         Write-Output ('candidate=' + $script:Candidate)
         Write-Output ('helper_sha256=' + (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant())
@@ -649,7 +715,8 @@ try {
         Write-Output 'evidence_validator_regression=PASS'
         Write-Output 'remote_script_lf_only=true'
         Write-Output 'utf8_byte_stream_transport=PASS'
-        if ($Corrective4) { Write-Output 'runtime_diagnostic_pass_binding_verified=true' }
+        Write-Output 'native_argument_tokenization=PASS'
+        if ($Corrective4 -or $Corrective5) { Write-Output 'runtime_diagnostic_pass_binding_verified=true' }
         Write-Output 'r0_g1_evidence_binding_verified=true'
         Write-Output 'production_connection_attempted=false'
         Write-Output 'production_change=false'
@@ -663,8 +730,11 @@ try {
         exit 0
     }
 
-    $executionGeneration = if ($Corrective4) { 'corrective-4' } elseif ($Corrective3) { 'corrective-3' } elseif ($Corrective2) { 'corrective-2' } elseif ($Corrective1) { 'corrective-1' } else { 'initial' }
-    $rootName = if ($Corrective4) {
+    $executionGeneration = if ($Corrective5) { 'corrective-5' } elseif ($Corrective4) { 'corrective-4' } elseif ($Corrective3) { 'corrective-3' } elseif ($Corrective2) { 'corrective-2' } elseif ($Corrective1) { 'corrective-1' } else { 'initial' }
+    $rootName = if ($Corrective5) {
+        'production-g2-migration-preflight-corrective-5-' + $script:Candidate
+    }
+    elseif ($Corrective4) {
         'production-g2-migration-preflight-corrective-4-' + $script:Candidate
     }
     elseif ($Corrective3) {
@@ -713,26 +783,26 @@ try {
         remote_sql_total_statements = $null
         remote_sql_rejected_statements = $null
         remote_stdout_contract_status = 'not_inspected'
+        native_argument_contract = 'not_evaluated'
         local_processing_substage = 'attempt_initialized'
         local_exception_sha256 = $null
     }
     Save-G2State
     $script:AttemptStarted = $true
 
+    $sshArguments = @(Get-SshArguments -KnownHostsPath $preconditions.KnownHostsPath)
+    $script:State.native_argument_contract = 'validated'
+    $script:State.local_processing_substage = 'native_arguments_validated'
+    Save-G2State
+    $phpSource = Get-Content -Raw -LiteralPath $preconditions.PhpScriptPath
+    $remoteScript = Get-RemoteScript -PhpSource $phpSource
+
     $script:FailureStage = 'PRODUCTION_READ_ONLY_G2_PREFLIGHT'
     $script:ProductionConnectionAttempted = $true
     $script:State.production_connection_attempted = $true
-    Save-G2State
-    $sshArguments = @(
-        '-T','-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','NumberOfPasswordPrompts=0',
-        '-o','ConnectionAttempts=1','-o','ClearAllForwardings=yes','-o','ForwardAgent=no','-o','PermitLocalCommand=no',
-        '-o',('UserKnownHostsFile=' + $preconditions.KnownHostsPath),$script:SshAlias,'bash -s'
-    )
-    $phpSource = Get-Content -Raw -LiteralPath $preconditions.PhpScriptPath
     $script:State.local_processing_substage = 'remote_process_execution'
     Save-G2State
-    $remoteScript = Get-RemoteScript -PhpSource $phpSource
-    $result = if ($Corrective4) {
+    $result = if ($Corrective4 -or $Corrective5) {
         Invoke-Utf8CapturedProcess -FilePath $preconditions.SshPath -Arguments $sshArguments -StandardInput $remoteScript
     }
     else {
