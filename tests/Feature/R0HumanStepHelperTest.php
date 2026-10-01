@@ -1,0 +1,47 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Services\Release\R0AuditBundleVerifier;
+use Tests\TestCase;
+
+class R0HumanStepHelperTest extends TestCase
+{
+    public function test_helper_is_fail_closed_single_command_orchestration(): void
+    {
+        $helper = base_path('deployment/r0-audit/Invoke-R0HumanStep.ps1');
+        $this->assertFileExists($helper);
+
+        $source = file_get_contents($helper);
+        $this->assertIsString($source);
+        $this->assertStringContainsString('[ValidateSet(2, 3, 4, 5, 6)]', $source);
+        $this->assertStringContainsString(R0AuditBundleVerifier::EXACT_CANDIDATE_COMMIT, $source);
+        $this->assertStringContainsString('5ba3c0fd459cabe885249d85dd13ffafbe087693435a5e24a483f5ad4a24a4c0', $source);
+        $this->assertStringContainsString('a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d', $source);
+
+        foreach ([
+            'BatchMode=yes',
+            'StrictHostKeyChecking=yes',
+            'NumberOfPasswordPrompts=0',
+            'ConnectionAttempts=1',
+            'ClearAllForwardings=yes',
+            'STEP_RETRY_FORBIDDEN',
+            'PREVIOUS_STEP_NOT_PASS',
+            'secret_output=false',
+            'next_action=RETURN_TO_HUMAN_CHATGPT',
+        ] as $required) {
+            $this->assertStringContainsString($required, $source);
+        }
+
+        $this->assertStringContainsString('mkdir "$AUDIT_ROOT"', $source);
+        $this->assertStringContainsString('mkdir "$AUDIT_DIR"', $source);
+        $this->assertStringContainsString('test ! -e "$AUDIT_ROOT"', $source);
+        $this->assertStringContainsString('production_change_scope=isolated_audit_directories_only', $source);
+        $this->assertStringNotContainsString('Write-Output $result.Stdout', $source);
+        $this->assertStringNotContainsString('Write-Output $result.Stderr', $source);
+        $this->assertStringNotContainsString('Remove-Item -Recurse', $source);
+        $this->assertStringNotContainsString('rm -rf', $source);
+        $this->assertStringNotContainsString('migrate --force', $source);
+        $this->assertStringNotContainsString('git push', $source);
+    }
+}
