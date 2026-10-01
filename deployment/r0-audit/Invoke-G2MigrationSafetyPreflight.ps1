@@ -2,7 +2,8 @@
 param(
     [switch] $VerifyOnly,
     [switch] $VerifyLocalPreconditionsOnly,
-    [switch] $Corrective1
+    [switch] $Corrective1,
+    [switch] $Corrective2
 )
 
 Set-StrictMode -Version Latest
@@ -21,6 +22,9 @@ $script:PreflightPhpSha256 = '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f
 $script:OriginalHelperSha256 = '0e31b3e2d00eadf14ca7e278ea7ede21a91bed46c365257185634f8341fd51b3'
 $script:OriginalPreflightPhpSha256 = '878a0399c50b0841e1d9c45cfb6b0f2cae1a297adf3d3bb9046ce7ebc7027cca'
 $script:OriginalAttemptStateSha256 = '918cec809034fc752906ed9e140da10c2255e36009e76765b624d6d2c8cd8808'
+$script:Corrective1HelperSha256 = '59de505cc3fe9af0ad4922ac20fe12a58c07d1cf0362e6683ea2144b66b3fd64'
+$script:Corrective1PreflightPhpSha256 = '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f88e0a9eef0a03c'
+$script:Corrective1AttemptStateSha256 = '81795b54e7419f8fb29e0d5de306d6768b76ab27da69badab7d6fcf3f2c69a55'
 $script:SshAlias = 'company-os-production'
 $script:IdentityFile = 'codex-company-os-production'
 $script:FailureStage = 'BOOTSTRAP'
@@ -183,13 +187,46 @@ function Assert-OriginalAttemptForCorrective {
     }
 }
 
+function Assert-Corrective1AttemptForCorrective2 {
+    param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
+
+    $corrective1Root = Join-Path $RepositoryRoot ('storage\app\release-audit\production-g2-migration-preflight-corrective-1-' + $script:Candidate)
+    $corrective1StatePath = Join-Path $corrective1Root 'execution-state.json'
+    Assert-EvidenceFile $corrective1StatePath $script:Corrective1AttemptStateSha256 'G2_CORRECTIVE1_ATTEMPT_MISSING' 'G2_CORRECTIVE1_ATTEMPT_HASH_MISMATCH'
+    try { $corrective1 = Get-Content -Raw -LiteralPath $corrective1StatePath | ConvertFrom-Json }
+    catch { Stop-G2 'G2_CORRECTIVE1_ATTEMPT_INVALID' }
+
+    if ($corrective1.execution_generation -ne 'corrective-1' -or
+        $corrective1.status -ne 'STOP' -or
+        $corrective1.candidate -ne $script:Candidate -or
+        $corrective1.helper_sha256 -ne $script:Corrective1HelperSha256 -or
+        $corrective1.preflight_php_sha256 -ne $script:Corrective1PreflightPhpSha256 -or
+        $corrective1.safe_error_code -ne 'G2_REMOTE_PREFLIGHT_FAILED' -or
+        $corrective1.failure_stage -ne 'PRODUCTION_READ_ONLY_G2_PREFLIGHT' -or
+        $corrective1.production_connection_attempted -ne $true -or
+        $corrective1.production_mutation -ne $false -or
+        $corrective1.retry_performed -ne $false -or
+        $corrective1.remote_exit_code -ne 1 -or
+        $corrective1.stderr_bytes -ne 808 -or
+        $null -ne $corrective1.remote_safe_error_code) {
+        Stop-G2 'G2_CORRECTIVE1_ATTEMPT_CONTRACT_MISMATCH'
+    }
+}
+
 function Get-LocalPreconditions {
     param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
 
     $script:FailureStage = 'LOCAL_EVIDENCE_BINDING'
     Assert-LocalEvidenceContract -RepositoryRoot $RepositoryRoot
+    if ($Corrective1 -and $Corrective2) {
+        Stop-G2 'G2_CORRECTIVE_GENERATION_AMBIGUOUS'
+    }
     if ($Corrective1) {
         Assert-OriginalAttemptForCorrective -RepositoryRoot $RepositoryRoot
+    }
+    if ($Corrective2) {
+        Assert-OriginalAttemptForCorrective -RepositoryRoot $RepositoryRoot
+        Assert-Corrective1AttemptForCorrective2 -RepositoryRoot $RepositoryRoot
     }
 
     $phpScript = Join-Path $RepositoryRoot 'deployment\r0-audit\g2-migration-preflight.php'
@@ -404,8 +441,11 @@ try {
         exit 0
     }
 
-    $executionGeneration = if ($Corrective1) { 'corrective-1' } else { 'initial' }
-    $rootName = if ($Corrective1) {
+    $executionGeneration = if ($Corrective2) { 'corrective-2' } elseif ($Corrective1) { 'corrective-1' } else { 'initial' }
+    $rootName = if ($Corrective2) {
+        'production-g2-migration-preflight-corrective-2-' + $script:Candidate
+    }
+    elseif ($Corrective1) {
         'production-g2-migration-preflight-corrective-1-' + $script:Candidate
     }
     else {
@@ -437,6 +477,7 @@ try {
         stderr_sha256 = $null
         stderr_bytes = 0
         remote_safe_error_code = $null
+        remote_stdout_contract_status = 'not_inspected'
     }
     Save-G2State
     $script:AttemptStarted = $true
@@ -457,24 +498,35 @@ try {
     $script:State.stderr_bytes = if ([string]::IsNullOrEmpty($result.Stderr)) { 0 } else { [Text.Encoding]::UTF8.GetByteCount($result.Stderr) }
     Save-G2State
     $evidencePath = Join-Path $evidenceRoot 'g2-preflight-evidence.json'
+    $safePass = Test-SafePassEvidence -Json $result.Stdout
+    $safeFailure = Test-SafeFailureEvidence -Json $result.Stdout
+    if ($safePass -or $safeFailure) {
+        [IO.File]::WriteAllText($evidencePath, $result.Stdout, [Text.UTF8Encoding]::new($false))
+        $script:State.remote_stdout_contract_status = if ($safePass) { 'safe_pass' } else { 'safe_failure' }
+        if ($safeFailure) {
+            $remoteFailure = $result.Stdout | ConvertFrom-Json
+            $script:State.remote_safe_error_code = $remoteFailure.failure.safe_error_code
+        }
+        Save-G2State
+    }
+    else {
+        $script:State.remote_stdout_contract_status = 'rejected'
+        Save-G2State
+    }
+    if ($safeFailure) {
+        Stop-G2 'G2_REMOTE_REPORTED_STOP'
+    }
     if (-not [string]::IsNullOrEmpty($result.Stderr)) {
+        if ($safePass) { Stop-G2 'G2_SAFE_PASS_WITH_STDERR' }
         Stop-G2 'G2_REMOTE_PREFLIGHT_FAILED'
     }
     if ($result.ExitCode -ne 0) {
-        if (Test-SafeFailureEvidence -Json $result.Stdout) {
-            [IO.File]::WriteAllText($evidencePath, $result.Stdout, [Text.UTF8Encoding]::new($false))
-            $remoteFailure = $result.Stdout | ConvertFrom-Json
-            $script:State.remote_safe_error_code = $remoteFailure.failure.safe_error_code
-            Save-G2State
-            Stop-G2 'G2_REMOTE_REPORTED_STOP'
-        }
         Stop-G2 'G2_REMOTE_PREFLIGHT_FAILED'
     }
-    if (-not (Test-SafePassEvidence -Json $result.Stdout)) {
+    if (-not $safePass) {
         Stop-G2 'G2_EVIDENCE_OUTPUT_REJECTED'
     }
 
-    [IO.File]::WriteAllText($evidencePath, $result.Stdout, [Text.UTF8Encoding]::new($false))
     $script:State.status = 'PASS'
     $script:State.completed_at_jst = Get-JstTimestamp
     Save-G2State

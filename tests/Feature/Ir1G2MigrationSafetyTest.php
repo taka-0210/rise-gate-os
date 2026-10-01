@@ -90,9 +90,13 @@ class Ir1G2MigrationSafetyTest extends TestCase
             '15e20d272f39d1bd69290af6b5c2f681b52bb42a09273b783ca77ad7eacf4340',
             '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f88e0a9eef0a03c',
             '918cec809034fc752906ed9e140da10c2255e36009e76765b624d6d2c8cd8808',
+            '81795b54e7419f8fb29e0d5de306d6768b76ab27da69badab7d6fcf3f2c69a55',
             'G2_ORIGINAL_ATTEMPT_CONTRACT_MISMATCH',
+            'G2_CORRECTIVE1_ATTEMPT_CONTRACT_MISMATCH',
             'production-g2-migration-preflight-corrective-1-',
+            'production-g2-migration-preflight-corrective-2-',
             'G2_REMOTE_REPORTED_STOP',
+            'G2_SAFE_PASS_WITH_STDERR',
             'Test-SafeFailureEvidence',
             'BatchMode=yes',
             'StrictHostKeyChecking=yes',
@@ -114,5 +118,9 @@ class Ir1G2MigrationSafetyTest extends TestCase
         $this->assertStringNotContainsString("sftp.exe @", $source);
         $this->assertStringNotContainsString("base64 -d", $source);
         $this->assertStringContainsString("<<'__G2_PHP_SOURCE_924AF911__'", $source);
+        $this->assertLessThan(
+            strpos($source, 'if (-not [string]::IsNullOrEmpty($result.Stderr))'),
+            strpos($source, '$safePass = Test-SafePassEvidence'),
+        );
     }
 }
