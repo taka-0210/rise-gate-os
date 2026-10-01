@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [switch] $VerifyOnly,
-    [switch] $VerifyLocalPreconditionsOnly
+    [switch] $VerifyLocalPreconditionsOnly,
+    [switch] $Corrective1
 )
 
 Set-StrictMode -Version Latest
@@ -16,7 +17,10 @@ $script:R0ApplicationEvidenceSha256 = '4cb2f91d7d12e1083e8edaee41a3a408d0b2577d4
 $script:R0HostEvidenceSha256 = '03f0a69dbeac35747082f06c34e2b492f03cd0bcc8ebd18dc251c81372d0a7ac'
 $script:G1StateSha256 = 'ffd48f4e508b299e24921fb4a016b12f97950043af63abc80d471080ac4bf038'
 $script:G1EvidenceSha256 = '15e20d272f39d1bd69290af6b5c2f681b52bb42a09273b783ca77ad7eacf4340'
-$script:PreflightPhpSha256 = '878a0399c50b0841e1d9c45cfb6b0f2cae1a297adf3d3bb9046ce7ebc7027cca'
+$script:PreflightPhpSha256 = '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f88e0a9eef0a03c'
+$script:OriginalHelperSha256 = '0e31b3e2d00eadf14ca7e278ea7ede21a91bed46c365257185634f8341fd51b3'
+$script:OriginalPreflightPhpSha256 = '878a0399c50b0841e1d9c45cfb6b0f2cae1a297adf3d3bb9046ce7ebc7027cca'
+$script:OriginalAttemptStateSha256 = '918cec809034fc752906ed9e140da10c2255e36009e76765b624d6d2c8cd8808'
 $script:SshAlias = 'company-os-production'
 $script:IdentityFile = 'codex-company-os-production'
 $script:FailureStage = 'BOOTSTRAP'
@@ -156,11 +160,37 @@ function Assert-LocalEvidenceContract {
     }
 }
 
+function Assert-OriginalAttemptForCorrective {
+    param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
+
+    $originalRoot = Join-Path $RepositoryRoot ('storage\app\release-audit\production-g2-migration-preflight-' + $script:Candidate)
+    $originalStatePath = Join-Path $originalRoot 'execution-state.json'
+    Assert-EvidenceFile $originalStatePath $script:OriginalAttemptStateSha256 'G2_ORIGINAL_ATTEMPT_MISSING' 'G2_ORIGINAL_ATTEMPT_HASH_MISMATCH'
+    try { $original = Get-Content -Raw -LiteralPath $originalStatePath | ConvertFrom-Json }
+    catch { Stop-G2 'G2_ORIGINAL_ATTEMPT_INVALID' }
+
+    if ($original.status -ne 'STOP' -or
+        $original.candidate -ne $script:Candidate -or
+        $original.helper_sha256 -ne $script:OriginalHelperSha256 -or
+        $original.preflight_php_sha256 -ne $script:OriginalPreflightPhpSha256 -or
+        $original.safe_error_code -ne 'G2_REMOTE_PREFLIGHT_FAILED' -or
+        $original.failure_stage -ne 'PRODUCTION_READ_ONLY_G2_PREFLIGHT' -or
+        $original.production_connection_attempted -ne $true -or
+        $original.production_mutation -ne $false -or
+        $original.retry_performed -ne $false -or
+        $original.remote_exit_code -ne 127) {
+        Stop-G2 'G2_ORIGINAL_ATTEMPT_CONTRACT_MISMATCH'
+    }
+}
+
 function Get-LocalPreconditions {
     param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
 
     $script:FailureStage = 'LOCAL_EVIDENCE_BINDING'
     Assert-LocalEvidenceContract -RepositoryRoot $RepositoryRoot
+    if ($Corrective1) {
+        Assert-OriginalAttemptForCorrective -RepositoryRoot $RepositoryRoot
+    }
 
     $phpScript = Join-Path $RepositoryRoot 'deployment\r0-audit\g2-migration-preflight.php'
     Assert-EvidenceFile $phpScript $script:PreflightPhpSha256 'G2_PREFLIGHT_SCRIPT_MISSING' 'G2_PREFLIGHT_SCRIPT_HASH_MISMATCH'
@@ -211,34 +241,41 @@ function Get-LocalPreconditions {
 function Get-RemoteScript {
     param([Parameter(Mandatory = $true)][string] $PhpSource)
 
-    $payload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($PhpSource))
-    return (@'
+    $delimiter = '__G2_PHP_SOURCE_924AF911__'
+    if ($PhpSource -match ('(?m)^' + [regex]::Escape($delimiter) + '$')) {
+        Stop-G2 'G2_PHP_HEREDOC_DELIMITER_COLLISION'
+    }
+    $prefix = @'
 set -eu
-ACTUAL_HOME="$(cd "$HOME" && pwd -P)"
-case "$ACTUAL_HOME" in /home/[A-Za-z0-9._-]*) ;; *) exit 41 ;; esac
+g2_shell_stop() {
+    printf '{"output_schema_version":1,"status":"INCONCLUSIVE","audit_mode":"read-only","evidence_completeness":"incomplete","failure":{"safe_error_code":"%s","failure_stage":"remote_shell_preflight"},"evidence":{"candidate":"924af91188cc60d33ff87c91b94ecc1d539566e6","partial_evidence":{"application_bootstrap":"not_used","database_connection":"not_attempted","last_completed_condition":"none","completed_conditions":[]},"sql_safety":{"allowed_statement_classes":["SELECT"],"statement_counts":{"SELECT":0},"total_statements":0,"rejected_statements":0,"statement_limit":24,"persistent_db_write":false,"ddl":false,"migration_execution":false}},"secret_output":false,"raw_identifier_output":false,"raw_exception_output":false,"production_change_scope":"none_read_only_g2_migration_preflight"}\n' "$1"
+    exit 1
+}
+command -v sha256sum >/dev/null 2>&1 || g2_shell_stop G2_SHA256SUM_UNAVAILABLE
+command -v find >/dev/null 2>&1 || g2_shell_stop G2_FIND_UNAVAILABLE
+command -v wc >/dev/null 2>&1 || g2_shell_stop G2_WC_UNAVAILABLE
+command -v env >/dev/null 2>&1 || g2_shell_stop G2_ENV_COMMAND_UNAVAILABLE
+ACTUAL_HOME="$(cd "$HOME" && pwd -P)" || g2_shell_stop G2_HOME_RESOLUTION_FAILED
+case "$ACTUAL_HOME" in /home/[A-Za-z0-9._-]*) ;; *) g2_shell_stop G2_HOME_IDENTITY_REJECTED ;; esac
 CANDIDATE_DIR="$ACTUAL_HOME/.ir1-r0-audit/924af91188cc60d33ff87c91b94ecc1d539566e6"
 AUDIT_DIR="$CANDIDATE_DIR/bundle"
 ARCHIVE_PATH="$CANDIDATE_DIR/ir1-r0-audit-bundle-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz"
 ENV_FILE="$ACTUAL_HOME/rise-gate.com/rise-gate-os/.env"
-test -d "$CANDIDATE_DIR"
-test ! -L "$CANDIDATE_DIR"
-test -f "$ARCHIVE_PATH"
-test ! -L "$ARCHIVE_PATH"
-printf '%s  %s\n' a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d "$ARCHIVE_PATH" | sha256sum --check --strict - >/dev/null
-test -d "$AUDIT_DIR"
-test ! -L "$AUDIT_DIR"
-test "$(find "$AUDIT_DIR" -type l -print | wc -l)" -eq 0
-test -f "$AUDIT_DIR/r0-bundle-manifest.json"
-test ! -L "$AUDIT_DIR/r0-bundle-manifest.json"
-printf '%s  %s\n' a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7 "$AUDIT_DIR/r0-bundle-manifest.json" | sha256sum --check --strict - >/dev/null
-test ! -e "$AUDIT_DIR/.env"
-test -f "$ENV_FILE"
-test ! -L "$ENV_FILE"
+test -d "$CANDIDATE_DIR" && test ! -L "$CANDIDATE_DIR" || g2_shell_stop G2_CANDIDATE_DIRECTORY_REJECTED
+test -f "$ARCHIVE_PATH" && test ! -L "$ARCHIVE_PATH" || g2_shell_stop G2_ARCHIVE_REJECTED
+printf '%s  %s\n' a2cc319f42a7b0b3f84afc3077aeda1af0aa95d40f96e56103b18ad31b448b0d "$ARCHIVE_PATH" | sha256sum --check --strict - >/dev/null || g2_shell_stop G2_ARCHIVE_HASH_MISMATCH
+test -d "$AUDIT_DIR" && test ! -L "$AUDIT_DIR" || g2_shell_stop G2_AUDIT_DIRECTORY_REJECTED
+test "$(find "$AUDIT_DIR" -type l -print | wc -l)" -eq 0 || g2_shell_stop G2_AUDIT_SYMLINK_REJECTED
+test -f "$AUDIT_DIR/r0-bundle-manifest.json" && test ! -L "$AUDIT_DIR/r0-bundle-manifest.json" || g2_shell_stop G2_MANIFEST_REJECTED
+printf '%s  %s\n' a15502cb7e832ef44affecd346d582f4b8550967fb55a2cd5a327d23005b9fd7 "$AUDIT_DIR/r0-bundle-manifest.json" | sha256sum --check --strict - >/dev/null || g2_shell_stop G2_MANIFEST_HASH_MISMATCH
+test ! -e "$AUDIT_DIR/.env" || g2_shell_stop G2_BUNDLE_ENV_REJECTED
+test -f "$ENV_FILE" && test ! -L "$ENV_FILE" || g2_shell_stop G2_PRODUCTION_ENV_REJECTED
 G2_PHP="$(command -v php8.3 || command -v php8.2 || command -v php || true)"
-test -n "$G2_PHP"
-cd "$AUDIT_DIR"
-printf '%s' '__PAYLOAD__' | base64 -d | env LOG_CHANNEL=stderr G2_CANDIDATE=924af91188cc60d33ff87c91b94ecc1d539566e6 IR1_R0_ENV_FILE="$ENV_FILE" "$G2_PHP"
-'@).Replace('__PAYLOAD__', $payload)
+test -n "$G2_PHP" || g2_shell_stop G2_PHP_UNAVAILABLE
+cd "$AUDIT_DIR" || g2_shell_stop G2_AUDIT_DIRECTORY_UNAVAILABLE
+env LOG_CHANNEL=stderr G2_CANDIDATE=924af91188cc60d33ff87c91b94ecc1d539566e6 IR1_R0_ENV_FILE="$ENV_FILE" "$G2_PHP" <<'__G2_PHP_SOURCE_924AF911__'
+'@
+    return $prefix + $PhpSource + [Environment]::NewLine + $delimiter + [Environment]::NewLine
 }
 
 function Test-SafePassEvidence {
@@ -262,6 +299,42 @@ function Test-SafePassEvidence {
     $sql = $evidence.evidence.sql_safety
     if ($sql.result -ne 'PASS' -or
         $sql.allowed_statement_classes.Count -ne 1 -or
+        $sql.allowed_statement_classes[0] -ne 'SELECT' -or
+        $sql.total_statements -gt 24 -or
+        $sql.total_statements -ne $sql.statement_counts.SELECT -or
+        $sql.rejected_statements -ne 0 -or
+        $sql.persistent_db_write -ne $false -or
+        $sql.ddl -ne $false -or
+        $sql.migration_execution -ne $false) {
+        return $false
+    }
+    if ($Json -match '(?i)DB_PASSWORD|DB_USERNAME|DB_HOST|APP_KEY|AUTHORIZATION|PRIVATE KEY|BEGIN RSA|BEGIN OPENSSH|exception_message|raw_path|organization_id|user_id') {
+        return $false
+    }
+    return $true
+}
+
+function Test-SafeFailureEvidence {
+    param([Parameter(Mandatory = $true)][string] $Json)
+
+    try { $evidence = $Json | ConvertFrom-Json }
+    catch { return $false }
+
+    if ($evidence.output_schema_version -ne 1 -or
+        $evidence.status -ne 'INCONCLUSIVE' -or
+        $evidence.audit_mode -ne 'read-only' -or
+        $evidence.evidence_completeness -ne 'incomplete' -or
+        $evidence.failure.safe_error_code -notmatch '^G2_[A-Z0-9_]+$' -or
+        $evidence.failure.failure_stage -notmatch '^[a-z0-9_]+$' -or
+        $evidence.evidence.candidate -ne $script:Candidate -or
+        $evidence.secret_output -ne $false -or
+        $evidence.raw_identifier_output -ne $false -or
+        $evidence.raw_exception_output -ne $false -or
+        $evidence.production_change_scope -ne 'none_read_only_g2_migration_preflight') {
+        return $false
+    }
+    $sql = $evidence.evidence.sql_safety
+    if ($sql.allowed_statement_classes.Count -ne 1 -or
         $sql.allowed_statement_classes[0] -ne 'SELECT' -or
         $sql.total_statements -gt 24 -or
         $sql.total_statements -ne $sql.statement_counts.SELECT -or
@@ -331,7 +404,14 @@ try {
         exit 0
     }
 
-    $evidenceRoot = Join-Path $repositoryRoot ('storage\app\release-audit\production-g2-migration-preflight-' + $script:Candidate)
+    $executionGeneration = if ($Corrective1) { 'corrective-1' } else { 'initial' }
+    $rootName = if ($Corrective1) {
+        'production-g2-migration-preflight-corrective-1-' + $script:Candidate
+    }
+    else {
+        'production-g2-migration-preflight-' + $script:Candidate
+    }
+    $evidenceRoot = Join-Path $repositoryRoot ('storage\app\release-audit\' + $rootName)
     $script:StatePath = Join-Path $evidenceRoot 'execution-state.json'
     $script:FailureStage = 'ATTEMPT_GUARD'
     if (Test-Path -LiteralPath $script:StatePath) { Stop-G2 'STEP_RETRY_FORBIDDEN' }
@@ -342,6 +422,7 @@ try {
         schema_version = 1
         candidate = $script:Candidate
         bundle_id = $script:BundleId
+        execution_generation = $executionGeneration
         status = 'ATTEMPT_STARTED'
         helper_sha256 = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLowerInvariant()
         preflight_php_sha256 = $script:PreflightPhpSha256
@@ -355,6 +436,7 @@ try {
         remote_exit_code = $null
         stderr_sha256 = $null
         stderr_bytes = 0
+        remote_safe_error_code = $null
     }
     Save-G2State
     $script:AttemptStarted = $true
@@ -374,14 +456,25 @@ try {
     $script:State.stderr_sha256 = if ([string]::IsNullOrEmpty($result.Stderr)) { $null } else { Get-Sha256Text $result.Stderr }
     $script:State.stderr_bytes = if ([string]::IsNullOrEmpty($result.Stderr)) { 0 } else { [Text.Encoding]::UTF8.GetByteCount($result.Stderr) }
     Save-G2State
-    if ($result.ExitCode -ne 0 -or -not [string]::IsNullOrEmpty($result.Stderr)) {
+    $evidencePath = Join-Path $evidenceRoot 'g2-preflight-evidence.json'
+    if (-not [string]::IsNullOrEmpty($result.Stderr)) {
+        Stop-G2 'G2_REMOTE_PREFLIGHT_FAILED'
+    }
+    if ($result.ExitCode -ne 0) {
+        if (Test-SafeFailureEvidence -Json $result.Stdout) {
+            [IO.File]::WriteAllText($evidencePath, $result.Stdout, [Text.UTF8Encoding]::new($false))
+            $remoteFailure = $result.Stdout | ConvertFrom-Json
+            $script:State.remote_safe_error_code = $remoteFailure.failure.safe_error_code
+            Save-G2State
+            Stop-G2 'G2_REMOTE_REPORTED_STOP'
+        }
         Stop-G2 'G2_REMOTE_PREFLIGHT_FAILED'
     }
     if (-not (Test-SafePassEvidence -Json $result.Stdout)) {
         Stop-G2 'G2_EVIDENCE_OUTPUT_REJECTED'
     }
 
-    [IO.File]::WriteAllText((Join-Path $evidenceRoot 'g2-preflight-evidence.json'), $result.Stdout, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($evidencePath, $result.Stdout, [Text.UTF8Encoding]::new($false))
     $script:State.status = 'PASS'
     $script:State.completed_at_jst = Get-JstTimestamp
     Save-G2State

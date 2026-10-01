@@ -8,9 +8,36 @@ const G2_OUTPUT_SCHEMA_VERSION = 1;
 const G2_EXACT_CANDIDATE = '924af91188cc60d33ff87c91b94ecc1d539566e6';
 const G2_SQL_LIMIT = 24;
 
+$g2Progress = [
+    'application_bootstrap' => 'not_used',
+    'database_connection' => 'not_attempted',
+    'last_completed_condition' => 'none',
+    'completed_conditions' => [],
+];
+$g2SqlSafety = [
+    'allowed_statement_classes' => ['SELECT'],
+    'statement_counts' => ['SELECT' => 0],
+    'total_statements' => 0,
+    'rejected_statements' => 0,
+    'statement_limit' => G2_SQL_LIMIT,
+    'persistent_db_write' => false,
+    'ddl' => false,
+    'migration_execution' => false,
+];
+
+function g2Checkpoint(string $condition): void
+{
+    global $g2Progress;
+
+    $g2Progress['last_completed_condition'] = $condition;
+    $g2Progress['completed_conditions'][] = $condition;
+}
+
 /** @return never */
 function g2Stop(string $safeErrorCode, string $failureStage): void
 {
+    global $g2Progress, $g2SqlSafety;
+
     fwrite(STDOUT, json_encode([
         'output_schema_version' => G2_OUTPUT_SCHEMA_VERSION,
         'status' => 'INCONCLUSIVE',
@@ -20,7 +47,15 @@ function g2Stop(string $safeErrorCode, string $failureStage): void
             'safe_error_code' => $safeErrorCode,
             'failure_stage' => $failureStage,
         ],
-        'evidence' => null,
+        'evidence' => [
+            'candidate' => G2_EXACT_CANDIDATE,
+            'partial_evidence' => $g2Progress,
+            'sql_safety' => $g2SqlSafety,
+        ],
+        'secret_output' => false,
+        'raw_identifier_output' => false,
+        'raw_exception_output' => false,
+        'production_change_scope' => 'none_read_only_g2_migration_preflight',
     ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
     exit(1);
 }
@@ -112,6 +147,8 @@ try {
             PDO::ATTR_EMULATE_PREPARES => false,
         ],
     );
+    $g2Progress['database_connection'] = 'established';
+    g2Checkpoint('database_connection');
 
     $sqlSafety = [
         'allowed_statement_classes' => ['SELECT'],
@@ -120,6 +157,7 @@ try {
         'rejected_statements' => 0,
         'statement_limit' => G2_SQL_LIMIT,
     ];
+    $g2SqlSafety =& $sqlSafety;
 
     $server = g2Select($pdo, <<<'SQL'
 SELECT
@@ -127,6 +165,7 @@ SELECT
     @@character_set_database AS character_set,
     @@collation_database AS collation
 SQL, $sqlSafety)[0] ?? [];
+    g2Checkpoint('database_identity');
 
     $affectedTables = g2Select($pdo, <<<'SQL'
 SELECT
@@ -142,10 +181,12 @@ WHERE TABLE_SCHEMA = DATABASE()
   )
 ORDER BY TABLE_NAME
 SQL, $sqlSafety);
+    g2Checkpoint('affected_table_metrics');
 
     $organizationUserCount = g2Select($pdo, <<<'SQL'
 SELECT COUNT(*) AS row_count FROM organization_users
 SQL, $sqlSafety)[0]['row_count'] ?? 0;
+    g2Checkpoint('organization_users_row_count');
 
     $legacyRoleCounts = g2Select($pdo, <<<'SQL'
 SELECT
@@ -161,6 +202,7 @@ FROM organization_users
 GROUP BY role_class
 ORDER BY role_class
 SQL, $sqlSafety);
+    g2Checkpoint('legacy_role_distribution');
 
     $expectedNewColumns = [
         'ai_proposals' => ['scope_type', 'scope_id', 'evidence'],
@@ -181,6 +223,7 @@ SQL, $sqlSafety);
         }
     }
     $columnCollisions = g2Select($pdo, 'SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ('.implode(' OR ', $columnPredicates).') ORDER BY TABLE_NAME, COLUMN_NAME', $sqlSafety);
+    g2Checkpoint('column_collision_preflight');
 
     $expectedNewTables = [
         'organization_groups', 'organization_group_memberships', 'organization_audit_events',
@@ -194,6 +237,7 @@ SQL, $sqlSafety);
     ];
     $quotedTables = implode(', ', array_map(static fn (string $table): string => "'".$table."'", $expectedNewTables));
     $tableCollisions = g2Select($pdo, 'SELECT TABLE_NAME AS table_name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('.$quotedTables.') ORDER BY TABLE_NAME', $sqlSafety);
+    g2Checkpoint('table_collision_preflight');
 
     $transactionState = ['status' => 'SUPPORTED', 'active_count' => 0];
     try {
@@ -205,6 +249,7 @@ SQL, $sqlSafety)[0]['active_count'] ?? 0);
     } catch (Throwable) {
         $transactionState = ['status' => 'UNSUPPORTED', 'active_count' => null];
     }
+    g2Checkpoint('active_transaction_snapshot');
 
     $metadataLockState = ['status' => 'SUPPORTED', 'pending_count' => 0];
     try {
@@ -217,6 +262,7 @@ SQL, $sqlSafety)[0]['pending_count'] ?? 0);
     } catch (Throwable) {
         $metadataLockState = ['status' => 'UNSUPPORTED', 'pending_count' => null];
     }
+    g2Checkpoint('metadata_lock_snapshot');
 
     $roleCounts = [
         'owner' => 0,

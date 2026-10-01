@@ -64,6 +64,9 @@ class Ir1G2MigrationSafetyTest extends TestCase
             "'secret_output' => false",
             "'raw_identifier_output' => false",
             "'raw_exception_output' => false",
+            "'partial_evidence' => \$g2Progress",
+            "'database_connection' => 'not_attempted'",
+            "function g2Checkpoint(string \$condition)",
             "external_writer_full_visibility' => 'UNSUPPORTED",
         ] as $required) {
             $this->assertStringContainsString($required, $source);
@@ -85,7 +88,12 @@ class Ir1G2MigrationSafetyTest extends TestCase
             '924af91188cc60d33ff87c91b94ecc1d539566e6',
             'ffd48f4e508b299e24921fb4a016b12f97950043af63abc80d471080ac4bf038',
             '15e20d272f39d1bd69290af6b5c2f681b52bb42a09273b783ca77ad7eacf4340',
-            '878a0399c50b0841e1d9c45cfb6b0f2cae1a297adf3d3bb9046ce7ebc7027cca',
+            '76dec6fc2b4cbc884b1a6c6a1e79142b79efb8725ddb021d0f88e0a9eef0a03c',
+            '918cec809034fc752906ed9e140da10c2255e36009e76765b624d6d2c8cd8808',
+            'G2_ORIGINAL_ATTEMPT_CONTRACT_MISMATCH',
+            'production-g2-migration-preflight-corrective-1-',
+            'G2_REMOTE_REPORTED_STOP',
+            'Test-SafeFailureEvidence',
             'BatchMode=yes',
             'StrictHostKeyChecking=yes',
             'NumberOfPasswordPrompts=0',
@@ -104,5 +112,7 @@ class Ir1G2MigrationSafetyTest extends TestCase
         }
         $this->assertStringNotContainsString("scp.exe @", $source);
         $this->assertStringNotContainsString("sftp.exe @", $source);
+        $this->assertStringNotContainsString("base64 -d", $source);
+        $this->assertStringContainsString("<<'__G2_PHP_SOURCE_924AF911__'", $source);
     }
 }
