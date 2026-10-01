@@ -20,7 +20,7 @@ The bundle contains an exact `git archive` of the candidate plus the allowlisted
 
 - Step 2 is reconciled by additive Evidence as ADOPTED_EXISTING_EMPTY_DIRECTORIES.
 - Step 3 completed PASS with one placement attempt of the exact audit archive.
-- Step 4 is not authorized until a separate Human + ChatGPT decision.
+- Step 4 completed PASS in one authorized attempt. The exact archive and manifest were verified, the extracted bundle contained no symlink or raw .env, and PHP CLI compatibility passed.
 - The helper rechecks the exact candidate, local archive SHA-256, reconciled Step 2 state and empty candidate boundary before connection.
 - Remote preparation atomically creates a private .step3-placement directory only after confirming the candidate directory remains empty.
 - SCP targets only that private staging directory.
@@ -29,6 +29,10 @@ The bundle contains an exact `git archive` of the candidate plus the allowlisted
 - PASS or STOP is terminal for this authorization. Retry requires a new Human + ChatGPT decision.
 
 Step 4, when separately authorized, is limited to exact archive verification and extraction under the same private candidate directory. Before extraction the helper binds to the recorded Step 3 helper hash and PASS receipt, requires the archive to be the only candidate entry, rejects symlinks and verifies the archive SHA-256. It creates a new bundle directory, extracts with no owner or permission restoration, verifies the manifest SHA-256 and required scripts, rejects a raw .env or any extracted symlink, and checks PHP CLI compatibility. It does not bootstrap Laravel, load Production .env, connect to the DB or run either R0 audit.
+
+Step 5 requires a separate Human + ChatGPT authorization. Before any connection, the local helper requires exactly one Step 4 PASS produced by the approved Step 4 helper identity, exit code 0, zero stderr bytes and no safe error. The remote preflight then requires the private candidate directory to contain exactly the approved archive and extracted bundle, re-verifies both the archive and manifest hashes, rejects symlinks and a raw bundle .env, and requires the legacy Production .env to be a regular non-symlink file. Only then may it bootstrap the exact bundle once and run the Application / DB read-only audit.
+
+Step 5 accepts PASS only when the sanitized schema-v2 JSON binds to the exact candidate and bundle, reports complete supported evidence, reports SQL safety PASS with zero rejected statements and no more than 48 audited statements, contains only SELECT / SHOW / DESCRIBE / PRAGMA classes, exposes owners only as HMAC references plus counts, and preserves unsupported Host responsibilities as UNSUPPORTED. Any mismatch is STOP. Step 5 does not run the Host audit, deploy, migrate, clear cache, dispatch work, send mail or call an external Provider.
 
 ## Future Human operation — not currently authorized
 

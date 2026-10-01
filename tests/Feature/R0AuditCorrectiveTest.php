@@ -60,6 +60,7 @@ class R0AuditCorrectiveTest extends TestCase
         $this->assertSame('PASS', $result['sql_safety']['result']);
         $this->assertSame(0, $result['sql_safety']['rejected_statements']);
         $this->assertGreaterThan(0, $result['sql_safety']['total_statements']);
+        $this->assertLessThanOrEqual(48, $result['sql_safety']['total_statements']);
         $this->assertSame([], array_diff(array_keys($result['sql_safety']['statement_counts']), ['SELECT', 'PRAGMA', 'SHOW', 'DESCRIBE']));
         Http::assertNothingSent();
         Mail::assertNothingSent();
