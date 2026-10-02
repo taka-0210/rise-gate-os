@@ -2,6 +2,7 @@
 param(
     [switch] $VerifyOnly,
     [switch] $Corrective1,
+    [switch] $Corrective2,
     [string] $EvidenceFixture
 )
 
@@ -19,6 +20,9 @@ $script:R0StateSha256 = '159392dde20356febf20ea744953c7b901696e5c0f7dc5f45d1e2ae
 $script:PlacementStateSha256 = '6b9af42c593ad52697cf3223cf3f644aec22f77321f7a1416c2890f9fc90a3b4'
 $script:InitialStopEvidenceSha256 = '54dd558aa47b909371b055d5ea8baf38ddcd59229e571ef91c696c5fa47b0c86'
 $script:InitialStopDerivedEvidenceSha256 = 'ddc9bced6045445a40c4ee0a4c2c4e04637f33925f4ee0e7f05737b7b8d3d7d4'
+$script:Corrective1StopEvidenceSha256 = 'e544962e18b9e8b9d6d3026a944d3ce5ab6a340e674d670fe91db13725e44c4b'
+$script:Corrective1StateSha256 = 'd1e5a8cc0019790542ec9efc1638117a450b506971c2f144b6737bb7a212cb2e'
+$script:Corrective1FramesSha256 = '40d06af80553d6fac20a934f527814b0a6d9df63c2654e087e1fe14661c2dc80'
 $script:SshAlias = 'company-os-production'
 $script:IdentityFile = 'codex-company-os-production'
 $script:FailureStage = 'BOOTSTRAP'
@@ -72,7 +76,7 @@ function Complete-State([string] $Status, [string] $Code) {
 function New-ExecutionState {
     return [pscustomobject]@{
         schema_version=1; candidate=$script:Candidate; artifact_sha256=$script:ArtifactSha256
-        attempt_generation='corrective-1'; status='ATTEMPT_STARTED'; started_at_jst=Get-JstTimestamp; completed_at_jst=$null
+        attempt_generation='corrective-2'; status='ATTEMPT_STARTED'; started_at_jst=Get-JstTimestamp; completed_at_jst=$null
         failure_stage='LOCAL_ATTEMPT_INITIALIZATION'; safe_error_code=$null; remote_exit_code=$null
         stdout_sha256=$null; stdout_bytes=0; stderr_sha256=$null; stderr_bytes=0
         production_connection_attempted=$false; ssh_attempt_limit=1; retry_performed=$false
@@ -138,7 +142,7 @@ function Get-RemoteArguments {
     $launcher = '.ir1-r0-audit/'+$script:Candidate+'/g2-preflight-v2/package/launcher.sh'
     $bundle = '.ir1-r0-audit/'+$script:Candidate+'/bundle'
     $environment = 'rise-gate.com/rise-gate-os/.env'
-    return @((Get-CommonArguments)+@('-T',$script:SshAlias,'sh',$launcher,$bundle,$environment))
+    return @((Get-CommonArguments)+@('-T',$script:SshAlias,'env','G2_V2_PHP_BIN=php8.3','sh',$launcher,$bundle,$environment))
 }
 
 function Assert-SelfContract {
@@ -150,7 +154,7 @@ function Assert-SelfContract {
         Stop-Execution 'REMOTE_INVOCATION_CONTRACT_MISMATCH'
     }
     $joined = $arguments -join ' '
-    foreach ($required in @($script:Candidate, 'g2-preflight-v2/package/launcher.sh', 'rise-gate.com/rise-gate-os/.env')) {
+    foreach ($required in @($script:Candidate, 'env', 'G2_V2_PHP_BIN=php8.3', 'g2-preflight-v2/package/launcher.sh', 'rise-gate.com/rise-gate-os/.env')) {
         if (-not $joined.Contains($required)) { Stop-Execution 'REMOTE_INVOCATION_CONTRACT_INCOMPLETE' }
     }
     foreach ($forbidden in @('scp','sftp','mkdir','rm ','rmdir','mv ','ln ','touch','chmod','chown','artisan','migrate','mysql','mariadb','bash -s','sh -s')) {
@@ -448,11 +452,14 @@ function Get-LocalPreconditions([string] $Root) {
         Stop-Execution 'PLACEMENT_COMPLETION_CONTRACT_MISMATCH'
     }
 
-    if (-not $Corrective1) { Stop-Execution 'INITIAL_EXECUTION_GENERATION_CLOSED' }
+    if ($Corrective1) { Stop-Execution 'CORRECTIVE1_EXECUTION_GENERATION_CLOSED' }
+    if (-not $Corrective2) { Stop-Execution 'CORRECTIVE2_EXECUTION_GENERATION_REQUIRED' }
     $initialStopEvidence = Join-Path $Root 'deployment\g2-preflight-v2\evidence\g2-v2-execution-initial-stop.json'
     Assert-FileHash $initialStopEvidence $script:InitialStopEvidenceSha256 'INITIAL_STOP_EVIDENCE_MISMATCH'
     $initialStopDerivedEvidence = Join-Path $Root 'deployment\g2-preflight-v2\evidence\g2-v2-execution-initial-stop.evidence'
     Assert-FileHash $initialStopDerivedEvidence $script:InitialStopDerivedEvidenceSha256 'INITIAL_STOP_DERIVED_EVIDENCE_MISMATCH'
+    $corrective1StopEvidence = Join-Path $Root 'deployment\g2-preflight-v2\evidence\g2-v2-execution-corrective1-stop.evidence'
+    Assert-FileHash $corrective1StopEvidence $script:Corrective1StopEvidenceSha256 'CORRECTIVE1_STOP_EVIDENCE_MISMATCH'
 
     $script:FailureStage = 'LOCAL_OPENSSH_CONTRACT'
     $script:LocalProcessingSubstage = 'OPENSSH_DISCOVERY'
@@ -495,12 +502,13 @@ try {
     $root = Get-RepositoryRoot
     $preconditions = Get-LocalPreconditions $root
     $initialEvidenceRoot = Join-Path $root ('storage\app\release-audit\production-g2-preflight-v2-execution-'+$script:Candidate)
-    $evidenceRoot = $initialEvidenceRoot+'-corrective-1'
+    $corrective1EvidenceRoot = $initialEvidenceRoot+'-corrective-1'
+    $evidenceRoot = $initialEvidenceRoot+'-corrective-2'
     if (Test-Path -LiteralPath $evidenceRoot) { Stop-Execution 'EXECUTION_ATTEMPT_ALREADY_RECORDED' }
 
     if ($VerifyOnly) {
         $stateContract = New-ExecutionState
-        if ($stateContract.attempt_generation -ne 'corrective-1' -or
+        if ($stateContract.attempt_generation -ne 'corrective-2' -or
             $stateContract.production_connection_attempted -ne $false -or
             $stateContract.remote_file_mutation -ne $false -or
             $stateContract.persistent_db_write -ne $false -or
@@ -529,11 +537,37 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($EvidenceFixture)) { Stop-Execution 'EVIDENCE_FIXTURE_FORBIDDEN' }
 
     $script:FailureStage = 'LOCAL_ATTEMPT_INITIALIZATION'
-    $script:LocalProcessingSubstage = 'INITIAL_STOP_STATE_BINDING'
+    $script:LocalProcessingSubstage = 'PRIOR_STOP_STATE_BINDING'
     if (-not (Test-Path -LiteralPath $initialEvidenceRoot -PathType Container) -or
         ((Get-Item -LiteralPath $initialEvidenceRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
         @(Get-ChildItem -LiteralPath $initialEvidenceRoot -Force).Count -ne 0) {
         Stop-Execution 'INITIAL_STOP_STATE_MISMATCH'
+    }
+    $corrective1StatePath = Join-Path $corrective1EvidenceRoot 'execution-state.json'
+    $corrective1FramesPath = Join-Path $corrective1EvidenceRoot 'evidence.ndjson'
+    Assert-FileHash $corrective1StatePath $script:Corrective1StateSha256 'CORRECTIVE1_STATE_IDENTITY_MISMATCH'
+    Assert-FileHash $corrective1FramesPath $script:Corrective1FramesSha256 'CORRECTIVE1_FRAMES_IDENTITY_MISMATCH'
+    try { $corrective1State = Get-Content -Raw -LiteralPath $corrective1StatePath | ConvertFrom-Json } catch { Stop-Execution 'CORRECTIVE1_STATE_INVALID' }
+    if ($corrective1State.candidate -ne $script:Candidate -or
+        $corrective1State.attempt_generation -ne 'corrective-1' -or
+        $corrective1State.status -ne 'STOP' -or
+        $corrective1State.safe_error_code -ne 'G2_V2_READ_ONLY_PREFLIGHT_FAILED' -or
+        $corrective1State.failure_stage -ne 'database_read_only_preflight' -or
+        $corrective1State.remote_exit_code -ne 1 -or
+        $corrective1State.stdout_sha256 -ne $script:Corrective1FramesSha256 -or
+        $corrective1State.stderr_bytes -ne 0 -or
+        $corrective1State.production_connection_attempted -ne $true -or
+        $corrective1State.database_connection -ne 'not_attempted' -or
+        $corrective1State.sql_statement_count -ne 0 -or
+        $corrective1State.rejected_statement_count -ne 0 -or
+        $corrective1State.remote_file_mutation -ne $false -or
+        $corrective1State.persistent_db_write -ne $false -or
+        $corrective1State.ddl -ne $false -or
+        $corrective1State.migration_executed -ne $false -or
+        $corrective1State.data_mutation -ne $false -or
+        $corrective1State.evidence_file_written -ne $true -or
+        $corrective1State.secret_output -ne $false) {
+        Stop-Execution 'CORRECTIVE1_STOP_CONTRACT_MISMATCH'
     }
     $script:LocalProcessingSubstage = 'STATE_OBJECT_INITIALIZATION'
     $script:State = New-ExecutionState
