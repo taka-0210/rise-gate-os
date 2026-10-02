@@ -81,9 +81,23 @@ class Ir1G2PreflightV2PlacementTest extends TestCase
         $this->removeTree($root);
     }
 
-    public function test_verify_only_is_local_and_does_not_record_an_attempt(): void
+    public function test_verify_only_is_local_or_completed_placement_receipt_remains_immutable(): void
     {
         $state = storage_path('app/release-audit/production-g2-preflight-v2-placement-'.self::CANDIDATE);
+        if (is_dir($state)) {
+            $receiptPath = $state.'/execution-state.json';
+            $this->assertFileExists($receiptPath);
+            $receipt = json_decode((string) file_get_contents($receiptPath), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertSame(self::CANDIDATE, $receipt['candidate']);
+            $this->assertSame('PASS', $receipt['status']);
+            $this->assertSame(0, $receipt['remote_exit_code']);
+            $this->assertFalse($receipt['overwrite_performed']);
+            $this->assertFalse($receipt['db_connection_attempted']);
+            $this->assertFalse($receipt['sql_executed']);
+            $this->assertFalse($receipt['migration_executed']);
+            $this->assertFalse($receipt['secret_output']);
+            return;
+        }
         $this->assertDirectoryDoesNotExist($state);
         $process = new Process([
             'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
