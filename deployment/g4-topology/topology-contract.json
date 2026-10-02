@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g4-immutable-topology.v1",
+  "release_case": "IR1-G4-IMMUTABLE-TOPOLOGY",
+  "release_id": "ir1-924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "source_commit": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "source_tree": "7d979ef6a854bce7943740044a3f0c4d942dc617",
+  "artifact": {
+    "file": "rise-gate-os-924af91188cc60d33ff87c91b94ecc1d539566e6.tar.gz",
+    "sha256": "2de9b840627d0dbfd1beabaca7e8609dc9e16be2fd9c3021e3dfdc2c764cdb69",
+    "bytes": 5807985
+  },
+  "g3_evidence_sha256": "dd08b0bc4e0b0a44863922423e3f34f7492948a4c1ff4769765a69f1e064e4a1",
+  "source_manifest_sha256": "864e12e50df83c8ab6190bf87570cf7baa698ad3791112e8264bfca19fa1bb3b",
+  "migration_manifest_sha256": "da22986bea8aa433e3e25cfa1fa726a18e44840660ac122a075c6ee017a64230",
+  "dependency_locks": {
+    "composer_lock_sha256": "48cae0d80cc435e52cd55d2c96ac90ffc7f79ffb502d6c996a18e81fee4aa059",
+    "package_lock_sha256": "4d1ec90c409b38991395209a2ff1330549b6dfeb1f3833ed22e798a97234ffdb"
+  },
+  "topology": {
+    "releases": "releases/<release-id>/",
+    "shared_env": "shared/.env",
+    "shared_storage": "shared/storage/",
+    "current": "current",
+    "current_previous": "current.previous",
+    "public_entry_target": "current/public"
+  },
+  "switch_contract": {
+    "atomic_rename": true,
+    "overwrite_release": false,
+    "blind_retry": false,
+    "code_rollback": true,
+    "database_rollback": false,
+    "application_rollback_keeps_additive_schema": true
+  },
+  "human_operation": {
+    "principle": "one_step_one_command",
+    "result": "PASS_OR_STOP"
+  },
+  "workflow": {
+    "trigger": "workflow_dispatch_only",
+    "deploy_on_push": false
+  },
+  "production_mutation_authorized": false,
+  "continuing_blockers": [
+    "usable_backup_unknown",
+    "db_restore_readiness_blocker",
+    "release_marker_application_binding_blocker",
+    "env_permission_0604_hardening_blocker",
+    "user_cron_unknown",
+    "external_writer_enablement_unknown",
+    "active_transaction_metadata_lock_unsupported",
+    "database_application_collation_difference"
+  ]
+}
