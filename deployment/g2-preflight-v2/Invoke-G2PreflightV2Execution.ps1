@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch] $VerifyOnly,
+    [switch] $Corrective1,
     [string] $EvidenceFixture
 )
 
@@ -16,6 +17,8 @@ $script:AuditorSha256 = '2a60d8c0b104915de400f5dad56a99b749cfe0be4d990b6b4da6c31
 $script:IsolatedEvidenceSha256 = 'ebebba036e01ae72333f4d446ae337d1ff89721ceac794a6bed435f4795edc86'
 $script:R0StateSha256 = '159392dde20356febf20ea744953c7b901696e5c0f7dc5f45d1e2ae914f13b18'
 $script:PlacementStateSha256 = '6b9af42c593ad52697cf3223cf3f644aec22f77321f7a1416c2890f9fc90a3b4'
+$script:InitialStopEvidenceSha256 = '54dd558aa47b909371b055d5ea8baf38ddcd59229e571ef91c696c5fa47b0c86'
+$script:InitialStopDerivedEvidenceSha256 = 'ddc9bced6045445a40c4ee0a4c2c4e04637f33925f4ee0e7f05737b7b8d3d7d4'
 $script:SshAlias = 'company-os-production'
 $script:IdentityFile = 'codex-company-os-production'
 $script:FailureStage = 'BOOTSTRAP'
@@ -26,6 +29,7 @@ $script:Stderr = ''
 $script:State = $null
 $script:StatePath = $null
 $script:EvidencePath = $null
+$script:LocalProcessingSubstage = 'BOOTSTRAP'
 
 function Get-JstTimestamp {
     return [DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromHours(9)).ToString('o')
@@ -61,7 +65,23 @@ function Complete-State([string] $Status, [string] $Code) {
     $script:State.stderr_sha256 = if ([string]::IsNullOrEmpty($script:Stderr)) { $null } else { Get-Sha256Text $script:Stderr }
     $script:State.stderr_bytes = [Text.Encoding]::UTF8.GetByteCount($script:Stderr)
     $script:State.production_connection_attempted = $script:ProductionConnectionAttempted
+    $script:State.local_processing_substage = $script:LocalProcessingSubstage
     Save-State
+}
+
+function New-ExecutionState {
+    return [pscustomobject]@{
+        schema_version=1; candidate=$script:Candidate; artifact_sha256=$script:ArtifactSha256
+        attempt_generation='corrective-1'; status='ATTEMPT_STARTED'; started_at_jst=Get-JstTimestamp; completed_at_jst=$null
+        failure_stage='LOCAL_ATTEMPT_INITIALIZATION'; safe_error_code=$null; remote_exit_code=$null
+        stdout_sha256=$null; stdout_bytes=0; stderr_sha256=$null; stderr_bytes=0
+        production_connection_attempted=$false; ssh_attempt_limit=1; retry_performed=$false
+        remote_file_mutation=$false; persistent_db_write=$false; ddl=$false; migration_executed=$false
+        data_mutation=$false; frame_count=0; completed_check_count=0; database_connection='not_attempted'
+        sql_statement_class='SELECT'; sql_statement_limit=24; sql_statement_count=$null
+        rejected_statement_count=$null; evidence_file_written=$false; secret_output=$false
+        local_processing_substage=$script:LocalProcessingSubstage; local_exception_type=$null; local_exception_hash=$null
+    }
 }
 
 function Assert-NativeArguments([Parameter(Mandatory = $true)][string[]] $Arguments) {
@@ -428,12 +448,21 @@ function Get-LocalPreconditions([string] $Root) {
         Stop-Execution 'PLACEMENT_COMPLETION_CONTRACT_MISMATCH'
     }
 
+    if (-not $Corrective1) { Stop-Execution 'INITIAL_EXECUTION_GENERATION_CLOSED' }
+    $initialStopEvidence = Join-Path $Root 'deployment\g2-preflight-v2\evidence\g2-v2-execution-initial-stop.json'
+    Assert-FileHash $initialStopEvidence $script:InitialStopEvidenceSha256 'INITIAL_STOP_EVIDENCE_MISMATCH'
+    $initialStopDerivedEvidence = Join-Path $Root 'deployment\g2-preflight-v2\evidence\g2-v2-execution-initial-stop.evidence'
+    Assert-FileHash $initialStopDerivedEvidence $script:InitialStopDerivedEvidenceSha256 'INITIAL_STOP_DERIVED_EVIDENCE_MISMATCH'
+
     $script:FailureStage = 'LOCAL_OPENSSH_CONTRACT'
+    $script:LocalProcessingSubstage = 'OPENSSH_DISCOVERY'
     $ssh = Get-Command ssh.exe -ErrorAction SilentlyContinue
     $sshKeygen = Get-Command ssh-keygen.exe -ErrorAction SilentlyContinue
     if ($null -eq $ssh -or $null -eq $sshKeygen) { Stop-Execution 'OPENSSH_CLIENT_UNAVAILABLE' }
+    $script:LocalProcessingSubstage = 'SSH_CONFIG_PROCESS'
     $configResult = Invoke-Utf8CapturedProcess $ssh.Source @('-G',$script:SshAlias)
     if ($configResult.ExitCode -ne 0) { Stop-Execution 'SSH_CONFIG_UNAVAILABLE' }
+    $script:LocalProcessingSubstage = 'SSH_CONFIG_PARSE'
     $config = @{}
     foreach ($line in ($configResult.Stdout -split "`r?`n")) {
         $parts = $line -split '\s+', 2
@@ -442,12 +471,14 @@ function Get-LocalPreconditions([string] $Root) {
     foreach ($required in @('hostname','user','port','identityfile')) {
         if (-not $config.ContainsKey($required) -or [string]::IsNullOrWhiteSpace($config[$required])) { Stop-Execution 'SSH_CONFIG_INCOMPLETE' }
     }
+    $script:LocalProcessingSubstage = 'SSH_IDENTITY_CONTRACT'
     if ((Split-Path -Leaf $config.identityfile.Trim('"')) -ne $script:IdentityFile -or $config.identitiesonly -ne 'yes') {
         Stop-Execution 'SSH_IDENTITY_CONTRACT_MISMATCH'
     }
     foreach ($directive in @('remotecommand','localcommand','proxycommand','proxyjump')) {
         if ($config.ContainsKey($directive) -and $config[$directive] -ne 'none') { Stop-Execution 'SSH_AUTOMATIC_COMMAND_FORBIDDEN' }
     }
+    $script:LocalProcessingSubstage = 'KNOWN_HOSTS_CONTRACT'
     $knownHosts = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ssh\known_hosts'
     if (-not (Test-Path -LiteralPath $knownHosts -PathType Leaf)) { Stop-Execution 'KNOWN_HOSTS_MISSING' }
     $lookup = '['+$config.hostname+']:'+$config.port
@@ -455,6 +486,7 @@ function Get-LocalPreconditions([string] $Root) {
     if ($known.ExitCode -ne 0) { Stop-Execution 'HOST_KEY_NOT_REGISTERED' }
     $types = @($known.Stdout -split "`r?`n" | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { ($_ -split '\s+')[1] } | Sort-Object -Unique)
     if (($types -join ',') -ne 'ecdsa-sha2-nistp256,ssh-ed25519,ssh-rsa') { Stop-Execution 'HOST_KEY_CONTRACT_MISMATCH' }
+    $script:LocalProcessingSubstage = 'LOCAL_PRECONDITIONS_COMPLETE'
     return [pscustomobject]@{ SshPath=$ssh.Source }
 }
 
@@ -462,10 +494,21 @@ try {
     Assert-SelfContract
     $root = Get-RepositoryRoot
     $preconditions = Get-LocalPreconditions $root
-    $evidenceRoot = Join-Path $root ('storage\app\release-audit\production-g2-preflight-v2-execution-'+$script:Candidate)
+    $initialEvidenceRoot = Join-Path $root ('storage\app\release-audit\production-g2-preflight-v2-execution-'+$script:Candidate)
+    $evidenceRoot = $initialEvidenceRoot+'-corrective-1'
     if (Test-Path -LiteralPath $evidenceRoot) { Stop-Execution 'EXECUTION_ATTEMPT_ALREADY_RECORDED' }
 
     if ($VerifyOnly) {
+        $stateContract = New-ExecutionState
+        if ($stateContract.attempt_generation -ne 'corrective-1' -or
+            $stateContract.production_connection_attempted -ne $false -or
+            $stateContract.remote_file_mutation -ne $false -or
+            $stateContract.persistent_db_write -ne $false -or
+            $stateContract.ddl -ne $false -or
+            $stateContract.migration_executed -ne $false -or
+            $stateContract.data_mutation -ne $false) {
+            Stop-Execution 'LOCAL_STATE_CONTRACT_INVALID'
+        }
         $fixtureResult = $null
         if (-not [string]::IsNullOrWhiteSpace($EvidenceFixture)) {
             if (-not (Test-Path -LiteralPath $EvidenceFixture -PathType Leaf)) { Stop-Execution 'EVIDENCE_FIXTURE_MISSING' }
@@ -485,23 +528,24 @@ try {
     }
     if (-not [string]::IsNullOrWhiteSpace($EvidenceFixture)) { Stop-Execution 'EVIDENCE_FIXTURE_FORBIDDEN' }
 
+    $script:FailureStage = 'LOCAL_ATTEMPT_INITIALIZATION'
+    $script:LocalProcessingSubstage = 'INITIAL_STOP_STATE_BINDING'
+    if (-not (Test-Path -LiteralPath $initialEvidenceRoot -PathType Container) -or
+        ((Get-Item -LiteralPath $initialEvidenceRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+        @(Get-ChildItem -LiteralPath $initialEvidenceRoot -Force).Count -ne 0) {
+        Stop-Execution 'INITIAL_STOP_STATE_MISMATCH'
+    }
+    $script:LocalProcessingSubstage = 'STATE_OBJECT_INITIALIZATION'
+    $script:State = New-ExecutionState
+    $script:LocalProcessingSubstage = 'CORRECTIVE_EVIDENCE_DIRECTORY_CREATION'
     New-Item -ItemType Directory -Path $evidenceRoot | Out-Null
     $script:StatePath = Join-Path $evidenceRoot 'execution-state.json'
     $script:EvidencePath = Join-Path $evidenceRoot 'evidence.ndjson'
-    $script:State = [pscustomobject]@{
-        schema_version=1; candidate=$script:Candidate; artifact_sha256=$script:ArtifactSha256
-        status='ATTEMPT_STARTED'; started_at_jst=Get-JstTimestamp; completed_at_jst=$null
-        failure_stage='PRODUCTION_READ_ONLY_EXECUTION'; safe_error_code=$null; remote_exit_code=$null
-        stdout_sha256=$null; stdout_bytes=0; stderr_sha256=$null; stderr_bytes=0
-        production_connection_attempted=$false; ssh_attempt_limit=1; retry_performed=$false
-        remote_file_mutation=false; persistent_db_write=false; ddl=false; migration_executed=false
-        data_mutation=false; frame_count=0; completed_check_count=0; database_connection='unknown'
-        sql_statement_class='SELECT'; sql_statement_limit=24; sql_statement_count=$null
-        rejected_statement_count=$null; evidence_file_written=false; secret_output=false
-    }
+    $script:LocalProcessingSubstage = 'INITIAL_STATE_WRITE'
     Save-State
 
     $script:FailureStage = 'PRODUCTION_READ_ONLY_EXECUTION'
+    $script:LocalProcessingSubstage = 'REMOTE_PROCESS_START'
     $script:ProductionConnectionAttempted = $true
     $script:State.production_connection_attempted = $true
     Save-State
@@ -544,6 +588,10 @@ try {
 }
 catch {
     $code = if ($_.Exception.Message -match '^[A-Z0-9_]+$') { $_.Exception.Message } else { 'UNEXPECTED_LOCAL_FAILURE' }
+    if ($null -ne $script:State) {
+        $script:State.local_exception_type = $_.Exception.GetType().Name
+        $script:State.local_exception_hash = Get-Sha256Text $_.Exception.Message
+    }
     Complete-State 'STOP' $code
     $dbState = if ($null -eq $script:State) { 'not_attempted' } else { $script:State.database_connection }
     $sqlCount = if ($null -eq $script:State -or $null -eq $script:State.sql_statement_count) { 'unknown' } else { [string]$script:State.sql_statement_count }
@@ -551,6 +599,7 @@ catch {
     Write-Output 'G2_V2_READ_ONLY_EXECUTION=STOP'
     Write-Output ('safe_error_code='+$code)
     Write-Output ('failure_stage='+$script:FailureStage)
+    Write-Output ('local_processing_substage='+$script:LocalProcessingSubstage)
     Write-Output ('production_connection_attempted='+$script:ProductionConnectionAttempted.ToString().ToLowerInvariant())
     Write-Output ('database_connection='+$dbState)
     Write-Output ('sql_statement_count='+$sqlCount)

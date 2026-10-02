@@ -18,8 +18,8 @@ class Ir1G2PreflightV2ExecutionTest extends TestCase
     {
         parent::setUp();
         $this->helper = base_path('deployment/g2-preflight-v2/Invoke-G2PreflightV2Execution.ps1');
-        $this->evidenceRoot = storage_path('app/release-audit/production-g2-preflight-v2-execution-'.self::CANDIDATE);
-        $this->assertDirectoryDoesNotExist($this->evidenceRoot, 'Execution attempt state must not exist before verification.');
+        $this->evidenceRoot = storage_path('app/release-audit/production-g2-preflight-v2-execution-'.self::CANDIDATE.'-corrective-1');
+        $this->assertDirectoryDoesNotExist($this->evidenceRoot, 'Corrective execution attempt state must not exist before verification.');
     }
 
     public function test_execution_helper_is_one_shot_candidate_bound_and_remote_read_only(): void
@@ -29,12 +29,22 @@ class Ir1G2PreflightV2ExecutionTest extends TestCase
         $this->assertStringContainsString(self::CANDIDATE, $source);
         $this->assertStringContainsString('PlacementStateSha256', $source);
         $this->assertStringContainsString('6b9af42c593ad52697cf3223cf3f644aec22f77321f7a1416c2890f9fc90a3b4', $source);
+        $this->assertStringContainsString('InitialStopEvidenceSha256', $source);
+        $this->assertStringContainsString('54dd558aa47b909371b055d5ea8baf38ddcd59229e571ef91c696c5fa47b0c86', $source);
+        $this->assertStringContainsString('InitialStopDerivedEvidenceSha256', $source);
+        $this->assertStringContainsString('ddc9bced6045445a40c4ee0a4c2c4e04637f33925f4ee0e7f05737b7b8d3d7d4', $source);
+        $this->assertStringContainsString('Corrective1', $source);
+        $this->assertStringContainsString('LOCAL_ATTEMPT_INITIALIZATION', $source);
+        $this->assertStringContainsString('corrective-1', $source);
         $this->assertStringContainsString('EXECUTION_ATTEMPT_ALREADY_RECORDED', $source);
         $this->assertStringContainsString('ssh_attempt_limit=1', $source);
         $this->assertStringContainsString('retry_performed=$false', $source);
-        $this->assertStringContainsString('remote_file_mutation=false', $source);
-        $this->assertStringContainsString('persistent_db_write=false', $source);
-        $this->assertStringContainsString('migration_executed=false', $source);
+        $this->assertStringContainsString('remote_file_mutation=$false', $source);
+        $this->assertStringContainsString('persistent_db_write=$false', $source);
+        $this->assertStringContainsString('migration_executed=$false', $source);
+        $this->assertStringNotContainsString('remote_file_mutation=false', $source);
+        $this->assertStringNotContainsString('persistent_db_write=false', $source);
+        $this->assertStringNotContainsString('migration_executed=false', $source);
         $this->assertStringContainsString('SQL_EXPECTED_COUNT_MISMATCH', $source);
         $this->assertStringContainsString('sql_statement_limit=24', str_replace(' ', '', $source));
         $this->assertStringContainsString("'none_read_only_g2_preflight_v2'", $source);
@@ -53,7 +63,7 @@ class Ir1G2PreflightV2ExecutionTest extends TestCase
 
     public function test_verify_only_is_local_and_does_not_record_attempt(): void
     {
-        $result = $this->runHelper(['-VerifyOnly']);
+        $result = $this->runHelper(['-Corrective1', '-VerifyOnly']);
         $result->mustRun();
 
         $this->assertSame(
@@ -63,11 +73,30 @@ class Ir1G2PreflightV2ExecutionTest extends TestCase
         $this->assertDirectoryDoesNotExist($this->evidenceRoot);
     }
 
+    public function test_initial_stop_evidence_is_exact_and_preserves_zero_mutation_boundary(): void
+    {
+        $path = base_path('deployment/g2-preflight-v2/evidence/g2-v2-execution-initial-stop.json');
+        $this->assertFileExists($path);
+        $this->assertSame('54dd558aa47b909371b055d5ea8baf38ddcd59229e571ef91c696c5fa47b0c86', hash_file('sha256', $path));
+        $derivedPath = base_path('deployment/g2-preflight-v2/evidence/g2-v2-execution-initial-stop.evidence');
+        $this->assertFileExists($derivedPath);
+        $this->assertSame('ddc9bced6045445a40c4ee0a4c2c4e04637f33925f4ee0e7f05737b7b8d3d7d4', hash_file('sha256', $derivedPath));
+        $evidence = (string) file_get_contents($derivedPath);
+        $this->assertStringContainsString('root_cause_code=POWERSHELL_BAREWORD_BOOLEAN_LITERAL', $evidence);
+        $this->assertStringContainsString('local_openssh_contract=PASS', $evidence);
+        $this->assertStringContainsString('production_connection_attempted=false', $evidence);
+        $this->assertStringContainsString('database_connection=not_attempted', $evidence);
+        $this->assertStringContainsString('persistent_db_write=false', $evidence);
+        $this->assertStringContainsString('ddl=false', $evidence);
+        $this->assertStringContainsString('migration_executed=false', $evidence);
+        $this->assertStringContainsString('data_mutation=false', $evidence);
+    }
+
     public function test_safe_complete_fixture_is_accepted_without_production_connection(): void
     {
         $fixture = $this->writeFixture($this->passFrames());
         try {
-            $result = $this->runHelper(['-VerifyOnly', '-EvidenceFixture', $fixture]);
+            $result = $this->runHelper(['-Corrective1', '-VerifyOnly', '-EvidenceFixture', $fixture]);
             $result->mustRun();
             $this->assertStringContainsString('G2_V2_EXECUTION_HELPER_VERIFY=PASS', $result->getOutput());
             $this->assertStringContainsString('production_connection_attempted=false', $result->getOutput());
@@ -83,7 +112,7 @@ class Ir1G2PreflightV2ExecutionTest extends TestCase
         $frames[14]['data']['database']['version'] = '/home/raw-path';
         $fixture = $this->writeFixture($frames);
         try {
-            $result = $this->runHelper(['-VerifyOnly', '-EvidenceFixture', $fixture]);
+            $result = $this->runHelper(['-Corrective1', '-VerifyOnly', '-EvidenceFixture', $fixture]);
             $result->run();
             $output = str_replace("\r\n", "\n", $result->getOutput());
             $this->assertFalse($result->isSuccessful());
@@ -100,7 +129,7 @@ class Ir1G2PreflightV2ExecutionTest extends TestCase
     {
         $fixture = $this->writeFixture($this->stopFrames());
         try {
-            $result = $this->runHelper(['-VerifyOnly', '-EvidenceFixture', $fixture]);
+            $result = $this->runHelper(['-Corrective1', '-VerifyOnly', '-EvidenceFixture', $fixture]);
             $result->mustRun();
             $output = str_replace("\r\n", "\n", $result->getOutput());
             $this->assertStringContainsString('fixture_outcome=STOP', $output);
