@@ -694,9 +694,11 @@ body[data-motion="off"] .motion-target {
 }
 
 .brand-visual__canvas {
+    --brand-x: 0px;
+    --brand-y: 0px;
     width: 100%;
     height: 100%;
-    transform: scale(var(--brand-scale));
+    transform: translate(var(--brand-x), var(--brand-y)) scale(var(--brand-scale));
     transform-origin: 70% 50%;
     transition: transform var(--brand-duration) cubic-bezier(.22, .72, .28, 1);
 }

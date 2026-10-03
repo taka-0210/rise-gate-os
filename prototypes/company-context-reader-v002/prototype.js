@@ -42,10 +42,9 @@
     var brandFallback = document.querySelector('[data-brand-visual-fallback]');
     var brandStatus = document.querySelector('[data-brand-status]');
     var brandCurrentLabel = document.querySelector('[data-brand-current-label]');
-    var brandChapterButtons = Array.from(document.querySelectorAll('[data-brand-chapter-choice]'));
     var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
     var brandSvg = null;
-    var brandEditingChapter = 'philosophy';
+    var brandLayoutState = { size: 100, x: 0, y: 0, blur: 1.5 };
     var brandChapterLabels = {
         philosophy: '01 理念 / ROOT',
         vision: '02 Vision / FUTURE',
@@ -241,8 +240,8 @@
 
     function brandSettingLabel(name, value) {
         if (name === 'blur') return value + 'px';
-        if (name === 'duration') return value + 'ms';
-        return value + '%';
+        if (name === 'size') return value + '%';
+        return value + 'px';
     }
 
     function setBrandLayerOpacity(id, value) {
@@ -252,16 +251,11 @@
     }
 
     function syncBrandControls(key) {
-        var state = brandChapterStates[key];
-        brandEditingChapter = key;
-        brandChapterButtons.forEach(function (button) {
-            button.setAttribute('aria-pressed', button.dataset.brandChapterChoice === key ? 'true' : 'false');
-        });
         brandSettingInputs.forEach(function (input) {
             var name = input.dataset.brandSetting;
-            input.value = state[name];
+            input.value = brandLayoutState[name];
             var output = document.querySelector('[data-brand-output=' + name + ']');
-            if (output) output.textContent = brandSettingLabel(name, state[name]);
+            if (output) output.textContent = brandSettingLabel(name, brandLayoutState[name]);
         });
         if (brandCurrentLabel) brandCurrentLabel.textContent = brandChapterLabels[key];
     }
@@ -271,11 +265,13 @@
         body.dataset.brandChapter = key;
         if (brandVisual) {
             brandVisual.style.setProperty('--brand-opacity', String(state.opacity / 100));
-            brandVisual.style.setProperty('--brand-blur', state.blur + 'px');
+            brandVisual.style.setProperty('--brand-blur', brandLayoutState.blur + 'px');
             brandVisual.style.setProperty('--brand-duration', state.duration + 'ms');
         }
         if (brandVisualCanvas) {
-            brandVisualCanvas.style.setProperty('--brand-scale', String(state.scale / 100));
+            brandVisualCanvas.style.setProperty('--brand-scale', String((state.scale * brandLayoutState.size) / 10000));
+            brandVisualCanvas.style.setProperty('--brand-x', brandLayoutState.x + 'px');
+            brandVisualCanvas.style.setProperty('--brand-y', brandLayoutState.y + 'px');
             brandVisualCanvas.style.setProperty('--brand-duration', state.duration + 'ms');
         }
         setBrandLayerOpacity('core-light', state.center);
@@ -295,18 +291,13 @@
     }
 
     function bindBrandTuning() {
-        brandChapterButtons.forEach(function (button) {
-            button.addEventListener('click', function () {
-                applyBrandChapter(button.dataset.brandChapterChoice, true);
-            });
-        });
         brandSettingInputs.forEach(function (input) {
             input.addEventListener('input', function () {
                 var name = input.dataset.brandSetting;
-                brandChapterStates[brandEditingChapter][name] = Number(input.value);
+                brandLayoutState[name] = Number(input.value);
                 var output = document.querySelector('[data-brand-output=' + name + ']');
                 if (output) output.textContent = brandSettingLabel(name, input.value);
-                applyBrandChapter(brandEditingChapter, false);
+                applyBrandChapter(body.dataset.brandChapter || 'philosophy', false);
             });
         });
     }

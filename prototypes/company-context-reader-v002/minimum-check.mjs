@@ -50,15 +50,22 @@ try {
             now: document.querySelector('#active-flow').style.opacity,
         }));
 
-        await page.locator('[data-brand-chapter-choice=vision]').evaluate(button => button.click());
         const tuning = await page.evaluate(() => {
-            const input = document.querySelector('[data-brand-setting=opacity]');
-            input.value = '25';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
+            const size = document.querySelector('[data-brand-setting=size]');
+            const x = document.querySelector('[data-brand-setting=x]');
+            const y = document.querySelector('[data-brand-setting=y]');
+            const blur = document.querySelector('[data-brand-setting=blur]');
+            size.value = '110';
+            x.value = '120';
+            y.value = '-60';
+            blur.value = '3';
+            [size, x, y, blur].forEach(input => input.dispatchEvent(new Event('input', { bubbles: true })));
             return {
-                chapter: document.body.dataset.brandChapter,
-                opacity: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-opacity'),
-                output: document.querySelector('[data-brand-output=opacity]').textContent,
+                scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
+                x: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-x'),
+                y: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-y'),
+                blur: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-blur'),
+                outputs: Array.from(document.querySelectorAll('[data-brand-output]')).map(output => output.textContent),
             };
         });
 
@@ -71,7 +78,8 @@ try {
         if (annual.chapter !== 'annual' || Number(annual.now) <= Number(initial.root.now)) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
-        if (tuning.chapter !== 'vision' || tuning.opacity !== '0.25' || tuning.output !== '25%') {
+        if (tuning.scale !== '1.067' || tuning.x !== '120px' || tuning.y !== '-60px' || tuning.blur !== '3px'
+            || tuning.outputs.join('|') !== '110%|120px|-60px|3px') {
             throw new Error(viewport.name + ': tuning ' + JSON.stringify(tuning));
         }
         if (errors.length) throw new Error(viewport.name + ': page errors ' + errors.join(' | '));
