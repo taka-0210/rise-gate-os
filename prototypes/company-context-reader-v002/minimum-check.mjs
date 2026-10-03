@@ -27,8 +27,11 @@ try {
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
             readerVisible: getComputedStyle(document.querySelector('.reader')).visibility !== 'hidden',
             tuningVisible: (() => {
-                const rect = document.querySelector('[data-brand-tuning]').getBoundingClientRect();
-                return rect.top >= 0 && rect.top < window.innerHeight && rect.height > 0;
+                const panel = document.querySelector('[data-brand-tuning]');
+                const rect = panel.getBoundingClientRect();
+                const firstInput = panel.querySelector('[data-brand-setting]');
+                return panel.open && rect.top >= 0 && rect.top < window.innerHeight && rect.height > 0
+                    && getComputedStyle(firstInput).display !== 'none';
             })(),
             root: {
                 core: document.querySelector('#core-light').style.opacity,
