@@ -26,6 +26,10 @@ try {
             chapter: document.body.dataset.brandChapter,
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
             readerVisible: getComputedStyle(document.querySelector('.reader')).visibility !== 'hidden',
+            tuningVisible: (() => {
+                const rect = document.querySelector('[data-brand-tuning]').getBoundingClientRect();
+                return rect.top >= 0 && rect.top < window.innerHeight && rect.height > 0;
+            })(),
             root: {
                 core: document.querySelector('#core-light').style.opacity,
                 outer: document.querySelector('#knowledge-layer').style.opacity,
@@ -69,7 +73,8 @@ try {
             };
         });
 
-        if (initial.source !== 'official-svg' || initial.chapter !== 'philosophy' || initial.overflow !== 0 || !initial.readerVisible) {
+        if (initial.source !== 'official-svg' || initial.chapter !== 'philosophy' || initial.overflow !== 0
+            || !initial.readerVisible || !initial.tuningVisible) {
             throw new Error(viewport.name + ': initial ' + JSON.stringify(initial));
         }
         if (initial.fade.duration !== '1350ms' || initial.fade.distance !== '40px' || initial.fade.blur !== '2.5px' || initial.fade.trigger !== '75') {

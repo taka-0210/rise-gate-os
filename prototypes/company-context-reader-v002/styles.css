@@ -738,11 +738,10 @@ body[data-motion="off"] .motion-target {
 }
 
 .brand-tuning {
-    position: fixed;
-    z-index: 180;
-    right: 16px;
-    bottom: 16px;
-    width: min(390px, calc(100vw - 32px));
+    position: relative;
+    z-index: 3;
+    width: min(var(--max), calc(100% - 48px));
+    margin: 0 auto 24px;
     color: var(--ink);
     background: rgba(255, 255, 255, .97);
     border: 1px solid #bdcacc;
@@ -815,9 +814,8 @@ body[data-motion="off"] .motion-target {
     }
 
     .brand-tuning {
-        right: 8px;
-        bottom: 8px;
-        width: min(370px, calc(100vw - 16px));
+        width: calc(100% - 28px);
+        margin-bottom: 14px;
     }
 
     .brand-tuning__body { max-height: 60vh; }

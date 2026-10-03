@@ -39,6 +39,8 @@
     var initializationSubstage = 'VARIABLE_BINDING';
     var brandVisual = document.querySelector('[data-brand-visual]');
     var brandVisualCanvas = document.querySelector('[data-brand-visual-canvas]');
+    var brandTuning = document.querySelector('[data-brand-tuning]');
+    var prototypeControls = document.querySelector('.prototype-controls');
     var brandFallback = document.querySelector('[data-brand-visual-fallback]');
     var brandStatus = document.querySelector('[data-brand-status]');
     var brandCurrentLabel = document.querySelector('[data-brand-current-label]');
@@ -291,6 +293,9 @@
     }
 
     function bindBrandTuning() {
+        if (brandTuning && prototypeControls) {
+            prototypeControls.insertAdjacentElement('afterend', brandTuning);
+        }
         brandSettingInputs.forEach(function (input) {
             input.addEventListener('input', function () {
                 var name = input.dataset.brandSetting;
