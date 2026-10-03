@@ -24,7 +24,7 @@
     var motionApplyButton = document.querySelector('[data-motion-apply]');
     var motionPending = document.querySelector('[data-motion-pending]');
     var motionPreview = document.querySelector('[data-motion-preview]');
-    var appliedMotionSettings = { trigger: 50, duration: 1200, distance: 14, blur: 1.5 };
+    var appliedMotionSettings = { trigger: 75, duration: 1350, distance: 40, blur: 2.5 };
     var chapters = Array.from(document.querySelectorAll('[data-chapter]'));
     var desktopTocLinks = Array.from(document.querySelectorAll('[data-toc-key]'));
     var mobileToc = document.querySelector('[data-mobile-toc]');

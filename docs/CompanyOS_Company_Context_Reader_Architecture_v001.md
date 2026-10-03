@@ -4,6 +4,7 @@
 
 - Status: `DESIGN BINDING COMPLETE / IMPLEMENTATION WAITING`
 - Date: 2026-10-03 JST
+- Motion Human Decision: 2026-10-04 JST / CR-PD04 CLOSED
 - Repository commit: `958a7b12865b12cbd587e49735cdd00111b69461`
 - Git tree: `70e304ebeca7b46ef8041eea8bdf490c87732bfd`
 - Product Design source: `CompanyOS_Company_Context_Reader_Product_Design_v001.md`
@@ -21,13 +22,13 @@
 | CR-PD01 | Philosophy、Vision、Policy、Annual Management Policyを4章の連続Readerとして構成し、TOC / anchorで直接移動できる。既存の各正本、Revision、Permission、管理画面は統合しない。 |
 | CR-PD02 | 正式な本文・Explanation / Backgroundを連続表示する。Annualは「期間・Lifecycle → 年度経営方針 → Purpose → Background → Themeと対応Priority → Department Policy」の順で読む。 |
 | CR-PD03 | Chapter 04の初期対象は現在の`Approved / Effective`。Upcoming / Pastは明示選択、Draftは管理側Previewだけ。Past選択時もChapter 01〜03は現在の正本であることを明示する。 |
-| CR-PD04 | 本文は常に静的に読める。Motionは章の変化を短く示すだけとし、scroll hijack、scroll snap、typewriter、本文待機を禁止する。Motion A / BをHuman比較し、`prefers-reduced-motion`と任意OFFで同じ情報・階層・操作を維持する。 |
+| CR-PD04 | Motionは見出し、Statement、本文、説明を含む意味ブロック単位のone-shot Revealとする。Human採用値は表示開始位置75%、1350ms、translateY 40px、blur 2.5px。`prefers-reduced-motion`、JS / Observer failure、任意OFFでは同じ情報・階層・操作を初期表示し、scroll hijack、scroll snap、typewriter、本文待機を禁止する。 |
 
 未確定のCR-OQ01〜03は実装Blockerに昇格させない。
 
 - CR-OQ01: Human-facing名称。第一候補は「会社の言葉」。
 - CR-OQ02: 実データ相当の長文量とTOCの読みやすさ。
-- CR-OQ03: Breadcrumb、Sticky TOC、Motion、390px固定領域のバランス。
+- CR-OQ03: Breadcrumb、Sticky TOC、390px固定領域のバランス。Motion値はCR-PD04として解決済み。
 
 ## 2. Architectural decision
 
@@ -219,7 +220,7 @@ Breadcrumbはpage hierarchy、TOCはdocument hierarchyを表す。双方をstick
 - Desktop TOCは左column内sticky。
 - Mobile TOCは通常flow又は短いdisclosure。
 
-## 8. Motion A / B contract
+## 8. Motion contract
 
 共通条件:
 
@@ -228,19 +229,12 @@ Breadcrumbはpage hierarchy、TOCはdocument hierarchyを表す。双方をstick
 - Anchor jump、browser back、focus移動をanimationで妨げない。
 - `prefers-reduced-motion: reduce`とReader内の任意OFFで追加motionを無効化する。
 - Motion preferenceを保存する場合はlocal presentation preferenceに限定し、Domain data / read completionにしない。v1ではsession中のtoggleでもよい。
-
-Motion A（推奨baseline）:
-
-- Chapter heading / separatorのopacityと最大4px程度の短い変化。
-- 本文paragraph、Explanation、Priorityはstaggerしない。
-- Anchor移動はnative `auto`をbaselineとし、smooth scrollを必須にしない。
-
-Motion B（Human比較用）:
-
-- 重要Statementの章入口だけ、Aより少し強いopacity / 最大8px程度の変化。
-- BodyはAと同じ静的表示。文字単位animation、scale、parallaxは使わない。
-
-時間・距離はProduct Designの150〜250ms / 4〜8pxを比較出発点とし、採用値ではない。
+- Reveal対象はChapter heading、Statement、Explanation、Section、Priority、Department Policyを意味ブロック単位とする。
+- 表示開始位置はviewport上端から75%のline、durationは1350ms、開始transformは`translateY(40px)`、開始blurは`2.5px`。
+- 一度Revealしたblockは同じsession中に再び隠さず、通常scroll再入場でreplayしない。
+- 文字単位animation、件数連動stagger、scale、parallax、forced dwellを使わない。
+- Anchor移動は対象を即時可視にし、native `auto`をbaselineとしてsmooth scrollを必須にしない。
+- Prototypeの4 SliderはHuman Decision用である。正式Readerで管理設定として公開・永続化せず、採用値をpresentation tokenとして実装する。
 
 ## 9. Responsive / accessibility
 

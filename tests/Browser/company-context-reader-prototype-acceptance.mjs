@@ -121,11 +121,11 @@ try {
         revealed: element.classList.contains('is-motion-revealed'),
     }));
     assert(motionOnState.name === 'motion-enter', `Motion reveal did not run: ${JSON.stringify(motionOnState)}`);
-    assert(motionOnState.duration === '1.2s', `Motion duration is not the 1200ms default: ${motionOnState.duration}`);
+    assert(motionOnState.duration === '1.35s', `Motion duration is not the Human-selected 1350ms default: ${motionOnState.duration}`);
     assert(motionOnState.revealed, 'Motion did not persist its revealed state.');
     await page.screenshot({ path: screenshots.desktopOn });
 
-    await page.waitForTimeout(1300);
+    await page.waitForTimeout(1450);
     await frameLocator.locator('html').evaluate(element => element.scrollTo(0, 0));
     await page.waitForTimeout(30);
     await desktopMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
@@ -144,7 +144,7 @@ try {
             input.value = String(value);
             input.dispatchEvent(new Event('input', { bubbles: true }));
         });
-    }, { trigger: 75, duration: 900, distance: 30, blur: 4 });
+    }, { trigger: 60, duration: 900, distance: 30, blur: 4 });
     const draftState = await frameLocator.locator('body').evaluate(element => ({
         duration: element.style.getPropertyValue('--motion-duration'),
         distance: element.style.getPropertyValue('--motion-distance'),
@@ -153,7 +153,7 @@ try {
         pending: document.querySelector('[data-motion-apply]')?.classList.contains('is-pending'),
         message: document.querySelector('[data-motion-pending]')?.textContent,
     }));
-    assert(draftState.duration === '1200ms' && draftState.distance === '14px' && draftState.blur === '1.5px' && draftState.trigger === '50',
+    assert(draftState.duration === '1350ms' && draftState.distance === '40px' && draftState.blur === '2.5px' && draftState.trigger === '75',
         `Slider draft changed applied Motion before confirmation: ${JSON.stringify(draftState)}`);
     assert(draftState.pending && draftState.message.includes('未反映'),
         `Pending state is not explicit: ${JSON.stringify(draftState)}`);
@@ -170,7 +170,7 @@ try {
         pending: document.querySelector('[data-motion-apply]')?.classList.contains('is-pending'),
         message: document.querySelector('[data-motion-pending]')?.textContent,
     }));
-    assert(appliedState.cssDuration === '900ms' && appliedState.distance === '30px' && appliedState.blur === '4px' && appliedState.trigger === '75',
+    assert(appliedState.cssDuration === '900ms' && appliedState.distance === '30px' && appliedState.blur === '4px' && appliedState.trigger === '60',
         `Confirmed settings were not applied together: ${JSON.stringify(appliedState)}`);
     assert(appliedState.previewName === 'motion-enter' && appliedState.previewDuration === '0.9s' && !appliedState.pending && appliedState.message.includes('反映しました'),
         `Apply confirmation did not replay visibly: ${JSON.stringify(appliedState)}`);
@@ -211,6 +211,14 @@ try {
     const mobileOverflow = await frameLocator.locator('html').evaluate(element => element.scrollWidth - element.clientWidth);
     assert(mobileOverflow <= 0, `390px Reader overflows horizontally by ${mobileOverflow}px.`);
 
+    await frameLocator.locator('.motion-tuning').evaluate((container, values) => {
+        Object.entries(values).forEach(([name, value]) => {
+            const input = container.querySelector(`[data-motion-setting="${name}"]`);
+            input.value = String(value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }, { trigger: 75, duration: 1350, distance: 40, blur: 2.5 });
+    await frameLocator.locator('[data-motion-apply]').click();
     const mobileMotionTarget = frameLocator.locator('#theme-three .motion-target--theme');
     await frameLocator.getByRole('button', { name: /Motion ON/ }).evaluate(button => button.click());
     await page.waitForTimeout(40);
@@ -226,7 +234,7 @@ try {
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
     }));
-    assert(mobileOnState.name === 'motion-enter' && mobileOnState.duration === '0.9s',
+    assert(mobileOnState.name === 'motion-enter' && mobileOnState.duration === '1.35s',
         `390px Motion setting contract is wrong: ${JSON.stringify(mobileOnState)}`);
     await page.screenshot({ path: screenshots.mobileMotionOn });
 
@@ -361,7 +369,7 @@ try {
         productRouteAdded: false,
         contentHash: textHashOn,
         motionVariants: ['ON-four-confirmed-settings', 'OFF-static'],
-        defaultMotionSettings: { trigger: '50%', duration: '1200ms', distance: '14px', blur: '1.5px' },
+        defaultMotionSettings: { trigger: '75%', duration: '1350ms', distance: '40px', blur: '2.5px' },
         humanAdjustableRanges: { trigger: '25%-90%', duration: '200ms-2000ms', distance: '0px-60px', blur: '0px-10px' },
         failOpenModes: ['reduced-motion', 'javascript-off', 'observer-unsupported', 'initialization-failure', 'direct-fragment'],
         mobileTocVariants: ['A-normal-flow-disclosure', 'B-current-chapter-sticky'],

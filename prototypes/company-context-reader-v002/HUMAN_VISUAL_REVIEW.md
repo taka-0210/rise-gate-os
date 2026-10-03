@@ -10,6 +10,7 @@
 - Mobile TOC: A（通常flow disclosure）/ B（現在Chapterだけの短いsticky control）
 - Motion ON: 見出し・Statement・本文・説明・Priority・部署方針を意味ブロック単位でReveal
 - 4設定: 表示開始位置 / フェード時間 / 移動距離 / ぼかし
+- Human採用初期値: 75% / 1350ms / 40px / 2.5px
 - Slider変更中は未反映。「設定を反映」で4項目を一括適用し、画面内本文を再生
 - Motion OFF: 初期から全文表示する完全静的baseline
 

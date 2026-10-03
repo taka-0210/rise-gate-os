@@ -112,7 +112,7 @@ compose(actor, organization, selector): ReaderViewData
 
 ### Phase 0｜Visual Prototype（推奨、別承認）
 
-- isolated static prototypeでCR-OQ01〜03、Motion A / B、Desktop / 390pxを比較する。
+- isolated static prototypeでCR-OQ01〜03、Motion設定、Desktop / 390pxを比較する。Motionは2026-10-04 Human Reviewで採用値決定済み。
 - 正式data / permission検証とは明確に分離する。
 - Humanが名称、長文密度、TOC、Motionをreviewする。
 
@@ -161,11 +161,12 @@ Acceptance:
 - Sticky elementがfocus / headingを完全に隠さない。
 - h1 / h2 / h3 hierarchyとlandmarkが正しい。
 
-### Phase 4｜Motion A / B binding
+### Phase 4｜Selected Motion binding
 
-- HumanがPrototypeで選んだvariantだけを正式実装する。
+- Human採用値（表示開始75%、1350ms、40px、blur 2.5px）をpresentation tokenとして正式実装する。
+- 見出し、Statement、本文、説明を含む意味ブロック単位のone-shot Revealとする。
 - 本文初期可視、progressive enhancement、reduced motion、任意OFF。
-- timing / distanceはCSS token化し、Domain dataへ保存しない。
+- timing / distance / blur / triggerはCSS / JS presentation token化し、Domain dataへ保存しない。Prototype Sliderは正式Readerへ持ち込まない。
 
 Acceptance:
 
@@ -176,7 +177,7 @@ Acceptance:
 
 - Existing MDC / Annual show、edit、permission、approval、historyを回帰。
 - Application Shell spacingとglobal breadcrumb DOMを回帰。
-- Browser screenshotsをDesktop / 390px、Motion A-selected / reduced、long fixtureで取得。
+- Browser screenshotsをDesktop / 390px、selected Motion / OFF / reduced、long fixtureで取得。
 - Human review evidenceを作成し、Human自身の判定を待つ。
 
 Gate: `CODE COMPLETE / HUMAN PRODUCT REVIEW WAITING`。CodexがHuman UXをPASS扱いしない。
@@ -238,7 +239,7 @@ Focused testsの後、環境が許す限り`php artisan test`を実行する。�
 5. Past選択時にChapter 01〜03のcurrent性を誤解しないか。
 6. Desktop breadcrumb + TOCが重くないか。
 7. 390px TOCが本文を圧迫しないか。
-8. Motion A / B / OFFのどれが読む体験を助けるか。
+8. 採用Motion（75% / 1350ms / 40px / blur 2.5px）がDesktop / 390pxで読む体験を助けるか。
 9. Readerと管理画面の役割が混同されないか。
 10. Permission差のあるUserで「見えない内容の存在」を推測できないか。
 

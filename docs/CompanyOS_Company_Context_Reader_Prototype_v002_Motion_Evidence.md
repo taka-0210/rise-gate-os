@@ -2,7 +2,7 @@
 
 ## Status
 
-**COMPANY CONTEXT READER / PROTOTYPE v002 MOTION READY / HUMAN VISUAL REVIEW WAITING**
+**COMPANY CONTEXT READER / PROTOTYPE v002 MOTION HUMAN DECISION COMPLETE**
 
 - Date: 2026-10-04 JST
 - Scope: Motion Corrective only
@@ -24,10 +24,10 @@
 
 | Control | Range | Default | Apply contract |
 |---|---:|---:|---|
-| 表示開始位置 | 画面上から25〜90% | 50% | IntersectionObserverを確定時に再生成 |
-| フェード時間 | 200〜2000ms | 1200ms | 全内容ブロックと確認Previewへ適用 |
-| 移動距離 | 0〜60px | 14px | Desktop / Mobile共通 |
-| ぼかし | 0〜10px | 1.5px | Desktop / Mobile共通 |
+| 表示開始位置 | 画面上から25〜90% | **75%（Human採用）** | IntersectionObserverを確定時に再生成 |
+| フェード時間 | 200〜2000ms | **1350ms（Human採用）** | 全内容ブロックと確認Previewへ適用 |
+| 移動距離 | 0〜60px | **40px（Human採用）** | Desktop / Mobile共通 |
+| ぼかし | 0〜10px | **2.5px（Human採用）** | Desktop / Mobile共通 |
 
 - opacity: 0 → 1
 - translateY → 0
@@ -62,14 +62,14 @@ Result: **PASS**
 - v001と同一Reader text hash: PASS
 - Motion ON / 調整後 / OFF text hash equality: PASS
 - Offscreen target待機状態: PASS
-- 初期設定 50% / 1200ms / 14px / blur 1.5px: PASS
+- Human採用初期設定 75% / 1350ms / 40px / blur 2.5px: PASS
 - Slider変更中のapplied値不変 / 未反映表示: PASS
-- 確定操作 75% / 900ms / 30px / blur 4px atomic適用: PASS
+- 別値による確定操作 60% / 900ms / 30px / blur 4px atomic適用: PASS
 - 確定確認Previewを適用値900msで再生: PASS
 - Explanation / Priority / Departmentを含む全内容ブロック対象化: PASS
 - one-shot reveal / normal re-entry replay 0: PASS
 - Motion OFF全文可視: PASS
-- 390px適用済みMotion 900ms: PASS
+- 390px Human採用Motion 75% / 1350ms / 40px / blur 2.5px: PASS
 - 1440 / 390 / 320 horizontal overflow: 0
 - 200% effective viewport（720×450）horizontal overflow: 0
 - direct fragment即時可視: PASS
@@ -107,13 +107,14 @@ Generated under ignored local storage:
 
 Screenshots are local Human Review evidence and are not Product assets.
 
-## Human Review pending
+## Human decision / remaining review
 
-Automated PASS does not decide:
+Human Motion Decision（2026-10-04 JST）:
 
-1. 4項目の採用値。
-2. Revealが読む順番と会社の言葉の存在感を助けるか。
-3. Desktop / Mobileで同じ設定が自然か。
-4. CR-OQ01〜03。
+- 表示開始位置: 75%
+- フェード時間: 1350ms
+- 移動距離: 40px
+- ぼかし: 2.5px
+- Reveal対象: 見出し、本文、説明を含む全内容ブロック
 
-Human ReviewでMotionが決まるまでCR-PD04をFinal Closeせず、正式Reader実装へ進まない。
+CR-PD04 Motion DecisionはCLOSE。CR-OQ01〜03のうち名称・TOC・Breadcrumb等の未決事項と、正式Reader実装のHuman Authorityは別途維持する。

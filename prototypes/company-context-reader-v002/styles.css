@@ -201,7 +201,7 @@ summary:focus-visible {
 .motion-pending { min-height: 18px; color: var(--muted); font-size: 10px !important; }
 .motion-pending.is-pending { color: #8a531b !important; font-weight: 750; }
 .motion-preview { margin-top: 8px !important; padding: 10px 12px; color: var(--ink-soft) !important; background: #f5f7f6; border-left: 3px solid var(--accent); border-radius: 4px; }
-.motion-preview.is-previewing { animation: motion-enter var(--motion-duration, 1200ms) cubic-bezier(.22, .72, .28, 1) both; }
+.motion-preview.is-previewing { animation: motion-enter var(--motion-duration, 1350ms) cubic-bezier(.22, .72, .28, 1) both; }
 
 .mobile-toc { display: none; }
 
@@ -501,18 +501,18 @@ summary:focus-visible {
 }
 
 @keyframes motion-enter {
-    from { opacity: 0; transform: translateY(var(--motion-distance, 14px)); filter: blur(var(--motion-blur, 1.5px)); }
+    from { opacity: 0; transform: translateY(var(--motion-distance, 40px)); filter: blur(var(--motion-blur, 2.5px)); }
     to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 body.is-motion-enhanced[data-motion="on"] .motion-target:not(.is-motion-revealed) {
     opacity: 0;
-    transform: translateY(var(--motion-distance, 14px));
-    filter: blur(var(--motion-blur, 1.5px));
+    transform: translateY(var(--motion-distance, 40px));
+    filter: blur(var(--motion-blur, 2.5px));
 }
 
 body[data-motion="on"] .motion-target.is-motion-animating {
-    animation: motion-enter var(--motion-duration, 1200ms) cubic-bezier(.22, .72, .28, 1) both;
+    animation: motion-enter var(--motion-duration, 1350ms) cubic-bezier(.22, .72, .28, 1) both;
 }
 
 body[data-motion="off"] .motion-target {
