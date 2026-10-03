@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5-target-environment.v1",
+  "release_case": "IR1-G5-TARGET-ENVIRONMENT",
+  "source_commit": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "source_tree": "7d979ef6a854bce7943740044a3f0c4d942dc617",
+  "release_id": "ir1-924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "application_artifact_sha256": "2de9b840627d0dbfd1beabaca7e8609dc9e16be2fd9c3021e3dfdc2c764cdb69",
+  "g4_package_sha256": "5c99d35d03bcfd08bb83e0ad81cb90ed0cf4ef7e4eb4f363930126e7c4c9118a",
+  "production_urls": {
+    "service_site": "company-os.jp",
+    "application_target": "app.company-os.jp",
+    "legacy_application": "os.rise-gate.com"
+  },
+  "relative_paths": {
+    "legacy_domain_root": "rise-gate.com",
+    "legacy_application_root": "rise-gate.com/rise-gate-os",
+    "legacy_public_entry": "rise-gate.com/public_html/os.rise-gate.com",
+    "target_domain_root": "company-os.jp",
+    "target_topology_root": "company-os.jp/company-os-app",
+    "target_releases": "company-os.jp/company-os-app/releases",
+    "target_shared_env": "company-os.jp/company-os-app/shared/.env",
+    "target_shared_storage": "company-os.jp/company-os-app/shared/storage",
+    "target_current": "company-os.jp/company-os-app/current",
+    "target_current_previous": "company-os.jp/company-os-app/current.previous",
+    "target_public_parent": "company-os.jp/public_html",
+    "target_public_entry": "company-os.jp/public_html/app.company-os.jp",
+    "target_public_entry_link": "company-os.jp/company-os-app/current/public",
+    "capability_rehearsal": "company-os.jp/.ir1-g5-capability-924af91188cc60d33ff87c91b94ecc1d539566e6"
+  },
+  "path_boundaries": {
+    "legacy_prefix_read_only": "rise-gate.com/",
+    "target_mutation_prefix": "company-os.jp/",
+    "service_site_document_root_immutable": "company-os.jp/public_html/",
+    "audit_and_rehearsal_only_before_build": true
+  },
+  "shared_state": {
+    "env_target_mode": "0600",
+    "env_values_never_output": true,
+    "storage_target_is_separate": true,
+    "legacy_storage_direct_link": false,
+    "authorized_seed_and_final_delta_required": true
+  },
+  "public_entry": {
+    "type": "symbolic_link",
+    "target": "company-os.jp/company-os-app/current/public",
+    "dns_or_ssl_change_in_g5": false
+  },
+  "rollback": {
+    "pre_public_binding": "remove_only_exact_new_empty_or_g5_created_paths",
+    "shared_env_or_storage_delete": false,
+    "post_switch": "g4_code_only_rollback",
+    "database_rollback": false,
+    "legacy_production_unchanged": true
+  },
+  "g6_handoff": {
+    "dns_change": "G6_ONLY",
+    "ssl_change": "G6_ONLY",
+    "requires_g5_topology_verification": true,
+    "requires_app_host_binding_verification": true
+  },
+  "human_operation": {
+    "principle": "one_step_one_command",
+    "result": "PASS_OR_STOP",
+    "blind_retry": false
+  },
+  "production_mutation_authorized": false,
+  "continuing_blockers": [
+    "usable_backup_unknown",
+    "db_restore_readiness_blocker",
+    "release_marker_application_binding_blocker",
+    "env_permission_0604_hardening_blocker",
+    "user_cron_unknown",
+    "external_writer_enablement_unknown",
+    "active_transaction_metadata_lock_unsupported",
+    "database_application_collation_difference",
+    "posix_symlink_atomic_rename_unverified"
+  ]
+}
