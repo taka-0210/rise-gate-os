@@ -488,53 +488,56 @@ summary:focus-visible {
 }
 
 @keyframes motion-a-enter {
-    from { opacity: 0; transform: translateY(18px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(60px); filter: blur(6px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 @keyframes motion-b-enter {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(120px); filter: blur(14px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 @keyframes motion-a-enter-mobile {
-    from { opacity: 0; transform: translateY(14px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(42px); filter: blur(5px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 @keyframes motion-b-enter-mobile {
-    from { opacity: 0; transform: translateY(22px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(80px); filter: blur(10px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 body.is-motion-enhanced[data-motion="a"] .motion-target--chapter:not(.is-motion-revealed),
 body.is-motion-enhanced[data-motion="a"] .motion-target--statement:not(.is-motion-revealed),
 body.is-motion-enhanced[data-motion="a"] .motion-target--theme:not(.is-motion-revealed) {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(60px);
+    filter: blur(6px);
 }
 
 body.is-motion-enhanced[data-motion="b"] .motion-target:not(.is-motion-revealed) {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(120px);
+    filter: blur(14px);
 }
 
 body[data-motion="a"] .motion-target.is-motion-animating {
-    animation: motion-a-enter 600ms cubic-bezier(.22, .72, .28, 1) both;
+    animation: motion-a-enter 1600ms cubic-bezier(.22, .72, .28, 1) both;
 }
 
 body[data-motion="b"] .motion-target.is-motion-animating {
-    animation: motion-b-enter 900ms cubic-bezier(.18, .78, .22, 1) both;
+    animation: motion-b-enter 2600ms cubic-bezier(.18, .78, .22, 1) both;
 }
 
 body[data-motion="b"] .motion-target--statement.is-motion-animating,
 body[data-motion="b"] .motion-target--theme.is-motion-animating {
-    animation-delay: 120ms;
+    animation-delay: 250ms;
 }
 
 body[data-motion="off"] .motion-target {
     opacity: 1 !important;
     transform: none !important;
+    filter: none !important;
     animation: none !important;
 }
 
@@ -548,6 +551,7 @@ body[data-motion="off"] .motion-target {
     .motion-target {
         opacity: 1 !important;
         transform: none !important;
+        filter: none !important;
     }
 }
 
@@ -567,21 +571,23 @@ body[data-motion="off"] .motion-target {
     body.is-motion-enhanced[data-motion="a"] .motion-target--chapter:not(.is-motion-revealed),
     body.is-motion-enhanced[data-motion="a"] .motion-target--statement:not(.is-motion-revealed),
     body.is-motion-enhanced[data-motion="a"] .motion-target--theme:not(.is-motion-revealed) {
-        transform: translateY(14px);
+        transform: translateY(42px);
+        filter: blur(5px);
     }
 
     body.is-motion-enhanced[data-motion="b"] .motion-target:not(.is-motion-revealed) {
-        transform: translateY(22px);
+        transform: translateY(80px);
+        filter: blur(10px);
     }
 
     body[data-motion="a"] .motion-target.is-motion-animating {
         animation-name: motion-a-enter-mobile;
-        animation-duration: 520ms;
+        animation-duration: 1400ms;
     }
 
     body[data-motion="b"] .motion-target.is-motion-animating {
         animation-name: motion-b-enter-mobile;
-        animation-duration: 760ms;
+        animation-duration: 2200ms;
     }
 
     .prototype-boundary { align-items: flex-start; gap: 4px 9px; flex-wrap: wrap; padding-block: 7px; }
@@ -689,7 +695,7 @@ body[data-motion="off"] .motion-target {
     .reader-end { display: none !important; }
     body { color: #000; background: #fff; }
     .reader-layout { width: auto; display: block; }
-    .motion-target { opacity: 1 !important; transform: none !important; animation: none !important; }
+    .motion-target { opacity: 1 !important; transform: none !important; filter: none !important; animation: none !important; }
     .reader-cover { min-height: 0; padding: 30px 0; background: #fff; border: 0; box-shadow: none; }
     .chapter, .chapter--future, .chapter--annual { margin: 0; padding: 52px 0; background: #fff; break-before: page; }
     .chapter__statement, .annual-policy { font-size: 28px; }

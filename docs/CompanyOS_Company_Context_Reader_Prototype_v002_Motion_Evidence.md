@@ -24,13 +24,13 @@
 
 | Variant | Desktop | Mobile | Reveal hierarchy |
 |---|---:|---:|---|
-| A v002 / Subtle | 18px / 600ms | 14px / 520ms | Chapter、Overall/Annual Statement、Theme Statement |
-| B v002 / Expressive | 30px / 900ms | 22px / 760ms | A対象 + 主要Section Statement |
+| A / Extreme Diagnostic | 60px / 1600ms / blur 6px | 42px / 1400ms / blur 5px | Chapter、Overall/Annual Statement、Theme Statement |
+| B / Extreme Diagnostic | 120px / 2600ms / blur 14px | 80px / 2200ms / blur 10px | A対象 + 主要Section Statement |
 | OFF | none | none | 初期から全文表示 |
 
 - opacity: 0 → 1
 - translateY → 0
-- BのStatement / Theme sequence: 120ms
+- BのStatement / Theme sequence: 250ms
 - 一文字表示、長いstagger、Priority件数連動、scale、parallax、scroll hijack、scroll snap: 0
 - 一度Revealした要素は通常scroll再入場で再び隠さない。
 - A/B明示切替時だけ、現在viewportの対象を比較用に再生できる。
@@ -59,12 +59,12 @@ Result: **PASS**
 - v001と同一Reader text hash: PASS
 - A / B / OFF text hash equality: PASS
 - Offscreen target待機状態: PASS
-- Motion A Desktop 600ms: PASS
-- Motion B Desktop 900ms: PASS
+- Motion A Desktop 1600ms: PASS
+- Motion B Desktop 2600ms: PASS
 - A / B CSS contract差: PASS
 - one-shot reveal / normal re-entry replay 0: PASS
 - Motion OFF全文可視: PASS
-- 390px Motion A 520ms / Motion B 760ms: PASS
+- 390px Motion A 1400ms / Motion B 2200ms: PASS
 - 1440 / 390 / 320 horizontal overflow: 0
 - 200% effective viewport（720×450）horizontal overflow: 0
 - direct fragment即時可視: PASS

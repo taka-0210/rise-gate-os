@@ -70,6 +70,9 @@
         enhancementFailed = true;
         body.classList.remove('is-motion-enhanced');
         body.dataset.motionContract = reason || 'fail-open';
+        if (motionState) {
+            motionState.textContent = 'Motion無効 / Runtime: ' + body.dataset.motionContract;
+        }
         motionTargets.forEach(function (target) {
             clearAnimation(target);
             target.classList.add('is-motion-revealed');
@@ -98,17 +101,18 @@
 
     function updateMotionState() {
         var labels = {
-            a: 'Motion A v002 / Subtle Reveal',
-            b: 'Motion B v002 / Expressive Reveal',
+            a: 'Motion A / EXTREME 60px・1.6秒',
+            b: 'Motion B / EXTREME 120px・2.6秒',
             off: 'Motion OFF / 完全静的'
         };
         var selected = body.dataset.motion || 'a';
         motionButtons.forEach(function (button) {
             button.setAttribute('aria-pressed', button.dataset.motionChoice === selected ? 'true' : 'false');
         });
+        var runtime = body.dataset.motionContract || 'initializing';
         motionState.textContent = reducedMotion.matches && selected !== 'off'
             ? '現在：' + labels[selected] + '（OS設定によりMotion OFF）'
-            : '現在：' + labels[selected];
+            : '現在：' + labels[selected] + ' / Runtime: ' + runtime;
     }
 
     function updateMobileTocMode(mode) {
@@ -161,7 +165,7 @@
                     revealTarget(entry.target, false);
                     motionObserver.unobserve(entry.target);
                 });
-            }, { threshold: 0.12, rootMargin: '0px 0px -35% 0px' });
+            }, { threshold: 0.12, rootMargin: '0px 0px -50% 0px' });
             motionTargets.forEach(function (target) { motionObserver.observe(target); });
         }
 
@@ -186,8 +190,8 @@
         motionButtons.forEach(function (button) {
             button.addEventListener('click', function () {
                 body.dataset.motion = button.dataset.motionChoice;
-                updateMotionState();
                 syncMotionEnhancement(true);
+                updateMotionState();
             });
         });
 
@@ -227,16 +231,16 @@
 
         if (typeof reducedMotion.addEventListener === 'function') {
             reducedMotion.addEventListener('change', function () {
-                updateMotionState();
                 syncMotionEnhancement(false);
+                updateMotionState();
             });
         }
 
         initializationSubstage = 'INITIAL_STATE';
-        updateMotionState();
         updateMobileTocMode(body.dataset.mobileToc || 'a');
         if (directFragmentSession) revealAnchor(window.location.hash);
         syncMotionEnhancement(false);
+        updateMotionState();
     } catch (error) {
         body.dataset.motionFailureSubstage = initializationSubstage;
         showEverythingFailOpen('initialization-failure-static');

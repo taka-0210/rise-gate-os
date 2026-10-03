@@ -8,8 +8,8 @@
 
 - Viewport: Desktop 1440×900 / Mobile 390×844 / Narrow 320×800
 - Mobile TOC: A（通常flow disclosure）/ B（現在Chapterだけの短いsticky control）
-- Motion A v002: 大切なStatementが静かに現れるSubtle Reveal
-- Motion B v002: Aとの差が明確なExpressive Reveal
+- Motion A Diagnostic: 60px / 1.6秒 / blurから現れるExtreme Reveal
+- Motion B Diagnostic: 120px / 2.6秒 / 強いblurから現れるExtreme Reveal
 - Motion OFF: 初期から全文表示する完全静的baseline
 
 TOC A / BはCR-OQ03のHuman Visual Review対象であり、本Prototypeは採用案を確定しない。

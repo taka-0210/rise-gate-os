@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light">
     <title>会社の言葉｜Visual Prototype v002</title>
     <link rel=icon href=data:,>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=motion-extreme-1">
 </head>
 <body data-motion="a">
     <a class="skip-link" href="#reader">本文へ移動</a>
@@ -36,15 +36,15 @@
     <section class="prototype-controls" aria-labelledby="prototype-controls-title">
         <div>
             <p class="prototype-controls__eyebrow">HUMAN VISUAL REVIEW</p>
-            <h2 id="prototype-controls-title">同じ本文でMotionだけを比較</h2>
+            <h2 id="prototype-controls-title">Extreme Motion Diagnostic</h2>
             <p>一冊感と構成を固定し、Revealの強さだけを確認する隔離Prototypeです。</p>
         </div>
         <div class="motion-picker" role="group" aria-label="Motionを選択">
             <button type="button" data-motion-choice="a" aria-pressed="true">
-                <span>Motion A</span><small>Subtle Reveal</small>
+                <span>Motion A</span><small>Extreme 60px / 1.6s</small>
             </button>
             <button type="button" data-motion-choice="b" aria-pressed="false">
-                <span>Motion B</span><small>Expressive Reveal</small>
+                <span>Motion B</span><small>Extreme 120px / 2.6s</small>
             </button>
             <button type="button" data-motion-choice="off" aria-pressed="false">
                 <span>OFF</span><small>完全静的</small>
@@ -320,6 +320,6 @@
     </div>
 
     <div class="prototype-toast" role="status" aria-live="polite" hidden>Prototypeのため管理機能は実装していません。</div>
-    <script src="prototype.js"></script>
+    <script src="prototype.js?v=motion-extreme-1"></script>
 </body>
 </html>
