@@ -96,14 +96,24 @@ class Ir1G5TargetEnvironmentTest extends TestCase
     {
         $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5TargetEnvironment.ps1'));
 
-        $this->assertStringContainsString('g5-discovery-corrective-1', $helper);
+        $this->assertStringContainsString('g5-discovery-corrective-2', $helper);
         $this->assertStringContainsString('function Read-LfScript', $helper);
         $this->assertStringContainsString('$text.Replace($crlf,$lf).Replace($cr,$lf)', $helper);
-        $this->assertStringContainsString('human_execution_path=validated_through_remote_script_preparation', $helper);
+        $this->assertStringContainsString('human_execution_path=validated_through_native_capture', $helper);
+        $this->assertStringContainsString('incremental_state_contract=PASS', $helper);
+        $this->assertStringContainsString('[Diagnostics.ProcessStartInfo]::new()', $helper);
+        $this->assertStringContainsString('[Text.UTF8Encoding]::new($false).GetBytes($InputText)', $helper);
+        $this->assertStringContainsString('read-only-inspection-corrective-2-state.json', $helper);
+        $this->assertStringContainsString('REMOTE_RESULT_CAPTURED', $helper);
+        $this->assertStringContainsString('stdout_bytes', $helper);
+        $this->assertStringContainsString('stderr_bytes', $helper);
+        $this->assertStringContainsString('local_exception_sha256', $helper);
+        $this->assertStringContainsString("production_mutation_possible=(\$Step-eq'Rehearse')", $helper);
         $this->assertStringContainsString("return 'UNEXPECTED_LOCAL_FAILURE'", $helper);
-        $this->assertStringContainsString('safe_error_code=$(Get-SafeErrorCode $_.Exception)', $helper);
+        $this->assertStringContainsString('$safeCode=Get-SafeErrorCode $_.Exception', $helper);
         $this->assertStringNotContainsString('.Replace(([char]13+[char]10),[char]10)', $helper);
         $this->assertStringNotContainsString('safe_error_code=$($_.Exception.Message)', $helper);
+        $this->assertStringNotContainsString('$InputText|& $File', $helper);
 
         $preparation = strpos($helper, '$scriptText=Read-LfScript');
         $verifyExit = strpos($helper, 'if($VerifyOnly)');
