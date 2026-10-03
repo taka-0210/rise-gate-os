@@ -37,6 +37,27 @@
     var enhancementFailed = false;
     var directFragmentSession = window.location.hash.length > 1;
     var initializationSubstage = 'VARIABLE_BINDING';
+    var brandVisual = document.querySelector('[data-brand-visual]');
+    var brandVisualCanvas = document.querySelector('[data-brand-visual-canvas]');
+    var brandFallback = document.querySelector('[data-brand-visual-fallback]');
+    var brandStatus = document.querySelector('[data-brand-status]');
+    var brandCurrentLabel = document.querySelector('[data-brand-current-label]');
+    var brandChapterButtons = Array.from(document.querySelectorAll('[data-brand-chapter-choice]'));
+    var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
+    var brandSvg = null;
+    var brandEditingChapter = 'philosophy';
+    var brandChapterLabels = {
+        philosophy: '01 理念 / ROOT',
+        vision: '02 Vision / FUTURE',
+        policy: '03 方針 / DIRECTION',
+        annual: '04 年度経営方針 / NOW'
+    };
+    var brandChapterStates = {
+        philosophy: { opacity: 16, scale: 84, center: 100, outer: 8, structure: 10, now: 6, blur: 2, duration: 1600 },
+        vision: { opacity: 18, scale: 91, center: 80, outer: 75, structure: 35, now: 18, blur: 1, duration: 1800 },
+        policy: { opacity: 17, scale: 95, center: 65, outer: 75, structure: 100, now: 30, blur: .5, duration: 1600 },
+        annual: { opacity: 16, scale: 97, center: 60, outer: 55, structure: 50, now: 100, blur: 0, duration: 1500 }
+    };
 
     function isInReviewWindow(element) {
         var rect = element.getBoundingClientRect();
@@ -218,6 +239,111 @@
         if (mode === 'a' && mobileToc) mobileToc.open = false;
     }
 
+    function brandSettingLabel(name, value) {
+        if (name === 'blur') return value + 'px';
+        if (name === 'duration') return value + 'ms';
+        return value + '%';
+    }
+
+    function setBrandLayerOpacity(id, value) {
+        if (!brandSvg) return;
+        var layer = brandSvg.querySelector('#' + id);
+        if (layer) layer.style.opacity = String(Math.max(0, Math.min(1, value / 100)));
+    }
+
+    function syncBrandControls(key) {
+        var state = brandChapterStates[key];
+        brandEditingChapter = key;
+        brandChapterButtons.forEach(function (button) {
+            button.setAttribute('aria-pressed', button.dataset.brandChapterChoice === key ? 'true' : 'false');
+        });
+        brandSettingInputs.forEach(function (input) {
+            var name = input.dataset.brandSetting;
+            input.value = state[name];
+            var output = document.querySelector('[data-brand-output=' + name + ']');
+            if (output) output.textContent = brandSettingLabel(name, state[name]);
+        });
+        if (brandCurrentLabel) brandCurrentLabel.textContent = brandChapterLabels[key];
+    }
+
+    function applyBrandChapter(key, syncControls) {
+        var state = brandChapterStates[key] || brandChapterStates.philosophy;
+        body.dataset.brandChapter = key;
+        if (brandVisual) {
+            brandVisual.style.setProperty('--brand-opacity', String(state.opacity / 100));
+            brandVisual.style.setProperty('--brand-blur', state.blur + 'px');
+            brandVisual.style.setProperty('--brand-duration', state.duration + 'ms');
+        }
+        if (brandVisualCanvas) {
+            brandVisualCanvas.style.setProperty('--brand-scale', String(state.scale / 100));
+            brandVisualCanvas.style.setProperty('--brand-duration', state.duration + 'ms');
+        }
+        setBrandLayerOpacity('core-light', state.center);
+        setBrandLayerOpacity('management-layer', state.center * .82);
+        setBrandLayerOpacity('execution-layer', state.outer * .72);
+        setBrandLayerOpacity('knowledge-layer', state.outer);
+        setBrandLayerOpacity('outer-structure', state.structure * .62);
+        setBrandLayerOpacity('connections', state.structure);
+        setBrandLayerOpacity('active-flow', state.now);
+        setBrandLayerOpacity('core-propagation', 0);
+        if (syncControls) syncBrandControls(key);
+        if (brandStatus) {
+            brandStatus.textContent = brandSvg
+                ? brandChapterLabels[key] + ' / 公式SVG layer stateを即時反映'
+                : brandChapterLabels[key] + ' / Source読込待ち（fallback表示）';
+        }
+    }
+
+    function bindBrandTuning() {
+        brandChapterButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                applyBrandChapter(button.dataset.brandChapterChoice, true);
+            });
+        });
+        brandSettingInputs.forEach(function (input) {
+            input.addEventListener('input', function () {
+                var name = input.dataset.brandSetting;
+                brandChapterStates[brandEditingChapter][name] = Number(input.value);
+                var output = document.querySelector('[data-brand-output=' + name + ']');
+                if (output) output.textContent = brandSettingLabel(name, input.value);
+                applyBrandChapter(brandEditingChapter, false);
+            });
+        });
+    }
+
+    function loadBrandVisualSource() {
+        if (!brandVisualCanvas || typeof window.fetch !== 'function') {
+            if (brandStatus) brandStatus.textContent = '公式SVGはfallback画像として表示中';
+            return;
+        }
+        window.fetch('brand-visual-source.php', { cache: 'no-store', credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) throw new Error('source-http-' + response.status);
+                return response.text();
+            })
+            .then(function (source) {
+                var parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+                var svg = parsed.documentElement;
+                var required = ['company-core', 'outer-structure', 'knowledge-layer', 'execution-layer', 'management-layer', 'core-light', 'connections', 'active-flow'];
+                if (!svg || svg.nodeName.toLowerCase() !== 'svg' || required.some(function (id) { return !svg.querySelector('#' + id); })) {
+                    throw new Error('source-layer-contract');
+                }
+                brandSvg = document.importNode(svg, true);
+                brandSvg.removeAttribute('width');
+                brandSvg.removeAttribute('height');
+                brandSvg.setAttribute('aria-hidden', 'true');
+                brandSvg.setAttribute('focusable', 'false');
+                if (brandFallback) brandFallback.remove();
+                brandVisualCanvas.appendChild(brandSvg);
+                body.dataset.brandSource = 'official-svg';
+                applyBrandChapter(body.dataset.brandChapter || 'philosophy', true);
+            })
+            .catch(function () {
+                body.dataset.brandSource = 'fallback-static';
+                if (brandStatus) brandStatus.textContent = '公式SVGのlayer読込に失敗 / fallback静的表示';
+            });
+    }
+
     function setCurrentChapter(chapter) {
         var key = chapter.dataset.chapter;
         desktopTocLinks.forEach(function (link) {
@@ -225,6 +351,7 @@
             else link.removeAttribute('aria-current');
         });
         if (mobileChapter) mobileChapter.textContent = chapter.dataset.chapterLabel;
+        applyBrandChapter(key, true);
     }
 
     function revealAnchor(hash) {
@@ -335,6 +462,9 @@
         }
 
         initializationSubstage = 'INITIAL_STATE';
+        bindBrandTuning();
+        applyBrandChapter('philosophy', true);
+        loadBrandVisualSource();
         updateDraftOutputs();
         applyMotionSettings(readMotionSettings(), false);
         updateMobileTocMode(body.dataset.mobileToc || 'a');

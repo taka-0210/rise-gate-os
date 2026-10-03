@@ -325,6 +325,35 @@
                 <a class="reader-end__top" href="#top">最初へ戻る</a>
             </footer>
         </main>
+    <div class='brand-visual' data-brand-visual aria-hidden='true'>
+        <div class='brand-visual__canvas' data-brand-visual-canvas>
+            <img src='brand-visual-source.php' alt='' width='2880' height='1620' data-brand-visual-fallback>
+        </div>
+    </div>
+
+    <details class='brand-tuning' data-brand-tuning>
+        <summary>Brand Visual 調整 <span data-brand-current-label>01 理念 / ROOT</span></summary>
+        <div class='brand-tuning__body'>
+            <p>Chapter別の一時値です。変更は即時反映され、保存されません。</p>
+            <div class='brand-tuning__chapters' role='group' aria-label='調整するChapter'>
+                <button type='button' data-brand-chapter-choice='philosophy' aria-pressed='true'>01 ROOT</button>
+                <button type='button' data-brand-chapter-choice='vision' aria-pressed='false'>02 FUTURE</button>
+                <button type='button' data-brand-chapter-choice='policy' aria-pressed='false'>03 DIRECTION</button>
+                <button type='button' data-brand-chapter-choice='annual' aria-pressed='false'>04 NOW</button>
+            </div>
+            <div class='brand-tuning__fields'>
+                <label>全体 opacity <output data-brand-output='opacity'>14%</output><input type='range' min='0' max='35' step='1' value='14' data-brand-setting='opacity'></label>
+                <label>scale <output data-brand-output='scale'>86%</output><input type='range' min='70' max='115' step='1' value='86' data-brand-setting='scale'></label>
+                <label>center emphasis <output data-brand-output='center'>100%</output><input type='range' min='0' max='100' step='5' value='100' data-brand-setting='center'></label>
+                <label>outer emphasis <output data-brand-output='outer'>12%</output><input type='range' min='0' max='100' step='5' value='12' data-brand-setting='outer'></label>
+                <label>line / structure <output data-brand-output='structure'>16%</output><input type='range' min='0' max='100' step='5' value='16' data-brand-setting='structure'></label>
+                <label>NOW emphasis <output data-brand-output='now'>12%</output><input type='range' min='0' max='100' step='5' value='12' data-brand-setting='now'></label>
+                <label>blur <output data-brand-output='blur'>1.5px</output><input type='range' min='0' max='8' step='0.5' value='1.5' data-brand-setting='blur'></label>
+                <label>transition <output data-brand-output='duration'>1600ms</output><input type='range' min='0' max='3000' step='100' value='1600' data-brand-setting='duration'></label>
+            </div>
+            <p class='brand-tuning__status' data-brand-status aria-live='polite'>公式SVG Sourceを読み込み中</p>
+        </div>
+    </details>
     </div>
 
     <div class="prototype-toast" role="status" aria-live="polite" hidden>Prototypeのため管理機能は実装していません。</div>
