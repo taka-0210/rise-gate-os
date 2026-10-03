@@ -20,8 +20,11 @@
     var tocButtons = Array.from(document.querySelectorAll('[data-toc-choice]'));
     var motionState = document.querySelector('.motion-state');
     var motionTargets = Array.from(document.querySelectorAll('.motion-target'));
-    var motionSpeed = document.querySelector('input[data-motion-speed]');
-    var motionSpeedOutput = document.querySelector('[data-motion-speed-output]');
+    var motionSettingInputs = Array.from(document.querySelectorAll('[data-motion-setting]'));
+    var motionApplyButton = document.querySelector('[data-motion-apply]');
+    var motionPending = document.querySelector('[data-motion-pending]');
+    var motionPreview = document.querySelector('[data-motion-preview]');
+    var appliedMotionSettings = { trigger: 50, duration: 1200, distance: 14, blur: 1.5 };
     var chapters = Array.from(document.querySelectorAll('[data-chapter]'));
     var desktopTocLinks = Array.from(document.querySelectorAll('[data-toc-key]'));
     var mobileToc = document.querySelector('[data-mobile-toc]');
@@ -41,26 +44,72 @@
     }
 
     function isAnimatedByMode(target) {
-        return body.dataset.motion === 'a' || body.dataset.motion === 'b';
+        return body.dataset.motion === 'on';
     }
 
-    function setMotionSpeed(value) {
-        var minimum = motionSpeed ? Number(motionSpeed.min) : 180;
-        var maximum = motionSpeed ? Number(motionSpeed.max) : 1200;
-        var durationA = Math.max(minimum, Math.min(maximum, Number(value) || 420));
-        var durationB = Math.round(durationA * 1.25);
-        body.style.setProperty('--motion-duration-a', durationA + 'ms');
-        body.style.setProperty('--motion-duration-b', durationB + 'ms');
-        body.style.setProperty('--motion-delay-b', Math.round(durationA * 0.13) + 'ms');
-        body.dataset.motionSpeed = String(durationA);
-        if (motionSpeed) motionSpeed.value = String(durationA);
-        if (motionSpeedOutput) motionSpeedOutput.textContent = durationA + 'ms';
+    function settingLabel(name, value) {
+        if (name === 'trigger') return '画面上から' + value + '%';
+        if (name === 'duration') return value + 'ms';
+        return value + 'px';
+    }
+
+    function readMotionSettings() {
+        var settings = {};
+        motionSettingInputs.forEach(function (input) {
+            settings[input.dataset.motionSetting] = Number(input.value);
+        });
+        return settings;
+    }
+
+    function updateDraftOutputs() {
+        motionSettingInputs.forEach(function (input) {
+            var output = document.querySelector('[data-motion-output="' + input.dataset.motionSetting + '"]');
+            if (output) output.textContent = settingLabel(input.dataset.motionSetting, input.value);
+        });
+    }
+
+    function markMotionPending() {
+        if (motionApplyButton) motionApplyButton.classList.add('is-pending');
+        if (motionPending) {
+            motionPending.classList.add('is-pending');
+            motionPending.textContent = '未反映の変更があります。「設定を反映」を押してください。';
+        }
+    }
+
+    function replayMotionPreview() {
+        if (!motionPreview || body.dataset.motion !== 'on' || reducedMotion.matches) return;
+        motionPreview.classList.remove('is-previewing');
+        void motionPreview.offsetWidth;
+        motionPreview.classList.add('is-previewing');
+        motionPreview.addEventListener('animationend', function () {
+            motionPreview.classList.remove('is-previewing');
+        }, { once: true });
+    }
+
+    function applyMotionSettings(settings, replayVisible) {
+        appliedMotionSettings = settings;
+        body.style.setProperty('--motion-duration', settings.duration + 'ms');
+        body.style.setProperty('--motion-distance', settings.distance + 'px');
+        body.style.setProperty('--motion-blur', settings.blur + 'px');
+        body.dataset.motionTrigger = String(settings.trigger);
+        body.dataset.motionDuration = String(settings.duration);
+        body.dataset.motionDistance = String(settings.distance);
+        body.dataset.motionBlur = String(settings.blur);
+        if (motionApplyButton) motionApplyButton.classList.remove('is-pending');
+        if (motionPending) {
+            motionPending.classList.remove('is-pending');
+            motionPending.textContent = '設定を反映しました。確認プレビューと以降の本文に適用されます。';
+        }
+        createMotionObserver();
+        syncMotionEnhancement(Boolean(replayVisible));
+        if (replayVisible) replayMotionPreview();
+        updateMotionState();
     }
 
     function canEnhanceMotion() {
         return !enhancementFailed
             && !directFragmentSession
-            && body.dataset.motion !== 'off'
+            && body.dataset.motion === 'on'
             && !reducedMotion.matches
             && typeof window.IntersectionObserver === 'function';
     }
@@ -124,22 +173,38 @@
         });
     }
 
+    function createMotionObserver() {
+        if (motionObserver) motionObserver.disconnect();
+        if (typeof window.IntersectionObserver !== 'function') {
+            showEverythingFailOpen('observer-unsupported-static');
+            return;
+        }
+        var bottomMargin = Math.max(0, 100 - appliedMotionSettings.trigger);
+        motionObserver = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting || !canEnhanceMotion()) return;
+                revealTarget(entry.target, false);
+                motionObserver.unobserve(entry.target);
+            });
+        }, { threshold: 0.01, rootMargin: '0px 0px -' + bottomMargin + '% 0px' });
+        motionTargets.filter(function (target) {
+            return !target.classList.contains('is-motion-revealed');
+        }).forEach(function (target) { motionObserver.observe(target); });
+    }
+
     function updateMotionState() {
-        var durationA = Number(body.dataset.motionSpeed || 420);
-        var durationB = Math.round(durationA * 1.25);
-        var labels = {
-            a: 'Motion A / ' + durationA + 'ms',
-            b: 'Motion B / ' + durationB + 'ms',
-            off: 'Motion OFF / 完全静的'
-        };
-        var selected = body.dataset.motion || 'a';
+        var selected = body.dataset.motion || 'on';
         motionButtons.forEach(function (button) {
             button.setAttribute('aria-pressed', button.dataset.motionChoice === selected ? 'true' : 'false');
         });
         var runtime = body.dataset.motionContract || 'initializing';
+        var summary = '開始' + appliedMotionSettings.trigger + '% / '
+            + appliedMotionSettings.duration + 'ms / '
+            + appliedMotionSettings.distance + 'px / blur '
+            + appliedMotionSettings.blur + 'px';
         motionState.textContent = reducedMotion.matches && selected !== 'off'
-            ? '現在：' + labels[selected] + '（OS設定によりMotion OFF）'
-            : '現在：' + labels[selected] + ' / Runtime: ' + runtime;
+            ? '適用値：' + summary + '（OS設定によりMotion OFF）'
+            : (selected === 'off' ? 'Motion OFF / 設定保持：' : '適用中：') + summary + ' / Runtime: ' + runtime;
     }
 
     function updateMobileTocMode(mode) {
@@ -183,18 +248,7 @@
 
     try {
         initializationSubstage = 'MOTION_OBSERVER';
-        if (typeof window.IntersectionObserver !== 'function') {
-            showEverythingFailOpen('observer-unsupported-static');
-        } else {
-            motionObserver = new IntersectionObserver(function (entries) {
-                entries.forEach(function (entry) {
-                    if (!entry.isIntersecting || !canEnhanceMotion()) return;
-                    revealTarget(entry.target, false);
-                    motionObserver.unobserve(entry.target);
-                });
-            }, { threshold: 0.12, rootMargin: '0px 0px -50% 0px' });
-            motionTargets.forEach(function (target) { motionObserver.observe(target); });
-        }
+        createMotionObserver();
 
         initializationSubstage = 'CHAPTER_OBSERVER';
         var chapterObserver = typeof window.IntersectionObserver === 'function'
@@ -222,14 +276,20 @@
             });
         });
 
-        if (motionSpeed) {
-            motionSpeed.addEventListener('input', function () {
-                setMotionSpeed(motionSpeed.value);
-                updateMotionState();
+        motionSettingInputs.forEach(function (input) {
+            input.addEventListener('input', function () {
+                updateDraftOutputs();
+                markMotionPending();
             });
-            motionSpeed.addEventListener('change', function () {
-                syncMotionEnhancement(true);
-                updateMotionState();
+        });
+
+        if (motionApplyButton) {
+            motionApplyButton.addEventListener('click', function () {
+                applyMotionSettings(readMotionSettings(), true);
+                motionApplyButton.textContent = '反映しました';
+                window.setTimeout(function () {
+                    motionApplyButton.textContent = '設定を反映';
+                }, 1200);
             });
         }
 
@@ -275,10 +335,10 @@
         }
 
         initializationSubstage = 'INITIAL_STATE';
-        setMotionSpeed(motionSpeed ? motionSpeed.value : 420);
+        updateDraftOutputs();
+        applyMotionSettings(readMotionSettings(), false);
         updateMobileTocMode(body.dataset.mobileToc || 'a');
         if (directFragmentSession) revealAnchor(window.location.hash);
-        syncMotionEnhancement(false);
         updateMotionState();
     } catch (error) {
         body.dataset.motionFailureSubstage = initializationSubstage;

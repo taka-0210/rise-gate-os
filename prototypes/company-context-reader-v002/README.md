@@ -8,9 +8,9 @@ Human比較の入口は`review.html`です。確実なsame-origin iframe比較�
 
 ## Compare
 
-- Motion A: 全内容ブロックの軽いReveal（初期値420ms）
-- Motion B: 全内容ブロックの少し強いReveal（Aの1.25倍）
-- フェード時間: 180ms〜1200msを画面内Sliderで即時調整
+- Motion ON: 本文を含む全内容ブロックのReveal
+- 4設定: 表示開始位置（25〜90%）/ フェード時間（200〜2000ms）/ 移動距離（0〜60px）/ ぼかし（0〜10px）
+- Slider変更はdraft。「設定を反映」で4項目を一括適用し、画面内本文を再生
 - Motion OFF: 完全静的
 - Mobile TOC: `A（通常flow disclosure）/ B（現在Chapterの短いsticky control）`
 - Viewport: Browser幅 `1440px / 390px / 320px`

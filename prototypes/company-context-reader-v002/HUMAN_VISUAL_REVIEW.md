@@ -8,9 +8,9 @@
 
 - Viewport: Desktop 1440×900 / Mobile 390×844 / Narrow 320×800
 - Mobile TOC: A（通常flow disclosure）/ B（現在Chapterだけの短いsticky control）
-- Motion A: 内容ブロック全体が軽く同時に現れる
-- Motion B: 内容ブロック全体が少し強く、短い余韻を伴って現れる
-- フェード時間: 180ms〜1200msを画面内Sliderで調整（初期値420ms）
+- Motion ON: 見出し・Statement・本文・説明・Priority・部署方針を意味ブロック単位でReveal
+- 4設定: 表示開始位置 / フェード時間 / 移動距離 / ぼかし
+- Slider変更中は未反映。「設定を反映」で4項目を一括適用し、画面内本文を再生
 - Motion OFF: 初期から全文表示する完全静的baseline
 
 TOC A / BはCR-OQ03のHuman Visual Review対象であり、本Prototypeは採用案を確定しない。
@@ -29,8 +29,8 @@ TOC A / BはCR-OQ03のHuman Visual Review対象であり、本Prototypeは採用
 2. 重要な言葉が自然に目へ入り、Explanationとの距離が適切か。
 3. ThemeとPriorityの所属関係を迷わず読めるか。
 4. 管理Dashboardではなく、会社の言葉を読む場所に感じるか。
-5. スクロールして言葉の場所へ来たとき、A / BのRevealを明確に認識できるか。
-6. A / B / OFFのどれが読む気持ちを助けるか。
+5. スクロールして言葉の場所へ来たとき、本文を含むRevealを明確に認識できるか。
+6. 4設定のどの組合せが読む気持ちを助けるか。
 7. 390pxでTOC A / Bのどちらが本文とNavigationを両立するか。
 8. 「会社の言葉」という名称は自然か。
 

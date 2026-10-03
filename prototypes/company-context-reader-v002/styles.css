@@ -133,7 +133,7 @@ summary:focus-visible {
 .prototype-controls {
     width: min(var(--max), calc(100% - 48px));
     display: grid;
-    grid-template-columns: minmax(240px, 1fr) auto minmax(180px, 240px) auto;
+    grid-template-columns: minmax(220px, .8fr) auto minmax(520px, 1.8fr);
     align-items: center;
     gap: 28px;
     margin: 8px auto 24px;
@@ -158,7 +158,7 @@ summary:focus-visible {
 
 .motion-picker {
     display: grid;
-    grid-template-columns: repeat(3, minmax(96px, 1fr));
+    grid-template-columns: repeat(2, minmax(96px, 1fr));
     gap: 5px;
     padding: 4px;
     background: #edf0ef;
@@ -183,6 +183,7 @@ summary:focus-visible {
 .motion-picker button[aria-pressed="true"] small { color: #d8eeee; }
 
 .motion-state {
+    grid-column: 1 / -1;
     min-width: 108px;
     margin: 0;
     color: var(--accent);
@@ -190,13 +191,17 @@ summary:focus-visible {
     font-weight: 750;
 }
 
-.motion-tuning { min-width: 180px; }
-.motion-tuning label,
-.motion-tuning > div { display: flex; justify-content: space-between; gap: 12px; }
-.motion-tuning label { color: var(--ink-soft); font-size: 11px; font-weight: 750; }
+.motion-tuning { min-width: 0; }
+.motion-tuning__fields { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 14px; }
+.motion-tuning label { display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; color: var(--ink-soft); font-size: 11px; font-weight: 750; }
 .motion-tuning output { color: var(--accent); font-variant-numeric: tabular-nums; }
-.motion-tuning input { width: 100%; margin: 8px 0 2px; accent-color: var(--accent); cursor: pointer; }
-.motion-tuning > div { color: var(--muted); font-size: 9px; }
+.motion-tuning input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+.motion-apply { width: 100%; min-height: 38px; margin-top: 12px; color: #fff; background: var(--accent); border: 0; border-radius: 7px; font-weight: 800; cursor: pointer; }
+.motion-apply.is-pending { background: #a2631f; box-shadow: 0 0 0 3px rgba(162, 99, 31, .13); }
+.motion-pending { min-height: 18px; color: var(--muted); font-size: 10px !important; }
+.motion-pending.is-pending { color: #8a531b !important; font-weight: 750; }
+.motion-preview { margin-top: 8px !important; padding: 10px 12px; color: var(--ink-soft) !important; background: #f5f7f6; border-left: 3px solid var(--accent); border-radius: 4px; }
+.motion-preview.is-previewing { animation: motion-enter var(--motion-duration, 1200ms) cubic-bezier(.22, .72, .28, 1) both; }
 
 .mobile-toc { display: none; }
 
@@ -495,48 +500,19 @@ summary:focus-visible {
     font-size: 13px;
 }
 
-@keyframes motion-a-enter {
-    from { opacity: 0; transform: translateY(14px); filter: blur(1.5px); }
+@keyframes motion-enter {
+    from { opacity: 0; transform: translateY(var(--motion-distance, 14px)); filter: blur(var(--motion-blur, 1.5px)); }
     to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
-@keyframes motion-b-enter {
-    from { opacity: 0; transform: translateY(24px); filter: blur(3px); }
-    to { opacity: 1; transform: translateY(0); filter: blur(0); }
-}
-
-@keyframes motion-a-enter-mobile {
-    from { opacity: 0; transform: translateY(11px); filter: blur(1px); }
-    to { opacity: 1; transform: translateY(0); filter: blur(0); }
-}
-
-@keyframes motion-b-enter-mobile {
-    from { opacity: 0; transform: translateY(18px); filter: blur(2px); }
-    to { opacity: 1; transform: translateY(0); filter: blur(0); }
-}
-
-body.is-motion-enhanced[data-motion="a"] .motion-target:not(.is-motion-revealed) {
+body.is-motion-enhanced[data-motion="on"] .motion-target:not(.is-motion-revealed) {
     opacity: 0;
-    transform: translateY(14px);
-    filter: blur(1.5px);
+    transform: translateY(var(--motion-distance, 14px));
+    filter: blur(var(--motion-blur, 1.5px));
 }
 
-body.is-motion-enhanced[data-motion="b"] .motion-target:not(.is-motion-revealed) {
-    opacity: 0;
-    transform: translateY(24px);
-    filter: blur(3px);
-}
-
-body[data-motion="a"] .motion-target.is-motion-animating {
-    animation: motion-a-enter var(--motion-duration-a, 420ms) cubic-bezier(.22, .72, .28, 1) both;
-}
-
-body[data-motion="b"] .motion-target.is-motion-animating {
-    animation: motion-b-enter var(--motion-duration-b, 525ms) cubic-bezier(.18, .78, .22, 1) both;
-}
-
-body[data-motion="b"] .motion-target--body.is-motion-animating {
-    animation-delay: var(--motion-delay-b, 55ms);
+body[data-motion="on"] .motion-target.is-motion-animating {
+    animation: motion-enter var(--motion-duration, 1200ms) cubic-bezier(.22, .72, .28, 1) both;
 }
 
 body[data-motion="off"] .motion-target {
@@ -563,6 +539,7 @@ body[data-motion="off"] .motion-target {
 @media (max-width: 980px) {
     .prototype-controls { grid-template-columns: 1fr; gap: 13px; }
     .motion-picker { width: min(100%, 430px); }
+    .motion-tuning__fields { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
     .motion-state { min-width: 0; }
     .reader-layout { grid-template-columns: 175px minmax(0, 1fr); gap: 34px; }
     .chapter__intro { grid-template-columns: 58px 1fr; gap: 18px; }
@@ -573,32 +550,15 @@ body[data-motion="off"] .motion-target {
 }
 
 @media (max-width: 760px) {
-    body.is-motion-enhanced[data-motion="a"] .motion-target:not(.is-motion-revealed) {
-        transform: translateY(11px);
-        filter: blur(1px);
-    }
-
-    body.is-motion-enhanced[data-motion="b"] .motion-target:not(.is-motion-revealed) {
-        transform: translateY(18px);
-        filter: blur(2px);
-    }
-
-    body[data-motion="a"] .motion-target.is-motion-animating {
-        animation-name: motion-a-enter-mobile;
-    }
-
-    body[data-motion="b"] .motion-target.is-motion-animating {
-        animation-name: motion-b-enter-mobile;
-    }
-
     .prototype-boundary { align-items: flex-start; gap: 4px 9px; flex-wrap: wrap; padding-block: 7px; }
     .global-placeholder { min-height: 54px; padding-inline: 18px; }
     .global-placeholder__label { display: none; }
     .breadcrumb-placeholder { width: calc(100% - 36px); min-height: 38px; font-size: 10px; overflow-x: auto; }
     .prototype-controls { width: calc(100% - 28px); margin-bottom: 14px; padding: 14px; border-radius: 10px; }
-    .motion-picker { grid-template-columns: repeat(3, 1fr); width: 100%; }
+    .motion-picker { grid-template-columns: repeat(2, 1fr); width: 100%; }
     .motion-picker button { min-width: 0; padding-inline: 4px; }
     .motion-picker button small { display: none; }
+    .motion-tuning__fields { grid-template-columns: 1fr; }
 
     .mobile-toc {
         position: sticky;

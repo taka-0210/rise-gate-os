@@ -21,13 +21,12 @@ const assert = (condition, message) => {
 
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const screenshots = {
-    desktopA: path.join(evidenceDirectory, 'desktop-motion-a.png'),
-    desktopB: path.join(evidenceDirectory, 'desktop-motion-b.png'),
+    desktopOn: path.join(evidenceDirectory, 'desktop-motion-on.png'),
+    desktopTuned: path.join(evidenceDirectory, 'desktop-motion-tuned.png'),
     desktopOff: path.join(evidenceDirectory, 'desktop-motion-off.png'),
     mobileTocA: path.join(evidenceDirectory, 'mobile-toc-a.png'),
     mobileTocB: path.join(evidenceDirectory, 'mobile-toc-b.png'),
-    mobileMotionA: path.join(evidenceDirectory, 'mobile-motion-a-v002.png'),
-    mobileMotionB: path.join(evidenceDirectory, 'mobile-motion-b-v002.png'),
+    mobileMotionOn: path.join(evidenceDirectory, 'mobile-motion-on-v002.png'),
     narrow: path.join(evidenceDirectory, 'narrow-320.png'),
     reduced: path.join(evidenceDirectory, 'reduced-motion.png'),
 };
@@ -76,7 +75,8 @@ try {
     assert(await frameLocator.locator('.chapter__opening.motion-target').count() === 3, 'Chapter opening blocks are not full-content reveal targets.');
     assert(await frameLocator.locator('.annual-context > section.motion-target').count() === 2, 'Annual explanatory blocks are not reveal targets.');
     assert(await frameLocator.locator('.priorities > section.motion-target').count() >= 9, 'Priority body blocks are not reveal targets.');
-    assert(await frameLocator.locator('input[data-motion-speed]').isVisible(), 'Motion speed slider is missing.');
+    assert(await frameLocator.locator('input[data-motion-setting]').count() === 4, 'Four Motion setting sliders are not present.');
+    assert(await frameLocator.getByRole('button', { name: '設定を反映' }).isVisible(), 'Motion apply button is missing.');
 
     const annualOrder = await frameLocator.locator('#annual').evaluate(section => {
         const selectors = ['.annual-period', '.annual-lead', '.annual-context', '.themes', '.departments'];
@@ -90,8 +90,8 @@ try {
     );
     assert(tocTargetsValid, 'A TOC link points to a missing anchor.');
 
-    const readerTextA = await frameLocator.locator('.reader').innerText();
-    const textHashA = digest(readerTextA);
+    const readerTextOn = await frameLocator.locator('.reader').innerText();
+    const textHashOn = digest(readerTextOn);
     const desktopMotionTarget = frameLocator.locator('#vision .motion-target--statement');
     const initialMotionState = await desktopMotionTarget.evaluate(element => ({
         enhanced: document.body.classList.contains('is-motion-enhanced'),
@@ -106,25 +106,26 @@ try {
         transform: getComputedStyle(element).transform,
         filter: getComputedStyle(element).filter,
     }));
-    assert(initialMotionState.enhanced, `Motion A did not enable progressive enhancement: ${JSON.stringify(initialMotionState)}`);
-    assert(!initialMotionState.revealed, 'Offscreen Motion A target was revealed before entering the viewport.');
-    assert(initialMotionState.opacity === '0', `Offscreen Motion A target is visible: ${JSON.stringify(initialMotionState)}`);
-    assert(initialMotionState.transform !== 'none', 'Motion A has no pre-reveal translation.');
-    assert(initialMotionState.filter !== 'none', 'Motion A has no pre-reveal softening.');
+    assert(initialMotionState.enhanced, `Motion ON did not enable progressive enhancement: ${JSON.stringify(initialMotionState)}`);
+    assert(initialMotionState.motion === 'on', `Motion mode is not ON: ${JSON.stringify(initialMotionState)}`);
+    assert(!initialMotionState.revealed, 'Offscreen Motion target was revealed before entering the viewport.');
+    assert(initialMotionState.opacity === '0', `Offscreen Motion target is visible: ${JSON.stringify(initialMotionState)}`);
+    assert(initialMotionState.transform !== 'none', 'Motion has no pre-reveal translation.');
+    assert(initialMotionState.filter !== 'none', 'Motion has no pre-reveal softening.');
 
     await desktopMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(250);
-    const motionAState = await desktopMotionTarget.evaluate(element => ({
+    const motionOnState = await desktopMotionTarget.evaluate(element => ({
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
         revealed: element.classList.contains('is-motion-revealed'),
     }));
-    assert(motionAState.name.includes('motion-a-enter'), `Motion A reveal did not run: ${JSON.stringify(motionAState)}`);
-    assert(motionAState.duration === '0.42s', `Motion A duration is not the 420ms slider default: ${motionAState.duration}`);
-    assert(motionAState.revealed, 'Motion A did not persist its revealed state.');
-    await page.screenshot({ path: screenshots.desktopA });
+    assert(motionOnState.name === 'motion-enter', `Motion reveal did not run: ${JSON.stringify(motionOnState)}`);
+    assert(motionOnState.duration === '1.2s', `Motion duration is not the 1200ms default: ${motionOnState.duration}`);
+    assert(motionOnState.revealed, 'Motion did not persist its revealed state.');
+    await page.screenshot({ path: screenshots.desktopOn });
 
-    await page.waitForTimeout(520);
+    await page.waitForTimeout(1300);
     await frameLocator.locator('html').evaluate(element => element.scrollTo(0, 0));
     await page.waitForTimeout(30);
     await desktopMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
@@ -137,34 +138,44 @@ try {
     assert(oneShotState.revealed && !oneShotState.animating && oneShotState.opacity === '1',
         `Revealed content replayed or hid during normal re-entry: ${JSON.stringify(oneShotState)}`);
 
-    await frameLocator.getByRole('button', { name: /Motion B/ }).evaluate(button => button.click());
-    await page.waitForTimeout(110);
-    const motionBState = await desktopMotionTarget.evaluate(element => ({
-        name: getComputedStyle(element).animationName,
-        duration: getComputedStyle(element).animationDuration,
-        distance: getComputedStyle(element).transform,
+    await frameLocator.locator('.motion-tuning').evaluate((container, values) => {
+        Object.entries(values).forEach(([name, value]) => {
+            const input = container.querySelector(`[data-motion-setting="${name}"]`);
+            input.value = String(value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }, { trigger: 75, duration: 900, distance: 30, blur: 4 });
+    const draftState = await frameLocator.locator('body').evaluate(element => ({
+        duration: element.style.getPropertyValue('--motion-duration'),
+        distance: element.style.getPropertyValue('--motion-distance'),
+        blur: element.style.getPropertyValue('--motion-blur'),
+        trigger: element.dataset.motionTrigger,
+        pending: document.querySelector('[data-motion-apply]')?.classList.contains('is-pending'),
+        message: document.querySelector('[data-motion-pending]')?.textContent,
     }));
-    assert(motionBState.name.includes('motion-b-enter'), `Motion B reveal did not run: ${JSON.stringify(motionBState)}`);
-    assert(motionBState.duration === '0.525s', `Motion B duration is not derived from the slider default: ${motionBState.duration}`);
-    assert(motionBState.name !== motionAState.name && motionBState.duration !== motionAState.duration,
-        'Motion A and B are not perceptibly distinct at the CSS contract.');
-    await page.screenshot({ path: screenshots.desktopB });
-    await frameLocator.locator('input[data-motion-speed]').evaluate(input => {
-        input.value = '640';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    const tunedSpeed = await frameLocator.locator('body').evaluate(element => ({
-        a: element.style.getPropertyValue('--motion-duration-a'),
-        b: element.style.getPropertyValue('--motion-duration-b'),
-        output: document.querySelector('[data-motion-speed-output]')?.textContent,
+    assert(draftState.duration === '1200ms' && draftState.distance === '14px' && draftState.blur === '1.5px' && draftState.trigger === '50',
+        `Slider draft changed applied Motion before confirmation: ${JSON.stringify(draftState)}`);
+    assert(draftState.pending && draftState.message.includes('未反映'),
+        `Pending state is not explicit: ${JSON.stringify(draftState)}`);
+
+    await frameLocator.locator('[data-motion-apply]').click();
+    await page.waitForTimeout(120);
+    const appliedState = await frameLocator.locator('[data-motion-preview]').evaluate(element => ({
+        previewDuration: getComputedStyle(element).animationDuration,
+        previewName: getComputedStyle(element).animationName,
+        cssDuration: document.body.style.getPropertyValue('--motion-duration'),
+        distance: document.body.style.getPropertyValue('--motion-distance'),
+        blur: document.body.style.getPropertyValue('--motion-blur'),
+        trigger: document.body.dataset.motionTrigger,
+        pending: document.querySelector('[data-motion-apply]')?.classList.contains('is-pending'),
+        message: document.querySelector('[data-motion-pending]')?.textContent,
     }));
-    assert(tunedSpeed.a === '640ms' && tunedSpeed.b === '800ms' && tunedSpeed.output === '640ms',
-        `Motion slider did not update A/B timing together: ${JSON.stringify(tunedSpeed)}`);
-    await frameLocator.locator('input[data-motion-speed]').evaluate(input => {
-        input.value = '420';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    const textHashB = digest(await frameLocator.locator('.reader').innerText());
+    assert(appliedState.cssDuration === '900ms' && appliedState.distance === '30px' && appliedState.blur === '4px' && appliedState.trigger === '75',
+        `Confirmed settings were not applied together: ${JSON.stringify(appliedState)}`);
+    assert(appliedState.previewName === 'motion-enter' && appliedState.previewDuration === '0.9s' && !appliedState.pending && appliedState.message.includes('反映しました'),
+        `Apply confirmation did not replay visibly: ${JSON.stringify(appliedState)}`);
+    await page.screenshot({ path: screenshots.desktopTuned });
+    const textHashTuned = digest(await frameLocator.locator('.reader').innerText());
 
     await frameLocator.getByRole('button', { name: /^OFF/ }).evaluate(button => button.click());
     await page.waitForTimeout(40);
@@ -177,7 +188,7 @@ try {
     assert(offStates.every(state => state.opacity === '1' && state.transform === 'none' && state.filter === 'none' && state.animation === 'none'),
         'Motion OFF does not expose every target as completely static content.');
     const textHashOff = digest(await frameLocator.locator('.reader').innerText());
-    assert(textHashA === textHashB && textHashB === textHashOff, 'Motion variants changed Reader text content.');
+    assert(textHashOn === textHashTuned && textHashTuned === textHashOff, 'Motion settings or OFF changed Reader text content.');
     await page.screenshot({ path: screenshots.desktopOff });
 
     await page.getByRole('button', { name: /Mobile/ }).click();
@@ -201,33 +212,23 @@ try {
     assert(mobileOverflow <= 0, `390px Reader overflows horizontally by ${mobileOverflow}px.`);
 
     const mobileMotionTarget = frameLocator.locator('#theme-three .motion-target--theme');
-    await frameLocator.getByRole('button', { name: /Motion A/ }).evaluate(button => button.click());
+    await frameLocator.getByRole('button', { name: /Motion ON/ }).evaluate(button => button.click());
     await page.waitForTimeout(40);
     const mobileBeforeReveal = await mobileMotionTarget.evaluate(element => ({
         revealed: element.classList.contains('is-motion-revealed'),
         opacity: getComputedStyle(element).opacity,
     }));
     assert(!mobileBeforeReveal.revealed && mobileBeforeReveal.opacity === '0',
-        `Offscreen 390px Motion A target is not waiting for reveal: ${JSON.stringify(mobileBeforeReveal)}`);
+        `Offscreen 390px Motion target is not waiting for reveal: ${JSON.stringify(mobileBeforeReveal)}`);
     await mobileMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(220);
-    const mobileAState = await mobileMotionTarget.evaluate(element => ({
+    const mobileOnState = await mobileMotionTarget.evaluate(element => ({
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
     }));
-    assert(mobileAState.name === 'motion-a-enter-mobile' && mobileAState.duration === '0.42s',
-        `390px Motion A contract is wrong: ${JSON.stringify(mobileAState)}`);
-    await page.screenshot({ path: screenshots.mobileMotionA });
-
-    await frameLocator.getByRole('button', { name: /Motion B/ }).evaluate(button => button.click());
-    await page.waitForTimeout(100);
-    const mobileBState = await mobileMotionTarget.evaluate(element => ({
-        name: getComputedStyle(element).animationName,
-        duration: getComputedStyle(element).animationDuration,
-    }));
-    assert(mobileBState.name === 'motion-b-enter-mobile' && mobileBState.duration === '0.525s',
-        `390px Motion B contract is wrong: ${JSON.stringify(mobileBState)}`);
-    await page.screenshot({ path: screenshots.mobileMotionB });
+    assert(mobileOnState.name === 'motion-enter' && mobileOnState.duration === '0.9s',
+        `390px Motion setting contract is wrong: ${JSON.stringify(mobileOnState)}`);
+    await page.screenshot({ path: screenshots.mobileMotionOn });
 
     await page.getByRole('button', { name: /Narrow/ }).click();
     const narrowWidth = await page.locator('#reader-frame').evaluate(element => Math.round(element.getBoundingClientRect().width));
@@ -241,7 +242,7 @@ try {
     assert(await frameLocator.getByText('Prototypeのため管理機能は実装していません。', { exact: true }).isVisible(), 'Management placeholder does not disclose its non-functional boundary.');
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await frameLocator.getByRole('button', { name: /Motion B/ }).evaluate(button => button.click());
+    await frameLocator.getByRole('button', { name: /Motion ON/ }).evaluate(button => button.click());
     await page.waitForTimeout(40);
     const reducedStates = await frameLocator.locator('.motion-target').evaluateAll(elements => elements.map(element => ({
         opacity: getComputedStyle(element).opacity,
@@ -358,10 +359,10 @@ try {
         officialDataConnected: false,
         databaseConnected: false,
         productRouteAdded: false,
-        contentHash: textHashA,
-        motionVariants: ['A-all-blocks-subtle', 'B-all-blocks-expressive', 'OFF-static'],
-        defaultMotionDurations: ['A-420ms', 'B-525ms'],
-        humanAdjustableRange: '180ms-1200ms',
+        contentHash: textHashOn,
+        motionVariants: ['ON-four-confirmed-settings', 'OFF-static'],
+        defaultMotionSettings: { trigger: '50%', duration: '1200ms', distance: '14px', blur: '1.5px' },
+        humanAdjustableRanges: { trigger: '25%-90%', duration: '200ms-2000ms', distance: '0px-60px', blur: '0px-10px' },
         failOpenModes: ['reduced-motion', 'javascript-off', 'observer-unsupported', 'initialization-failure', 'direct-fragment'],
         mobileTocVariants: ['A-normal-flow-disclosure', 'B-current-chapter-sticky'],
         viewports: ['1440x900', '390x844', '320x800', '200%-effective-720x450'],

@@ -22,22 +22,25 @@
 
 ## Motion contract
 
-| Variant | Desktop | Mobile | Reveal hierarchy |
+| Control | Range | Default | Apply contract |
 |---|---:|---:|---|
-| A / Subtle | 14px / 初期420ms / blur 1.5px | 11px / 初期420ms / blur 1px | 見出し、Statement、Explanation、Section、Priority、部署方針を意味ブロック単位でReveal |
-| B / Expressive | 24px / 初期525ms / blur 3px | 18px / 初期525ms / blur 2px | Aと同じ本文を、移動量と短い余韻を強めてReveal |
-| OFF | none | none | 初期から全文表示 |
+| 表示開始位置 | 画面上から25〜90% | 50% | IntersectionObserverを確定時に再生成 |
+| フェード時間 | 200〜2000ms | 1200ms | 全内容ブロックと確認Previewへ適用 |
+| 移動距離 | 0〜60px | 14px | Desktop / Mobile共通 |
+| ぼかし | 0〜10px | 1.5px | Desktop / Mobile共通 |
 
 - opacity: 0 → 1
 - translateY → 0
-- Human調整Slider: A 180ms〜1200ms、BはAの1.25倍、B body余韻はAの13%
+- Motion ON / OFFを維持し、A/B presetは廃止。
+- Slider変更中はdraftでありMotionへ即時反映しない。`設定を反映`で4項目をatomicに適用する。
+- 確定時は同じ値で確認Previewを必ず再生し、以降のReader本文へ適用する。
 - 一文字表示、長いstagger、Priority件数連動、scale、parallax、scroll hijack、scroll snap: 0
 - 一度Revealした要素は通常scroll再入場で再び隠さない。
-- A/B明示切替時だけ、現在viewportの対象を比較用に再生できる。
+- 見出し、Statement、Explanation、Section、Priority、部署方針を意味ブロック単位でRevealする。
 
 ## Progressive enhancement / fail-open
 
-Reveal前の非表示は、JavaScriptがObserverを正常に初期化し、A/Bが選択された場合だけ有効になる。
+Reveal前の非表示は、JavaScriptがObserverを正常に初期化し、Motion ONの場合だけ有効になる。
 
 次はAnimationを待たず全文表示する。
 
@@ -57,15 +60,16 @@ Result: **PASS**
 
 - Reader text SHA-256: `7d602ef9391b5cc57a98845e8503eb51dcfc97582058c3c4350d2b6efa132ba7`
 - v001と同一Reader text hash: PASS
-- A / B / OFF text hash equality: PASS
+- Motion ON / 調整後 / OFF text hash equality: PASS
 - Offscreen target待機状態: PASS
-- Motion A初期420ms / Motion B初期525ms: PASS
-- Slider 640ms入力 → A 640ms / B 800ms連動: PASS
+- 初期設定 50% / 1200ms / 14px / blur 1.5px: PASS
+- Slider変更中のapplied値不変 / 未反映表示: PASS
+- 確定操作 75% / 900ms / 30px / blur 4px atomic適用: PASS
+- 確定確認Previewを適用値900msで再生: PASS
 - Explanation / Priority / Departmentを含む全内容ブロック対象化: PASS
-- A / B CSS contract差: PASS
 - one-shot reveal / normal re-entry replay 0: PASS
 - Motion OFF全文可視: PASS
-- 390px Motion A 420ms / Motion B 525ms: PASS
+- 390px適用済みMotion 900ms: PASS
 - 1440 / 390 / 320 horizontal overflow: 0
 - 200% effective viewport（720×450）horizontal overflow: 0
 - direct fragment即時可視: PASS
@@ -92,11 +96,10 @@ Initial automated journeyでは3分類のSTOPをProduction-freeでCorrectiveし�
 
 Generated under ignored local storage:
 
-- `storage/app/company-context-reader-prototype-v002-motion-evidence/desktop-motion-a.png`
-- `storage/app/company-context-reader-prototype-v002-motion-evidence/desktop-motion-b.png`
+- `storage/app/company-context-reader-prototype-v002-motion-evidence/desktop-motion-on.png`
+- `storage/app/company-context-reader-prototype-v002-motion-evidence/desktop-motion-tuned.png`
 - `storage/app/company-context-reader-prototype-v002-motion-evidence/desktop-motion-off.png`
-- `storage/app/company-context-reader-prototype-v002-motion-evidence/mobile-motion-a-v002.png`
-- `storage/app/company-context-reader-prototype-v002-motion-evidence/mobile-motion-b-v002.png`
+- `storage/app/company-context-reader-prototype-v002-motion-evidence/mobile-motion-on-v002.png`
 - `storage/app/company-context-reader-prototype-v002-motion-evidence/mobile-toc-a.png`
 - `storage/app/company-context-reader-prototype-v002-motion-evidence/mobile-toc-b.png`
 - `storage/app/company-context-reader-prototype-v002-motion-evidence/narrow-320.png`
@@ -108,9 +111,9 @@ Screenshots are local Human Review evidence and are not Product assets.
 
 Automated PASS does not decide:
 
-1. Motion A / B / OFFの採用。
+1. 4項目の採用値。
 2. Revealが読む順番と会社の言葉の存在感を助けるか。
-3. Mobileで距離・durationが自然か。
+3. Desktop / Mobileで同じ設定が自然か。
 4. CR-OQ01〜03。
 
 Human ReviewでMotionが決まるまでCR-PD04をFinal Closeせず、正式Reader実装へ進まない。
