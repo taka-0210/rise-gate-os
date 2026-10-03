@@ -4,7 +4,7 @@
 
 **COMPANY CONTEXT READER / PROTOTYPE v002 MOTION READY / HUMAN VISUAL REVIEW WAITING**
 
-- Date: 2026-10-03 JST
+- Date: 2026-10-04 JST
 - Scope: Motion Corrective only
 - Human-approved KEEP: four-chapter Reader, IA, typography, whitespace, content, Annual hierarchy, TOC and Reader/Management boundary
 - Prototype type: isolated static
@@ -24,13 +24,13 @@
 
 | Variant | Desktop | Mobile | Reveal hierarchy |
 |---|---:|---:|---|
-| A / Extreme Diagnostic | 60px / 1600ms / blur 6px | 42px / 1400ms / blur 5px | Chapter、Overall/Annual Statement、Theme Statement |
-| B / Extreme Diagnostic | 120px / 2600ms / blur 14px | 80px / 2200ms / blur 10px | A対象 + 主要Section Statement |
+| A / Subtle | 14px / 初期420ms / blur 1.5px | 11px / 初期420ms / blur 1px | 見出し、Statement、Explanation、Section、Priority、部署方針を意味ブロック単位でReveal |
+| B / Expressive | 24px / 初期525ms / blur 3px | 18px / 初期525ms / blur 2px | Aと同じ本文を、移動量と短い余韻を強めてReveal |
 | OFF | none | none | 初期から全文表示 |
 
 - opacity: 0 → 1
 - translateY → 0
-- BのStatement / Theme sequence: 250ms
+- Human調整Slider: A 180ms〜1200ms、BはAの1.25倍、B body余韻はAの13%
 - 一文字表示、長いstagger、Priority件数連動、scale、parallax、scroll hijack、scroll snap: 0
 - 一度Revealした要素は通常scroll再入場で再び隠さない。
 - A/B明示切替時だけ、現在viewportの対象を比較用に再生できる。
@@ -59,12 +59,13 @@ Result: **PASS**
 - v001と同一Reader text hash: PASS
 - A / B / OFF text hash equality: PASS
 - Offscreen target待機状態: PASS
-- Motion A Desktop 1600ms: PASS
-- Motion B Desktop 2600ms: PASS
+- Motion A初期420ms / Motion B初期525ms: PASS
+- Slider 640ms入力 → A 640ms / B 800ms連動: PASS
+- Explanation / Priority / Departmentを含む全内容ブロック対象化: PASS
 - A / B CSS contract差: PASS
 - one-shot reveal / normal re-entry replay 0: PASS
 - Motion OFF全文可視: PASS
-- 390px Motion A 1400ms / Motion B 2200ms: PASS
+- 390px Motion A 420ms / Motion B 525ms: PASS
 - 1440 / 390 / 320 horizontal overflow: 0
 - 200% effective viewport（720×450）horizontal overflow: 0
 - direct fragment即時可視: PASS
@@ -77,6 +78,7 @@ Result: **PASS**
 - external request: 0
 - HTTP error: 0
 - DB connection / mutation: 0 / 0
+- Launcher v002固有port `41802` / artifact identity検証: PASS
 
 Initial automated journeyでは3分類のSTOPをProduction-freeでCorrectiveし、同一full journeyをPASSした。
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateRange(1024, 65535)]
-    [int] $Port = 41793
+    [int] $Port = 41802
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,6 +18,7 @@ if (-not (Test-Path -LiteralPath $reviewPath -PathType Leaf)) {
 }
 
 $uri = "http://127.0.0.1:$Port/review.html"
+$expectedIdentity = '<meta name="prototype-id" content="company-context-reader-v002-motion">'
 $server = $null
 
 try {
@@ -34,9 +35,12 @@ try {
         }
         try {
             $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 1
-            if ($response.StatusCode -eq 200) {
+            if ($response.StatusCode -eq 200 -and $response.Content.Contains($expectedIdentity)) {
                 $ready = $true
                 break
+            }
+            if ($response.StatusCode -eq 200) {
+                throw 'The selected port is serving a different prototype. No browser was opened.'
             }
         } catch {
             Start-Sleep -Milliseconds 200

@@ -2,14 +2,15 @@
 
 ## Entry
 
-`review.html`をChromeまたはEdgeで開く。
+`Open-CompanyContextReaderPrototype.ps1`を実行し、ChromeまたはEdgeで開く。v002専用portとidentity検証により旧Prototypeとの混同を防ぐ。
 
 同一のReader本文に対して、次を切り替えられる。
 
 - Viewport: Desktop 1440×900 / Mobile 390×844 / Narrow 320×800
 - Mobile TOC: A（通常flow disclosure）/ B（現在Chapterだけの短いsticky control）
-- Motion A Diagnostic: 60px / 1.6秒 / blurから現れるExtreme Reveal
-- Motion B Diagnostic: 120px / 2.6秒 / 強いblurから現れるExtreme Reveal
+- Motion A: 内容ブロック全体が軽く同時に現れる
+- Motion B: 内容ブロック全体が少し強く、短い余韻を伴って現れる
+- フェード時間: 180ms〜1200msを画面内Sliderで調整（初期値420ms）
 - Motion OFF: 初期から全文表示する完全静的baseline
 
 TOC A / BはCR-OQ03のHuman Visual Review対象であり、本Prototypeは採用案を確定しない。

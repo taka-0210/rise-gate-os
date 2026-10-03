@@ -8,8 +8,9 @@ Human比較の入口は`review.html`です。確実なsame-origin iframe比較�
 
 ## Compare
 
-- Motion A Diagnostic: Extreme Reveal（Desktop 60px / 1600ms / blur 6px、Mobile 42px / 1400ms）
-- Motion B Diagnostic: Extreme Reveal（Desktop 120px / 2600ms / blur 14px、Mobile 80px / 2200ms）
+- Motion A: 全内容ブロックの軽いReveal（初期値420ms）
+- Motion B: 全内容ブロックの少し強いReveal（Aの1.25倍）
+- フェード時間: 180ms〜1200msを画面内Sliderで即時調整
 - Motion OFF: 完全静的
 - Mobile TOC: `A（通常flow disclosure）/ B（現在Chapterの短いsticky control）`
 - Viewport: Browser幅 `1440px / 390px / 320px`

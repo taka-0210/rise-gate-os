@@ -3,9 +3,25 @@
 
     var body = document.body;
     var motionButtons = Array.from(document.querySelectorAll('[data-motion-choice]'));
+    var motionBlockDefinitions = [
+        { selector: '.chapter__intro', kind: 'chapter' },
+        { selector: '.chapter__opening, .annual-lead', kind: 'statement' },
+        { selector: '.context-section, .vision-step, .policy-item, .annual-period, .annual-context > section, .priorities > section, .department-grid > section', kind: 'body' },
+        { selector: '.theme > header, .departments > header', kind: 'theme' }
+    ];
+    Array.from(document.querySelectorAll('.motion-target')).forEach(function (target) {
+        target.classList.remove('motion-target', 'motion-target--chapter', 'motion-target--statement', 'motion-target--section', 'motion-target--theme');
+    });
+    motionBlockDefinitions.forEach(function (definition) {
+        Array.from(document.querySelectorAll(definition.selector)).forEach(function (target) {
+            target.classList.add('motion-target', 'motion-target--' + definition.kind);
+        });
+    });
     var tocButtons = Array.from(document.querySelectorAll('[data-toc-choice]'));
     var motionState = document.querySelector('.motion-state');
     var motionTargets = Array.from(document.querySelectorAll('.motion-target'));
+    var motionSpeed = document.querySelector('input[data-motion-speed]');
+    var motionSpeedOutput = document.querySelector('[data-motion-speed-output]');
     var chapters = Array.from(document.querySelectorAll('[data-chapter]'));
     var desktopTocLinks = Array.from(document.querySelectorAll('[data-toc-key]'));
     var mobileToc = document.querySelector('[data-mobile-toc]');
@@ -25,11 +41,20 @@
     }
 
     function isAnimatedByMode(target) {
-        if (body.dataset.motion === 'b') return true;
-        if (body.dataset.motion !== 'a') return false;
-        return target.classList.contains('motion-target--chapter')
-            || target.classList.contains('motion-target--statement')
-            || target.classList.contains('motion-target--theme');
+        return body.dataset.motion === 'a' || body.dataset.motion === 'b';
+    }
+
+    function setMotionSpeed(value) {
+        var minimum = motionSpeed ? Number(motionSpeed.min) : 180;
+        var maximum = motionSpeed ? Number(motionSpeed.max) : 1200;
+        var durationA = Math.max(minimum, Math.min(maximum, Number(value) || 420));
+        var durationB = Math.round(durationA * 1.25);
+        body.style.setProperty('--motion-duration-a', durationA + 'ms');
+        body.style.setProperty('--motion-duration-b', durationB + 'ms');
+        body.style.setProperty('--motion-delay-b', Math.round(durationA * 0.13) + 'ms');
+        body.dataset.motionSpeed = String(durationA);
+        if (motionSpeed) motionSpeed.value = String(durationA);
+        if (motionSpeedOutput) motionSpeedOutput.textContent = durationA + 'ms';
     }
 
     function canEnhanceMotion() {
@@ -100,9 +125,11 @@
     }
 
     function updateMotionState() {
+        var durationA = Number(body.dataset.motionSpeed || 420);
+        var durationB = Math.round(durationA * 1.25);
         var labels = {
-            a: 'Motion A / EXTREME 60px・1.6秒',
-            b: 'Motion B / EXTREME 120px・2.6秒',
+            a: 'Motion A / ' + durationA + 'ms',
+            b: 'Motion B / ' + durationB + 'ms',
             off: 'Motion OFF / 完全静的'
         };
         var selected = body.dataset.motion || 'a';
@@ -144,7 +171,7 @@
         if (target.classList.contains('motion-target')) targets.unshift(target);
         if (target.classList.contains('chapter')) {
             targets = Array.from(target.querySelectorAll(
-                ':scope > .chapter__intro, :scope > .chapter__opening .motion-target, :scope > .annual-lead .motion-target'
+                ':scope > .chapter__intro, :scope > .chapter__opening, :scope > .annual-period, :scope > .annual-lead'
             ));
         }
         targets.forEach(function (motionTarget) {
@@ -195,6 +222,17 @@
             });
         });
 
+        if (motionSpeed) {
+            motionSpeed.addEventListener('input', function () {
+                setMotionSpeed(motionSpeed.value);
+                updateMotionState();
+            });
+            motionSpeed.addEventListener('change', function () {
+                syncMotionEnhancement(true);
+                updateMotionState();
+            });
+        }
+
         tocButtons.forEach(function (button) {
             button.addEventListener('click', function () {
                 updateMobileTocMode(button.dataset.tocChoice);
@@ -237,6 +275,7 @@
         }
 
         initializationSubstage = 'INITIAL_STATE';
+        setMotionSpeed(motionSpeed ? motionSpeed.value : 420);
         updateMobileTocMode(body.dataset.mobileToc || 'a');
         if (directFragmentSession) revealAnchor(window.location.hash);
         syncMotionEnhancement(false);

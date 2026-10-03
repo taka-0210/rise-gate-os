@@ -73,6 +73,10 @@ try {
     assert(await frameLocator.locator('.theme').count() >= 3, 'Annual policy must contain multiple themes.');
     assert(await frameLocator.locator('.priorities > section').count() >= 9, 'Annual policy must contain multiple priorities.');
     assert(await frameLocator.locator('.department-grid > section').count() >= 3, 'Annual policy must contain multiple departments.');
+    assert(await frameLocator.locator('.chapter__opening.motion-target').count() === 3, 'Chapter opening blocks are not full-content reveal targets.');
+    assert(await frameLocator.locator('.annual-context > section.motion-target').count() === 2, 'Annual explanatory blocks are not reveal targets.');
+    assert(await frameLocator.locator('.priorities > section.motion-target').count() >= 9, 'Priority body blocks are not reveal targets.');
+    assert(await frameLocator.locator('input[data-motion-speed]').isVisible(), 'Motion speed slider is missing.');
 
     const annualOrder = await frameLocator.locator('#annual').evaluate(section => {
         const selectors = ['.annual-period', '.annual-lead', '.annual-context', '.themes', '.departments'];
@@ -106,21 +110,21 @@ try {
     assert(!initialMotionState.revealed, 'Offscreen Motion A target was revealed before entering the viewport.');
     assert(initialMotionState.opacity === '0', `Offscreen Motion A target is visible: ${JSON.stringify(initialMotionState)}`);
     assert(initialMotionState.transform !== 'none', 'Motion A has no pre-reveal translation.');
-    assert(initialMotionState.filter !== 'none', 'Extreme Motion A has no diagnostic blur.');
+    assert(initialMotionState.filter !== 'none', 'Motion A has no pre-reveal softening.');
 
     await desktopMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
-    await page.waitForTimeout(90);
+    await page.waitForTimeout(250);
     const motionAState = await desktopMotionTarget.evaluate(element => ({
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
         revealed: element.classList.contains('is-motion-revealed'),
     }));
     assert(motionAState.name.includes('motion-a-enter'), `Motion A reveal did not run: ${JSON.stringify(motionAState)}`);
-    assert(motionAState.duration === '1.6s', `Motion A duration is not 1600ms: ${motionAState.duration}`);
+    assert(motionAState.duration === '0.42s', `Motion A duration is not the 420ms slider default: ${motionAState.duration}`);
     assert(motionAState.revealed, 'Motion A did not persist its revealed state.');
     await page.screenshot({ path: screenshots.desktopA });
 
-    await page.waitForTimeout(1700);
+    await page.waitForTimeout(520);
     await frameLocator.locator('html').evaluate(element => element.scrollTo(0, 0));
     await page.waitForTimeout(30);
     await desktopMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
@@ -141,10 +145,25 @@ try {
         distance: getComputedStyle(element).transform,
     }));
     assert(motionBState.name.includes('motion-b-enter'), `Motion B reveal did not run: ${JSON.stringify(motionBState)}`);
-    assert(motionBState.duration === '2.6s', `Motion B duration is not 2600ms: ${motionBState.duration}`);
+    assert(motionBState.duration === '0.525s', `Motion B duration is not derived from the slider default: ${motionBState.duration}`);
     assert(motionBState.name !== motionAState.name && motionBState.duration !== motionAState.duration,
         'Motion A and B are not perceptibly distinct at the CSS contract.');
     await page.screenshot({ path: screenshots.desktopB });
+    await frameLocator.locator('input[data-motion-speed]').evaluate(input => {
+        input.value = '640';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const tunedSpeed = await frameLocator.locator('body').evaluate(element => ({
+        a: element.style.getPropertyValue('--motion-duration-a'),
+        b: element.style.getPropertyValue('--motion-duration-b'),
+        output: document.querySelector('[data-motion-speed-output]')?.textContent,
+    }));
+    assert(tunedSpeed.a === '640ms' && tunedSpeed.b === '800ms' && tunedSpeed.output === '640ms',
+        `Motion slider did not update A/B timing together: ${JSON.stringify(tunedSpeed)}`);
+    await frameLocator.locator('input[data-motion-speed]').evaluate(input => {
+        input.value = '420';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     const textHashB = digest(await frameLocator.locator('.reader').innerText());
 
     await frameLocator.getByRole('button', { name: /^OFF/ }).evaluate(button => button.click());
@@ -191,12 +210,12 @@ try {
     assert(!mobileBeforeReveal.revealed && mobileBeforeReveal.opacity === '0',
         `Offscreen 390px Motion A target is not waiting for reveal: ${JSON.stringify(mobileBeforeReveal)}`);
     await mobileMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
-    await page.waitForTimeout(80);
+    await page.waitForTimeout(220);
     const mobileAState = await mobileMotionTarget.evaluate(element => ({
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
     }));
-    assert(mobileAState.name === 'motion-a-enter-mobile' && mobileAState.duration === '1.4s',
+    assert(mobileAState.name === 'motion-a-enter-mobile' && mobileAState.duration === '0.42s',
         `390px Motion A contract is wrong: ${JSON.stringify(mobileAState)}`);
     await page.screenshot({ path: screenshots.mobileMotionA });
 
@@ -206,7 +225,7 @@ try {
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
     }));
-    assert(mobileBState.name === 'motion-b-enter-mobile' && mobileBState.duration === '2.2s',
+    assert(mobileBState.name === 'motion-b-enter-mobile' && mobileBState.duration === '0.525s',
         `390px Motion B contract is wrong: ${JSON.stringify(mobileBState)}`);
     await page.screenshot({ path: screenshots.mobileMotionB });
 
@@ -340,9 +359,9 @@ try {
         databaseConnected: false,
         productRouteAdded: false,
         contentHash: textHashA,
-        motionVariants: ['A-extreme-diagnostic', 'B-extreme-diagnostic', 'OFF-static'],
-        desktopMotionDurations: ['1600ms', '2600ms'],
-        mobileMotionDurations: ['1400ms', '2200ms'],
+        motionVariants: ['A-all-blocks-subtle', 'B-all-blocks-expressive', 'OFF-static'],
+        defaultMotionDurations: ['A-420ms', 'B-525ms'],
+        humanAdjustableRange: '180ms-1200ms',
         failOpenModes: ['reduced-motion', 'javascript-off', 'observer-unsupported', 'initialization-failure', 'direct-fragment'],
         mobileTocVariants: ['A-normal-flow-disclosure', 'B-current-chapter-sticky'],
         viewports: ['1440x900', '390x844', '320x800', '200%-effective-720x450'],

@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light">
     <title>会社の言葉｜Visual Prototype v002</title>
     <link rel=icon href=data:,>
-    <link rel="stylesheet" href="styles.css?v=motion-extreme-1">
+    <link rel="stylesheet" href="styles.css?v=motion-tuning-1">
 </head>
 <body data-motion="a">
     <a class="skip-link" href="#reader">本文へ移動</a>
@@ -36,19 +36,24 @@
     <section class="prototype-controls" aria-labelledby="prototype-controls-title">
         <div>
             <p class="prototype-controls__eyebrow">HUMAN VISUAL REVIEW</p>
-            <h2 id="prototype-controls-title">Extreme Motion Diagnostic</h2>
-            <p>一冊感と構成を固定し、Revealの強さだけを確認する隔離Prototypeです。</p>
+            <h2 id="prototype-controls-title">Motion Timing Review</h2>
+            <p>本文を含む内容ブロック全体のReveal速度を、その場で調整できます。</p>
         </div>
         <div class="motion-picker" role="group" aria-label="Motionを選択">
             <button type="button" data-motion-choice="a" aria-pressed="true">
-                <span>Motion A</span><small>Extreme 60px / 1.6s</small>
+                <span>Motion A</span><small>軽く・同時に</small>
             </button>
             <button type="button" data-motion-choice="b" aria-pressed="false">
-                <span>Motion B</span><small>Extreme 120px / 2.6s</small>
+                <span>Motion B</span><small>少し強く・余韻あり</small>
             </button>
             <button type="button" data-motion-choice="off" aria-pressed="false">
                 <span>OFF</span><small>完全静的</small>
             </button>
+        </div>
+        <div class="motion-tuning">
+            <label for="motion-speed">フェード時間 <output for="motion-speed" data-motion-speed-output>420ms</output></label>
+            <input id="motion-speed" type="range" min="180" max="1200" step="20" value="420" data-motion-speed>
+            <div aria-hidden="true"><span>速い</span><span>ゆっくり</span></div>
         </div>
         <p class="motion-state" aria-live="polite">現在：Motion A</p>
     </section>
@@ -320,6 +325,6 @@
     </div>
 
     <div class="prototype-toast" role="status" aria-live="polite" hidden>Prototypeのため管理機能は実装していません。</div>
-    <script src="prototype.js?v=motion-extreme-1"></script>
+    <script src="prototype.js?v=motion-tuning-1"></script>
 </body>
 </html>
