@@ -309,6 +309,7 @@
         'business-domains.show',
         'management-design.index',
         'management-design.show',
+        'annual-management-policy.*',
     ),
 ])>
 <div class="shell">
@@ -398,6 +399,7 @@
                 $module = match (true) {
                     request()->routeIs('business-domains.*') => ['事業領域', route('business-domains.index')],
                     request()->routeIs('management-design.*') => ['理念・Vision・方針', route('management-design.index')],
+                    request()->routeIs('annual-management-policy.*') => ['年度経営方針', route('annual-management-policy.index')],
                     request()->routeIs('ai-common.*') => ['COに相談', route('ai-common.index')],
                     request()->routeIs('company-finance.*') => ['経営数値', route('company-finance.index')],
                     request()->routeIs('company-loans.*') => ['借入管理', route('company-loans.index')],

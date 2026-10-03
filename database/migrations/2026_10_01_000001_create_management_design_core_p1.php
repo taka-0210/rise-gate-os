@@ -100,7 +100,7 @@ return new class extends Migration
             $table->string('status', 20);
             $table->json('snapshot');
             $table->foreignId('actor_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('management_design_operation_id')->nullable()->constrained('management_design_operations')->nullOnDelete();
+            $table->foreignId('management_design_operation_id')->nullable()->constrained('management_design_operations', indexName: 'mdr_operation_fk')->nullOnDelete();
             $table->string('change_reason', 2000)->nullable();
             $table->timestamp('changed_at');
             $table->timestamps();

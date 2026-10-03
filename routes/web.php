@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActionExecutionController;
+use App\Http\Controllers\AnnualManagementPolicyController;
 use App\Http\Controllers\AiCommonController;
 use App\Http\Controllers\AiCommonInputController;
 use App\Http\Controllers\AiCommonPolicyController;
@@ -268,6 +269,23 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::get('/company/management-design/{type}/revisions/{revision}', [ManagementDesignController::class, 'revision'])->whereIn('type', ['philosophy', 'vision', 'policy'])->whereNumber('revision')->name('management-design.revisions.show');
         Route::post('/company/management-design/{type}/archive', [ManagementDesignController::class, 'archive'])->whereIn('type', ['philosophy', 'vision', 'policy'])->name('management-design.archive');
         Route::post('/company/management-design/{type}/reopen', [ManagementDesignController::class, 'reopen'])->whereIn('type', ['philosophy', 'vision', 'policy'])->name('management-design.reopen');
+        Route::get('/company/annual-management-policy', [AnnualManagementPolicyController::class, 'index'])->name('annual-management-policy.index');
+        Route::post('/company/annual-management-policy/periods', [AnnualManagementPolicyController::class, 'storePeriod'])->name('annual-management-policy.periods.store');
+        Route::put('/company/annual-management-policy/periods/{period}', [AnnualManagementPolicyController::class, 'updatePeriod'])->name('annual-management-policy.periods.update');
+        Route::post('/company/annual-management-policy/periods/{period}/initialize', [AnnualManagementPolicyController::class, 'initialize'])->name('annual-management-policy.initialize');
+        Route::get('/company/annual-management-policy/{annualPolicy}', [AnnualManagementPolicyController::class, 'show'])->name('annual-management-policy.show');
+        Route::get('/company/annual-management-policy/{annualPolicy}/edit', [AnnualManagementPolicyController::class, 'edit'])->name('annual-management-policy.edit');
+        Route::put('/company/annual-management-policy/{annualPolicy}', [AnnualManagementPolicyController::class, 'update'])->name('annual-management-policy.update');
+        Route::get('/company/annual-management-policy/{annualPolicy}/approval', [AnnualManagementPolicyController::class, 'approval'])->name('annual-management-policy.approval');
+        Route::post('/company/annual-management-policy/{annualPolicy}/approve', [AnnualManagementPolicyController::class, 'approve'])->name('annual-management-policy.approve');
+        Route::get('/company/annual-management-policy/{annualPolicy}/history', [AnnualManagementPolicyController::class, 'history'])->name('annual-management-policy.history');
+        Route::get('/company/annual-management-policy/{annualPolicy}/revisions/{revision}', [AnnualManagementPolicyController::class, 'revision'])->whereNumber('revision')->name('annual-management-policy.revisions.show');
+        Route::get('/company/annual-management-policy/{annualPolicy}/permissions', [AnnualManagementPolicyController::class, 'permissions'])->name('annual-management-policy.permissions');
+        Route::put('/company/annual-management-policy/{annualPolicy}/permissions', [AnnualManagementPolicyController::class, 'updatePermissions'])->name('annual-management-policy.permissions.update');
+        Route::get('/company/annual-management-policy/{annualPolicy}/relations', [AnnualManagementPolicyController::class, 'relations'])->name('annual-management-policy.relations');
+        Route::post('/company/annual-management-policy/{annualPolicy}/relations', [AnnualManagementPolicyController::class, 'storeRelation'])->name('annual-management-policy.relations.store');
+        Route::post('/company/annual-management-policy/{annualPolicy}/relations/{relation}/withdraw', [AnnualManagementPolicyController::class, 'withdrawRelation'])->name('annual-management-policy.relations.withdraw');
+        Route::get('/company/annual-management-policy/{annualPolicy}/source-evidence', [AnnualManagementPolicyController::class, 'sourceEvidence'])->name('annual-management-policy.source-evidence');
         Route::get('/company/today', [ActionExecutionController::class, 'today'])->name('action-executions.today');
         Route::post('/company/today/refresh', [ActionExecutionController::class, 'refresh'])->name('action-executions.refresh');
         Route::get('/company/projects/{project}/actions/{action}/executions', [ActionExecutionController::class, 'show'])->name('action-executions.show');

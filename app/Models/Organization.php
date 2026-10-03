@@ -119,4 +119,14 @@ class Organization extends Model
     {
         return $this->hasMany(BusinessDomainEditorGrant::class);
     }
+
+    public function managementPeriods(): HasMany
+    {
+        return $this->hasMany(OrganizationManagementPeriod::class);
+    }
+
+    public function annualManagementPolicies(): HasMany
+    {
+        return $this->hasMany(AnnualManagementPolicy::class);
+    }
 }

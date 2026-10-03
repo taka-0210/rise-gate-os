@@ -170,8 +170,8 @@ return new class extends Migration
         Schema::create('ai_common_shared_durable_final_commits', function (Blueprint $table): void {
             $table->id();
             $table->uuid('public_id')->unique();
-            $table->unsignedBigInteger('provider_event_receipt_id')->unique();
-            $table->uuid('writer_operation_id')->unique();
+            $table->unsignedBigInteger('provider_event_receipt_id')->unique('acrcommit_receipt_unique');
+            $table->uuid('writer_operation_id')->unique('acrcommit_writer_operation_unique');
             $table->unsignedBigInteger('validated_source_start_sample');
             $table->unsignedBigInteger('validated_source_end_sample');
             $table->string('state', 24);

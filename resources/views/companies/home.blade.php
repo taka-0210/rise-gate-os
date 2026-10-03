@@ -73,6 +73,11 @@
                     <span class="badge">閲覧可能</span>
                 @endif
             </a>
+            <a class="card" href="{{ route('annual-management-policy.index') }}">
+                <div class="meta">ANNUAL MANAGEMENT POLICY</div>
+                <h2>年度経営方針</h2>
+                <p>会社の期間ごとの正式方針と重点項目を確認します。</p>
+            </a>
             @if ($canViewCompanyDebt ?? false)
                 <a class="card" href="{{ route('company-loans.index') }}"><div class="meta">DEBT / FUNDING</div><h2>借入・資金計画</h2><p>借入残高 {{ number_format($loanBalance) }}円</p></a>
             @endif
