@@ -63,7 +63,16 @@
                     <div class="meta">ORGANIZATION</div><h2>Organization設定</h2><p>Organization Role・Position・Groupを管理</p>
                 </a>
             @endif
-            <div class="card"><div class="meta">DIRECTION</div><h2>経営指針</h2><p>理念・未来・方針・計画（今後実装）</p></div>
+            <a class="card" href="{{ route('management-design.index') }}">
+                <div class="meta">MANAGEMENT DESIGN / COMPANY CONTEXT</div>
+                <h2>理念・Vision・方針</h2>
+                <p>会社の根本思想、向かう未来、判断の方向を正本として読みます。</p>
+                @if ($canManageManagementDesign)
+                    <span class="badge">権限管理</span>
+                @elseif ($canViewManagementDesign)
+                    <span class="badge">閲覧可能</span>
+                @endif
+            </a>
             @if ($canViewCompanyDebt ?? false)
                 <a class="card" href="{{ route('company-loans.index') }}"><div class="meta">DEBT / FUNDING</div><h2>借入・資金計画</h2><p>借入残高 {{ number_format($loanBalance) }}円</p></a>
             @endif
