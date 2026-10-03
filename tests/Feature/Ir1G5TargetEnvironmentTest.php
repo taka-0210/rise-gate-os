@@ -92,6 +92,32 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringNotContainsString('Invoke-WebRequest', $helper);
     }
 
+    public function test_helper_uses_powershell_51_safe_line_ending_normalization_on_the_human_path(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5TargetEnvironment.ps1'));
+
+        $this->assertStringContainsString('g5-discovery-corrective-1', $helper);
+        $this->assertStringContainsString('function Read-LfScript', $helper);
+        $this->assertStringContainsString('$text.Replace($crlf,$lf).Replace($cr,$lf)', $helper);
+        $this->assertStringContainsString('human_execution_path=validated_through_remote_script_preparation', $helper);
+        $this->assertStringContainsString("return 'UNEXPECTED_LOCAL_FAILURE'", $helper);
+        $this->assertStringContainsString('safe_error_code=$(Get-SafeErrorCode $_.Exception)', $helper);
+        $this->assertStringNotContainsString('.Replace(([char]13+[char]10),[char]10)', $helper);
+        $this->assertStringNotContainsString('safe_error_code=$($_.Exception.Message)', $helper);
+
+        $preparation = strpos($helper, '$scriptText=Read-LfScript');
+        $verifyExit = strpos($helper, 'if($VerifyOnly)');
+        $productionStage = strpos($helper, '$FailureStage=if($Step-eq\'Inspect\')');
+        $connectionAttempt = strpos($helper, '$ConnectionAttempted=$true');
+
+        $this->assertIsInt($preparation);
+        $this->assertIsInt($verifyExit);
+        $this->assertIsInt($productionStage);
+        $this->assertIsInt($connectionAttempt);
+        $this->assertLessThan($verifyExit, $preparation);
+        $this->assertLessThan($connectionAttempt, $productionStage);
+    }
+
     public function test_builder_is_g4_bound_deterministic_and_production_free(): void
     {
         $builder = (string) file_get_contents(base_path('deployment/g5-target-environment/Build-G5TargetPackage.ps1'));

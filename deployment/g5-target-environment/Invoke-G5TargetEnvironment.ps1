@@ -9,6 +9,7 @@ $Candidate='924af91188cc60d33ff87c91b94ecc1d539566e6'
 $PackageSha='f89a71cbfe453b2e9bd74d20fdf5e3bab9c2b98e28775ddf755922713ca8a232'
 $SshAlias='company-os-production'
 $IdentityFile='codex-company-os-production'
+$HelperGeneration='g5-discovery-corrective-1'
 $FailureStage='LOCAL_PRECONDITIONS'
 $ConnectionAttempted=$false
 
@@ -17,6 +18,20 @@ function Hash-Text([string]$Value){
     $sha=[Security.Cryptography.SHA256]::Create()
     try{return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Value)))).Replace('-','').ToLowerInvariant()}
     finally{$sha.Dispose()}
+}
+function Read-LfScript([string]$Path){
+    $text=[IO.File]::ReadAllText($Path)
+    $crlf=[string]::Concat([char]13,[char]10)
+    $cr=[string][char]13
+    $lf=[string][char]10
+    $normalized=$text.Replace($crlf,$lf).Replace($cr,$lf)
+    if($normalized.Contains([char]13)){Stop-G5'SCRIPT_LINE_ENDING_NORMALIZATION_FAILED'}
+    return $normalized
+}
+function Get-SafeErrorCode([Exception]$Exception){
+    $value=$Exception.Message
+    if($value-match'^[A-Z][A-Z0-9_]{2,80}$'){return $value}
+    return 'UNEXPECTED_LOCAL_FAILURE'
 }
 function Invoke-Captured([string]$File,[string[]]$Arguments,[AllowNull()][string]$InputText){
     $stdout=[IO.Path]::GetTempFileName();$stderr=[IO.Path]::GetTempFileName();$old=$ErrorActionPreference
@@ -75,8 +90,14 @@ try{
     if(-not(Test-Path $known -PathType Leaf)){Stop-G5'KNOWN_HOSTS_MISSING'}
     $lookup="[$($config.hostname)]:$($config.port)"
     if((Invoke-Captured $keygen.Source @('-F',$lookup,'-f',$known) $null).ExitCode-ne0){Stop-G5'HOST_KEY_NOT_REGISTERED'}
+    $FailureStage='LOCAL_REMOTE_SCRIPT_PREPARATION'
+    $scriptName=if($Step-eq'Inspect'){'inspect-target-read-only.sh'}else{'rehearse-posix-capabilities.sh'}
+    $confirm=if($Step-eq'Inspect'){'IR1-G5-READ-ONLY-INSPECTION'}else{'IR1-G5-POSIX-CAPABILITY-REHEARSAL'}
+    $header=if($Step-eq'Inspect'){'G5_TARGET_INSPECTION'}else{'G5_POSIX_CAPABILITY_REHEARSAL'}
+    $scriptText=Read-LfScript(Join-Path $PSScriptRoot $scriptName)
     if($VerifyOnly){
         Write-Output 'G5_TARGET_HELPER_VERIFY_ONLY=PASS'; Write-Output "package_sha256=$PackageSha"
+        Write-Output "helper_generation=$HelperGeneration"; Write-Output 'human_execution_path=validated_through_remote_script_preparation'
         Write-Output 'production_connection_attempted=false'; Write-Output 'production_mutation=false'; exit 0
     }
 
@@ -91,17 +112,13 @@ try{
         $inspection=Get-Content -Raw $inspectionPath|ConvertFrom-Json
         if($inspection.status-ne'PASS'-or$inspection.evidence.mutation_readiness-ne'capability_rehearsal_eligible'){Stop-G5'CAPABILITY_REHEARSAL_NOT_ELIGIBLE'}
     }
-    $FailureStage=if($Step-eq'Inspect'){'PRODUCTION_READ_ONLY_INSPECTION'}else{'PRODUCTION_ISOLATED_CAPABILITY_REHEARSAL'}
-    $scriptName=if($Step-eq'Inspect'){'inspect-target-read-only.sh'}else{'rehearse-posix-capabilities.sh'}
-    $confirm=if($Step-eq'Inspect'){'IR1-G5-READ-ONLY-INSPECTION'}else{'IR1-G5-POSIX-CAPABILITY-REHEARSAL'}
-    $scriptText=[IO.File]::ReadAllText((Join-Path $PSScriptRoot $scriptName)).Replace(([char]13+[char]10),[char]10)
     $arguments=@('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','NumberOfPasswordPrompts=0','-o','ConnectionAttempts=1',
         '-o','ConnectTimeout=10','-o','ClearAllForwardings=yes','-o','LogLevel=ERROR','-T',$SshAlias,'sh','-s','--',$confirm)
+    $FailureStage=if($Step-eq'Inspect'){'PRODUCTION_READ_ONLY_INSPECTION'}else{'PRODUCTION_ISOLATED_CAPABILITY_REHEARSAL'}
     $ConnectionAttempted=$true;$result=Invoke-Captured $ssh.Source $arguments $scriptText
-    $header=if($Step-eq'Inspect'){'G5_TARGET_INSPECTION'}else{'G5_POSIX_CAPABILITY_REHEARSAL'}
     $parsed=Parse-SafeOutput $result.Stdout $header
     if($result.ExitCode-ne0-or-not[string]::IsNullOrWhiteSpace($result.Stderr)){Stop-G5'REMOTE_STEP_FAILED'}
-    $receipt=[ordered]@{schema_version=1;candidate=$Candidate;step=$Step;status='PASS';package_sha256=$PackageSha
+    $receipt=[ordered]@{schema_version=1;candidate=$Candidate;step=$Step;status='PASS';package_sha256=$PackageSha;helper_generation=$HelperGeneration
         production_connection_attempted=$true;production_mutation=($Step-eq'Rehearse');stdout_sha256=Hash-Text $result.Stdout
         stderr_sha256=Hash-Text $result.Stderr;raw_output_stored=$false;evidence=$parsed}
     Save-Receipt $receiptPath $receipt
@@ -109,7 +126,7 @@ try{
     Write-Output "production_mutation=$(($Step-eq'Rehearse').ToString().ToLowerInvariant())"
     Write-Output 'retry_available=false'; Write-Output 'secret_output=false'; Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'
 }catch{
-    Write-Output "G5_TARGET_$($Step.ToUpperInvariant())=STOP"; Write-Output "safe_error_code=$($_.Exception.Message)"
+    Write-Output "G5_TARGET_$($Step.ToUpperInvariant())=STOP"; Write-Output "safe_error_code=$(Get-SafeErrorCode $_.Exception)"
     Write-Output "failure_stage=$FailureStage"; Write-Output "production_connection_attempted=$($ConnectionAttempted.ToString().ToLowerInvariant())"
     Write-Output 'retry_performed=false'; Write-Output 'secret_output=false'; Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'; exit 1
 }
