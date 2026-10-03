@@ -53,11 +53,12 @@
         policy: '03 方針 / DIRECTION',
         annual: '04 年度経営方針 / NOW'
     };
+    var brandFixedScale = 84;
     var brandChapterStates = {
-        philosophy: { opacity: 16, scale: 84, center: 100, outer: 8, structure: 10, now: 6, blur: 2, duration: 1600 },
-        vision: { opacity: 18, scale: 91, center: 80, outer: 75, structure: 35, now: 18, blur: 1, duration: 1800 },
-        policy: { opacity: 17, scale: 95, center: 65, outer: 75, structure: 100, now: 30, blur: .5, duration: 1600 },
-        annual: { opacity: 16, scale: 97, center: 60, outer: 55, structure: 50, now: 100, blur: 0, duration: 1500 }
+        philosophy: { opacity: 16, center: 100, outer: 8, structure: 10, now: 6, blur: 2, duration: 1600 },
+        vision: { opacity: 18, center: 80, outer: 75, structure: 35, now: 18, blur: 1, duration: 1800 },
+        policy: { opacity: 17, center: 65, outer: 75, structure: 100, now: 30, blur: .5, duration: 1600 },
+        annual: { opacity: 16, center: 60, outer: 55, structure: 50, now: 100, blur: 0, duration: 1500 }
     };
 
     function isInReviewWindow(element) {
@@ -252,6 +253,28 @@
         if (layer) layer.style.opacity = String(Math.max(0, Math.min(1, value / 100)));
     }
 
+    function setManagementDepth(key) {
+        if (!brandSvg) return;
+        var management = brandSvg.querySelector('#management-layer');
+        if (!management) return;
+        Array.from(management.querySelectorAll('[data-base-opacity]')).forEach(function (element) {
+            element.style.opacity = element.dataset.baseOpacity;
+        });
+        if (key !== 'philosophy') return;
+        [
+            { radius: '360.000', strength: .10 },
+            { radius: '305.000', strength: .28 },
+            { radius: '255.000', strength: .68 },
+            { radius: '205.000', strength: 1 }
+        ].forEach(function (ring) {
+            Array.from(management.querySelectorAll('path[d*="A ' + ring.radius + '"]')).forEach(function (path) {
+                path.style.opacity = String(Number(path.dataset.baseOpacity) * ring.strength);
+            });
+        });
+        var boundary = management.querySelector('circle[r="385"]');
+        if (boundary) boundary.style.opacity = String(Number(boundary.dataset.baseOpacity) * .10);
+    }
+
     function syncBrandControls(key) {
         brandSettingInputs.forEach(function (input) {
             var name = input.dataset.brandSetting;
@@ -271,13 +294,14 @@
             brandVisual.style.setProperty('--brand-duration', state.duration + 'ms');
         }
         if (brandVisualCanvas) {
-            brandVisualCanvas.style.setProperty('--brand-scale', String((state.scale * brandLayoutState.size) / 10000));
+            brandVisualCanvas.style.setProperty('--brand-scale', String((brandFixedScale * brandLayoutState.size) / 10000));
             brandVisualCanvas.style.setProperty('--brand-x', brandLayoutState.x + 'px');
             brandVisualCanvas.style.setProperty('--brand-y', brandLayoutState.y + 'px');
             brandVisualCanvas.style.setProperty('--brand-duration', state.duration + 'ms');
         }
         setBrandLayerOpacity('core-light', state.center);
         setBrandLayerOpacity('management-layer', state.center * .82);
+        setManagementDepth(key);
         setBrandLayerOpacity('execution-layer', state.outer * .72);
         setBrandLayerOpacity('knowledge-layer', state.outer);
         setBrandLayerOpacity('outer-structure', state.structure * .62);
@@ -329,6 +353,9 @@
                 brandSvg.removeAttribute('height');
                 brandSvg.setAttribute('aria-hidden', 'true');
                 brandSvg.setAttribute('focusable', 'false');
+                Array.from(brandSvg.querySelectorAll('#management-layer path, #management-layer circle')).forEach(function (element) {
+                    element.dataset.baseOpacity = element.getAttribute('opacity') || '1';
+                });
                 if (brandFallback) brandFallback.remove();
                 brandVisualCanvas.appendChild(brandSvg);
                 body.dataset.brandSource = 'official-svg';

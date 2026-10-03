@@ -38,6 +38,9 @@ try {
                 outer: document.querySelector('#knowledge-layer').style.opacity,
                 structure: document.querySelector('#connections').style.opacity,
                 now: document.querySelector('#active-flow').style.opacity,
+                scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
+                innerArc: Number(document.querySelector('#management-layer path[d*="A 205.000"]').style.opacity),
+                outerArc: Number(document.querySelector('#management-layer path[d*="A 360.000"]').style.opacity),
             },
             fade: {
                 duration: document.body.style.getPropertyValue('--motion-duration'),
@@ -55,6 +58,7 @@ try {
             outer: document.querySelector('#knowledge-layer').style.opacity,
             structure: document.querySelector('#connections').style.opacity,
             now: document.querySelector('#active-flow').style.opacity,
+            scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
         }));
 
         const tuning = await page.evaluate(() => {
@@ -83,10 +87,14 @@ try {
         if (initial.fade.duration !== '1350ms' || initial.fade.distance !== '40px' || initial.fade.blur !== '2.5px' || initial.fade.trigger !== '75') {
             throw new Error(viewport.name + ': fade ' + JSON.stringify(initial.fade));
         }
-        if (annual.chapter !== 'annual' || Number(annual.now) <= Number(initial.root.now)) {
+        if (annual.chapter !== 'annual' || Number(annual.now) <= Number(initial.root.now)
+            || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
-        if (tuning.scale !== '1.067' || tuning.x !== '120px' || tuning.y !== '-60px' || tuning.blur !== '3px'
+        if (!(initial.root.innerArc > initial.root.outerArc * 6)) {
+            throw new Error(viewport.name + ': ROOT emphasis is not concentrated in the inner rings');
+        }
+        if (tuning.scale !== '0.924' || tuning.x !== '120px' || tuning.y !== '-60px' || tuning.blur !== '3px'
             || tuning.outputs.join('|') !== '110%|120px|-60px|3px') {
             throw new Error(viewport.name + ': tuning ' + JSON.stringify(tuning));
         }
@@ -113,7 +121,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('brand-position-controls-2') || !cacheIdentity.js.includes('brand-position-controls-2')) {
+    if (!cacheIdentity.css.includes('brand-fixed-geometry-1') || !cacheIdentity.js.includes('brand-fixed-geometry-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
