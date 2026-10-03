@@ -114,11 +114,11 @@ try {
         revealed: element.classList.contains('is-motion-revealed'),
     }));
     assert(motionAState.name.includes('motion-a-enter'), `Motion A reveal did not run: ${JSON.stringify(motionAState)}`);
-    assert(motionAState.duration === '0.36s', `Motion A duration is not 360ms: ${motionAState.duration}`);
+    assert(motionAState.duration === '0.6s', `Motion A duration is not 600ms: ${motionAState.duration}`);
     assert(motionAState.revealed, 'Motion A did not persist its revealed state.');
     await page.screenshot({ path: screenshots.desktopA });
 
-    await page.waitForTimeout(420);
+    await page.waitForTimeout(660);
     await frameLocator.locator('html').evaluate(element => element.scrollTo(0, 0));
     await page.waitForTimeout(30);
     await desktopMotionTarget.evaluate(element => element.scrollIntoView({ block: 'center' }));
@@ -139,7 +139,7 @@ try {
         distance: getComputedStyle(element).transform,
     }));
     assert(motionBState.name.includes('motion-b-enter'), `Motion B reveal did not run: ${JSON.stringify(motionBState)}`);
-    assert(motionBState.duration === '0.54s', `Motion B duration is not 540ms: ${motionBState.duration}`);
+    assert(motionBState.duration === '0.9s', `Motion B duration is not 900ms: ${motionBState.duration}`);
     assert(motionBState.name !== motionAState.name && motionBState.duration !== motionAState.duration,
         'Motion A and B are not perceptibly distinct at the CSS contract.');
     await page.screenshot({ path: screenshots.desktopB });
@@ -193,7 +193,7 @@ try {
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
     }));
-    assert(mobileAState.name === 'motion-a-enter-mobile' && mobileAState.duration === '0.32s',
+    assert(mobileAState.name === 'motion-a-enter-mobile' && mobileAState.duration === '0.52s',
         `390px Motion A contract is wrong: ${JSON.stringify(mobileAState)}`);
     await page.screenshot({ path: screenshots.mobileMotionA });
 
@@ -203,7 +203,7 @@ try {
         name: getComputedStyle(element).animationName,
         duration: getComputedStyle(element).animationDuration,
     }));
-    assert(mobileBState.name === 'motion-b-enter-mobile' && mobileBState.duration === '0.46s',
+    assert(mobileBState.name === 'motion-b-enter-mobile' && mobileBState.duration === '0.76s',
         `390px Motion B contract is wrong: ${JSON.stringify(mobileBState)}`);
     await page.screenshot({ path: screenshots.mobileMotionB });
 
@@ -338,8 +338,8 @@ try {
         productRouteAdded: false,
         contentHash: textHashA,
         motionVariants: ['A-v002-subtle', 'B-v002-expressive', 'OFF-static'],
-        desktopMotionDurations: ['360ms', '540ms'],
-        mobileMotionDurations: ['320ms', '460ms'],
+        desktopMotionDurations: ['600ms', '900ms'],
+        mobileMotionDurations: ['520ms', '760ms'],
         failOpenModes: ['reduced-motion', 'javascript-off', 'observer-unsupported', 'initialization-failure', 'direct-fragment'],
         mobileTocVariants: ['A-normal-flow-disclosure', 'B-current-chapter-sticky'],
         viewports: ['1440x900', '390x844', '320x800', '200%-effective-720x450'],

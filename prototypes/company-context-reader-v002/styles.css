@@ -488,22 +488,22 @@ summary:focus-visible {
 }
 
 @keyframes motion-a-enter {
-    from { opacity: 0; transform: translateY(14px); }
+    from { opacity: 0; transform: translateY(18px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes motion-b-enter {
-    from { opacity: 0; transform: translateY(24px); }
+    from { opacity: 0; transform: translateY(30px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes motion-a-enter-mobile {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes motion-b-enter-mobile {
-    from { opacity: 0; transform: translateY(18px); }
+    from { opacity: 0; transform: translateY(22px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
@@ -511,25 +511,25 @@ body.is-motion-enhanced[data-motion="a"] .motion-target--chapter:not(.is-motion-
 body.is-motion-enhanced[data-motion="a"] .motion-target--statement:not(.is-motion-revealed),
 body.is-motion-enhanced[data-motion="a"] .motion-target--theme:not(.is-motion-revealed) {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(18px);
 }
 
 body.is-motion-enhanced[data-motion="b"] .motion-target:not(.is-motion-revealed) {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(30px);
 }
 
 body[data-motion="a"] .motion-target.is-motion-animating {
-    animation: motion-a-enter 360ms cubic-bezier(.22, .72, .28, 1) both;
+    animation: motion-a-enter 600ms cubic-bezier(.22, .72, .28, 1) both;
 }
 
 body[data-motion="b"] .motion-target.is-motion-animating {
-    animation: motion-b-enter 540ms cubic-bezier(.18, .78, .22, 1) both;
+    animation: motion-b-enter 900ms cubic-bezier(.18, .78, .22, 1) both;
 }
 
 body[data-motion="b"] .motion-target--statement.is-motion-animating,
 body[data-motion="b"] .motion-target--theme.is-motion-animating {
-    animation-delay: 70ms;
+    animation-delay: 120ms;
 }
 
 body[data-motion="off"] .motion-target {
@@ -567,21 +567,21 @@ body[data-motion="off"] .motion-target {
     body.is-motion-enhanced[data-motion="a"] .motion-target--chapter:not(.is-motion-revealed),
     body.is-motion-enhanced[data-motion="a"] .motion-target--statement:not(.is-motion-revealed),
     body.is-motion-enhanced[data-motion="a"] .motion-target--theme:not(.is-motion-revealed) {
-        transform: translateY(12px);
+        transform: translateY(14px);
     }
 
     body.is-motion-enhanced[data-motion="b"] .motion-target:not(.is-motion-revealed) {
-        transform: translateY(18px);
+        transform: translateY(22px);
     }
 
     body[data-motion="a"] .motion-target.is-motion-animating {
         animation-name: motion-a-enter-mobile;
-        animation-duration: 320ms;
+        animation-duration: 520ms;
     }
 
     body[data-motion="b"] .motion-target.is-motion-animating {
         animation-name: motion-b-enter-mobile;
-        animation-duration: 460ms;
+        animation-duration: 760ms;
     }
 
     .prototype-boundary { align-items: flex-start; gap: 4px 9px; flex-wrap: wrap; padding-block: 7px; }

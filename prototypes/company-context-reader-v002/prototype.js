@@ -161,7 +161,7 @@
                     revealTarget(entry.target, false);
                     motionObserver.unobserve(entry.target);
                 });
-            }, { threshold: 0.12, rootMargin: '0px 0px -10% 0px' });
+            }, { threshold: 0.12, rootMargin: '0px 0px -35% 0px' });
             motionTargets.forEach(function (target) { motionObserver.observe(target); });
         }
 
