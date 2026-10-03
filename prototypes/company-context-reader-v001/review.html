@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Company Context Reader｜Human Visual Review</title>
+    <link rel=icon href=data:,>
+    <link rel="stylesheet" href="review.css">
+</head>
+<body>
+    <header class="review-header">
+        <div>
+            <p>ISOLATED VISUAL PROTOTYPE</p>
+            <h1>Company Context Reader｜Human Visual Review</h1>
+            <span>正式Data・DB・Permission・Product Codeには接続していません。</span>
+        </div>
+        <a href="index.html" target="_blank" rel="noopener">Readerだけを新しいTabで開く</a>
+    </header>
+
+    <section class="review-controls" aria-label="Prototype比較条件">
+        <div class="review-control-group" role="group" aria-label="Viewport">
+            <span>VIEWPORT</span>
+            <button type="button" data-viewport="desktop" aria-pressed="true">Desktop<br><small>1440×900</small></button>
+            <button type="button" data-viewport="mobile" aria-pressed="false">Mobile<br><small>390×844</small></button>
+            <button type="button" data-viewport="narrow" aria-pressed="false">Narrow<br><small>320×800</small></button>
+        </div>
+        <div class="review-control-group" role="group" aria-label="Mobile TOC">
+            <span>MOBILE TOC / CR-OQ03</span>
+            <button type="button" data-toc-mode="a" aria-pressed="true">TOC A<br><small>通常flow disclosure</small></button>
+            <button type="button" data-toc-mode="b" aria-pressed="false">TOC B<br><small>現在Chapter / sticky</small></button>
+        </div>
+        <p class="review-status" aria-live="polite">Desktop 1440×900 / TOC Aを保持</p>
+    </section>
+
+    <main>
+        <p class="review-note">Motion A / B / OFFはReader上部で切り替えます。TOC A / BはMobile・Narrowで比較してください。採用案はHuman Reviewで決定します。</p>
+        <div class="viewport-stage" data-viewport-stage="desktop">
+            <div class="viewport-label" aria-hidden="true"><span data-viewport-label>1440 × 900</span></div>
+            <iframe id="reader-frame" src="index.html" title="Company Context Reader Visual Prototype"></iframe>
+        </div>
+    </main>
+
+    <script src="review.js"></script>
+</body>
+</html>
