@@ -24,6 +24,7 @@ class AnnualManagementPolicySourceProvider
         private readonly AnnualManagementPolicyAccess $access,
         private readonly ManagementPeriodResolver $periods,
         private readonly AnnualManagementPolicySnapshot $snapshots,
+        private readonly AnnualManagementPolicyLifecycle $lifecycle,
     ) {}
 
     public function export(User $actor, Organization $organization, string $mode, array $selector = []): array
@@ -39,10 +40,15 @@ class AnnualManagementPolicySourceProvider
             : CarbonImmutable::now('Asia/Tokyo')->toDateString();
 
         return [
-            'schema_version' => 1,
+            'schema_version' => 2,
             'source_namespace' => self::NAMESPACE,
             'mode' => $mode,
             'approval_status' => $status,
+            'effective_status' => $this->lifecycle->evaluate(
+                $policy->period,
+                $status === 'approved',
+                $evaluatedOn,
+            )['effective_status'],
             'organization_public_id' => $organization->public_id,
             'annual_public_id' => $policy->public_id,
             'period_public_id' => $policy->period->public_id,
@@ -50,6 +56,7 @@ class AnnualManagementPolicySourceProvider
             'content_hash' => $contentHash,
             'currentness' => [
                 'period_version' => (int) $policy->period->version,
+                'fiscal_term_number' => $policy->period->fiscal_term_number,
                 'relation_version' => (int) ($snapshot['annual']['relation_version'] ?? $policy->relation_version),
                 'evaluated_on' => $evaluatedOn,
                 'timezone' => 'Asia/Tokyo',

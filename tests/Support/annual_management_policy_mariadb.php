@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyPermissionManager;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyRelationService;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyWriter;
+use App\Services\AnnualManagementPolicy\AnnualManagementPolicyLifecycle;
 use App\Services\AnnualManagementPolicy\ManagementPeriodWriter;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
@@ -54,7 +55,7 @@ $membership = OrganizationUser::create([
     'organization_role'=>OrganizationUser::ORGANIZATION_ROLE_OWNER,'membership_status'=>OrganizationUser::STATUS_ACTIVE,
     'access_epoch'=>1,'permissions'=>[],'joined_at'=>now(),
 ]);
-$period = app(ManagementPeriodWriter::class)->register($owner,$organization,'2026年度','2026-04-01','2027-03-31',(string) Str::uuid());
+$period = app(ManagementPeriodWriter::class)->register($owner,$organization,'2026年度','2026-12-01','2027-11-30',(string) Str::uuid(),23);
 $policy = app(AnnualManagementPolicyPermissionManager::class)->initialize($owner,$organization,$period,(string) Str::uuid());
 app(AnnualManagementPolicyPermissionManager::class)->update($owner,$organization,$policy,AnnualManagementPolicy::VIEW_SCOPE_EXPLICIT,[
     $membership->id=>['can_view_approved'=>true,'can_view_draft'=>true,'can_edit'=>true,'can_approve'=>true],
@@ -62,7 +63,7 @@ app(AnnualManagementPolicyPermissionManager::class)->update($owner,$organization
 $group=OrganizationGroup::create(['organization_id'=>$organization->id,'name'=>'MariaDB部']);
 $writer=app(AnnualManagementPolicyWriter::class);
 $saved=$writer->saveDraft($owner,$policy,[
-    'period_name'=>'2026年度','starts_on'=>'2026-04-01','ends_on'=>'2027-03-31','purpose'=>null,'background'=>null,
+    'period_name'=>'2026年度','starts_on'=>'2026-12-01','ends_on'=>'2027-11-30','purpose'=>null,'background'=>null,
     'policy'=>'MariaDB上の正式方針','themes'=>[['statement'=>'Theme','priorities'=>[['statement'=>'Priority']]]],
     'departments'=>[['group_public_id'=>$group->public_id,'statements'=>[['statement'=>'Department Policy']]]],
 ],0,(string) Str::uuid());
@@ -76,14 +77,22 @@ $checks=[
     'mariadb_10_11'=>str_starts_with((string)$version,'10.11.'),
     'revision_one'=>$revision->revision_no===1,
     'snapshot_policy'=>$revision->snapshot['annual']['policy']==='MariaDB上の正式方針',
+    'snapshot_schema_two'=>$revision->snapshot_schema_version===2,
+    'fiscal_term_number'=>$period->fresh()->fiscal_term_number===23,
+    'snapshot_fiscal_term_number'=>$revision->snapshot['annual']['period']['organization_fiscal_term_number']===23,
+    'approved_upcoming'=>app(AnnualManagementPolicyLifecycle::class)->evaluate($period->fresh(),true,'2026-10-03')['effective_status']==='upcoming',
+    'period_columns'=>Schema::hasColumn('organization_management_periods','fiscal_term_number')
+        && Schema::hasColumn('organization_management_period_versions','fiscal_term_number'),
     'relation_version'=>$saved->fresh()->relation_version===1,
     'migration_count'=>(int)DB::table('migrations')->count()>0,
 ];
 if (in_array(false,$checks,true)) {$fail('35A_MARIADB_ASSERTION_FAILED');}
-$rollbackExit=Artisan::call('migrate:rollback',['--force'=>true,'--step'=>2]);
+$rollbackExit=Artisan::call('migrate:rollback',['--force'=>true,'--step'=>3]);
 $checks['rollback_exit_zero']=$rollbackExit===0;
 $checks['annual_tables_removed']=!Schema::hasTable('annual_management_policies')
     && !Schema::hasTable('annual_management_policy_relations');
+$checks['period_columns_removed']=!Schema::hasColumn('organization_management_periods','fiscal_term_number')
+    && !Schema::hasColumn('organization_management_period_versions','fiscal_term_number');
 $checks['baseline_tables_preserved']=Schema::hasTable('organizations') && Schema::hasTable('management_design_items');
 if (in_array(false,$checks,true)) {
     echo '35A_FAILED_CHECKS='.implode(',',array_keys(array_filter($checks,fn($value)=>$value===false))).PHP_EOL;

@@ -11,6 +11,9 @@
         </section>
 
         @if (session('success')) <div class="success">{{ session('success') }}</div> @endif
+        @if (request()->filled('return_to_annual_policy') && preg_match('/^[0-9A-HJKMNP-TV-Z]{26}$/', (string) request('return_to_annual_policy')))
+            <div class="notice"><a href="{{ route('annual-management-policy.edit', request('return_to_annual_policy')) }}">年度経営方針の編集へ戻る</a></div>
+        @endif
         @if ($errors->any())
             <div class="error">
                 @foreach ($errors->all() as $error) <div>{{ $error }}</div> @endforeach

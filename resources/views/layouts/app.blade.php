@@ -36,8 +36,14 @@
             background: var(--paper);
         }
         a { color: var(--accent-dark); text-decoration: none; }
-        .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+        .shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-areas: "header" "breadcrumbs" "main";
+            grid-template-rows: auto auto minmax(0, 1fr);
+        }
         .topbar {
+            grid-area: header;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -61,10 +67,10 @@
         }
         .nav { display: flex; align-items: center; justify-content:flex-end; flex-wrap:wrap; gap: 14px; color: var(--muted); font-size: 14px; }
         .nav-separator { width:1px; height:20px; background:var(--line); }
-        .breadcrumbs { display:flex; align-items:center; gap:8px; width:min(1040px, calc(100% - 40px)); margin:18px auto -18px; color:var(--muted); font-size:13px; }
+        .breadcrumbs { grid-area:breadcrumbs; display:flex; align-items:center; gap:8px; width:min(1040px, calc(100% - 40px)); margin:18px auto 0; color:var(--muted); font-size:13px; }
         .breadcrumbs a { color:var(--muted); }
         .breadcrumbs [aria-current="page"] { color:var(--ink); font-weight:700; }
-        .main { width: min(1040px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0; }
+        .main { grid-area:main; width: min(1040px, calc(100% - 40px)); margin: 0 auto; padding: 24px 0 42px; }
         .panel {
             background: #fff;
             border: 1px solid var(--line);
@@ -292,7 +298,7 @@
             .topbar { align-items: flex-start; flex-direction: column; }
             .nav-separator { display:none; }
             .breadcrumbs { width:min(100% - 28px, 1040px); margin-top:14px; }
-            .main { width: min(100% - 28px, 1040px); padding-top: 28px; }
+            .main { width: min(100% - 28px, 1040px); padding: 16px 0 28px; }
             .grid { grid-template-columns: 1fr; }
             .pagination { align-items: flex-start; flex-direction: column; }
             .os-hero { min-height: auto; grid-template-columns: 1fr; padding: 42px 28px; border-radius: 18px; }

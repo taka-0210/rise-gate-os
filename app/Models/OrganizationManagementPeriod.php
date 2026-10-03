@@ -14,13 +14,18 @@ class OrganizationManagementPeriod extends Model
     use HasFactory;
 
     protected $fillable = [
-        'public_id', 'organization_id', 'name', 'starts_on', 'ends_on', 'version',
+        'public_id', 'organization_id', 'name', 'fiscal_term_number', 'starts_on', 'ends_on', 'version',
         'created_by_user_id', 'updated_by_user_id',
     ];
 
     protected function casts(): array
     {
-        return ['starts_on' => 'date', 'ends_on' => 'date', 'version' => 'integer'];
+        return [
+            'fiscal_term_number' => 'integer',
+            'starts_on' => 'date',
+            'ends_on' => 'date',
+            'version' => 'integer',
+        ];
     }
 
     protected static function booted(): void
@@ -46,5 +51,12 @@ class OrganizationManagementPeriod extends Model
     public function annualPolicy(): HasOne
     {
         return $this->hasOne(AnnualManagementPolicy::class);
+    }
+
+    public function getDisplayLabelAttribute(): string
+    {
+        return $this->fiscal_term_number
+            ? '第'.$this->fiscal_term_number.'期｜'.$this->name
+            : $this->name;
     }
 }

@@ -12,13 +12,19 @@ class OrganizationManagementPeriodVersion extends Model
     use HasFactory;
 
     protected $fillable = [
-        'organization_management_period_id', 'version_no', 'name', 'starts_on', 'ends_on',
+        'organization_management_period_id', 'version_no', 'name', 'fiscal_term_number', 'starts_on', 'ends_on',
         'actor_user_id', 'change_reason', 'changed_at',
     ];
 
     protected function casts(): array
     {
-        return ['version_no' => 'integer', 'starts_on' => 'date', 'ends_on' => 'date', 'changed_at' => 'datetime'];
+        return [
+            'version_no' => 'integer',
+            'fiscal_term_number' => 'integer',
+            'starts_on' => 'date',
+            'ends_on' => 'date',
+            'changed_at' => 'datetime',
+        ];
     }
 
     protected static function booted(): void

@@ -27,8 +27,9 @@ class ManagementPeriodWriter
         string $startsOn,
         string $endsOn,
         string $requestId,
+        ?int $fiscalTermNumber = null,
     ): OrganizationManagementPeriod {
-        return $this->write($actor, $organization, null, $name, $startsOn, $endsOn, 0, null, $requestId);
+        return $this->write($actor, $organization, null, $name, $startsOn, $endsOn, 0, null, $requestId, $fiscalTermNumber);
     }
 
     public function correct(
@@ -41,8 +42,9 @@ class ManagementPeriodWriter
         int $expectedVersion,
         ?string $reason,
         string $requestId,
+        ?int $fiscalTermNumber = null,
     ): OrganizationManagementPeriod {
-        return $this->write($actor, $organization, $period, $name, $startsOn, $endsOn, $expectedVersion, $reason, $requestId);
+        return $this->write($actor, $organization, $period, $name, $startsOn, $endsOn, $expectedVersion, $reason, $requestId, $fiscalTermNumber);
     }
 
     private function write(
@@ -55,8 +57,9 @@ class ManagementPeriodWriter
         int $expectedVersion,
         ?string $reason,
         string $requestId,
+        ?int $fiscalTermNumber,
     ): OrganizationManagementPeriod {
-        return DB::transaction(function () use ($actor, $organization, $period, $name, $startsOn, $endsOn, $expectedVersion, $reason, $requestId): OrganizationManagementPeriod {
+        return DB::transaction(function () use ($actor, $organization, $period, $name, $startsOn, $endsOn, $expectedVersion, $reason, $requestId, $fiscalTermNumber): OrganizationManagementPeriod {
             $organization = Organization::query()->lockForUpdate()->findOrFail($organization->id);
             $this->access->authorizeManage($actor, $organization, true);
             $name = trim($name);
@@ -65,7 +68,7 @@ class ManagementPeriodWriter
             if ($name === '' || $start->gt($end)) {
                 throw ValidationException::withMessages(['period' => '期間名と開始・終了日を確認してください。']);
             }
-            $payload = compact('name', 'startsOn', 'endsOn', 'expectedVersion', 'reason');
+            $payload = compact('name', 'startsOn', 'endsOn', 'expectedVersion', 'reason', 'fiscalTermNumber');
             $operationName = $period ? 'period_correct' : 'period_register';
             $hash = $this->hash($operationName, $payload);
             if ($existing = $this->completedOperation($organization, $actor, $requestId, $operationName, $hash)) {
@@ -88,6 +91,19 @@ class ManagementPeriodWriter
             if ($overlap) {
                 throw ValidationException::withMessages(['period' => '同じ会社の期間は重ねられません。']);
             }
+            if ($fiscalTermNumber !== null) {
+                $termExists = OrganizationManagementPeriod::query()
+                    ->where('organization_id', $organization->id)
+                    ->where('fiscal_term_number', $fiscalTermNumber)
+                    ->when($locked, fn ($query) => $query->whereKeyNot($locked->id))
+                    ->lockForUpdate()
+                    ->exists();
+                if ($termExists) {
+                    throw ValidationException::withMessages([
+                        'fiscal_term_number' => '同じ会社で同じ期数は使用できません。',
+                    ]);
+                }
+            }
 
             $before = $locked ? ['version' => (int) $locked->version] : null;
             $locked ??= new OrganizationManagementPeriod([
@@ -95,13 +111,15 @@ class ManagementPeriodWriter
                 'created_by_user_id' => $actor->id,
             ]);
             $locked->fill([
-                'name' => $name, 'starts_on' => $start->toDateString(), 'ends_on' => $end->toDateString(),
+                'name' => $name, 'fiscal_term_number' => $fiscalTermNumber,
+                'starts_on' => $start->toDateString(), 'ends_on' => $end->toDateString(),
                 'version' => $expectedVersion + 1, 'updated_by_user_id' => $actor->id,
             ])->save();
             OrganizationManagementPeriodVersion::create([
                 'organization_management_period_id' => $locked->id,
                 'version_no' => $locked->version,
                 'name' => $locked->name,
+                'fiscal_term_number' => $locked->fiscal_term_number,
                 'starts_on' => $locked->starts_on,
                 'ends_on' => $locked->ends_on,
                 'actor_user_id' => $actor->id,

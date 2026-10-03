@@ -13,6 +13,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyAccess;
+use App\Services\AnnualManagementPolicy\AnnualManagementPolicyLifecycle;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyPermissionManager;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyRelationService;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicySnapshot;
@@ -53,6 +54,61 @@ class AnnualManagementPolicyTest extends TestCase
         $this->assertSame(2, $corrected->version);
         $this->assertSame(['前期', '今期（訂正）'], $organization->managementPeriods()->orderBy('starts_on')->pluck('name')->all());
         $this->assertDatabaseCount('organization_management_period_versions', 3);
+    }
+
+    public function test_company_period_term_number_is_optional_versioned_unique_and_never_inferred(): void
+    {
+        $organization = $this->organization('term-number');
+        [$owner] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $writer = app(ManagementPeriodWriter::class);
+        $legacy = $writer->register($owner, $organization, '2025年度', '2025-01-01', '2025-12-31', (string) Str::uuid());
+        $current = $writer->register($owner, $organization, '2026年度', '2026-01-01', '2026-12-31', (string) Str::uuid(), 23);
+        $this->assertNull($legacy->fiscal_term_number);
+        $this->assertSame(23, $current->fiscal_term_number);
+        $this->assertSame('第23期｜2026年度', $current->display_label);
+        $corrected = $writer->correct(
+            $owner, $organization, $current, '2026年度', '2026-01-01', '2026-12-31',
+            1, '期数確認', (string) Str::uuid(), 24,
+        );
+        $this->assertSame(24, $corrected->fiscal_term_number);
+        $this->assertSame([23, 24], $corrected->versions()->reorder('version_no')->pluck('fiscal_term_number')->all());
+        try {
+            $writer->register($owner, $organization, '2027年度', '2027-01-01', '2027-12-31', (string) Str::uuid(), 24);
+            $this->fail('A fiscal term number must be unique inside one organization.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('fiscal_term_number', $exception->errors());
+        }
+    }
+
+    public function test_approval_and_effective_lifecycle_are_independent_and_jst_bound(): void
+    {
+        $organization = $this->organization('lifecycle');
+        [$owner, $membership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $policy = $this->policy($owner, $organization, '2026-12-01', '2027-11-30');
+        $this->grants($owner, $policy, [$membership->id=>['can_view_approved'=>true,'can_view_draft'=>true,'can_edit'=>true,'can_approve'=>true]]);
+        $lifecycle = app(AnnualManagementPolicyLifecycle::class);
+        $this->assertSame([
+            'approval_status'=>'draft', 'effective_status'=>'upcoming',
+            'evaluated_on'=>'2026-10-03', 'timezone'=>'Asia/Tokyo',
+        ], $lifecycle->evaluate($policy->period, false, '2026-10-03'));
+        $writer = app(AnnualManagementPolicyWriter::class);
+        $saved = $writer->saveDraft($owner, $policy, $this->draft([
+            'starts_on'=>'2026-12-01', 'ends_on'=>'2027-11-30',
+        ]), 0, (string) Str::uuid());
+        $preview = $writer->preview($owner, $saved);
+        $writer->approve($owner, $saved, 1, null, 0, $preview['snapshot_hash'], false, null, (string) Str::uuid());
+        $this->assertSame('承認済み / 開始前', $lifecycle->label($lifecycle->evaluate($policy->period, true, '2026-10-03')));
+        $this->assertSame('effective', $lifecycle->evaluate($policy->period, true, '2026-12-01')['effective_status']);
+        $this->assertSame('effective', $lifecycle->evaluate($policy->period, true, '2027-11-30')['effective_status']);
+        $this->assertSame('ended', $lifecycle->evaluate($policy->period, true, '2027-12-01')['effective_status']);
+        $export = app(AnnualManagementPolicySourceProvider::class)->export(
+            $owner, $organization, AnnualManagementPolicySourceProvider::MODE_PERIOD,
+            ['annual_public_id'=>$policy->public_id, 'evaluated_on'=>'2026-10-03'],
+        );
+        $this->assertSame(2, $export['schema_version']);
+        $this->assertSame('approved', $export['approval_status']);
+        $this->assertSame('upcoming', $export['effective_status']);
+        $this->assertSame('Asia/Tokyo', $export['currentness']['timezone']);
     }
 
     public function test_owner_manage_does_not_bypass_body_capabilities_and_grants_are_independent(): void
@@ -324,9 +380,9 @@ class AnnualManagementPolicyTest extends TestCase
         $policy=$this->policy($owner,$organization);
         $this->grants($owner,$policy,[$membership->id=>['can_view_approved'=>true,'can_view_draft'=>true,'can_edit'=>true,'can_approve'=>true]]);
         $this->asCompany($owner,$organization)->get(route('company.home'))->assertOk()->assertSee('ANNUAL MANAGEMENT POLICY');
-        $this->asCompany($owner,$organization)->get(route('annual-management-policy.index'))->assertOk()->assertSee('年度経営方針')->assertSee('正式版は未承認');
-        $this->asCompany($owner,$organization)->get(route('annual-management-policy.show',$policy))->assertOk()->assertSee('作成中の内容があります')->assertDontSee('<textarea',false);
-        $this->asCompany($owner,$organization)->get(route('annual-management-policy.edit',$policy))->assertOk()->assertSee('Draftを保存')->assertSee('data-add-theme',false)->assertSee('@media(max-width:640px)',false);
+        $this->asCompany($owner,$organization)->get(route('annual-management-policy.index'))->assertOk()->assertSee('年度経営方針')->assertSee('作成中 / 未承認')->assertSee('grid-template-areas: "header" "breadcrumbs" "main"',false);
+        $this->asCompany($owner,$organization)->get(route('annual-management-policy.show',$policy))->assertOk()->assertSee('正式Revisionはまだありません')->assertSee('作成・承認・管理')->assertDontSee('<textarea',false);
+        $this->asCompany($owner,$organization)->get(route('annual-management-policy.edit',$policy))->assertOk()->assertSee('Draftを保存')->assertSee('data-add-theme',false)->assertSee('data-move-up',false)->assertSee('今期、何を実現したいのか')->assertSee('部署がまだ登録されていません')->assertSee('after_save',false)->assertSee('@media(max-width:640px)',false);
         $this->asCompany($owner,$organization)->get(route('annual-management-policy.permissions',$policy))->assertOk()->assertSee('在籍中のスタッフ全員へ共有')->assertSee('選んだ人へ共有');
     }
 
@@ -375,6 +431,78 @@ class AnnualManagementPolicyTest extends TestCase
             $this->assertArrayHasKey('departments.1.group_public_id',$exception->errors());
         }
         $this->assertSame('更新後の方針',$second->fresh('departments.statements')->departments->first()->statements->first()->statement);
+    }
+
+    public function test_explicit_reordering_preserves_public_ids_and_snapshot_order(): void
+    {
+        $organization=$this->organization('ordering');
+        [$owner,$membership]=$this->member($organization,OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $sales=OrganizationGroup::create(['organization_id'=>$organization->id,'name'=>'営業部']);
+        $support=OrganizationGroup::create(['organization_id'=>$organization->id,'name'=>'支援部']);
+        $policy=$this->policy($owner,$organization);
+        $this->grants($owner,$policy,[$membership->id=>['can_view_approved'=>true,'can_view_draft'=>true,'can_edit'=>true,'can_approve'=>true]]);
+        $writer=app(AnnualManagementPolicyWriter::class);
+        $first=$writer->saveDraft($owner,$policy,$this->draft([
+            'themes'=>[
+                ['statement'=>'Theme A','priorities'=>[['statement'=>'A1'],['statement'=>'A2']]],
+                ['statement'=>'Theme B','priorities'=>[['statement'=>'B1']]],
+            ],
+            'departments'=>[
+                ['group_public_id'=>$sales->public_id,'statements'=>[['statement'=>'Sales 1'],['statement'=>'Sales 2']]],
+                ['group_public_id'=>$support->public_id,'statements'=>[['statement'=>'Support 1']]],
+            ],
+        ]),0,(string)Str::uuid());
+        $themes=$first->themes;
+        $departments=$first->departments;
+        $second=$writer->saveDraft($owner,$first,$this->draft([
+            'themes'=>[
+                ['public_id'=>$themes[1]->public_id,'statement'=>'Theme B','priorities'=>[['public_id'=>$themes[1]->priorities[0]->public_id,'statement'=>'B1']]],
+                ['public_id'=>$themes[0]->public_id,'statement'=>'Theme A','priorities'=>[
+                    ['public_id'=>$themes[0]->priorities[1]->public_id,'statement'=>'A2'],
+                    ['public_id'=>$themes[0]->priorities[0]->public_id,'statement'=>'A1'],
+                ]],
+            ],
+            'departments'=>[
+                ['public_id'=>$departments[1]->public_id,'group_public_id'=>$support->public_id,'statements'=>[['public_id'=>$departments[1]->statements[0]->public_id,'statement'=>'Support 1']]],
+                ['public_id'=>$departments[0]->public_id,'group_public_id'=>$sales->public_id,'statements'=>[
+                    ['public_id'=>$departments[0]->statements[1]->public_id,'statement'=>'Sales 2'],
+                    ['public_id'=>$departments[0]->statements[0]->public_id,'statement'=>'Sales 1'],
+                ]],
+            ],
+        ]),1,(string)Str::uuid());
+        $this->assertSame(['Theme B','Theme A'],$second->themes->pluck('statement')->all());
+        $this->assertSame(['A2','A1'],$second->themes[1]->priorities->pluck('statement')->all());
+        $this->assertSame(['支援部','営業部'],$second->departments->pluck('group.name')->all());
+        $this->assertSame(['Sales 2','Sales 1'],$second->departments[1]->statements->pluck('statement')->all());
+        $preview=$writer->preview($owner,$second);
+        $this->assertSame(['Theme B','Theme A'],collect($preview['snapshot']['annual']['themes'])->pluck('statement')->all());
+        $this->assertSame(['支援部','営業部'],collect($preview['snapshot']['annual']['departments'])->pluck('group_name_at_approval')->all());
+    }
+
+    public function test_department_setup_return_saves_draft_and_only_accepts_fixed_destination(): void
+    {
+        $organization=$this->organization('department-return');
+        [$owner,$membership]=$this->member($organization,OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        $policy=$this->policy($owner,$organization);
+        $this->grants($owner,$policy,[$membership->id=>['can_view_draft'=>true,'can_edit'=>true]]);
+        $payload=$this->draft([
+            'request_id'=>(string)Str::uuid(),
+            'expected_draft_version'=>0,
+            'after_save'=>'organization_groups',
+        ]);
+        $this->asCompany($owner,$organization)
+            ->put(route('annual-management-policy.update',$policy),$payload)
+            ->assertRedirect(route('organization-management.index',[
+                'return_to_annual_policy'=>$policy->public_id,
+            ]));
+        $this->assertSame(1,$policy->fresh()->draft_version);
+        $payload['request_id']=(string)Str::uuid();
+        $payload['expected_draft_version']=1;
+        $payload['after_save']='https://example.test';
+        $this->asCompany($owner,$organization)
+            ->put(route('annual-management-policy.update',$policy),$payload)
+            ->assertSessionHasErrors('after_save');
+        $this->assertSame(1,$policy->fresh()->draft_version);
     }
 
     public function test_tenant_routes_and_source_provider_do_not_cross_organization_boundary(): void

@@ -6,7 +6,7 @@ use App\Models\AnnualManagementPolicy;
 
 class AnnualManagementPolicySnapshot
 {
-    public const SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 2;
 
     public function make(AnnualManagementPolicy $policy): array
     {
@@ -33,6 +33,7 @@ class AnnualManagementPolicySnapshot
                     'public_id' => $policy->period->public_id,
                     'organization_version' => (int) $policy->period->version,
                     'organization_name' => $policy->period->name,
+                    'organization_fiscal_term_number' => $policy->period->fiscal_term_number,
                     'organization_starts_on' => $policy->period->starts_on->toDateString(),
                     'organization_ends_on' => $policy->period->ends_on->toDateString(),
                     'declared_name' => $policy->draft_period_name,

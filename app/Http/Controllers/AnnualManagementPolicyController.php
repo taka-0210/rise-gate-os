@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Services\ActionExecution\ActionExecutionAccess;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyAccess;
+use App\Services\AnnualManagementPolicy\AnnualManagementPolicyLifecycle;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyPermissionManager;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyRelationService;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicySourceProvider;
@@ -27,7 +28,12 @@ use Illuminate\View\View;
 
 class AnnualManagementPolicyController extends Controller
 {
-    public function index(Request $request, AnnualManagementPolicyAccess $access, ManagementPeriodResolver $resolver): View
+    public function index(
+        Request $request,
+        AnnualManagementPolicyAccess $access,
+        ManagementPeriodResolver $resolver,
+        AnnualManagementPolicyLifecycle $lifecycle,
+    ): View
     {
         $organization = $request->attributes->get('currentCompany');
         $access->authorizeMembership($request->user(), $organization);
@@ -41,6 +47,7 @@ class AnnualManagementPolicyController extends Controller
             'currentPeriodId' => $current?->id,
             'canManage' => $access->canManage($request->user(), $organization),
             'access' => $access,
+            'lifecycle' => $lifecycle,
             'requestId' => (string) Str::uuid(),
         ]);
     }
@@ -49,11 +56,13 @@ class AnnualManagementPolicyController extends Controller
     {
         $validated = $request->validate([
             'request_id' => ['required', 'uuid'], 'name' => ['required', 'string', 'max:120'],
+            'fiscal_term_number' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
             'starts_on' => ['required', 'date_format:Y-m-d'], 'ends_on' => ['required', 'date_format:Y-m-d'],
         ]);
         $writer->register(
             $request->user(), $request->attributes->get('currentCompany'), $validated['name'],
             $validated['starts_on'], $validated['ends_on'], $validated['request_id'],
+            isset($validated['fiscal_term_number']) ? (int) $validated['fiscal_term_number'] : null,
         );
         return back()->with('status', '会社の期間を登録しました。');
     }
@@ -63,12 +72,14 @@ class AnnualManagementPolicyController extends Controller
         $validated = $request->validate([
             'request_id' => ['required', 'uuid'], 'expected_version' => ['required', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:120'], 'starts_on' => ['required', 'date_format:Y-m-d'],
+            'fiscal_term_number' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
             'ends_on' => ['required', 'date_format:Y-m-d'], 'change_reason' => ['nullable', 'string', 'max:2000'],
         ]);
         $writer->correct(
             $request->user(), $request->attributes->get('currentCompany'), $period, $validated['name'],
             $validated['starts_on'], $validated['ends_on'], (int) $validated['expected_version'],
             $validated['change_reason'] ?? null, $validated['request_id'],
+            isset($validated['fiscal_term_number']) ? (int) $validated['fiscal_term_number'] : null,
         );
         return back()->with('status', '会社の期間を訂正しました。正式版に記録された期間は変わりません。');
     }
@@ -83,7 +94,12 @@ class AnnualManagementPolicyController extends Controller
             ->with('status', '年度方針の枠を作成しました。本文を扱う担当者を明示してください。');
     }
 
-    public function show(Request $request, AnnualManagementPolicy $annualPolicy, AnnualManagementPolicyAccess $access): View
+    public function show(
+        Request $request,
+        AnnualManagementPolicy $annualPolicy,
+        AnnualManagementPolicyAccess $access,
+        AnnualManagementPolicyLifecycle $lifecycle,
+    ): View
     {
         $this->assertOrganization($request, $annualPolicy);
         $canApproved = $access->canViewApproved($request->user(), $annualPolicy);
@@ -100,6 +116,11 @@ class AnnualManagementPolicyController extends Controller
             'canEdit' => $access->canEdit($request->user(), $annualPolicy),
             'canApprove' => $access->canApprove($request->user(), $annualPolicy),
             'canManage' => $access->canManage($request->user(), $annualPolicy->organization),
+            'lifecycle' => $lifecycle->evaluate(
+                $annualPolicy->period,
+                $annualPolicy->currentApprovedRevision !== null,
+            ),
+            'lifecyclePresenter' => $lifecycle,
         ]);
     }
 
@@ -121,6 +142,11 @@ class AnnualManagementPolicyController extends Controller
         $this->assertOrganization($request, $annualPolicy);
         $validated = $request->validate($this->draftRules());
         $writer->saveDraft($request->user(), $annualPolicy, $validated, (int) $validated['expected_draft_version'], $validated['request_id']);
+        if (($validated['after_save'] ?? null) === 'organization_groups') {
+            return redirect()->route('organization-management.index', [
+                'return_to_annual_policy' => $annualPolicy->public_id,
+            ])->with('status', '作成中の案を保存しました。部署・グループを登録後、年度経営方針へ戻ってください。');
+        }
         return redirect()->route('annual-management-policy.show', $annualPolicy)
             ->with('status', '作成中の案を保存しました。まだ正式方針ではありません。');
     }
@@ -284,6 +310,7 @@ class AnnualManagementPolicyController extends Controller
     {
         return [
             'request_id' => ['required', 'uuid'], 'expected_draft_version' => ['required', 'integer', 'min:0'],
+            'after_save' => ['nullable', Rule::in(['organization_groups'])],
             'period_name' => ['nullable', 'string', 'max:120'], 'starts_on' => ['nullable', 'date_format:Y-m-d'],
             'ends_on' => ['nullable', 'date_format:Y-m-d'], 'purpose' => ['nullable', 'string', 'max:50000'],
             'background' => ['nullable', 'string', 'max:50000'], 'policy' => ['nullable', 'string', 'max:50000'],
