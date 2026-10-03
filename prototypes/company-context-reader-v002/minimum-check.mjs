@@ -92,6 +92,29 @@ try {
         results.push({ viewport: viewport.name, initial, annual, tuning, pageErrors: errors.length });
         await page.close();
     }
+
+    const review = await browser.newPage({ viewport: { width: 1440, height: 920 } });
+    await review.goto(baseUrl + '/review.html', { waitUntil: 'networkidle' });
+    const frame = review.frameLocator('#reader-frame');
+    await frame.locator('[data-brand-tuning]').waitFor();
+    const iframeRect = await review.locator('#reader-frame').boundingBox();
+    const panelRect = await frame.locator('[data-brand-tuning]').evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        return { top: rect.top, height: rect.height };
+    });
+    const cacheIdentity = await frame.locator('html').evaluate(() => ({
+        css: document.querySelector('link[rel=stylesheet]').getAttribute('href'),
+        js: document.querySelector('script[src]').getAttribute('src'),
+    }));
+    const panelViewportTop = iframeRect.y + panelRect.top;
+    if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
+        throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
+    }
+    if (!cacheIdentity.css.includes('brand-position-controls-2') || !cacheIdentity.js.includes('brand-position-controls-2')) {
+        throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
+    }
+    results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
+    await review.close();
 } finally {
     await browser.close();
 }
