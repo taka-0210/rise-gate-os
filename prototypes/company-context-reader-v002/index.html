@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>会社の言葉｜Visual Prototype v002</title>
+    <link rel=icon href=data:,>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-motion="a">
+    <a class="skip-link" href="#reader">本文へ移動</a>
+
+    <div class="prototype-boundary" id="prototype-boundary" role="note">
+        <span>VISUAL PROTOTYPE v002</span>
+        <strong>NOT OFFICIAL DATA</strong>
+        <span>架空Data・DB非接続・Permission未実装</span>
+    </div>
+
+    <header class="global-placeholder" aria-label="Company OS Global Header placeholder">
+        <a class="brand" href="#top" aria-label="Company OS prototype top">
+            <span class="brand__mark" aria-hidden="true">C</span>
+            <span>Company OS</span>
+        </a>
+        <span class="global-placeholder__label">Global Header / visual placeholder</span>
+    </header>
+
+    <nav class="breadcrumb-placeholder" aria-label="パンくず（Prototype placeholder）">
+        <span>Company OS</span>
+        <span aria-hidden="true">/</span>
+        <span>架空株式会社ひかり製作所</span>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">会社の言葉（名称候補）</span>
+    </nav>
+
+    <section class="prototype-controls" aria-labelledby="prototype-controls-title">
+        <div>
+            <p class="prototype-controls__eyebrow">HUMAN VISUAL REVIEW</p>
+            <h2 id="prototype-controls-title">同じ本文でMotionだけを比較</h2>
+            <p>一冊感と構成を固定し、Revealの強さだけを確認する隔離Prototypeです。</p>
+        </div>
+        <div class="motion-picker" role="group" aria-label="Motionを選択">
+            <button type="button" data-motion-choice="a" aria-pressed="true">
+                <span>Motion A</span><small>Subtle Reveal</small>
+            </button>
+            <button type="button" data-motion-choice="b" aria-pressed="false">
+                <span>Motion B</span><small>Expressive Reveal</small>
+            </button>
+            <button type="button" data-motion-choice="off" aria-pressed="false">
+                <span>OFF</span><small>完全静的</small>
+            </button>
+        </div>
+        <p class="motion-state" aria-live="polite">現在：Motion A</p>
+    </section>
+
+    <details class="mobile-toc" data-mobile-toc>
+        <summary><span data-current-chapter>01 理念</span><span>目次</span></summary>
+        <nav aria-label="Reader目次（Mobile）">
+            <a href="#philosophy">01 <span>理念</span></a>
+            <a href="#vision">02 <span>Vision</span></a>
+            <a href="#policy">03 <span>方針</span></a>
+            <a href="#annual">04 <span>年度経営方針</span></a>
+        </nav>
+    </details>
+
+    <div class="reader-layout" id="top">
+        <aside class="reader-rail" aria-label="Reader Navigation">
+            <div class="reader-rail__inner">
+                <p class="reader-rail__label">CHAPTERS</p>
+                <nav class="chapter-toc" aria-label="Reader目次">
+                    <a href="#philosophy" aria-current="true" data-toc-key="philosophy">
+                        <span class="chapter-toc__number">01</span>
+                        <span><strong>理念</strong><small>WHY / ROOT</small></span>
+                    </a>
+                    <a href="#vision" data-toc-key="vision">
+                        <span class="chapter-toc__number">02</span>
+                        <span><strong>Vision</strong><small>WHERE TO / FUTURE</small></span>
+                    </a>
+                    <a href="#policy" data-toc-key="policy">
+                        <span class="chapter-toc__number">03</span>
+                        <span><strong>方針</strong><small>HOW WE DECIDE</small></span>
+                    </a>
+                    <a href="#annual" data-toc-key="annual">
+                        <span class="chapter-toc__number">04</span>
+                        <span><strong>年度経営方針</strong><small>THIS YEAR</small></span>
+                    </a>
+                </nav>
+                <p class="reader-rail__note">目次は同じReader内を移動します。読了率や承認状態を表しません。</p>
+            </div>
+        </aside>
+
+        <main class="reader" id="reader">
+            <header class="reader-cover">
+                <p class="reader-cover__company">架空株式会社ひかり製作所</p>
+                <p class="reader-cover__kicker">COMPANY CONTEXT READER</p>
+                <h1>会社の言葉</h1>
+                <p class="reader-cover__lead">私たちが大切にすること、目指す未来、判断の方向、そして今期の重点を、一つの流れで読みます。</p>
+                <p class="reader-cover__candidate">「会社の言葉」はHuman-facing名称の第一候補であり、正式決定ではありません。</p>
+                <nav class="cover-index" aria-label="短い章目次">
+                    <a href="#philosophy"><span>01</span>理念</a>
+                    <a href="#vision"><span>02</span>Vision</a>
+                    <a href="#policy"><span>03</span>方針</a>
+                    <a href="#annual"><span>04</span>年度経営方針</a>
+                </nav>
+            </header>
+
+            <article class="reader-book" aria-label="会社の言葉 Visual Prototype">
+                <section class="chapter chapter--root" id="philosophy" data-chapter="philosophy" data-chapter-label="01 理念">
+                    <header class="chapter__intro motion-target motion-target--chapter">
+                        <p class="chapter__number">01</p>
+                        <div>
+                            <p class="chapter__direction">WHY / ROOT</p>
+                            <h2>理念</h2>
+                            <p class="chapter__question">私たちは、何を大切にするのか。</p>
+                        </div>
+                    </header>
+
+                    <div class="chapter__opening">
+                        <p class="chapter__statement motion-target motion-target--statement">まっすぐな仕事で、<br>人とまちの明日を明るくする。</p>
+                        <div class="chapter__explanation prose">
+                            <p>私たちの仕事は、目の前の依頼を終わらせることだけではありません。道具や技術を届け、その先で働く人が前を向ける状態をつくることまでを、自分たちの責任として考えます。</p>
+                            <p>正直に向き合い、分からないことを曖昧にせず、約束したことを積み重ねる。その小さな選択が、お客様の安心と仲間の誇りになり、地域の明日を少しずつ明るくすると信じています。</p>
+                        </div>
+                    </div>
+
+                    <div class="section-sequence section-sequence--root">
+                        <section class="context-section">
+                            <p class="context-section__index">01</p>
+                            <div>
+                                <h3>誠実である</h3>
+                                <p class="context-section__statement motion-target motion-target--section">都合のよい答えではなく、相手の未来にとって正しい答えを選ぶ。</p>
+                                <p class="context-section__explanation">状況が難しいときほど、事実を確かめ、できることとできないことを率直に伝えます。</p>
+                            </div>
+                        </section>
+                        <section class="context-section">
+                            <p class="context-section__index">02</p>
+                            <div>
+                                <h3>仕事を次へつなぐ</h3>
+                                <p class="context-section__statement motion-target motion-target--section">今日の工夫を、次の人が使える知恵として残す。</p>
+                                <p class="context-section__explanation">一人の経験で終わらせず、言葉と仕組みに変えることで、会社全体の力を育てます。</p>
+                            </div>
+                        </section>
+                        <section class="context-section">
+                            <p class="context-section__index">03</p>
+                            <div>
+                                <h3>ともに良くなる</h3>
+                                <p class="context-section__statement motion-target motion-target--section">お客様、仲間、地域のどれか一つだけを置き去りにしない。</p>
+                                <p class="context-section__explanation">短い成果だけでなく、長く信頼し合える関係と持続する価値を選びます。</p>
+                            </div>
+                        </section>
+                    </div>
+
+                    <footer class="chapter__document-info">
+                        <span>Visual fixture / Current Officialを模した表示</span>
+                        <a href="#prototype-boundary" data-management-placeholder>この文書を管理（見た目のみ）</a>
+                    </footer>
+                </section>
+
+                <div class="chapter-transition" aria-hidden="true"><span>FROM ROOT</span><i></i><span>TO FUTURE</span></div>
+
+                <section class="chapter chapter--future" id="vision" data-chapter="vision" data-chapter-label="02 Vision">
+                    <header class="chapter__intro motion-target motion-target--chapter">
+                        <p class="chapter__number">02</p>
+                        <div>
+                            <p class="chapter__direction">WHERE TO / FUTURE</p>
+                            <h2>Vision</h2>
+                            <p class="chapter__question">私たちは、どこへ向かうのか。</p>
+                        </div>
+                    </header>
+
+                    <div class="chapter__opening chapter__opening--future">
+                        <p class="chapter__statement motion-target motion-target--statement">技術と対話がめぐり、<br>誰もが良い仕事を続けられる社会へ。</p>
+                        <div class="chapter__horizon"><span>HORIZON</span><strong>2032｜地域の現場から広がる</strong></div>
+                        <div class="chapter__explanation prose">
+                            <p>知識を持つ人だけが前へ進めるのではなく、必要な情報と支えが、必要な場所へ届く状態を目指します。</p>
+                            <p>現場の声とデジタルの力を離れたものにせず、人の判断を助ける仕組みとして結び直します。会社の中で生まれた良い実践が、お客様や地域へも静かに広がっていく未来を描きます。</p>
+                        </div>
+                    </div>
+
+                    <div class="vision-path" aria-label="Vision sections">
+                        <section class="vision-step">
+                            <p class="vision-step__year">01</p><div><h3 class="motion-target motion-target--section">現場の知恵が見える</h3><p>経験や工夫が個人の中だけに留まらず、次の判断に使える言葉として共有されている。</p><small>Horizon｜2028</small></div>
+                        </section>
+                        <section class="vision-step">
+                            <p class="vision-step__year">02</p><div><h3 class="motion-target motion-target--section">選ぶ理由が伝わる</h3><p>価格や速さだけではなく、私たちが届ける価値と仕事への姿勢が、お客様に自然に伝わっている。</p><small>Horizon｜2029</small></div>
+                        </section>
+                        <section class="vision-step">
+                            <p class="vision-step__year">03</p><div><h3 class="motion-target motion-target--section">人と仕組みが育ち合う</h3><p>新しい仲間が安心して挑戦でき、ベテランの知恵も生き続ける。改善が特別な活動ではなく日常になっている。</p><small>Horizon｜2030</small></div>
+                        </section>
+                        <section class="vision-step">
+                            <p class="vision-step__year">04</p><div><h3 class="motion-target motion-target--section">地域の可能性をひらく</h3><p>自社だけで完結せず、地域の事業者や働く人と価値を分かち合い、新しい選択肢を増やしている。</p><small>Horizon｜2032</small></div>
+                        </section>
+                    </div>
+
+                    <footer class="chapter__document-info">
+                        <span>Visual fixture / Current Officialを模した表示</span>
+                        <a href="#prototype-boundary" data-management-placeholder>この文書を管理（見た目のみ）</a>
+                    </footer>
+                </section>
+
+                <div class="chapter-transition" aria-hidden="true"><span>FROM FUTURE</span><i></i><span>TO DIRECTION</span></div>
+
+                <section class="chapter chapter--direction" id="policy" data-chapter="policy" data-chapter-label="03 方針">
+                    <header class="chapter__intro motion-target motion-target--chapter">
+                        <p class="chapter__number">03</p>
+                        <div>
+                            <p class="chapter__direction">HOW WE DECIDE / DIRECTION</p>
+                            <h2>方針</h2>
+                            <p class="chapter__question">私たちは、何を基準に判断するのか。</p>
+                        </div>
+                    </header>
+
+                    <div class="chapter__opening">
+                        <p class="chapter__statement motion-target motion-target--statement">強みを仕組みに変え、<br>全員が同じ方向を向いて動ける会社をつくる。</p>
+                        <div class="chapter__explanation prose">
+                            <p>私たちは、技術、教え合う文化、デジタル活用、再生力、提案力など、多くの強みを積み重ねてきました。これからの成長に必要なのは、それらを一部の人の経験や頑張りだけに頼るのではなく、会社の共通基準と仕組みに変えていくことです。</p>
+                            <p>理念・方向性・業績を共有し、判断と行動の共通基準を、業務フロー、教育、評価、改善へつなげます。誰が担当しても一定以上の品質で仕事が進み、部署を越えて支え合える組織をつくります。</p>
+                        </div>
+                    </div>
+
+                    <div class="policy-list">
+                        <section class="policy-item"><p>01</p><div><h3>判断と行動をそろえる</h3><strong class="motion-target motion-target--section">会社としての判断軸を共有する。</strong><span>何を大切にするのか、どこへ向かうのか、現在どこにいるのかを理解し、同じ方向を見て判断します。</span></div></section>
+                        <section class="policy-item"><p>02</p><div><h3>強みを仕組みに変える</h3><strong class="motion-target motion-target--section">個人の経験や技術を、会社全体で再現できる形にする。</strong><span>現場に蓄積した知識を言葉と手順へ変え、改善された方法を育て続けます。</span></div></section>
+                        <section class="policy-item"><p>03</p><div><h3>全体最適で動く</h3><strong class="motion-target motion-target--section">自分の仕事だけでなく、価値が届くまでの流れを見る。</strong><span>役割を越えて支え合い、会社全体として成果が最大になる判断を優先します。</span></div></section>
+                        <section class="policy-item"><p>04</p><div><h3>生産性を成果につなげる</h3><strong class="motion-target motion-target--section">同じ時間から、より大きな価値を生み出す。</strong><span>デジタル、標準化、改善を、導入すること自体ではなく、お客様と働く人への価値へつなげます。</span></div></section>
+                        <section class="policy-item"><p>05</p><div><h3>価値で選ばれる仕事をする</h3><strong class="motion-target motion-target--section">価格だけでなく、信頼と提案で選ばれる。</strong><span>丁寧さ、専門性、誠実さを積み重ね、「ここに任せたい」と思われる仕事をします。</span></div></section>
+                        <section class="policy-item"><p>06</p><div><h3>成長できる組織基盤をつくる</h3><strong class="motion-target motion-target--section">人と仕組みの両面から、次の挑戦を支える。</strong><span>採用、教育、評価、情報管理、環境整備を、未来へ進むための基盤として整えます。</span></div></section>
+                    </div>
+
+                    <footer class="chapter__document-info">
+                        <span>Visual fixture / Current Officialを模した表示</span>
+                        <a href="#prototype-boundary" data-management-placeholder>この文書を管理（見た目のみ）</a>
+                    </footer>
+                </section>
+
+                <div class="chapter-transition" aria-hidden="true"><span>FROM DIRECTION</span><i></i><span>TO THIS YEAR</span></div>
+
+                <section class="chapter chapter--annual" id="annual" data-chapter="annual" data-chapter-label="04 年度経営方針">
+                    <header class="chapter__intro motion-target motion-target--chapter">
+                        <p class="chapter__number">04</p>
+                        <div>
+                            <p class="chapter__direction">THIS YEAR</p>
+                            <h2>年度経営方針</h2>
+                            <p class="chapter__question">今期、何を重要と考え、何を変えるのか。</p>
+                        </div>
+                    </header>
+
+                    <div class="annual-period">
+                        <div><p>COMPANY PERIOD</p><h3>第23期｜2026年度</h3><span>2026/12/01 — 2027/11/30 / Asia/Tokyo</span></div>
+                        <p class="annual-period__status"><span>APPROVED</span><strong>承認済み / 現在有効</strong><small>Prototype上の状態表示例</small></p>
+                    </div>
+
+                    <section class="annual-lead">
+                        <p class="annual-label">年度経営方針</p>
+                        <p class="annual-policy motion-target motion-target--statement">現場の知恵をつなぎ、<br>価値が届く速さと確かさを高める。</p>
+                    </section>
+
+                    <div class="annual-context">
+                        <section><p class="annual-label">今期、何を実現したいのか</p><h3 class="motion-target motion-target--section">良い仕事が、人に依存せず続いていく会社へ。</h3><p>お客様の相談から提案、準備、提供、振り返りまでを一つの流れとして整え、働く人が本当に考えるべき仕事へ時間を使える状態をつくります。</p></section>
+                        <section><p class="annual-label">この方針を定める背景</p><h3 class="motion-target motion-target--section">成長によって増えた複雑さを、次の強さへ変える。</h3><p>拠点、仲間、扱う情報が増え、以前は会話だけで共有できた判断が届きにくくなっています。一方で、各現場には多くの知恵と改善が生まれています。今期はその知恵を集め、整理し、必要な人へ戻す循環をつくります。</p><p>効率化だけを目的にせず、品質、信頼、働きやすさが同時に高まる仕組みを選びます。</p></section>
+                    </div>
+
+                    <div class="annual-subnav" aria-label="年度経営方針の章内目次">
+                        <a href="#theme-one">重点テーマ 01</a><a href="#theme-two">重点テーマ 02</a><a href="#theme-three">重点テーマ 03</a><a href="#departments">部署方針</a>
+                    </div>
+
+                    <div class="themes">
+                        <section class="theme" id="theme-one">
+                            <header><p>重点テーマ <span>01</span></p><h3 class="motion-target motion-target--theme">お客様の時間を守る</h3><div class="theme__explanation">相談から提供までの停滞を減らし、必要な情報が、必要なときに、分かりやすく届く流れをつくります。</div></header>
+                            <div class="priorities">
+                                <section><p>優先方針 01</p><h4>最初の相談で、次の一歩を明確にする</h4><span>聞くべきことと伝えるべきことを整え、担当が変わってもお客様を迷わせません。</span></section>
+                                <section><p>優先方針 02</p><h4>約束した期日と状態を、誰でも確認できるようにする</h4><span>進捗を個人の記憶に置かず、必要な人が同じ事実を見られる状態をつくります。</span></section>
+                                <section><p>優先方針 03</p><h4>説明の品質をそろえる</h4><span>専門用語を並べるのではなく、選択肢と違いをお客様の言葉で伝えます。</span></section>
+                            </div>
+                        </section>
+
+                        <section class="theme" id="theme-two">
+                            <header><p>重点テーマ <span>02</span></p><h3 class="motion-target motion-target--theme">現場の知恵を会社の力にする</h3><div class="theme__explanation">一人が見つけた工夫を、別の場所でも使える言葉と仕組みに変え、改善の速度を高めます。</div></header>
+                            <div class="priorities">
+                                <section><p>優先方針 01</p><h4>良い実践を、その日のうちに残す</h4><span>完成されたManualを待たず、事実と気づきを小さく記録する習慣をつくります。</span></section>
+                                <section><p>優先方針 02</p><h4>標準を固定せず、改善できる形にする</h4><span>基準を守ることと、より良い方法へ更新することを両立します。</span></section>
+                                <section><p>優先方針 03</p><h4>教える時間を、成長の時間に変える</h4><span>答えだけでなく判断の理由を共有し、次は自分で考えられる支援を行います。</span></section>
+                                <section><p>優先方針 04</p><h4>見つからない時間を減らす</h4><span>情報の置き場所と名前をそろえ、探すより考えることへ時間を使います。</span></section>
+                            </div>
+                        </section>
+
+                        <section class="theme" id="theme-three">
+                            <header><p>重点テーマ <span>03</span></p><h3 class="motion-target motion-target--theme">次の挑戦を支える余白をつくる</h3><div class="theme__explanation">忙しさを成果と取り違えず、学ぶ、試す、振り返るための時間を、日々の仕事の中に取り戻します。</div></header>
+                            <div class="priorities">
+                                <section><p>優先方針 01</p><h4>繰り返し作業を見直す</h4><span>人が判断しなくてもよい作業は仕組みに任せ、対話と工夫へ時間を戻します。</span></section>
+                                <section><p>優先方針 02</p><h4>小さく試し、早く学ぶ</h4><span>最初から完全を求めず、範囲を限定して試し、事実から次の判断を行います。</span></section>
+                                <section><p>優先方針 03</p><h4>成果と学びを一緒に振り返る</h4><span>数字だけでなく、次も続けたい判断や変えたい方法を言葉にします。</span></section>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="departments" id="departments">
+                        <header><p class="annual-label">部署方針</p><h3>それぞれの場所から、同じ今期へ向かう。</h3></header>
+                        <div class="department-grid">
+                            <section><p>営業・提案</p><h4>相談の背景まで理解し、選べる提案を届ける。</h4><span>情報を受け取って終わらず、お客様が本当に実現したい状態を、次の担当へ正確につなぎます。</span></section>
+                            <section><p>オペレーション</p><h4>流れの詰まりを見つけ、確かな提供へ変える。</h4><span>前後の工程を理解し、問題が大きくなる前に共有し、全体で解決できる状態をつくります。</span></section>
+                            <section><p>人・組織</p><h4>挑戦できる基盤を整え、成長の手応えを増やす。</h4><span>役割、学び、評価、対話をつなぎ、一人ひとりが次の一歩を選べる環境を整えます。</span></section>
+                        </div>
+                    </section>
+
+                    <footer class="chapter__document-info chapter__document-info--annual">
+                        <span>Visual fixture / Approved・Effectiveを模した表示</span>
+                        <a href="#prototype-boundary" data-management-placeholder>年度方針を管理（見た目のみ）</a>
+                    </footer>
+                </section>
+            </article>
+
+            <footer class="reader-end">
+                <p>END OF READER</p>
+                <h2>必要な言葉へ、いつでも戻れます。</h2>
+                <nav aria-label="Reader終端の章目次"><a href="#philosophy">理念</a><a href="#vision">Vision</a><a href="#policy">方針</a><a href="#annual">年度経営方針</a></nav>
+                <a class="reader-end__top" href="#top">最初へ戻る</a>
+            </footer>
+        </main>
+    </div>
+
+    <div class="prototype-toast" role="status" aria-live="polite" hidden>Prototypeのため管理機能は実装していません。</div>
+    <script src="prototype.js"></script>
+</body>
+</html>
