@@ -52,6 +52,7 @@
     var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
     var brandSvg = null;
     var brandLayoutState = { size: 120, x: -110, y: 0, blur: .5, density: 200, transition: 2600 };
+    var brandEntryComplete = directFragmentSession || reducedMotion.matches;
     var brandChapterLabels = {
         philosophy: '01 理念 / ROOT',
         vision: '02 Vision / FUTURE',
@@ -62,8 +63,8 @@
     var brandChapterStates = {
         philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, boundary: 10, now: 6 },
         vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, boundary: 10, now: 18 },
-        policy: { opacity: 17, center: 65, middle: 75, outer: 0, structure: 100, boundary: 10, now: 0 },
-        annual: { opacity: 17, center: 65, middle: 75, outer: 14, structure: 100, boundary: 18, now: 0 }
+        policy: { opacity: 17, center: 65, middle: 75, outer: 0, structure: 0, boundary: 10, now: 0 },
+        annual: { opacity: 17, center: 65, middle: 75, outer: 45, structure: 100, boundary: 38, now: 0 }
     };
 
     function isInReviewWindow(element) {
@@ -340,6 +341,21 @@
         }
     }
 
+    function revealBrandVisual() {
+        if (brandEntryComplete) {
+            body.dataset.brandEntry = 'entered';
+            return;
+        }
+        brandEntryComplete = true;
+        if (brandVisualCanvas) {
+            brandVisualCanvas.style.setProperty('--brand-canvas-duration', '1800ms');
+        }
+        body.dataset.brandEntry = 'entered';
+        window.setTimeout(function () {
+            if (brandVisualCanvas) brandVisualCanvas.style.removeProperty('--brand-canvas-duration');
+        }, 1850);
+    }
+
     function bindBrandTuning() {
         if (brandTuning && prototypeControls) {
             prototypeControls.insertAdjacentElement('afterend', brandTuning);
@@ -393,6 +409,7 @@
 
     function setCurrentChapter(chapter) {
         var key = chapter.dataset.chapter;
+        revealBrandVisual();
         desktopTocLinks.forEach(function (link) {
             if (link.dataset.tocKey === key) link.setAttribute('aria-current', 'true');
             else link.removeAttribute('aria-current');
@@ -509,6 +526,7 @@
         }
 
         initializationSubstage = 'INITIAL_STATE';
+        body.dataset.brandEntry = brandEntryComplete ? 'entered' : 'waiting';
         bindBrandTuning();
         applyBrandChapter('philosophy', true);
         loadBrandVisualSource();

@@ -54,6 +54,8 @@ try {
         const initial = await page.evaluate(() => ({
             source: document.body.dataset.brandSource,
             chapter: document.body.dataset.brandChapter,
+            brandEntry: document.body.dataset.brandEntry,
+            brandCanvasOpacity: getComputedStyle(document.querySelector('[data-brand-visual-canvas]')).opacity,
             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
             readerVisible: getComputedStyle(document.querySelector('.reader')).visibility !== 'hidden',
             tuningVisible: (() => {
@@ -94,6 +96,13 @@ try {
                 duration: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-duration'),
                 outputs: Array.from(document.querySelectorAll('[data-brand-output]')).map(output => output.textContent),
             },
+        }));
+
+        await activateChapter(page, 'philosophy');
+        await page.waitForTimeout(1500);
+        const brandEntry = await page.evaluate(() => ({
+            state: document.body.dataset.brandEntry,
+            opacity: getComputedStyle(document.querySelector('[data-brand-visual-canvas]')).opacity,
         }));
 
         await activateChapter(page, 'vision');
@@ -165,8 +174,12 @@ try {
         });
 
         if (initial.source !== 'official-svg' || initial.chapter !== 'philosophy' || initial.overflow !== 0
-            || !initial.readerVisible || !initial.tuningVisible) {
+            || !initial.readerVisible || !initial.tuningVisible
+            || initial.brandEntry !== 'waiting' || initial.brandCanvasOpacity !== '0') {
             throw new Error(viewport.name + ': initial ' + JSON.stringify(initial));
+        }
+        if (brandEntry.state !== 'entered' || brandEntry.opacity !== '1') {
+            throw new Error(viewport.name + ': brand entry ' + JSON.stringify(brandEntry));
         }
         if (initial.fade.duration !== '1350ms' || initial.fade.distance !== '40px' || initial.fade.blur !== '2.5px' || initial.fade.trigger !== '75') {
             throw new Error(viewport.name + ': fade ' + JSON.stringify(initial.fade));
@@ -182,7 +195,7 @@ try {
             throw new Error(viewport.name + ': vision ring sequence ' + JSON.stringify(vision));
         }
         if (policy.chapter !== 'policy' || Number(policy.outer) !== 0
-            || Number(policy.structure) <= Number(vision.middle)
+            || Number(policy.structure) !== 0
             || Number(policy.boundary) !== 0.062
             || Number(policy.now) !== 0
             || policy.secondExecutionArc <= vision.secondExecutionArc * 10
@@ -191,8 +204,8 @@ try {
         }
         if (annual.chapter !== 'annual' || Number(annual.now) !== 0
             || annual.core !== '0.65' || annual.middle !== policy.middle
-            || annual.structure !== policy.structure
-            || Number(annual.outer) !== 0.14 || Number(annual.boundary) !== 0.1116
+            || Number(annual.structure) !== 1
+            || Number(annual.outer) !== 0.45 || Number(annual.boundary) !== 0.2356
             || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
@@ -234,7 +247,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('annual-uniform-outer-1') || !cacheIdentity.js.includes('annual-uniform-outer-1')) {
+    if (!cacheIdentity.css.includes('policy-lines-annual-1') || !cacheIdentity.js.includes('policy-lines-annual-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });

@@ -696,11 +696,19 @@ body[data-motion="off"] .motion-target {
 .brand-visual__canvas {
     --brand-x: 0px;
     --brand-y: 0px;
+    --brand-canvas-duration: var(--brand-duration);
     width: 100%;
     height: 100%;
+    opacity: 1;
     transform: translate(var(--brand-x), var(--brand-y)) scale(var(--brand-scale));
     transform-origin: 70% 50%;
-    transition: transform var(--brand-duration) cubic-bezier(.22, .72, .28, 1);
+    transition: transform var(--brand-canvas-duration) cubic-bezier(.22, .72, .28, 1),
+        opacity calc(var(--brand-canvas-duration) * .72) ease;
+}
+
+body[data-brand-entry='waiting'] .brand-visual__canvas {
+    opacity: 0;
+    transform: translate(calc(var(--brand-x) + 62vw), var(--brand-y)) scale(var(--brand-scale));
 }
 
 .brand-visual img,
@@ -817,6 +825,11 @@ body[data-motion="off"] .motion-target {
     .brand-visual svg * {
         transition: none !important;
         animation: none !important;
+    }
+
+    body[data-brand-entry='waiting'] .brand-visual__canvas {
+        opacity: 1;
+        transform: translate(var(--brand-x), var(--brand-y)) scale(var(--brand-scale));
     }
 }
 
