@@ -69,6 +69,8 @@ try {
             chapter: document.body.dataset.brandChapter,
             middle: document.querySelector('#execution-layer').style.opacity,
             outer: document.querySelector('#knowledge-layer').style.opacity,
+            innerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 430.000"]').style.opacity),
+            outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
         }));
 
         await page.locator('#policy').scrollIntoViewIfNeeded();
@@ -78,6 +80,7 @@ try {
             middle: document.querySelector('#execution-layer').style.opacity,
             outer: document.querySelector('#knowledge-layer').style.opacity,
             structure: document.querySelector('#connections').style.opacity,
+            outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
         }));
 
         await page.locator('#annual').scrollIntoViewIfNeeded();
@@ -125,11 +128,13 @@ try {
             || initial.layout.outputs.join('|') !== '120%|-110px|0px|0.5px|200%') {
             throw new Error(viewport.name + ': initial layout ' + JSON.stringify(initial.layout));
         }
-        if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 3) {
+        if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 8
+            || vision.innerExecutionArc <= vision.outerExecutionArc * 12) {
             throw new Error(viewport.name + ': vision ring sequence ' + JSON.stringify(vision));
         }
         if (policy.chapter !== 'policy' || Number(policy.outer) <= Number(vision.outer) * 4
-            || Number(policy.structure) <= Number(vision.middle)) {
+            || Number(policy.structure) <= Number(vision.middle)
+            || policy.outerExecutionArc <= vision.outerExecutionArc * 10) {
             throw new Error(viewport.name + ': policy ring sequence ' + JSON.stringify(policy));
         }
         if (annual.chapter !== 'annual' || Number(annual.now) <= Number(initial.root.now)
@@ -169,7 +174,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('brand-ring-sequence-1') || !cacheIdentity.js.includes('brand-ring-sequence-1')) {
+    if (!cacheIdentity.css.includes('brand-radius-sequence-1') || !cacheIdentity.js.includes('brand-radius-sequence-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });

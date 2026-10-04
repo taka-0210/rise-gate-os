@@ -60,7 +60,7 @@
     var brandFixedScale = 84;
     var brandChapterStates = {
         philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, now: 6, duration: 1600 },
-        vision: { opacity: 18, center: 80, middle: 75, outer: 12, structure: 22, now: 18, duration: 1800 },
+        vision: { opacity: 18, center: 80, middle: 75, outer: 4, structure: 10, now: 18, duration: 1800 },
         policy: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, now: 30, duration: 1600 },
         annual: { opacity: 16, center: 60, middle: 55, outer: 55, structure: 50, now: 100, duration: 1500 }
     };
@@ -279,6 +279,23 @@
         if (boundary) boundary.style.opacity = String(Number(boundary.dataset.baseOpacity) * .10);
     }
 
+    function setExecutionDepth(key) {
+        if (!brandSvg) return;
+        var execution = brandSvg.querySelector('#execution-layer');
+        if (!execution) return;
+        Array.from(execution.querySelectorAll('[data-base-opacity]')).forEach(function (element) {
+            element.style.opacity = element.dataset.baseOpacity;
+        });
+        if (key !== 'vision') return;
+        ['535.000', '585.000'].forEach(function (radius) {
+            Array.from(execution.querySelectorAll('path[d*="A ' + radius + '"]')).forEach(function (path) {
+                path.style.opacity = String(Number(path.dataset.baseOpacity) * .08);
+            });
+        });
+        var outerBoundary = execution.querySelector('circle[r="610"]');
+        if (outerBoundary) outerBoundary.style.opacity = String(Number(outerBoundary.dataset.baseOpacity) * .08);
+    }
+
     function syncBrandControls(key) {
         brandSettingInputs.forEach(function (input) {
             var name = input.dataset.brandSetting;
@@ -307,6 +324,7 @@
         setBrandLayerOpacity('management-layer', state.center * .82);
         setManagementDepth(key);
         setBrandLayerOpacity('execution-layer', state.middle * .72);
+        setExecutionDepth(key);
         setBrandLayerOpacity('knowledge-layer', state.outer);
         setBrandLayerOpacity('outer-structure', state.structure * .62);
         setBrandLayerOpacity('connections', state.structure);
@@ -357,7 +375,7 @@
                 brandSvg.removeAttribute('height');
                 brandSvg.setAttribute('aria-hidden', 'true');
                 brandSvg.setAttribute('focusable', 'false');
-                Array.from(brandSvg.querySelectorAll('#management-layer path, #management-layer circle')).forEach(function (element) {
+                Array.from(brandSvg.querySelectorAll('#management-layer path, #management-layer circle, #execution-layer path, #execution-layer circle')).forEach(function (element) {
                     element.dataset.baseOpacity = element.getAttribute('opacity') || '1';
                 });
                 if (brandFallback) brandFallback.remove();
