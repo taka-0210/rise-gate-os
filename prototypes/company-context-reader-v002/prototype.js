@@ -60,7 +60,7 @@
     var brandFixedScale = 84;
     var brandChapterStates = {
         philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, now: 6, duration: 1600 },
-        vision: { opacity: 18, center: 80, middle: 75, outer: 4, structure: 10, now: 18, duration: 1800 },
+        vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, now: 18, duration: 1800 },
         policy: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, now: 30, duration: 1600 },
         annual: { opacity: 16, center: 60, middle: 55, outer: 55, structure: 50, now: 100, duration: 1500 }
     };
@@ -287,13 +287,13 @@
             element.style.opacity = element.dataset.baseOpacity;
         });
         if (key !== 'vision') return;
-        ['535.000', '585.000'].forEach(function (radius) {
+        ['485.000', '535.000', '585.000'].forEach(function (radius) {
             Array.from(execution.querySelectorAll('path[d*="A ' + radius + '"]')).forEach(function (path) {
-                path.style.opacity = String(Number(path.dataset.baseOpacity) * .08);
+                path.style.opacity = '0';
             });
         });
         var outerBoundary = execution.querySelector('circle[r="610"]');
-        if (outerBoundary) outerBoundary.style.opacity = String(Number(outerBoundary.dataset.baseOpacity) * .08);
+        if (outerBoundary) outerBoundary.style.opacity = '0';
     }
 
     function syncBrandControls(key) {

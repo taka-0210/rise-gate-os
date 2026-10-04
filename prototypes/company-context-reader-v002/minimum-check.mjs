@@ -70,6 +70,7 @@ try {
             middle: document.querySelector('#execution-layer').style.opacity,
             outer: document.querySelector('#knowledge-layer').style.opacity,
             innerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 430.000"]').style.opacity),
+            secondExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 485.000"]').style.opacity),
             outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
         }));
 
@@ -80,6 +81,7 @@ try {
             middle: document.querySelector('#execution-layer').style.opacity,
             outer: document.querySelector('#knowledge-layer').style.opacity,
             structure: document.querySelector('#connections').style.opacity,
+            secondExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 485.000"]').style.opacity),
             outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
         }));
 
@@ -129,11 +131,12 @@ try {
             throw new Error(viewport.name + ': initial layout ' + JSON.stringify(initial.layout));
         }
         if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 8
-            || vision.innerExecutionArc <= vision.outerExecutionArc * 12) {
+            || vision.secondExecutionArc !== 0 || vision.outerExecutionArc !== 0) {
             throw new Error(viewport.name + ': vision ring sequence ' + JSON.stringify(vision));
         }
         if (policy.chapter !== 'policy' || Number(policy.outer) <= Number(vision.outer) * 4
             || Number(policy.structure) <= Number(vision.middle)
+            || policy.secondExecutionArc <= vision.secondExecutionArc * 10
             || policy.outerExecutionArc <= vision.outerExecutionArc * 10) {
             throw new Error(viewport.name + ': policy ring sequence ' + JSON.stringify(policy));
         }
@@ -174,7 +177,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('brand-radius-sequence-1') || !cacheIdentity.js.includes('brand-radius-sequence-1')) {
+    if (!cacheIdentity.css.includes('brand-radius-sequence-2') || !cacheIdentity.js.includes('brand-radius-sequence-2')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
