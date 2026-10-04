@@ -73,6 +73,11 @@
                     <span class="badge">閲覧可能</span>
                 @endif
             </a>
+            <a class="card" href="{{ route('company-context-reader.show') }}">
+                <div class="meta">COMPANY CONTEXT READER</div>
+                <h2>会社の言葉</h2>
+                <p>理念、Vision、方針、年度経営方針を一つのCompany Storyとして読みます。</p>
+            </a>
             <a class="card" href="{{ route('annual-management-policy.index') }}">
                 <div class="meta">ANNUAL MANAGEMENT POLICY</div>
                 <h2>年度経営方針</h2>

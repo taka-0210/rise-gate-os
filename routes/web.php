@@ -20,6 +20,7 @@ use App\Http\Controllers\Client\ClientCompanyAccountController;
 use App\Http\Controllers\Client\ClientController;
 use App\Http\Controllers\CompanyAnnualPlanController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CompanyContextReaderController;
 use App\Http\Controllers\CompanyFinanceController;
 use App\Http\Controllers\CompanyHomeController;
 use App\Http\Controllers\CompanyLoanController;
@@ -160,6 +161,7 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
 
     Route::middleware(['workspace-mode', 'company'])->group(function (): void {
         Route::get('/company', CompanyHomeController::class)->name('company.home');
+        Route::get('/company/company-context', CompanyContextReaderController::class)->name('company-context-reader.show');
         Route::get('/company/co', [AiCommonController::class, 'index'])->name('ai-common.index');
         Route::post('/company/co/conversations', [AiCommonController::class, 'store'])->name('ai-common.store');
         Route::get('/company/co/conversations/{conversation}', [AiCommonController::class, 'show'])->name('ai-common.show');

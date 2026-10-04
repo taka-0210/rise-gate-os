@@ -316,6 +316,7 @@
         'management-design.index',
         'management-design.show',
         'annual-management-policy.*',
+        'company-context-reader.*',
     ),
 ])>
 <div class="shell">
