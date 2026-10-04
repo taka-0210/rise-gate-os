@@ -44,9 +44,13 @@
     var brandFallback = document.querySelector('[data-brand-visual-fallback]');
     var brandStatus = document.querySelector('[data-brand-status]');
     var brandCurrentLabel = document.querySelector('[data-brand-current-label]');
+    var brandTuningFields = document.querySelector('.brand-tuning__fields');
+    if (brandTuningFields) {
+        brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#20840;&#20307;&#12398;&#28611;&#12373; <output data-brand-output="density">100%</output><input type="range" min="10" max="200" step="5" value="100" data-brand-setting="density"></label>');
+    }
     var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
     var brandSvg = null;
-    var brandLayoutState = { size: 100, x: 0, y: 0, blur: 1.5 };
+    var brandLayoutState = { size: 100, x: 0, y: 0, blur: 1.5, density: 100 };
     var brandChapterLabels = {
         philosophy: '01 理念 / ROOT',
         vision: '02 Vision / FUTURE',
@@ -243,7 +247,7 @@
 
     function brandSettingLabel(name, value) {
         if (name === 'blur') return value + 'px';
-        if (name === 'size') return value + '%';
+        if (name === 'size' || name === 'density') return value + '%';
         return value + 'px';
     }
 
@@ -289,7 +293,7 @@
         var state = brandChapterStates[key] || brandChapterStates.philosophy;
         body.dataset.brandChapter = key;
         if (brandVisual) {
-            brandVisual.style.setProperty('--brand-opacity', String(state.opacity / 100));
+            brandVisual.style.setProperty('--brand-opacity', String((state.opacity * brandLayoutState.density) / 10000));
             brandVisual.style.setProperty('--brand-blur', brandLayoutState.blur + 'px');
             brandVisual.style.setProperty('--brand-duration', state.duration + 'ms');
         }
