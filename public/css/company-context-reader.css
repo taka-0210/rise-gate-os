@@ -7,6 +7,8 @@
     --ccr-gold: #8c6229;
     --ccr-annual: #f4efe4;
     --ccr-reading: 720px;
+    --ccr-brand-x: -200px;
+    --ccr-brand-scale: 1.26;
     position: relative;
     isolation: isolate;
     color: var(--ccr-ink);
@@ -30,10 +32,6 @@
 .ccr-toolbar strong { font-family: Georgia, "Noto Serif JP", serif; font-size: 20px; }
 .ccr-toolbar > div:first-child span { color: var(--ccr-soft); font-size: 11px; }
 .ccr-toolbar__actions { display: flex; align-items: flex-end; gap: 16px; }
-.ccr-brand-tuner { min-width:290px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.ccr-brand-tuner label { display:grid; grid-template-columns:1fr auto; gap:2px 8px; color:var(--ccr-soft); font-size:9px; font-weight:800; }
-.ccr-brand-tuner output { color:var(--ccr-accent); }
-.ccr-brand-tuner input { grid-column:1/-1; width:100%; accent-color:var(--ccr-accent); }
 .ccr-period-selector { display: grid; grid-template-columns: auto minmax(190px, 280px); align-items: center; gap: 7px; }
 .ccr-period-selector label { margin: 0; color: var(--ccr-soft); font-size: 10px; }
 .ccr-period-selector select { padding: 8px 30px 8px 10px; border-color: var(--ccr-line); font-size: 11px; }
@@ -155,14 +153,10 @@
     .ccr-reveal { opacity:1 !important; transform:none !important; filter:none !important; }
     .ccr[data-brand-entry="waiting"] .ccr-brand__canvas { opacity:1; transform:translate(var(--ccr-brand-x,-110px),0) scale(var(--ccr-brand-scale,1.008)); }
 }
-@media (min-width:761px) and (max-width:1180px) {
-    .ccr-brand-tuner { display:none; }
-}
 @media (max-width:760px) {
-    .ccr { margin-inline:-14px; border-radius:0; }
+    .ccr { --ccr-brand-x:0px; --ccr-brand-scale:1.008; margin-inline:-14px; border-radius:0; }
     .ccr-toolbar { align-items:flex-start; flex-direction:column; padding:14px; }
     .ccr-toolbar__actions { width:100%; align-items:stretch; flex-direction:column; }
-    .ccr-brand-tuner { display:none; }
     .ccr-period-selector { grid-template-columns:1fr; }
     .ccr-motion { align-self:flex-end; }
     .ccr-period-note { align-items:flex-start; flex-direction:column; }

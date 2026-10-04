@@ -7,10 +7,6 @@
     <header class="ccr-toolbar" aria-label="Reader表示設定">
         <div><p>COMPANY CONTEXT READER</p><strong>会社の言葉</strong><span>理念から今期の重点まで、一つの流れで読みます。</span></div>
         <div class="ccr-toolbar__actions">
-            <div class="ccr-brand-tuner" role="group" aria-label="Brand Visual位置の一時調整">
-                <label>Visual X <output data-brand-output="x">-110px</output><input type="range" min="-320" max="80" step="10" value="-110" data-brand-setting="x"></label>
-                <label>Size <output data-brand-output="size">100%</output><input type="range" min="80" max="140" step="5" value="100" data-brand-setting="size"></label>
-            </div>
             @if(count($reader->annualOptions) > 0)
                 <form method="GET" action="{{ route('company-context-reader.show') }}" class="ccr-period-selector">
                     <label for="ccr-annual">年度方針</label>

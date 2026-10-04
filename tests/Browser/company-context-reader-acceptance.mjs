@@ -44,7 +44,7 @@ try {
     assert(await page.getByText('第23期｜2026年度', { exact: true }).count() >= 1, 'Fiscal term label is missing.');
     assert(await page.getByText('承認済み / 現在有効', { exact: true }).count() >= 1, 'Approved/effective lifecycle is missing.');
     assert(await page.locator('[data-reader-width]').count() === 0, 'Canvas comparison control remains after the 1440px decision.');
-    assert(await page.locator('[data-brand-setting]').count() === 2, 'Temporary Brand position controls are incomplete.');
+    assert(await page.locator('[data-brand-setting]').count() === 0, 'Temporary Brand position controls remain after the Desktop decision.');
     assert(await page.getByText(/VISUAL PROTOTYPE|NOT OFFICIAL DATA/).count() === 0, 'Prototype boundary text leaked into product.');
     assert(await page.locator('.ccr-rail').isVisible(), 'Desktop TOC is missing.');
     assert(await page.locator('.ccr-mobile-toc').isHidden(), 'Mobile TOC is visible on desktop.');
@@ -52,12 +52,8 @@ try {
     assert(await page.locator('.main').evaluate(element => Math.round(element.getBoundingClientRect().width) === 1440), 'Desktop Reader Canvas is not fixed at 1440px.');
     assert(await page.locator('.ccr-opening').first().evaluate(element => element.getBoundingClientRect().width <= 720), 'Reading measure exceeds 720px.');
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.locator('[data-brand-setting="x"]').fill('-180');
-    await page.locator('[data-brand-setting="size"]').fill('115');
-    assert(await page.locator('[data-brand-output="x"]').textContent() === '-180px', 'Brand X tuning is not applied immediately.');
-    assert(await page.locator('[data-brand-output="size"]').textContent() === '115%', 'Brand size tuning is not applied immediately.');
-    await page.locator('[data-brand-setting="x"]').fill('-110');
-    await page.locator('[data-brand-setting="size"]').fill('100');
+    assert(await page.locator('[data-company-context-reader]').evaluate(element => getComputedStyle(element).getPropertyValue('--ccr-brand-x').trim() === '-200px'), 'Desktop Brand X is not fixed at the Human-selected value.');
+    assert(await page.locator('[data-company-context-reader]').evaluate(element => getComputedStyle(element).getPropertyValue('--ccr-brand-scale').trim() === '1.26'), 'Desktop Brand size is not fixed at the Human-selected value.');
     await page.waitForFunction(() => document.querySelector('[data-brand-canvas] svg #company-core'));
     assert((await page.locator('[data-brand-canvas] svg').count()) === 1, 'Official brand SVG was not loaded as layers.');
 
@@ -96,7 +92,10 @@ try {
     await page.goto(baseUrl + '/company/company-context');
     assert(await page.locator('.ccr-mobile-toc').isVisible(), '390px current-chapter TOC is missing.');
     assert(await page.locator('.ccr-rail').isHidden(), 'Desktop TOC remains at 390px.');
-    assert(await page.locator('.ccr-brand-tuner').isHidden(), 'Temporary Brand tuning UI is visible at 390px.');
+    assert(await page.locator('[data-brand-canvas]').evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        return rect.left + rect.width / 2 > window.innerWidth * .65;
+    }), 'Mobile Brand Visual has drifted back to the center.');
     assert(await page.locator('.ccr-mobile-toc').evaluate(element => getComputedStyle(element).position === 'sticky'), '390px TOC is not the approved short sticky control.');
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), '390px Reader overflows horizontally.');
     assert(await page.locator('[data-brand-visual]').evaluate(element => parseFloat(getComputedStyle(element).right) < 0), 'Mobile Brand Visual is not held on the right.');
