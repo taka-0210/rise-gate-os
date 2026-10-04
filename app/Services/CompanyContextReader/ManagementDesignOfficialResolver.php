@@ -101,7 +101,7 @@ class ManagementDesignOfficialResolver
             'question' => match ($type) {
                 ManagementDesignItem::TYPE_PHILOSOPHY => '私たちは、何を大切にするのか。',
                 ManagementDesignItem::TYPE_VISION => '私たちは、どこへ向かうのか。',
-                ManagementDesignItem::TYPE_POLICY => '私たちは、何を基準に判断するのか。',
+                ManagementDesignItem::TYPE_POLICY => '私たちは、どのようにビジョンを実現するのか。',
             },
         ];
     }
