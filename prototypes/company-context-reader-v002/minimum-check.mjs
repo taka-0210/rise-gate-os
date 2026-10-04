@@ -110,7 +110,7 @@ try {
             duration: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-canvas-duration'),
             philosophyTop: document.getElementById('philosophy').getBoundingClientRect().top,
         }));
-        await page.waitForTimeout(1400);
+        await page.waitForTimeout(2300);
         const brandEntry = await page.evaluate(() => ({
             state: document.body.dataset.brandEntry,
             opacity: getComputedStyle(document.querySelector('[data-brand-visual-canvas]')).opacity,
@@ -201,7 +201,7 @@ try {
         if (brandEntry.state !== 'entered' || brandEntry.opacity !== '1') {
             throw new Error(viewport.name + ': brand entry ' + JSON.stringify(brandEntry));
         }
-        if (brandEntryStart.state !== 'entered' || brandEntryStart.duration !== '1400ms'
+        if (brandEntryStart.state !== 'entered' || brandEntryStart.duration !== '2300ms'
             || brandEntryStart.philosophyTop < viewport.height * .70) {
             throw new Error(viewport.name + ': brand entry did not start during section transition ' + JSON.stringify(brandEntryStart));
         }
@@ -209,9 +209,9 @@ try {
             throw new Error(viewport.name + ': fade ' + JSON.stringify(initial.fade));
         }
         if (initial.root.scale !== '1.008' || initial.layout.x !== '-110px' || initial.layout.y !== '0px'
-            || initial.layout.blur !== '0.5px' || initial.layout.opacity !== '0.32'
-            || initial.layout.duration !== '2600ms'
-            || initial.layout.outputs.join('|') !== '120%|-110px|0px|0.5px|200%|2600ms|1400ms') {
+            || initial.layout.blur !== '1px' || initial.layout.opacity !== '0.32'
+            || initial.layout.duration !== '2000ms'
+            || initial.layout.outputs.join('|') !== '120%|-110px|0px|1px|200%|2000ms|2300ms') {
             throw new Error(viewport.name + ': initial layout ' + JSON.stringify(initial.layout));
         }
         if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 8
@@ -229,7 +229,7 @@ try {
         if (annual.chapter !== 'annual' || Number(annual.now) !== 0
             || annual.core !== '0.65' || annual.middle !== policy.middle
             || Number(annual.structure) !== 1
-            || Number(annual.outer) !== 0.75 || Number(annual.boundary) !== 0.372
+            || Number(annual.outer) !== 1 || Number(annual.boundary) !== 0.527
             || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
@@ -274,7 +274,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('entry-speed-tuning-1') || !cacheIdentity.js.includes('entry-speed-tuning-1')) {
+    if (!cacheIdentity.css.includes('final-tuning-1') || !cacheIdentity.js.includes('final-tuning-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });

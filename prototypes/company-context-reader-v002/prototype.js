@@ -47,14 +47,14 @@
     var brandTuningFields = document.querySelector('.brand-tuning__fields');
     if (brandTuningFields) {
         brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#20840;&#20307;&#12398;&#28611;&#12373; <output data-brand-output="density">200%</output><input type="range" min="10" max="200" step="5" value="200" data-brand-setting="density"></label>');
-        brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#24195;&#12364;&#12426;&#26178;&#38291; <output data-brand-output="transition">2600ms</output><input type="range" min="500" max="5000" step="100" value="2600" data-brand-setting="transition"></label>');
-        brandTuningFields.insertAdjacentHTML('beforeend', '<label>入口スライド時間 <output data-brand-output="entryDuration">1400ms</output><input type="range" min="600" max="3000" step="100" value="1400" data-brand-setting="entryDuration"></label>');
+        brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#24195;&#12364;&#12426;&#26178;&#38291; <output data-brand-output="transition">2000ms</output><input type="range" min="500" max="5000" step="100" value="2000" data-brand-setting="transition"></label>');
+        brandTuningFields.insertAdjacentHTML('beforeend', '<label>入口スライド時間 <output data-brand-output="entryDuration">2300ms</output><input type="range" min="600" max="3000" step="100" value="2300" data-brand-setting="entryDuration"></label>');
         brandTuningFields.insertAdjacentHTML('afterend', '<button type="button" class="brand-tuning__replay" data-brand-entry-replay>入口スライドを再生</button>');
     }
     var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
     var brandEntryReplayButton = document.querySelector('[data-brand-entry-replay]');
     var brandSvg = null;
-    var brandLayoutState = { size: 120, x: -110, y: 0, blur: .5, density: 200, transition: 2600, entryDuration: 1400 };
+    var brandLayoutState = { size: 120, x: -110, y: 0, blur: 1, density: 200, transition: 2000, entryDuration: 2300 };
     var brandEntryComplete = directFragmentSession || reducedMotion.matches;
     var brandEntryTimer = null;
     var brandChapterLabels = {
@@ -68,7 +68,7 @@
         philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, boundary: 10, now: 6 },
         vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, boundary: 10, now: 18 },
         policy: { opacity: 17, center: 65, middle: 75, outer: 0, structure: 0, boundary: 10, now: 0 },
-        annual: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, boundary: 60, now: 0 }
+        annual: { opacity: 17, center: 65, middle: 75, outer: 100, structure: 100, boundary: 85, now: 0 }
     };
 
     function isInReviewWindow(element) {
