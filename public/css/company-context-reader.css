@@ -14,6 +14,9 @@
     border-radius: 14px;
     overflow: clip;
 }
+@media (min-width:761px) {
+    body.company-context-read-page .main { width:min(var(--ccr-canvas-max,1320px),calc(100% - 40px)); }
+}
 .ccr a { color: var(--ccr-accent); }
 .ccr-skip { position: fixed; z-index: 300; top: 8px; left: 8px; padding: 10px 14px; color: #fff !important; background: var(--ccr-ink); transform: translateY(-160%); }
 .ccr-skip:focus { transform: translateY(0); }
@@ -27,6 +30,10 @@
 .ccr-toolbar strong { font-family: Georgia, "Noto Serif JP", serif; font-size: 20px; }
 .ccr-toolbar > div:first-child span { color: var(--ccr-soft); font-size: 11px; }
 .ccr-toolbar__actions { display: flex; align-items: flex-end; gap: 16px; }
+.ccr-width-tuner { display:grid; grid-template-columns:auto repeat(4,42px); align-items:center; gap:3px; }
+.ccr-width-tuner > span { margin-right:4px; color:var(--ccr-soft); font-size:9px; font-weight:800; text-transform:uppercase; }
+.ccr-width-tuner button { min-height:31px; padding:6px 4px; color:var(--ccr-accent); background:#edf2f0; border-radius:4px; font-size:9px; }
+.ccr-width-tuner button[aria-pressed="true"] { color:#fff; background:var(--ccr-accent); }
 .ccr-period-selector { display: grid; grid-template-columns: auto minmax(190px, 280px); align-items: center; gap: 7px; }
 .ccr-period-selector label { margin: 0; color: var(--ccr-soft); font-size: 10px; }
 .ccr-period-selector select { padding: 8px 30px 8px 10px; border-color: var(--ccr-line); font-size: 11px; }
@@ -148,10 +155,14 @@
     .ccr-reveal { opacity:1 !important; transform:none !important; filter:none !important; }
     .ccr[data-brand-entry="waiting"] .ccr-brand__canvas { opacity:1; transform:translate(-110px,0) scale(1.008); }
 }
+@media (min-width:761px) and (max-width:1180px) {
+    .ccr-width-tuner { display:none; }
+}
 @media (max-width:760px) {
     .ccr { margin-inline:-14px; border-radius:0; }
     .ccr-toolbar { align-items:flex-start; flex-direction:column; padding:14px; }
     .ccr-toolbar__actions { width:100%; align-items:stretch; flex-direction:column; }
+    .ccr-width-tuner { display:none; }
     .ccr-period-selector { grid-template-columns:1fr; }
     .ccr-motion { align-self:flex-end; }
     .ccr-period-note { align-items:flex-start; flex-direction:column; }

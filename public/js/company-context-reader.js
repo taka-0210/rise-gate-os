@@ -12,6 +12,7 @@
     var mobileToc = root.querySelector('[data-mobile-toc]');
     var mobileChapter = root.querySelector('[data-current-chapter]');
     var motionButtons = Array.from(root.querySelectorAll('[data-motion-choice]'));
+    var canvasWidthButtons = Array.from(root.querySelectorAll('[data-reader-width]'));
     var motionObserver = null;
     var activeChapterKey = null;
     var brand = root.querySelector('[data-brand-visual]');
@@ -79,6 +80,15 @@
         } else {
             enableMotion();
         }
+    }
+
+    function chooseCanvasWidth(value) {
+        if (!['1200', '1320', '1440', '1520'].includes(value)) return;
+        document.body.style.setProperty('--ccr-canvas-max', value + 'px');
+        root.dataset.canvasWidth = value;
+        canvasWidthButtons.forEach(function (button) {
+            button.setAttribute('aria-pressed', button.dataset.readerWidth === value ? 'true' : 'false');
+        });
     }
 
     function revealAnchor(hash) {
@@ -234,6 +244,9 @@
         motionButtons.forEach(function (button) {
             button.addEventListener('click', function () { chooseMotion(button.dataset.motionChoice); });
         });
+        canvasWidthButtons.forEach(function (button) {
+            button.addEventListener('click', function () { chooseCanvasWidth(button.dataset.readerWidth); });
+        });
         root.querySelectorAll('a[href^="#"]').forEach(function (link) {
             link.addEventListener('click', function () {
                 revealAnchor(link.getAttribute('href'));
@@ -249,6 +262,7 @@
         }
         if (reducedMotion.matches) root.dataset.brandEntry = 'entered';
         loadBrand();
+        chooseCanvasWidth(root.dataset.canvasWidth || '1320');
         chooseMotion(root.dataset.motion);
         if (directFragment) {
             root.dataset.brandEntry = 'entered';

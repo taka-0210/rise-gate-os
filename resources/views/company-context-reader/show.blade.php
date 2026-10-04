@@ -2,11 +2,17 @@
 
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/company-context-reader.css') }}">
-<div class="ccr" id="top" data-company-context-reader data-motion="on" data-brand-entry="waiting">
+<div class="ccr" id="top" data-company-context-reader data-motion="on" data-brand-entry="waiting" data-canvas-width="1320">
     <a class="ccr-skip" href="#ccr-reader">本文へ移動</a>
     <header class="ccr-toolbar" aria-label="Reader表示設定">
         <div><p>COMPANY CONTEXT READER</p><strong>会社の言葉</strong><span>理念から今期の重点まで、一つの流れで読みます。</span></div>
         <div class="ccr-toolbar__actions">
+            <div class="ccr-width-tuner" role="group" aria-label="Reader Canvas幅の一時比較">
+                <span>Canvas</span>
+                @foreach([1200, 1320, 1440, 1520] as $width)
+                    <button type="button" data-reader-width="{{ $width }}" aria-pressed="{{ $width === 1320 ? 'true' : 'false' }}">{{ $width }}</button>
+                @endforeach
+            </div>
             @if(count($reader->annualOptions) > 0)
                 <form method="GET" action="{{ route('company-context-reader.show') }}" class="ccr-period-selector">
                     <label for="ccr-annual">年度方針</label>
