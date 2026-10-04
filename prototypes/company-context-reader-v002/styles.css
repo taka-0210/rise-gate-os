@@ -734,21 +734,6 @@ body[data-motion="off"] .motion-target {
     transition: opacity var(--brand-duration) ease, fill var(--brand-duration) ease, stroke var(--brand-duration) ease, stroke-width var(--brand-duration) ease !important;
 }
 
-body[data-brand-chapter='annual'] .brand-visual svg #active-flow {
-    filter: drop-shadow(0 0 5px rgb(15 111 105 / .42));
-}
-
-body[data-brand-chapter='annual'] .brand-visual svg #active-flow path {
-    stroke: #0f6f69 !important;
-    stroke-width: 8px !important;
-}
-
-body[data-brand-chapter='annual'] .brand-visual svg #active-flow circle {
-    fill: #0f6f69 !important;
-    stroke: #f5fbfc;
-    stroke-width: 2px;
-}
-
 .brand-visual svg #active-flow,
 .brand-visual svg .flow-track,
 .brand-visual svg .shift-instance,

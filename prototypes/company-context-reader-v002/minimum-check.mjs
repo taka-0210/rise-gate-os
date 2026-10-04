@@ -128,6 +128,7 @@ try {
         const annual = await page.evaluate(() => ({
             chapter: document.body.dataset.brandChapter,
             core: document.querySelector('#core-light').style.opacity,
+            middle: document.querySelector('#execution-layer').style.opacity,
             outer: document.querySelector('#knowledge-layer').style.opacity,
             structure: document.querySelector('#connections').style.opacity,
             boundary: document.querySelector('#outer-structure').style.opacity,
@@ -188,14 +189,15 @@ try {
             || policy.outerExecutionArc <= vision.outerExecutionArc * 10) {
             throw new Error(viewport.name + ': policy ring sequence ' + JSON.stringify(policy));
         }
-        if (annual.chapter !== 'annual' || Number(annual.now) <= Number(initial.root.now)
-            || Number(annual.outer) !== 0.3 || Number(annual.boundary) !== 0.1364
+        if (annual.chapter !== 'annual' || Number(annual.now) !== 0
+            || annual.core !== '0.65' || annual.middle !== policy.middle
+            || annual.structure !== policy.structure
+            || Number(annual.outer) !== 0.14 || Number(annual.boundary) !== 0.1116
             || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
-        if (annual.nowStroke !== 'rgb(15, 111, 105)' || annual.nowWidth !== '8px'
-            || annual.nowFilter === 'none' || annual.nowStroke === policy.nowStroke || annual.nowWidth === policy.nowWidth) {
-            throw new Error(viewport.name + ': annual NOW emphasis ' + JSON.stringify({ policy, annual }));
+        if (annual.nowFilter !== 'none' || annual.nowStroke !== policy.nowStroke || annual.nowWidth !== policy.nowWidth) {
+            throw new Error(viewport.name + ': annual partial emphasis remains ' + JSON.stringify({ policy, annual }));
         }
         if (!(initial.root.innerArc > initial.root.outerArc * 6)
             || initial.root.secondExecutionArc !== 0 || initial.root.outerExecutionArc !== 0) {
@@ -205,7 +207,7 @@ try {
             throw new Error(viewport.name + ': arc motion/color ' + JSON.stringify(initial.root));
         }
         if (tuning.scale !== '0.924' || tuning.x !== '120px' || tuning.y !== '-60px' || tuning.blur !== '3px'
-            || tuning.opacity !== '0.096' || tuning.duration !== '3600ms'
+            || tuning.opacity !== '0.102' || tuning.duration !== '3600ms'
             || tuning.outputs.join('|') !== '110%|120px|-60px|3px|60%|3600ms') {
             throw new Error(viewport.name + ': tuning ' + JSON.stringify(tuning));
         }
@@ -232,7 +234,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('policy-ring3-only-1') || !cacheIdentity.js.includes('policy-ring3-only-1')) {
+    if (!cacheIdentity.css.includes('annual-uniform-outer-1') || !cacheIdentity.js.includes('annual-uniform-outer-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });

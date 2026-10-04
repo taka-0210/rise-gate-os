@@ -63,7 +63,7 @@
         philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, boundary: 10, now: 6 },
         vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, boundary: 10, now: 18 },
         policy: { opacity: 17, center: 65, middle: 75, outer: 0, structure: 100, boundary: 10, now: 0 },
-        annual: { opacity: 16, center: 45, middle: 35, outer: 30, structure: 22, boundary: 22, now: 100 }
+        annual: { opacity: 17, center: 65, middle: 75, outer: 14, structure: 100, boundary: 18, now: 0 }
     };
 
     function isInReviewWindow(element) {
