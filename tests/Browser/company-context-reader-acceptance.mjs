@@ -92,10 +92,15 @@ try {
     await page.goto(baseUrl + '/company/company-context');
     assert(await page.locator('.ccr-mobile-toc').isVisible(), '390px current-chapter TOC is missing.');
     assert(await page.locator('.ccr-rail').isHidden(), 'Desktop TOC remains at 390px.');
+    await page.locator('#vision').evaluate(element => element.scrollIntoView({ block: 'center', behavior: 'auto' }));
+    await page.waitForFunction(() => document.querySelector('[data-company-context-reader]').dataset.brandEntry === 'entered');
+    await page.waitForTimeout(2400);
     assert(await page.locator('[data-brand-canvas]').evaluate(element => {
         const rect = element.getBoundingClientRect();
-        return rect.left + rect.width / 2 > window.innerWidth * .65;
-    }), 'Mobile Brand Visual has drifted back to the center.');
+        const centerRatio = (rect.left + rect.width / 2) / window.innerWidth;
+        return centerRatio > .55 && centerRatio < .75;
+    }), 'Mobile Brand Visual is either centered or clipped too far to the right.');
+    assert(await page.locator('[data-brand-visual]').evaluate(element => Number(getComputedStyle(element).opacity) >= .3), 'Mobile Brand Visual remains too faint.');
     assert(await page.locator('.ccr-mobile-toc').evaluate(element => getComputedStyle(element).position === 'sticky'), '390px TOC is not the approved short sticky control.');
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), '390px Reader overflows horizontally.');
     assert(await page.locator('[data-brand-visual]').evaluate(element => parseFloat(getComputedStyle(element).right) < 0), 'Mobile Brand Visual is not held on the right.');
