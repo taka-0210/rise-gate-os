@@ -13,6 +13,7 @@
     @if(config('company_notifications.vapid.public_key'))
         <meta name='company-os-vapid-public-key' content='{{ config('company_notifications.vapid.public_key') }}'>
     @endif
+    @stack('head')
     <style>
         :root {
             --ink: #17202a;
@@ -309,6 +310,7 @@
     </style>
 </head>
 <body @class([
+    'login-brand-page' => request()->routeIs('login'),
     'company-finance-screen' => request()->routeIs('company-finance.*'),
     'company-context-read-page' => request()->routeIs(
         'business-domains.index',

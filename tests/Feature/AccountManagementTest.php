@@ -155,7 +155,11 @@ class AccountManagementTest extends TestCase
 
     public function test_login_logout_and_bootstrap_entry_behavior_are_preserved(): void
     {
-        $this->get(route('login'))->assertOk()->assertSee('初期セットアップ');
+        $this->get(route('login'))
+            ->assertOk()
+            ->assertSee('login-brand__composition', false)
+            ->assertSee('company-os-brand-symbol.svg', false)
+            ->assertSee('初期セットアップ');
         $user = User::factory()->create(['email' => 'login@example.com', 'password' => 'password-test']);
         $this->get(route('login'))->assertOk()->assertDontSee('初期セットアップ')->assertSee('Passwordを忘れた場合');
 
