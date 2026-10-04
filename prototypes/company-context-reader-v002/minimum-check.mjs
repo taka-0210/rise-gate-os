@@ -54,6 +54,30 @@ try {
                 blur: document.body.style.getPropertyValue('--motion-blur'),
                 trigger: document.body.dataset.motionTrigger,
             },
+            layout: {
+                x: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-x'),
+                y: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-y'),
+                blur: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-blur'),
+                opacity: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-opacity'),
+                outputs: Array.from(document.querySelectorAll('[data-brand-output]')).map(output => output.textContent),
+            },
+        }));
+
+        await page.locator('#vision').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(250);
+        const vision = await page.evaluate(() => ({
+            chapter: document.body.dataset.brandChapter,
+            middle: document.querySelector('#execution-layer').style.opacity,
+            outer: document.querySelector('#knowledge-layer').style.opacity,
+        }));
+
+        await page.locator('#policy').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(250);
+        const policy = await page.evaluate(() => ({
+            chapter: document.body.dataset.brandChapter,
+            middle: document.querySelector('#execution-layer').style.opacity,
+            outer: document.querySelector('#knowledge-layer').style.opacity,
+            structure: document.querySelector('#connections').style.opacity,
         }));
 
         await page.locator('#annual').scrollIntoViewIfNeeded();
@@ -96,6 +120,18 @@ try {
         if (initial.fade.duration !== '1350ms' || initial.fade.distance !== '40px' || initial.fade.blur !== '2.5px' || initial.fade.trigger !== '75') {
             throw new Error(viewport.name + ': fade ' + JSON.stringify(initial.fade));
         }
+        if (initial.root.scale !== '1.008' || initial.layout.x !== '-110px' || initial.layout.y !== '0px'
+            || initial.layout.blur !== '0.5px' || initial.layout.opacity !== '0.32'
+            || initial.layout.outputs.join('|') !== '120%|-110px|0px|0.5px|200%') {
+            throw new Error(viewport.name + ': initial layout ' + JSON.stringify(initial.layout));
+        }
+        if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 3) {
+            throw new Error(viewport.name + ': vision ring sequence ' + JSON.stringify(vision));
+        }
+        if (policy.chapter !== 'policy' || Number(policy.outer) <= Number(vision.outer) * 4
+            || Number(policy.structure) <= Number(vision.middle)) {
+            throw new Error(viewport.name + ': policy ring sequence ' + JSON.stringify(policy));
+        }
         if (annual.chapter !== 'annual' || Number(annual.now) <= Number(initial.root.now)
             || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
@@ -112,7 +148,7 @@ try {
         }
         if (errors.length) throw new Error(viewport.name + ': page errors ' + errors.join(' | '));
 
-        results.push({ viewport: viewport.name, initial, annual, tuning, pageErrors: errors.length });
+        results.push({ viewport: viewport.name, initial, vision, policy, annual, tuning, pageErrors: errors.length });
         await page.close();
     }
 
@@ -133,7 +169,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('brand-live-arcs-1') || !cacheIdentity.js.includes('brand-live-arcs-1')) {
+    if (!cacheIdentity.css.includes('brand-ring-sequence-1') || !cacheIdentity.js.includes('brand-ring-sequence-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });

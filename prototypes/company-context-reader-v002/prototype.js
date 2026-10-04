@@ -46,11 +46,11 @@
     var brandCurrentLabel = document.querySelector('[data-brand-current-label]');
     var brandTuningFields = document.querySelector('.brand-tuning__fields');
     if (brandTuningFields) {
-        brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#20840;&#20307;&#12398;&#28611;&#12373; <output data-brand-output="density">100%</output><input type="range" min="10" max="200" step="5" value="100" data-brand-setting="density"></label>');
+        brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#20840;&#20307;&#12398;&#28611;&#12373; <output data-brand-output="density">200%</output><input type="range" min="10" max="200" step="5" value="200" data-brand-setting="density"></label>');
     }
     var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
     var brandSvg = null;
-    var brandLayoutState = { size: 100, x: 0, y: 0, blur: 1.5, density: 100 };
+    var brandLayoutState = { size: 120, x: -110, y: 0, blur: .5, density: 200 };
     var brandChapterLabels = {
         philosophy: '01 理念 / ROOT',
         vision: '02 Vision / FUTURE',
@@ -59,10 +59,10 @@
     };
     var brandFixedScale = 84;
     var brandChapterStates = {
-        philosophy: { opacity: 16, center: 100, outer: 8, structure: 10, now: 6, blur: 2, duration: 1600 },
-        vision: { opacity: 18, center: 80, outer: 75, structure: 35, now: 18, blur: 1, duration: 1800 },
-        policy: { opacity: 17, center: 65, outer: 75, structure: 100, now: 30, blur: .5, duration: 1600 },
-        annual: { opacity: 16, center: 60, outer: 55, structure: 50, now: 100, blur: 0, duration: 1500 }
+        philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, now: 6, duration: 1600 },
+        vision: { opacity: 18, center: 80, middle: 75, outer: 12, structure: 22, now: 18, duration: 1800 },
+        policy: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, now: 30, duration: 1600 },
+        annual: { opacity: 16, center: 60, middle: 55, outer: 55, structure: 50, now: 100, duration: 1500 }
     };
 
     function isInReviewWindow(element) {
@@ -306,7 +306,7 @@
         setBrandLayerOpacity('core-light', state.center);
         setBrandLayerOpacity('management-layer', state.center * .82);
         setManagementDepth(key);
-        setBrandLayerOpacity('execution-layer', state.outer * .72);
+        setBrandLayerOpacity('execution-layer', state.middle * .72);
         setBrandLayerOpacity('knowledge-layer', state.outer);
         setBrandLayerOpacity('outer-structure', state.structure * .62);
         setBrandLayerOpacity('connections', state.structure);
