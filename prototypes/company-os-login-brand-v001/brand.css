@@ -16,3 +16,8 @@
 @media(max-width:760px){.prototype-notice{justify-content:space-between;gap:10px;padding-inline:16px;font-size:8px}.site-header{min-height:62px;padding-inline:20px}.site-header p{display:none}.login-composition{display:block;min-height:auto}.login-content{width:100%;min-height:calc(100vh - 144px);padding:56px 24px 62px}.login-content:before{position:absolute;inset:47% 12px auto;z-index:-1;height:49%;border-radius:2px;background:rgba(248,250,250,.82);backdrop-filter:blur(4px);content:""}.eyebrow{max-width:230px;line-height:1.7}h1{margin:24px 0 26px;font-size:clamp(72px,24vw,96px)}.brand-statement{font-size:25px}.brand-description{font-size:13px;line-height:1.85}.login-form{margin-top:46px}.brand-visual{position:absolute;inset:62px 0 auto;height:500px;pointer-events:none}.brand-visual img{top:5%;left:70%;width:620px;transform:translate(-50%,0);opacity:.25;filter:saturate(.78) contrast(.88)}.visual-wash{background:linear-gradient(180deg,rgba(244,247,248,.26),rgba(244,247,248,.78))}.visual-axis{display:none}.form-options{align-items:flex-start}footer{min-height:52px;padding-inline:20px;font-size:7px}}
 @media(max-width:340px){.login-content{padding-inline:18px}h1{font-size:70px}.form-options{flex-direction:column;gap:10px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Human visual review v002: clearer wordmark rhythm and stronger brand composition. */
+h1{line-height:.86}
+.brand-statement,.brand-description,.form-heading h2{font-family:inherit}
+@media(min-width:901px){.brand-visual img{width:min(105vw,1480px)}}
