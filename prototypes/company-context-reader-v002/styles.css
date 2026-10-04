@@ -721,9 +721,6 @@ body[data-motion="off"] .motion-target {
     transition: opacity var(--brand-duration) ease, filter var(--brand-duration) ease !important;
 }
 
-.brand-visual svg #knowledge-layer,
-.brand-visual svg #execution-layer,
-.brand-visual svg #management-layer,
 .brand-visual svg #active-flow,
 .brand-visual svg .flow-track,
 .brand-visual svg .shift-instance,
@@ -735,6 +732,11 @@ body[data-motion="off"] .motion-target {
 .brand-visual svg #active-flow circle {
     animation: none !important;
     transform: none !important;
+}
+
+.brand-visual svg #outer-structure path {
+    stroke: #356f7b !important;
+    opacity: .58 !important;
 }
 
 .brand-tuning {
