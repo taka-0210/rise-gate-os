@@ -62,7 +62,7 @@
     var brandChapterStates = {
         philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, now: 6 },
         vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, now: 18 },
-        policy: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, now: 30 },
+        policy: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, now: 0 },
         annual: { opacity: 16, center: 45, middle: 35, outer: 30, structure: 22, now: 100 }
     };
 

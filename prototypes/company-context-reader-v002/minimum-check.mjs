@@ -114,6 +114,7 @@ try {
             structure: document.querySelector('#connections').style.opacity,
             secondExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 485.000"]').style.opacity),
             outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
+            now: document.querySelector('#active-flow').style.opacity,
             nowStroke: getComputedStyle(document.querySelector('#active-flow path')).stroke,
             nowWidth: getComputedStyle(document.querySelector('#active-flow path')).strokeWidth,
         }));
@@ -176,6 +177,7 @@ try {
         }
         if (policy.chapter !== 'policy' || Number(policy.outer) <= Number(vision.outer) * 4
             || Number(policy.structure) <= Number(vision.middle)
+            || Number(policy.now) !== 0
             || policy.secondExecutionArc <= vision.secondExecutionArc * 10
             || policy.outerExecutionArc <= vision.outerExecutionArc * 10) {
             throw new Error(viewport.name + ': policy ring sequence ' + JSON.stringify(policy));
@@ -222,7 +224,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('brand-transition-control-1') || !cacheIdentity.js.includes('brand-transition-control-1')) {
+    if (!cacheIdentity.css.includes('policy-no-now-1') || !cacheIdentity.js.includes('policy-no-now-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
