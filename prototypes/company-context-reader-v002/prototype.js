@@ -48,11 +48,15 @@
     if (brandTuningFields) {
         brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#20840;&#20307;&#12398;&#28611;&#12373; <output data-brand-output="density">200%</output><input type="range" min="10" max="200" step="5" value="200" data-brand-setting="density"></label>');
         brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#24195;&#12364;&#12426;&#26178;&#38291; <output data-brand-output="transition">2600ms</output><input type="range" min="500" max="5000" step="100" value="2600" data-brand-setting="transition"></label>');
+        brandTuningFields.insertAdjacentHTML('beforeend', '<label>入口スライド時間 <output data-brand-output="entryDuration">1400ms</output><input type="range" min="600" max="3000" step="100" value="1400" data-brand-setting="entryDuration"></label>');
+        brandTuningFields.insertAdjacentHTML('afterend', '<button type="button" class="brand-tuning__replay" data-brand-entry-replay>入口スライドを再生</button>');
     }
     var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
+    var brandEntryReplayButton = document.querySelector('[data-brand-entry-replay]');
     var brandSvg = null;
-    var brandLayoutState = { size: 120, x: -110, y: 0, blur: .5, density: 200, transition: 2600 };
+    var brandLayoutState = { size: 120, x: -110, y: 0, blur: .5, density: 200, transition: 2600, entryDuration: 1400 };
     var brandEntryComplete = directFragmentSession || reducedMotion.matches;
+    var brandEntryTimer = null;
     var brandChapterLabels = {
         philosophy: '01 理念 / ROOT',
         vision: '02 Vision / FUTURE',
@@ -64,7 +68,7 @@
         philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, boundary: 10, now: 6 },
         vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, boundary: 10, now: 18 },
         policy: { opacity: 17, center: 65, middle: 75, outer: 0, structure: 0, boundary: 10, now: 0 },
-        annual: { opacity: 17, center: 65, middle: 75, outer: 45, structure: 100, boundary: 38, now: 0 }
+        annual: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, boundary: 60, now: 0 }
     };
 
     function isInReviewWindow(element) {
@@ -249,7 +253,7 @@
 
     function brandSettingLabel(name, value) {
         if (name === 'blur') return value + 'px';
-        if (name === 'transition') return value + 'ms';
+        if (name === 'transition' || name === 'entryDuration') return value + 'ms';
         if (name === 'size' || name === 'density') return value + '%';
         return value + 'px';
     }
@@ -347,14 +351,33 @@
             return;
         }
         brandEntryComplete = true;
+        playBrandEntry();
+        window.removeEventListener('scroll', revealBrandVisualDuringTransition);
+    }
+
+    function playBrandEntry() {
+        if (brandEntryTimer) window.clearTimeout(brandEntryTimer);
         if (brandVisualCanvas) {
-            brandVisualCanvas.style.setProperty('--brand-canvas-duration', '900ms');
+            brandVisualCanvas.style.setProperty('--brand-canvas-duration', brandLayoutState.entryDuration + 'ms');
         }
         body.dataset.brandEntry = 'entered';
-        window.removeEventListener('scroll', revealBrandVisualDuringTransition);
-        window.setTimeout(function () {
+        brandEntryTimer = window.setTimeout(function () {
             if (brandVisualCanvas) brandVisualCanvas.style.removeProperty('--brand-canvas-duration');
-        }, 950);
+            brandEntryTimer = null;
+        }, brandLayoutState.entryDuration + 50);
+    }
+
+    function replayBrandEntry() {
+        if (!brandVisualCanvas || reducedMotion.matches) {
+            body.dataset.brandEntry = 'entered';
+            return;
+        }
+        if (brandEntryTimer) window.clearTimeout(brandEntryTimer);
+        brandVisualCanvas.style.setProperty('--brand-canvas-duration', '0ms');
+        body.dataset.brandEntry = 'waiting';
+        window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(playBrandEntry);
+        });
     }
 
     function revealBrandVisualDuringTransition() {
@@ -381,6 +404,9 @@
                 applyBrandChapter(body.dataset.brandChapter || 'philosophy', false);
             });
         });
+        if (brandEntryReplayButton) {
+            brandEntryReplayButton.addEventListener('click', replayBrandEntry);
+        }
     }
 
     function loadBrandVisualSource() {

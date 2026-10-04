@@ -102,6 +102,7 @@ try {
             const philosophy = document.getElementById('philosophy');
             const transitionY = window.scrollY + philosophy.getBoundingClientRect().top - window.innerHeight * .80;
             window.scrollTo(0, Math.max(1, transitionY));
+            window.dispatchEvent(new Event('scroll'));
         });
         await page.waitForTimeout(80);
         const brandEntryStart = await page.evaluate(() => ({
@@ -109,7 +110,7 @@ try {
             duration: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-canvas-duration'),
             philosophyTop: document.getElementById('philosophy').getBoundingClientRect().top,
         }));
-        await page.waitForTimeout(900);
+        await page.waitForTimeout(1400);
         const brandEntry = await page.evaluate(() => ({
             state: document.body.dataset.brandEntry,
             opacity: getComputedStyle(document.querySelector('[data-brand-visual-canvas]')).opacity,
@@ -166,13 +167,16 @@ try {
             const blur = document.querySelector('[data-brand-setting=blur]');
             const density = document.querySelector('[data-brand-setting=density]');
             const transition = document.querySelector('[data-brand-setting=transition]');
+            const entryDuration = document.querySelector('[data-brand-setting=entryDuration]');
             size.value = '110';
             x.value = '120';
             y.value = '-60';
             blur.value = '3';
             density.value = '60';
             transition.value = '3600';
-            [size, x, y, blur, density, transition].forEach(input => input.dispatchEvent(new Event('input', { bubbles: true })));
+            entryDuration.value = '2100';
+            [size, x, y, blur, density, transition, entryDuration].forEach(input => input.dispatchEvent(new Event('input', { bubbles: true })));
+            document.querySelector('[data-brand-entry-replay]').click();
             return {
                 scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
                 x: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-x'),
@@ -183,6 +187,11 @@ try {
                 outputs: Array.from(document.querySelectorAll('[data-brand-output]')).map(output => output.textContent),
             };
         });
+        await page.waitForTimeout(100);
+        const entryReplay = await page.evaluate(() => ({
+            state: document.body.dataset.brandEntry,
+            duration: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-canvas-duration'),
+        }));
 
         if (initial.source !== 'official-svg' || initial.chapter !== 'philosophy' || initial.overflow !== 0
             || !initial.readerVisible || !initial.tuningVisible
@@ -192,7 +201,7 @@ try {
         if (brandEntry.state !== 'entered' || brandEntry.opacity !== '1') {
             throw new Error(viewport.name + ': brand entry ' + JSON.stringify(brandEntry));
         }
-        if (brandEntryStart.state !== 'entered' || brandEntryStart.duration !== '900ms'
+        if (brandEntryStart.state !== 'entered' || brandEntryStart.duration !== '1400ms'
             || brandEntryStart.philosophyTop < viewport.height * .70) {
             throw new Error(viewport.name + ': brand entry did not start during section transition ' + JSON.stringify(brandEntryStart));
         }
@@ -202,7 +211,7 @@ try {
         if (initial.root.scale !== '1.008' || initial.layout.x !== '-110px' || initial.layout.y !== '0px'
             || initial.layout.blur !== '0.5px' || initial.layout.opacity !== '0.32'
             || initial.layout.duration !== '2600ms'
-            || initial.layout.outputs.join('|') !== '120%|-110px|0px|0.5px|200%|2600ms') {
+            || initial.layout.outputs.join('|') !== '120%|-110px|0px|0.5px|200%|2600ms|1400ms') {
             throw new Error(viewport.name + ': initial layout ' + JSON.stringify(initial.layout));
         }
         if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 8
@@ -220,7 +229,7 @@ try {
         if (annual.chapter !== 'annual' || Number(annual.now) !== 0
             || annual.core !== '0.65' || annual.middle !== policy.middle
             || Number(annual.structure) !== 1
-            || Number(annual.outer) !== 0.45 || Number(annual.boundary) !== 0.2356
+            || Number(annual.outer) !== 0.75 || Number(annual.boundary) !== 0.372
             || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
@@ -236,12 +245,15 @@ try {
         }
         if (tuning.scale !== '0.924' || tuning.x !== '120px' || tuning.y !== '-60px' || tuning.blur !== '3px'
             || tuning.opacity !== '0.102' || tuning.duration !== '3600ms'
-            || tuning.outputs.join('|') !== '110%|120px|-60px|3px|60%|3600ms') {
+            || tuning.outputs.join('|') !== '110%|120px|-60px|3px|60%|3600ms|2100ms') {
             throw new Error(viewport.name + ': tuning ' + JSON.stringify(tuning));
+        }
+        if (entryReplay.state !== 'entered' || entryReplay.duration !== '2100ms') {
+            throw new Error(viewport.name + ': entry replay ' + JSON.stringify(entryReplay));
         }
         if (errors.length) throw new Error(viewport.name + ': page errors ' + errors.join(' | '));
 
-        results.push({ viewport: viewport.name, initial, vision, policy, annual, tuning, pageErrors: errors.length });
+        results.push({ viewport: viewport.name, initial, vision, policy, annual, tuning, entryReplay, pageErrors: errors.length });
         await page.close();
     }
 
@@ -262,7 +274,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('intro-slide-fast-1') || !cacheIdentity.js.includes('intro-slide-fast-1')) {
+    if (!cacheIdentity.css.includes('entry-speed-tuning-1') || !cacheIdentity.js.includes('entry-speed-tuning-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });

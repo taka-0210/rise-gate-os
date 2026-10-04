@@ -817,6 +817,21 @@ body[data-brand-entry='waiting'] .brand-visual__canvas {
 .brand-tuning__fields label { display: grid; grid-template-columns: 1fr auto; gap: 3px 7px; color: var(--ink-soft); font-size: 9px; font-weight: 750; }
 .brand-tuning__fields output { color: var(--accent); font-variant-numeric: tabular-nums; }
 .brand-tuning__fields input { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.brand-tuning__replay {
+    width: 100%;
+    margin-top: 13px;
+    padding: 9px 12px;
+    color: #fff;
+    background: var(--accent);
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+}
+.brand-tuning__replay:hover { background: #0a5660; }
+.brand-tuning__replay:focus-visible { outline: 3px solid rgba(15, 111, 105, .28); outline-offset: 2px; }
 .brand-tuning__status { margin-top: 11px !important; color: var(--accent) !important; font-weight: 750; }
 
 @media (prefers-reduced-motion: reduce) {
