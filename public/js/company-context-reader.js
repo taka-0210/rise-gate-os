@@ -12,7 +12,7 @@
     var mobileToc = root.querySelector('[data-mobile-toc]');
     var mobileChapter = root.querySelector('[data-current-chapter]');
     var motionButtons = Array.from(root.querySelectorAll('[data-motion-choice]'));
-    var canvasWidthButtons = Array.from(root.querySelectorAll('[data-reader-width]'));
+    var brandTuningFields = Array.from(root.querySelectorAll('[data-brand-setting]'));
     var motionObserver = null;
     var activeChapterKey = null;
     var brand = root.querySelector('[data-brand-visual]');
@@ -82,13 +82,21 @@
         }
     }
 
-    function chooseCanvasWidth(value) {
-        if (!['1200', '1320', '1440', '1520'].includes(value)) return;
-        document.body.style.setProperty('--ccr-canvas-max', value + 'px');
-        root.dataset.canvasWidth = value;
-        canvasWidthButtons.forEach(function (button) {
-            button.setAttribute('aria-pressed', button.dataset.readerWidth === value ? 'true' : 'false');
-        });
+    function applyBrandTuning() {
+        var xField = root.querySelector('[data-brand-setting="x"]');
+        var sizeField = root.querySelector('[data-brand-setting="size"]');
+        if (!xField || !sizeField) return;
+        var x = Number(xField.value);
+        var size = Number(sizeField.value);
+        if (!Number.isFinite(x) || !Number.isFinite(size)) return;
+        x = Math.max(-320, Math.min(80, x));
+        size = Math.max(80, Math.min(140, size));
+        root.style.setProperty('--ccr-brand-x', x + 'px');
+        root.style.setProperty('--ccr-brand-scale', (1.008 * size / 100).toFixed(4));
+        var xOutput = root.querySelector('[data-brand-output="x"]');
+        var sizeOutput = root.querySelector('[data-brand-output="size"]');
+        if (xOutput) xOutput.textContent = x + 'px';
+        if (sizeOutput) sizeOutput.textContent = size + '%';
     }
 
     function revealAnchor(hash) {
@@ -244,8 +252,8 @@
         motionButtons.forEach(function (button) {
             button.addEventListener('click', function () { chooseMotion(button.dataset.motionChoice); });
         });
-        canvasWidthButtons.forEach(function (button) {
-            button.addEventListener('click', function () { chooseCanvasWidth(button.dataset.readerWidth); });
+        brandTuningFields.forEach(function (field) {
+            field.addEventListener('input', applyBrandTuning);
         });
         root.querySelectorAll('a[href^="#"]').forEach(function (link) {
             link.addEventListener('click', function () {
@@ -262,7 +270,7 @@
         }
         if (reducedMotion.matches) root.dataset.brandEntry = 'entered';
         loadBrand();
-        chooseCanvasWidth(root.dataset.canvasWidth || '1320');
+        applyBrandTuning();
         chooseMotion(root.dataset.motion);
         if (directFragment) {
             root.dataset.brandEntry = 'entered';

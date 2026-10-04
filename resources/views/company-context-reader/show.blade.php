@@ -2,16 +2,14 @@
 
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/company-context-reader.css') }}">
-<div class="ccr" id="top" data-company-context-reader data-motion="on" data-brand-entry="waiting" data-canvas-width="1320">
+<div class="ccr" id="top" data-company-context-reader data-motion="on" data-brand-entry="waiting">
     <a class="ccr-skip" href="#ccr-reader">本文へ移動</a>
     <header class="ccr-toolbar" aria-label="Reader表示設定">
         <div><p>COMPANY CONTEXT READER</p><strong>会社の言葉</strong><span>理念から今期の重点まで、一つの流れで読みます。</span></div>
         <div class="ccr-toolbar__actions">
-            <div class="ccr-width-tuner" role="group" aria-label="Reader Canvas幅の一時比較">
-                <span>Canvas</span>
-                @foreach([1200, 1320, 1440, 1520] as $width)
-                    <button type="button" data-reader-width="{{ $width }}" aria-pressed="{{ $width === 1320 ? 'true' : 'false' }}">{{ $width }}</button>
-                @endforeach
+            <div class="ccr-brand-tuner" role="group" aria-label="Brand Visual位置の一時調整">
+                <label>Visual X <output data-brand-output="x">-110px</output><input type="range" min="-320" max="80" step="10" value="-110" data-brand-setting="x"></label>
+                <label>Size <output data-brand-output="size">100%</output><input type="range" min="80" max="140" step="5" value="100" data-brand-setting="size"></label>
             </div>
             @if(count($reader->annualOptions) > 0)
                 <form method="GET" action="{{ route('company-context-reader.show') }}" class="ccr-period-selector">
