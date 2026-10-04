@@ -5,7 +5,7 @@
 <section class="amp-shell">
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
     <header class="amp-header">
-        <div><p class="amp-kicker">ANNUAL MANAGEMENT POLICY</p><h1>年度経営方針</h1><p class="amp-lead">会社の期間ごとに、承認状態と現在の有効状態を分けて確認できます。</p></div>
+        <div><p class="amp-kicker">ANNUAL MANAGEMENT POLICY</p><h1>年度経営方針</h1><p class="amp-lead">現在有効な方針・計画中の次期方針・過年度の方針を確認できます。</p></div>
     </header>
     @if($canManage)
         <details class="panel"><summary><strong>会社の期間を登録</strong></summary>
@@ -26,11 +26,14 @@
                 $canDraft = $policy && $access->canViewDraft(request()->user(), $policy);
                 $visible = $policy && ($canApproved || $canDraft || $canManage);
                 $state = $lifecycle->evaluate($period, $policy?->currentApprovedRevision !== null);
+                $humanStatus = $state['approval_status'] === 'approved' && $state['effective_status'] === 'upcoming'
+                    ? '計画中｜承認済み・開始前'
+                    : $lifecycle->label($state);
             @endphp
             <article class="amp-period">
                 <div class="stack" style="gap:8px">
                     <div class="amp-period__meta">
-                        <span class="amp-status amp-status--{{ $state['approval_status'] }} amp-status--{{ $state['effective_status'] }}">{{ $lifecycle->label($state) }}</span>
+                        <span class="amp-status amp-status--{{ $state['approval_status'] }} amp-status--{{ $state['effective_status'] }}">{{ $humanStatus }}</span>
                         @if($period->id === $currentPeriodId)<span class="amp-status">会社の現在期間</span>@endif
                         @if($policy?->currentApprovedRevision)<span class="meta">Revision {{ $policy->currentApprovedRevision->revision_no }}</span>@endif
                     </div>

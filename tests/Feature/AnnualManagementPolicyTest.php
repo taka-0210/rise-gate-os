@@ -22,6 +22,7 @@ use App\Services\AnnualManagementPolicy\AnnualManagementPolicyWriter;
 use App\Services\AnnualManagementPolicy\ManagementPeriodResolver;
 use App\Services\AnnualManagementPolicy\ManagementPeriodWriter;
 use App\Services\Organization\OrganizationAudit;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -98,6 +99,16 @@ class AnnualManagementPolicyTest extends TestCase
         $preview = $writer->preview($owner, $saved);
         $writer->approve($owner, $saved, 1, null, 0, $preview['snapshot_hash'], false, null, (string) Str::uuid());
         $this->assertSame('承認済み / 開始前', $lifecycle->label($lifecycle->evaluate($policy->period, true, '2026-10-03')));
+        Carbon::setTestNow('2026-10-03 12:00:00 Asia/Tokyo');
+        try {
+            $this->asCompany($owner, $organization)->get(route('annual-management-policy.index'))
+                ->assertOk()
+                ->assertSee('現在有効な方針・計画中の次期方針・過年度の方針を確認できます。')
+                ->assertSee('計画中｜承認済み・開始前')
+                ->assertDontSee('会社の期間ごとに、承認状態と現在の有効状態を分けて確認できます。');
+        } finally {
+            Carbon::setTestNow();
+        }
         $this->assertSame('effective', $lifecycle->evaluate($policy->period, true, '2026-12-01')['effective_status']);
         $this->assertSame('effective', $lifecycle->evaluate($policy->period, true, '2027-11-30')['effective_status']);
         $this->assertSame('ended', $lifecycle->evaluate($policy->period, true, '2027-12-01')['effective_status']);
