@@ -23,7 +23,7 @@ class ManagementDesignItem extends Model
     public const PRESENTATION = [
         self::TYPE_PHILOSOPHY => [
             'label' => '理念',
-            'direction' => 'ROOT',
+            'direction' => 'PHILOSOPHY',
             'description' => '会社が存在する根本思想を読む',
             'statement_explanation_label' => 'この理念に込めた意味（任意）',
             'statement_explanation_help' => '正式なStatementとは分けて、理念の背景・意図・会社としての解釈を説明できます。',
