@@ -20,4 +20,5 @@
 /* Human visual review v002: clearer wordmark rhythm and stronger brand composition. */
 h1{line-height:.86}
 .brand-statement,.brand-description,.form-heading h2{font-family:inherit}
-@media(min-width:901px){.brand-visual img{width:min(105vw,1480px)}}
+@media(min-width:901px){.brand-visual img{left:auto;right:0;width:min(91.7vw,1320px);transform:translateY(-50%)}}
+@media(max-width:760px){.brand-visual img{left:54%}}
