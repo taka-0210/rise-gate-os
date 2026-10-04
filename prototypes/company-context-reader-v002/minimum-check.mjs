@@ -115,6 +115,7 @@ try {
             middle: document.querySelector('#execution-layer').style.opacity,
             outer: document.querySelector('#knowledge-layer').style.opacity,
             structure: document.querySelector('#connections').style.opacity,
+            boundary: document.querySelector('#outer-structure').style.opacity,
             secondExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 485.000"]').style.opacity),
             outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
             now: document.querySelector('#active-flow').style.opacity,
@@ -129,6 +130,7 @@ try {
             core: document.querySelector('#core-light').style.opacity,
             outer: document.querySelector('#knowledge-layer').style.opacity,
             structure: document.querySelector('#connections').style.opacity,
+            boundary: document.querySelector('#outer-structure').style.opacity,
             now: document.querySelector('#active-flow').style.opacity,
             scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
             nowStroke: getComputedStyle(document.querySelector('#active-flow path')).stroke,
@@ -178,14 +180,16 @@ try {
             || vision.secondExecutionArc !== 0 || vision.computedSecondExecutionArc !== 0 || vision.outerExecutionArc !== 0) {
             throw new Error(viewport.name + ': vision ring sequence ' + JSON.stringify(vision));
         }
-        if (policy.chapter !== 'policy' || Number(policy.outer) <= Number(vision.outer) * 4
+        if (policy.chapter !== 'policy' || Number(policy.outer) !== 0
             || Number(policy.structure) <= Number(vision.middle)
+            || Number(policy.boundary) !== 0.062
             || Number(policy.now) !== 0
             || policy.secondExecutionArc <= vision.secondExecutionArc * 10
             || policy.outerExecutionArc <= vision.outerExecutionArc * 10) {
             throw new Error(viewport.name + ': policy ring sequence ' + JSON.stringify(policy));
         }
         if (annual.chapter !== 'annual' || Number(annual.now) <= Number(initial.root.now)
+            || Number(annual.outer) !== 0.3 || Number(annual.boundary) !== 0.1364
             || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
@@ -228,7 +232,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('no-vision-ring-flash-1') || !cacheIdentity.js.includes('no-vision-ring-flash-1')) {
+    if (!cacheIdentity.css.includes('policy-ring3-only-1') || !cacheIdentity.js.includes('policy-ring3-only-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
