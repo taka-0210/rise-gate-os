@@ -99,6 +99,7 @@ class AnnualManagementPolicyTest extends TestCase
         $preview = $writer->preview($owner, $saved);
         $writer->approve($owner, $saved, 1, null, 0, $preview['snapshot_hash'], false, null, (string) Str::uuid());
         $this->assertSame('承認済み / 開始前', $lifecycle->label($lifecycle->evaluate($policy->period, true, '2026-10-03')));
+        $this->assertSame('計画中｜承認済み・開始前', $lifecycle->humanFacingLabel($lifecycle->evaluate($policy->period, true, '2026-10-03')));
         Carbon::setTestNow('2026-10-03 12:00:00 Asia/Tokyo');
         try {
             $this->asCompany($owner, $organization)->get(route('annual-management-policy.index'))
@@ -106,6 +107,12 @@ class AnnualManagementPolicyTest extends TestCase
                 ->assertSee('現在有効な方針・計画中の次期方針・過年度の方針を確認できます。')
                 ->assertSee('計画中｜承認済み・開始前')
                 ->assertDontSee('会社の期間ごとに、承認状態と現在の有効状態を分けて確認できます。');
+            $this->asCompany($owner, $organization)->get(route('annual-management-policy.show', $policy))
+                ->assertOk()
+                ->assertSee('計画中｜承認済み・開始前')
+                ->assertSee('承認済みの、次期の方針です。')
+                ->assertSee('2026/12/01から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。')
+                ->assertDontSee('承認済み / 開始前');
         } finally {
             Carbon::setTestNow();
         }

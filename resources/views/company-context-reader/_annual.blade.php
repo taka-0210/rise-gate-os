@@ -4,7 +4,7 @@
 </div>
 @if($annual['experience'] === 'planning')
     <aside class='ccr-planning-intro ccr-reveal' aria-label='計画中の年度経営方針'>
-        <p>計画中・開始前 / 承認済み</p>
+        <p>{{ $annual['lifecycle_label'] }}</p>
         <strong>承認済みの、次期の方針です。</strong>
         <span>{{ str_replace('-', '/', $annual['starts_on']) }}から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。</span>
     </aside>

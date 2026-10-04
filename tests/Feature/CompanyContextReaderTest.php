@@ -149,10 +149,10 @@ class CompanyContextReaderTest extends TestCase
         $this->asCompany($viewer, $organization)->get(route('company-context-reader.show', ['annual' => $upcoming->period->public_id]))
             ->assertOk()
             ->assertSee('来期の正式方針')
-            ->assertSee('計画中・開始前')
+            ->assertSee('計画中｜承認済み・開始前')
             ->assertSee('承認済みの、次期の方針です。')
             ->assertSee('2027/01/01から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。')
-            ->assertSee('承認済み / 開始前');
+            ->assertDontSee('承認済み / 開始前');
 
         $other = $this->organization('selector-other');
         [$otherOwner, $otherMembership] = $this->member($other, OrganizationUser::ORGANIZATION_ROLE_OWNER);
@@ -202,21 +202,21 @@ class CompanyContextReaderTest extends TestCase
 
         $this->asCompany($planner, $organization)->get(route('company-context-reader.show'))
             ->assertOk()
-            ->assertSee('第23期｜2026年度｜計画中・開始前｜承認済み')
+            ->assertSee('第23期｜2026年度｜計画中｜承認済み・開始前')
             ->assertDontSee('承認済みの次期方針')
             ->assertDontSee('未承認Draftの次期方針');
         $this->asCompany($planner, $organization)->get(route('company-context-reader.show', ['annual' => $upcoming->period->public_id]))
             ->assertOk()
             ->assertSee('承認済みの次期方針')
             ->assertSee('承認済みの、次期の方針です。')
-            ->assertSee('計画中・開始前')
+            ->assertSee('計画中｜承認済み・開始前')
             ->assertDontSee('未承認Draftの次期方針');
 
         $this->asCompany($outsider, $organization)->get(route('company-context-reader.show'))
             ->assertOk()
             ->assertDontSee('ccr-period-selector', false)
             ->assertDontSee('第23期｜2026年度')
-            ->assertDontSee('計画中・開始前')
+            ->assertDontSee('計画中｜承認済み・開始前')
             ->assertDontSee('承認済みの次期方針');
         $this->asCompany($outsider, $organization)->get(route('company-context-reader.show', ['annual' => $upcoming->period->public_id]))
             ->assertNotFound()

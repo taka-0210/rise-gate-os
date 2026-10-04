@@ -152,14 +152,14 @@ try {
     assert(await page.locator('#ccr-annual option').first().textContent() === '現在有効', 'Current is not the selector default.');
     const planningOption = page.locator(`#ccr-annual optgroup[label='計画中'] option`).first();
     assert(await planningOption.count() === 1, 'Planning selector group is missing.');
-    assert((await planningOption.textContent())?.trim() === '第24期｜2027年度｜計画中・開始前｜承認済み', 'Planning selector wording is incomplete.');
+    assert((await planningOption.textContent())?.trim() === '第24期｜2027年度｜計画中｜承認済み・開始前', 'Planning selector wording is incomplete.');
     const upcomingPeriod = await planningOption.getAttribute('value');
     assert(upcomingPeriod, 'Planning selector has no safe period identifier.');
     const upcomingUrl = baseUrl + '/company/company-context?annual=' + encodeURIComponent(upcomingPeriod);
     const upcomingResponse = await page.goto(upcomingUrl);
     assert(upcomingResponse.status() === 200, 'Upcoming Reader returned ' + upcomingResponse.status());
     assert(await page.locator('.ccr-planning-intro').isVisible(), 'Upcoming Chapter 04 explanation is missing.');
-    assert(await page.getByText('計画中・開始前 / 承認済み', { exact: true }).isVisible(), 'Planning and approval states are not separated.');
+    assert(await page.getByText('計画中｜承認済み・開始前', { exact: true }).first().isVisible(), 'Planning, approval, and timing states are not presented consistently.');
     assert(await page.getByText('承認済みの、次期の方針です。', { exact: true }).isVisible(), 'Upcoming approval explanation is missing.');
     assert(await page.getByText('2027/01/01から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。', { exact: true }).isVisible(), 'Upcoming start explanation is missing.');
     assert(await page.getByText('次期の成長に向けて、計画と実行の準備を整える。', { exact: true }).isVisible(), 'Upcoming approved snapshot is missing.');

@@ -45,4 +45,16 @@ class AnnualManagementPolicyLifecycle
             default => '承認済み',
         };
     }
+
+    public function humanFacingLabel(array $lifecycle): string
+    {
+        if (
+            ($lifecycle['approval_status'] ?? null) === 'approved'
+            && ($lifecycle['effective_status'] ?? null) === 'upcoming'
+        ) {
+            return '計画中｜承認済み・開始前';
+        }
+
+        return $this->label($lifecycle);
+    }
 }

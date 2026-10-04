@@ -4,7 +4,14 @@
 @include('annual-management-policy._styles')
 <section class="amp-shell">
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
-    <header class="amp-reader-header"><p class="amp-kicker">ANNUAL MANAGEMENT POLICY</p><div class="amp-reader-header__title"><div><h1>{{ $annualPolicy->period->display_label }}</h1><p>{{ $annualPolicy->period->starts_on->format('Y/m/d') }} — {{ $annualPolicy->period->ends_on->format('Y/m/d') }} / JST</p></div><span class="amp-status amp-status--{{ $lifecycle['effective_status'] }}">{{ $lifecyclePresenter->label($lifecycle) }}</span></div></header>
+    <header class="amp-reader-header"><p class="amp-kicker">ANNUAL MANAGEMENT POLICY</p><div class="amp-reader-header__title"><div><h1>{{ $annualPolicy->period->display_label }}</h1><p>{{ $annualPolicy->period->starts_on->format('Y/m/d') }} — {{ $annualPolicy->period->ends_on->format('Y/m/d') }} / JST</p></div><span class="amp-status amp-status--{{ $lifecycle['effective_status'] }}">{{ $lifecyclePresenter->humanFacingLabel($lifecycle) }}</span></div></header>
+    @if($approved && $lifecycle['effective_status'] === 'upcoming')
+        <aside class="amp-section stack" aria-label="計画中の年度経営方針">
+            <p class="amp-kicker">{{ $lifecyclePresenter->humanFacingLabel($lifecycle) }}</p>
+            <strong>承認済みの、次期の方針です。</strong>
+            <p class="meta">{{ $annualPolicy->period->starts_on->format('Y/m/d') }}から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。</p>
+        </aside>
+    @endif
     @if($approved)
         <article class="amp-reader" aria-label="正式な年度経営方針"><div class="amp-reader__revision"><span>正式Revision {{ $annualPolicy->currentApprovedRevision->revision_no }}</span><span>{{ $annualPolicy->currentApprovedRevision->approved_at->timezone('Asia/Tokyo')->format('Y/m/d H:i') }} JST 承認</span></div>@include('annual-management-policy._snapshot', ['snapshot' => $approved])</article>
     @elseif($canDraft)

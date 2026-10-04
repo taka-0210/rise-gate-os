@@ -26,14 +26,11 @@
                 $canDraft = $policy && $access->canViewDraft(request()->user(), $policy);
                 $visible = $policy && ($canApproved || $canDraft || $canManage);
                 $state = $lifecycle->evaluate($period, $policy?->currentApprovedRevision !== null);
-                $humanStatus = $state['approval_status'] === 'approved' && $state['effective_status'] === 'upcoming'
-                    ? '計画中｜承認済み・開始前'
-                    : $lifecycle->label($state);
             @endphp
             <article class="amp-period">
                 <div class="stack" style="gap:8px">
                     <div class="amp-period__meta">
-                        <span class="amp-status amp-status--{{ $state['approval_status'] }} amp-status--{{ $state['effective_status'] }}">{{ $humanStatus }}</span>
+                        <span class="amp-status amp-status--{{ $state['approval_status'] }} amp-status--{{ $state['effective_status'] }}">{{ $lifecycle->humanFacingLabel($state) }}</span>
                         @if($period->id === $currentPeriodId)<span class="amp-status">会社の現在期間</span>@endif
                         @if($policy?->currentApprovedRevision)<span class="meta">Revision {{ $policy->currentApprovedRevision->revision_no }}</span>@endif
                     </div>

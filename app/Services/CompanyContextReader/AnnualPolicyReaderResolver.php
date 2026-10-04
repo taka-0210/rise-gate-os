@@ -39,7 +39,9 @@ class AnnualPolicyReaderResolver
             return [
                 'value' => $policy->period->public_id,
                 'label' => $this->periodLabel($policy),
-                'lifecycle' => $experience['status'].'｜'.$experience['approval'],
+                'lifecycle' => $state['effective_status'] === 'upcoming'
+                    ? $this->lifecycle->humanFacingLabel($state)
+                    : $experience['status'].'｜'.$experience['approval'],
                 'experience' => $experience['key'],
                 'experience_label' => $experience['label'],
                 'experience_status' => $experience['status'],
@@ -121,7 +123,7 @@ class AnnualPolicyReaderResolver
                 'ends_on' => (string) (($period['declared_ends_on'] ?? null) ?: ($period['organization_ends_on'] ?? $policy->period->ends_on->toDateString())),
                 'approval_status' => $state['approval_status'],
                 'effective_status' => $state['effective_status'],
-                'lifecycle_label' => $this->lifecycle->label($state),
+                'lifecycle_label' => $this->lifecycle->humanFacingLabel($state),
                 'experience' => $experience['key'],
                 'experience_label' => $experience['label'],
                 'experience_status' => $experience['status'],

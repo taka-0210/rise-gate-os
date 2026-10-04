@@ -77,10 +77,13 @@ try {
 
     await page.goto(`${baseUrl}/company/annual-management-policy`);
     assert(await page.getByText('第23期｜2026年度', { exact: true }).first().isVisible(), 'Fiscal term and year are not presented independently.');
-    assert(await page.getByText('承認済み / 開始前', { exact: true }).isVisible(), 'Approved future policy is not shown as upcoming.');
+    assert(await page.getByText('計画中｜承認済み・開始前', { exact: true }).isVisible(), 'Approved future policy is not shown with planning terminology.');
 
     await page.goto(`${baseUrl}/company/annual-management-policy/${publicId}`);
     assert(await page.locator('.amp-reader').isVisible(), 'Reader-first article is missing.');
+    assert(await page.getByText('計画中｜承認済み・開始前', { exact: true }).first().isVisible(), 'Standalone Reader planning terminology is inconsistent.');
+    assert(await page.getByText('承認済みの、次期の方針です。', { exact: true }).isVisible(), 'Standalone Reader planning explanation is missing.');
+    assert(await page.getByText('2026/12/01から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。', { exact: true }).isVisible(), 'Standalone Reader start-date explanation is missing.');
     assert(await page.locator('.amp-management-tools').isVisible(), 'Management tools are missing.');
     const readerOrder = await page.evaluate(() => {
         const reader = document.querySelector('.amp-reader');
