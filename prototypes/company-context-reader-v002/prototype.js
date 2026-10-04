@@ -47,10 +47,11 @@
     var brandTuningFields = document.querySelector('.brand-tuning__fields');
     if (brandTuningFields) {
         brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#20840;&#20307;&#12398;&#28611;&#12373; <output data-brand-output="density">200%</output><input type="range" min="10" max="200" step="5" value="200" data-brand-setting="density"></label>');
+        brandTuningFields.insertAdjacentHTML('beforeend', '<label>&#24195;&#12364;&#12426;&#26178;&#38291; <output data-brand-output="transition">2600ms</output><input type="range" min="500" max="5000" step="100" value="2600" data-brand-setting="transition"></label>');
     }
     var brandSettingInputs = Array.from(document.querySelectorAll('[data-brand-setting]'));
     var brandSvg = null;
-    var brandLayoutState = { size: 120, x: -110, y: 0, blur: .5, density: 200 };
+    var brandLayoutState = { size: 120, x: -110, y: 0, blur: .5, density: 200, transition: 2600 };
     var brandChapterLabels = {
         philosophy: '01 理念 / ROOT',
         vision: '02 Vision / FUTURE',
@@ -59,10 +60,10 @@
     };
     var brandFixedScale = 84;
     var brandChapterStates = {
-        philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, now: 6, duration: 1600 },
-        vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, now: 18, duration: 1800 },
-        policy: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, now: 30, duration: 1600 },
-        annual: { opacity: 16, center: 60, middle: 55, outer: 55, structure: 50, now: 100, duration: 1500 }
+        philosophy: { opacity: 16, center: 100, middle: 8, outer: 8, structure: 10, now: 6 },
+        vision: { opacity: 18, center: 80, middle: 75, outer: 0, structure: 10, now: 18 },
+        policy: { opacity: 17, center: 65, middle: 75, outer: 75, structure: 100, now: 30 },
+        annual: { opacity: 16, center: 45, middle: 35, outer: 30, structure: 22, now: 100 }
     };
 
     function isInReviewWindow(element) {
@@ -247,6 +248,7 @@
 
     function brandSettingLabel(name, value) {
         if (name === 'blur') return value + 'px';
+        if (name === 'transition') return value + 'ms';
         if (name === 'size' || name === 'density') return value + '%';
         return value + 'px';
     }
@@ -312,13 +314,13 @@
         if (brandVisual) {
             brandVisual.style.setProperty('--brand-opacity', String((state.opacity * brandLayoutState.density) / 10000));
             brandVisual.style.setProperty('--brand-blur', brandLayoutState.blur + 'px');
-            brandVisual.style.setProperty('--brand-duration', state.duration + 'ms');
+            brandVisual.style.setProperty('--brand-duration', brandLayoutState.transition + 'ms');
         }
         if (brandVisualCanvas) {
             brandVisualCanvas.style.setProperty('--brand-scale', String((brandFixedScale * brandLayoutState.size) / 10000));
             brandVisualCanvas.style.setProperty('--brand-x', brandLayoutState.x + 'px');
             brandVisualCanvas.style.setProperty('--brand-y', brandLayoutState.y + 'px');
-            brandVisualCanvas.style.setProperty('--brand-duration', state.duration + 'ms');
+            brandVisualCanvas.style.setProperty('--brand-duration', brandLayoutState.transition + 'ms');
         }
         setBrandLayerOpacity('core-light', state.center);
         setBrandLayerOpacity('management-layer', state.center * .82);

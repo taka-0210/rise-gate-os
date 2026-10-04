@@ -10,6 +10,36 @@ const browser = await chromium.launch({
 
 const results = [];
 
+async function activateChapter(page, id) {
+    await page.evaluate(async chapterId => {
+        document.documentElement.style.setProperty('scroll-behavior', 'auto', 'important');
+        const element = document.getElementById(chapterId);
+        const requested = window.scrollY + element.getBoundingClientRect().top - window.innerHeight * .10;
+        const target = Math.max(0, Math.min(requested, document.documentElement.scrollHeight - window.innerHeight));
+        const direction = target >= window.scrollY ? 1 : -1;
+        while ((direction > 0 && window.scrollY < target) || (direction < 0 && window.scrollY > target)) {
+            const previous = window.scrollY;
+            const next = direction > 0 ? Math.min(target, window.scrollY + 180) : Math.max(target, window.scrollY - 180);
+            window.scrollTo(0, next);
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            if (window.scrollY === previous) break;
+        }
+    }, id);
+    await page.waitForTimeout(400);
+    const state = await page.evaluate(chapterId => {
+        const rect = document.getElementById(chapterId).getBoundingClientRect();
+        return {
+            expected: chapterId,
+            actual: document.body.dataset.brandChapter,
+            scrollY: window.scrollY,
+            top: rect.top,
+            bottom: rect.bottom,
+            viewport: window.innerHeight,
+        };
+    }, id);
+    if (state.actual !== id) throw new Error('chapter activation ' + JSON.stringify(state));
+}
+
 try {
     for (const viewport of [
         { name: 'desktop', width: 1440, height: 900 },
@@ -59,11 +89,12 @@ try {
                 y: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-y'),
                 blur: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-blur'),
                 opacity: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-opacity'),
+                duration: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-duration'),
                 outputs: Array.from(document.querySelectorAll('[data-brand-output]')).map(output => output.textContent),
             },
         }));
 
-        await page.locator('#vision').scrollIntoViewIfNeeded();
+        await activateChapter(page, 'vision');
         await page.waitForTimeout(250);
         const vision = await page.evaluate(() => ({
             chapter: document.body.dataset.brandChapter,
@@ -74,7 +105,7 @@ try {
             outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
         }));
 
-        await page.locator('#policy').scrollIntoViewIfNeeded();
+        await activateChapter(page, 'policy');
         await page.waitForTimeout(250);
         const policy = await page.evaluate(() => ({
             chapter: document.body.dataset.brandChapter,
@@ -83,10 +114,12 @@ try {
             structure: document.querySelector('#connections').style.opacity,
             secondExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 485.000"]').style.opacity),
             outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
+            nowStroke: getComputedStyle(document.querySelector('#active-flow path')).stroke,
+            nowWidth: getComputedStyle(document.querySelector('#active-flow path')).strokeWidth,
         }));
 
-        await page.locator('#annual').scrollIntoViewIfNeeded();
-        await page.waitForTimeout(250);
+        await activateChapter(page, 'annual');
+        await page.waitForTimeout(2800);
         const annual = await page.evaluate(() => ({
             chapter: document.body.dataset.brandChapter,
             core: document.querySelector('#core-light').style.opacity,
@@ -94,6 +127,9 @@ try {
             structure: document.querySelector('#connections').style.opacity,
             now: document.querySelector('#active-flow').style.opacity,
             scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
+            nowStroke: getComputedStyle(document.querySelector('#active-flow path')).stroke,
+            nowWidth: getComputedStyle(document.querySelector('#active-flow path')).strokeWidth,
+            nowFilter: getComputedStyle(document.querySelector('#active-flow')).filter,
         }));
 
         const tuning = await page.evaluate(() => {
@@ -102,18 +138,21 @@ try {
             const y = document.querySelector('[data-brand-setting=y]');
             const blur = document.querySelector('[data-brand-setting=blur]');
             const density = document.querySelector('[data-brand-setting=density]');
+            const transition = document.querySelector('[data-brand-setting=transition]');
             size.value = '110';
             x.value = '120';
             y.value = '-60';
             blur.value = '3';
             density.value = '60';
-            [size, x, y, blur, density].forEach(input => input.dispatchEvent(new Event('input', { bubbles: true })));
+            transition.value = '3600';
+            [size, x, y, blur, density, transition].forEach(input => input.dispatchEvent(new Event('input', { bubbles: true })));
             return {
                 scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
                 x: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-x'),
                 y: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-y'),
                 blur: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-blur'),
                 opacity: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-opacity'),
+                duration: document.querySelector('[data-brand-visual]').style.getPropertyValue('--brand-duration'),
                 outputs: Array.from(document.querySelectorAll('[data-brand-output]')).map(output => output.textContent),
             };
         });
@@ -127,7 +166,8 @@ try {
         }
         if (initial.root.scale !== '1.008' || initial.layout.x !== '-110px' || initial.layout.y !== '0px'
             || initial.layout.blur !== '0.5px' || initial.layout.opacity !== '0.32'
-            || initial.layout.outputs.join('|') !== '120%|-110px|0px|0.5px|200%') {
+            || initial.layout.duration !== '2600ms'
+            || initial.layout.outputs.join('|') !== '120%|-110px|0px|0.5px|200%|2600ms') {
             throw new Error(viewport.name + ': initial layout ' + JSON.stringify(initial.layout));
         }
         if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 8
@@ -144,6 +184,10 @@ try {
             || annual.scale !== initial.root.scale) {
             throw new Error(viewport.name + ': annual ' + JSON.stringify(annual));
         }
+        if (annual.nowStroke !== 'rgb(15, 111, 105)' || annual.nowWidth !== '8px'
+            || annual.nowFilter === 'none' || annual.nowStroke === policy.nowStroke || annual.nowWidth === policy.nowWidth) {
+            throw new Error(viewport.name + ': annual NOW emphasis ' + JSON.stringify({ policy, annual }));
+        }
         if (!(initial.root.innerArc > initial.root.outerArc * 6)) {
             throw new Error(viewport.name + ': ROOT emphasis is not concentrated in the inner rings');
         }
@@ -151,7 +195,8 @@ try {
             throw new Error(viewport.name + ': arc motion/color ' + JSON.stringify(initial.root));
         }
         if (tuning.scale !== '0.924' || tuning.x !== '120px' || tuning.y !== '-60px' || tuning.blur !== '3px'
-            || tuning.opacity !== '0.096' || tuning.outputs.join('|') !== '110%|120px|-60px|3px|60%') {
+            || tuning.opacity !== '0.096' || tuning.duration !== '3600ms'
+            || tuning.outputs.join('|') !== '110%|120px|-60px|3px|60%|3600ms') {
             throw new Error(viewport.name + ': tuning ' + JSON.stringify(tuning));
         }
         if (errors.length) throw new Error(viewport.name + ': page errors ' + errors.join(' | '));
@@ -177,7 +222,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('brand-radius-sequence-2') || !cacheIdentity.js.includes('brand-radius-sequence-2')) {
+    if (!cacheIdentity.css.includes('brand-transition-control-1') || !cacheIdentity.js.includes('brand-transition-control-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
