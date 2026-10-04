@@ -383,7 +383,12 @@ class AnnualManagementPolicyTest extends TestCase
         $this->asCompany($owner,$organization)->get(route('annual-management-policy.index'))->assertOk()->assertSee('年度経営方針')->assertSee('作成中 / 未承認')->assertSee('grid-template-areas: "header" "breadcrumbs" "main"',false);
         $this->asCompany($owner,$organization)->get(route('annual-management-policy.show',$policy))->assertOk()->assertSee('正式Revisionはまだありません')->assertSee('作成・承認・管理')->assertDontSee('<textarea',false);
         $this->asCompany($owner,$organization)->get(route('annual-management-policy.edit',$policy))->assertOk()->assertSee('Draftを保存')->assertSee('data-add-theme',false)->assertSee('data-move-up',false)->assertSee('今期、何を実現したいのか')->assertSee('部署がまだ登録されていません')->assertSee('after_save',false)->assertSee('@media(max-width:640px)',false);
-        $this->asCompany($owner,$organization)->get(route('annual-management-policy.permissions',$policy))->assertOk()->assertSee('在籍中のスタッフ全員へ共有')->assertSee('選んだ人へ共有');
+        $this->asCompany($owner,$organization)->get(route('annual-management-policy.permissions',$policy))
+            ->assertOk()
+            ->assertSee('在籍中のスタッフ全員へ共有')
+            ->assertSee('選んだ人へ共有')
+            ->assertSee('この設定は承認後、開始日前にも適用されます。')
+            ->assertSee('期の開始によって共有範囲が自動で変わることはありません。');
     }
 
     public function test_empty_optional_collections_long_japanese_and_many_items_are_supported(): void

@@ -146,6 +146,35 @@ try {
     assert(await page.locator('.ccr-toolbar').evaluate(element => getComputedStyle(element).display === 'none'), 'Print retains Reader controls.');
     assert(await page.getByText('正式Revision 1', { exact: false }).count() >= 4, 'Print loses chapter revision identity.');
 
+    await page.emulateMedia({ media: 'screen' });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(baseUrl + '/company/company-context');
+    assert(await page.locator('#ccr-annual option').first().textContent() === '現在有効', 'Current is not the selector default.');
+    const planningOption = page.locator(`#ccr-annual optgroup[label='計画中'] option`).first();
+    assert(await planningOption.count() === 1, 'Planning selector group is missing.');
+    assert((await planningOption.textContent())?.trim() === '第24期｜2027年度｜計画中・開始前｜承認済み', 'Planning selector wording is incomplete.');
+    const upcomingPeriod = await planningOption.getAttribute('value');
+    assert(upcomingPeriod, 'Planning selector has no safe period identifier.');
+    const upcomingUrl = baseUrl + '/company/company-context?annual=' + encodeURIComponent(upcomingPeriod);
+    const upcomingResponse = await page.goto(upcomingUrl);
+    assert(upcomingResponse.status() === 200, 'Upcoming Reader returned ' + upcomingResponse.status());
+    assert(await page.locator('.ccr-planning-intro').isVisible(), 'Upcoming Chapter 04 explanation is missing.');
+    assert(await page.getByText('計画中・開始前 / 承認済み', { exact: true }).isVisible(), 'Planning and approval states are not separated.');
+    assert(await page.getByText('承認済みの、次期の方針です。', { exact: true }).isVisible(), 'Upcoming approval explanation is missing.');
+    assert(await page.getByText('2027/01/01から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。', { exact: true }).isVisible(), 'Upcoming start explanation is missing.');
+    assert(await page.getByText('次期の成長に向けて、計画と実行の準備を整える。', { exact: true }).isVisible(), 'Upcoming approved snapshot is missing.');
+    assert(await page.locator('.ccr-rail').isVisible(), 'Desktop TOC is missing from Upcoming Reader.');
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'Upcoming Desktop Reader overflows horizontally.');
+    await page.screenshot({ path: evidenceDirectory + '/upcoming-desktop-1440x1000.png', fullPage: true });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(upcomingUrl);
+    assert(await page.locator('.ccr-mobile-toc').isVisible(), 'Upcoming 390px TOC B is missing.');
+    assert(await page.locator('.ccr-rail').isHidden(), 'Upcoming Desktop TOC remains at 390px.');
+    assert(await page.locator('.ccr-planning-intro').isVisible(), 'Upcoming explanation is missing at 390px.');
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'Upcoming 390px Reader overflows horizontally.');
+    await page.screenshot({ path: evidenceDirectory + '/upcoming-mobile-390x844.png', fullPage: true });
+
     assert(http5xx.length === 0, 'Unexpected HTTP 5xx: ' + JSON.stringify(http5xx));
     assert(externalRequests.length === 0, 'Unexpected external requests: ' + JSON.stringify(externalRequests));
     console.log(JSON.stringify({
@@ -156,7 +185,7 @@ try {
         textResize: '200%',
         http5xx: 0,
         externalRequests: 0,
-        checks: ['four-chapter-story', 'desktop-toc', 'mobile-toc-b', 'motion-one-shot', 'motion-off', 'reduced-motion', 'js-off', 'direct-anchor', 'brand-chapter-states', 'print-revision-identity'],
+        checks: ['four-chapter-story', 'desktop-toc', 'mobile-toc-b', 'motion-one-shot', 'motion-off', 'reduced-motion', 'js-off', 'direct-anchor', 'brand-chapter-states', 'print-revision-identity', 'upcoming-planning'],
     }));
 } finally {
     await browser.close();

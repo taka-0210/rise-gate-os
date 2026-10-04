@@ -2,6 +2,13 @@
     <div><p>COMPANY PERIOD</p><h3>{{ $annual['period_label'] }}</h3><span>{{ str_replace('-', '/', $annual['starts_on']) }} — {{ str_replace('-', '/', $annual['ends_on']) }} / {{ $annual['timezone'] }}</span></div>
     <p><span>{{ strtoupper($annual['approval_status']) }}</span><strong>{{ $annual['lifecycle_label'] }}</strong><small>正式Revision {{ $chapter->revisionNo }}</small></p>
 </div>
+@if($annual['experience'] === 'planning')
+    <aside class='ccr-planning-intro ccr-reveal' aria-label='計画中の年度経営方針'>
+        <p>計画中・開始前 / 承認済み</p>
+        <strong>承認済みの、次期の方針です。</strong>
+        <span>{{ str_replace('-', '/', $annual['starts_on']) }}から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。</span>
+    </aside>
+@endif
 <section class="ccr-annual-lead ccr-reveal"><p>年度経営方針</p><h3>{!! nl2br(e($chapter->statement ?? '')) !!}</h3></section>
 <div class="ccr-annual-context">
     @if($annual['purpose'])<section class="ccr-reveal"><p>今期、何を実現したいのか</p><div>{!! nl2br(e($annual['purpose'])) !!}</div></section>@endif

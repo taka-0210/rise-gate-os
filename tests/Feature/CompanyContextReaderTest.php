@@ -145,9 +145,14 @@ class CompanyContextReaderTest extends TestCase
         $this->asCompany($viewer, $organization)->get(route('company-context-reader.show'))
             ->assertOk()->assertDontSee('過去の正式方針')->assertDontSee('来期の正式方針');
         $this->asCompany($viewer, $organization)->get(route('company-context-reader.show', ['annual' => $ended->period->public_id]))
-            ->assertOk()->assertSee('過去の正式方針')->assertSee('承認済み / 終了');
+            ->assertOk()->assertSee('過去の正式方針')->assertSee('過年度')->assertSee('承認済み / 終了');
         $this->asCompany($viewer, $organization)->get(route('company-context-reader.show', ['annual' => $upcoming->period->public_id]))
-            ->assertOk()->assertSee('来期の正式方針')->assertSee('承認済み / 開始前');
+            ->assertOk()
+            ->assertSee('来期の正式方針')
+            ->assertSee('計画中・開始前')
+            ->assertSee('承認済みの、次期の方針です。')
+            ->assertSee('2027/01/01から適用されます。現在は、この方針をもとに次期の計画を検討するための表示です。')
+            ->assertSee('承認済み / 開始前');
 
         $other = $this->organization('selector-other');
         [$otherOwner, $otherMembership] = $this->member($other, OrganizationUser::ORGANIZATION_ROLE_OWNER);
@@ -156,6 +161,77 @@ class CompanyContextReaderTest extends TestCase
         $this->approve($otherOwner, $foreign, '他社秘密方針', '2026-01-01', '2026-12-31');
         $this->asCompany($viewer, $organization)->get(route('company-context-reader.show', ['annual' => $foreign->period->public_id]))
             ->assertNotFound()->assertDontSee('他社秘密方針');
+    }
+
+    public function test_upcoming_planning_reader_uses_approved_view_and_does_not_publish_on_start(): void
+    {
+        Carbon::setTestNow('2026-10-04 12:00:00 Asia/Tokyo');
+        $organization = $this->organization('planning-publication');
+        [$owner, $ownerMembership] = $this->member($organization, OrganizationUser::ORGANIZATION_ROLE_OWNER);
+        [$planner, $plannerMembership] = $this->member($organization);
+        [$outsider, $outsiderMembership] = $this->member($organization);
+        $this->mdPermissions($owner, $organization, 'philosophy', [
+            $plannerMembership->id => ['can_view' => true],
+            $outsiderMembership->id => ['can_view' => true],
+        ]);
+        $upcoming = $this->annualPolicy($owner, $organization, '2026-12-01', '2027-11-30', 23);
+        app(AnnualManagementPolicyPermissionManager::class)->update(
+            $owner,
+            $organization,
+            $upcoming,
+            AnnualManagementPolicy::VIEW_SCOPE_EXPLICIT,
+            [
+                $ownerMembership->id => ['can_view_approved' => true, 'can_view_draft' => true, 'can_edit' => true, 'can_approve' => true],
+                $plannerMembership->id => ['can_view_approved' => true],
+            ],
+            (string) Str::uuid(),
+        );
+        $this->approve($owner, $upcoming, '承認済みの次期方針', '2026-12-01', '2027-11-30');
+        app(AnnualManagementPolicyWriter::class)->saveDraft(
+            $owner,
+            $upcoming->fresh(),
+            $this->draft([
+                'period_name' => '2026年度',
+                'starts_on' => '2026-12-01',
+                'ends_on' => '2027-11-30',
+                'policy' => '未承認Draftの次期方針',
+            ]),
+            1,
+            (string) Str::uuid(),
+        );
+
+        $this->asCompany($planner, $organization)->get(route('company-context-reader.show'))
+            ->assertOk()
+            ->assertSee('第23期｜2026年度｜計画中・開始前｜承認済み')
+            ->assertDontSee('承認済みの次期方針')
+            ->assertDontSee('未承認Draftの次期方針');
+        $this->asCompany($planner, $organization)->get(route('company-context-reader.show', ['annual' => $upcoming->period->public_id]))
+            ->assertOk()
+            ->assertSee('承認済みの次期方針')
+            ->assertSee('承認済みの、次期の方針です。')
+            ->assertSee('計画中・開始前')
+            ->assertDontSee('未承認Draftの次期方針');
+
+        $this->asCompany($outsider, $organization)->get(route('company-context-reader.show'))
+            ->assertOk()
+            ->assertDontSee('ccr-period-selector', false)
+            ->assertDontSee('第23期｜2026年度')
+            ->assertDontSee('計画中・開始前')
+            ->assertDontSee('承認済みの次期方針');
+        $this->asCompany($outsider, $organization)->get(route('company-context-reader.show', ['annual' => $upcoming->period->public_id]))
+            ->assertNotFound()
+            ->assertDontSee('承認済みの次期方針');
+
+        Carbon::setTestNow('2026-12-01 00:00:00 Asia/Tokyo');
+        $this->asCompany($planner, $organization)->get(route('company-context-reader.show'))
+            ->assertOk()
+            ->assertSee('承認済みの次期方針')
+            ->assertSee('承認済み / 現在有効')
+            ->assertDontSee('未承認Draftの次期方針');
+        $this->asCompany($outsider, $organization)->get(route('company-context-reader.show'))
+            ->assertOk()
+            ->assertDontSee('第23期｜2026年度')
+            ->assertDontSee('承認済みの次期方針');
     }
 
     public function test_reader_composition_is_read_only_and_creates_no_audit_or_revision(): void

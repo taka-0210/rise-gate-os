@@ -101,6 +101,10 @@
 .ccr-annual-period > div > span, .ccr-annual-period small { color: var(--ccr-soft); font-size: 11px; }
 .ccr-annual-period > p { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
 .ccr-annual-period > p strong { font-size: 13px; }
+.ccr-planning-intro { max-width: var(--ccr-reading); display: grid; gap: 7px; margin: 18px auto 0; padding: 18px 22px; border-left: 3px solid var(--ccr-gold); background: rgba(255,255,255,.56); }
+.ccr-planning-intro p { margin: 0; color: var(--ccr-gold); font-size: 9px; font-weight: 850; letter-spacing: .15em; }
+.ccr-planning-intro strong { font-family: Georgia, 'Noto Serif JP', serif; font-size: 19px; }
+.ccr-planning-intro span { color: var(--ccr-soft); font-size: 12px; line-height: 1.75; }
 .ccr-annual-lead { max-width: var(--ccr-reading); margin: 70px auto 0; }
 .ccr-annual-lead > p, .ccr-annual-context p, .ccr-theme header > p, .ccr-priorities p, .ccr-departments header > p { margin: 0 0 14px; color: var(--ccr-gold); font-size: 10px; font-weight: 850; letter-spacing: .14em; }
 .ccr-annual-lead h3 { margin: 0; font-family: Georgia, "Noto Serif JP", serif; font-size: clamp(34px,5vw,50px); line-height: 1.5; }

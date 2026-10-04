@@ -8,12 +8,19 @@
         <div><p>COMPANY CONTEXT READER</p><strong>会社の言葉</strong><span>理念から今期の重点まで、一つの流れで読みます。</span></div>
         <div class="ccr-toolbar__actions">
             @if(count($reader->annualOptions) > 0)
+                @php($annualOptionGroups = collect($reader->annualOptions)->groupBy('experience'))
                 <form method="GET" action="{{ route('company-context-reader.show') }}" class="ccr-period-selector">
                     <label for="ccr-annual">年度方針</label>
                     <select id="ccr-annual" name="annual" onchange="this.form.submit()">
                         <option value="">現在有効</option>
-                        @foreach($reader->annualOptions as $option)
+                        @foreach(['planning' => '計画中', 'past' => '過年度'] as $experience => $groupLabel)
+                            @if($annualOptionGroups->has($experience))
+                                <optgroup label='{{ $groupLabel }}'>
+                                @foreach($annualOptionGroups->get($experience) as $option)
                             <option value="{{ $option['value'] }}" @selected($reader->selectedAnnual === $option['value'])>{{ $option['label'] }}｜{{ $option['lifecycle'] }}</option>
+                        @endforeach
+                                </optgroup>
+                            @endif
                         @endforeach
                     </select>
                     <noscript><button type="submit">表示</button></noscript>

@@ -1,6 +1,7 @@
 @extends('layouts.app', ['title' => '年度経営方針の共有・担当者 - '.$organization->name])
 @section('content')
 @include('annual-management-policy._styles')
+<div class='amp-warning amp-publication-note' style='margin-bottom:24px'>この設定は承認後、開始日前にも適用されます。開始前に計画参加者だけへ共有する場合は「選んだ人へ共有」を使用してください。期の開始によって共有範囲が自動で変わることはありません。</div>
 <section class="amp-shell"><header class="amp-header"><div><p class="amp-kicker">SHARING AND POLICY TEAM</p><h1>共有・担当者</h1><p>「正式版を共有する人」と「方針づくりに参加する担当者」を分けて指定します。内部Permission Contractは変わりません。</p></div><a class="button secondary" href="{{ route('annual-management-policy.show',$annualPolicy) }}">方針へ戻る</a></header>
  @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif
  @if($errors->any())<div class="panel" role="alert">@foreach($errors->all() as $error)<div class="error">{{ $error }}</div>@endforeach</div>@endif

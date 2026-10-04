@@ -169,9 +169,34 @@ $saved = $annualWriter->saveDraft($owner, $annual, [
 $preview = $annualWriter->preview($owner, $saved);
 $annualWriter->approve($owner, $saved, 1, null, 0, $preview['snapshot_hash'], false, null, (string) Str::uuid());
 
+$upcomingPeriod = app(ManagementPeriodWriter::class)->register(
+    $owner, $organization, '2027年度', '2027-01-01', '2027-12-31', (string) Str::uuid(), 24,
+);
+$upcoming = app(AnnualManagementPolicyPermissionManager::class)->initialize(
+    $owner, $organization, $upcomingPeriod, (string) Str::uuid(),
+);
+app(AnnualManagementPolicyPermissionManager::class)->update(
+    $owner, $organization, $upcoming, AnnualManagementPolicy::VIEW_SCOPE_EXPLICIT,
+    [$membership->id => ['can_view_approved' => true, 'can_view_draft' => true, 'can_edit' => true, 'can_approve' => true]],
+    (string) Str::uuid(),
+);
+$upcomingSaved = $annualWriter->saveDraft($owner, $upcoming, [
+    'period_name' => '2027年度',
+    'starts_on' => '2027-01-01',
+    'ends_on' => '2027-12-31',
+    'purpose' => '次期の準備を、承認済みの方針から始める。',
+    'background' => '正式共有の前に、計画参加者が同じ次期方針を読める状態をつくります。',
+    'policy' => '次期の成長に向けて、計画と実行の準備を整える。',
+    'themes' => [],
+    'departments' => [],
+], 0, (string) Str::uuid());
+$upcomingPreview = $annualWriter->preview($owner, $upcomingSaved);
+$annualWriter->approve($owner, $upcomingSaved, 1, null, 0, $upcomingPreview['snapshot_hash'], false, null, (string) Str::uuid());
+
 echo json_encode([
     'database' => $databasePath,
     'organization_id' => $organization->id,
     'owner_id' => $owner->id,
     'annual_public_id' => $annual->public_id,
+    'upcoming_period_public_id' => $upcomingPeriod->public_id,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT).PHP_EOL;

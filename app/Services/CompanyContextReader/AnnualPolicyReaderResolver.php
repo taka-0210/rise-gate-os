@@ -34,11 +34,16 @@ class AnnualPolicyReaderResolver
 
         $options = $authorized->map(function (AnnualManagementPolicy $policy): array {
             $state = $this->lifecycle->evaluate($policy->period, true);
+            $experience = $this->readerExperience($state);
 
             return [
                 'value' => $policy->period->public_id,
                 'label' => $this->periodLabel($policy),
-                'lifecycle' => $this->lifecycle->label($state),
+                'lifecycle' => $experience['status'].'｜'.$experience['approval'],
+                'experience' => $experience['key'],
+                'experience_label' => $experience['label'],
+                'experience_status' => $experience['status'],
+                'approval_label' => $experience['approval'],
             ];
         })->all();
 
@@ -82,6 +87,7 @@ class AnnualPolicyReaderResolver
             throw new LogicException('Annual Management Policy current revision identity mismatch.');
         }
         $period = (array) ($annual['period'] ?? []);
+        $experience = $this->readerExperience($state);
         $term = $period['organization_fiscal_term_number'] ?? null;
         $name = (string) (($period['declared_name'] ?? null) ?: ($period['organization_name'] ?? $policy->period->name));
         $label = $term ? '第'.$term.'期｜'.$name : $name;
@@ -116,6 +122,10 @@ class AnnualPolicyReaderResolver
                 'approval_status' => $state['approval_status'],
                 'effective_status' => $state['effective_status'],
                 'lifecycle_label' => $this->lifecycle->label($state),
+                'experience' => $experience['key'],
+                'experience_label' => $experience['label'],
+                'experience_status' => $experience['status'],
+                'approval_label' => $experience['approval'],
                 'timezone' => $state['timezone'],
                 'purpose' => $this->text($annual['purpose'] ?? null),
                 'background' => $this->text($annual['background'] ?? null),
@@ -147,6 +157,31 @@ class AnnualPolicyReaderResolver
         $name = (string) (($period['declared_name'] ?? null) ?: ($period['organization_name'] ?? $policy->period->name));
 
         return $term ? '第'.$term.'期｜'.$name : $name;
+    }
+
+    /** @return array{key:string,label:string,status:string,approval:string} */
+    private function readerExperience(array $state): array
+    {
+        return match ($state['effective_status'] ?? null) {
+            'upcoming' => [
+                'key' => 'planning',
+                'label' => '計画中',
+                'status' => '計画中・開始前',
+                'approval' => '承認済み',
+            ],
+            'ended' => [
+                'key' => 'past',
+                'label' => '過年度',
+                'status' => '過年度',
+                'approval' => '承認済み',
+            ],
+            default => [
+                'key' => 'current',
+                'label' => '現在有効',
+                'status' => '現在有効',
+                'approval' => '承認済み',
+            ],
+        };
     }
 
     private function text(mixed $value): ?string
