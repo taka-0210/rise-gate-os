@@ -288,7 +288,7 @@
         Array.from(execution.querySelectorAll('[data-base-opacity]')).forEach(function (element) {
             element.style.opacity = element.dataset.baseOpacity;
         });
-        if (key !== 'vision') return;
+        if (key !== 'philosophy' && key !== 'vision') return;
         ['485.000', '535.000', '585.000'].forEach(function (radius) {
             Array.from(execution.querySelectorAll('path[d*="A ' + radius + '"]')).forEach(function (path) {
                 path.style.opacity = '0';

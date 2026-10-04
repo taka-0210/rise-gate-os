@@ -71,6 +71,8 @@ try {
                 scale: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-scale'),
                 innerArc: Number(document.querySelector('#management-layer path[d*="A 205.000"]').style.opacity),
                 outerArc: Number(document.querySelector('#management-layer path[d*="A 360.000"]').style.opacity),
+                secondExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 485.000"]').style.opacity),
+                outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
                 ringMotion: [
                     getComputedStyle(document.querySelector('#knowledge-layer')).animationName,
                     getComputedStyle(document.querySelector('#execution-layer')).animationName,
@@ -102,6 +104,7 @@ try {
             outer: document.querySelector('#knowledge-layer').style.opacity,
             innerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 430.000"]').style.opacity),
             secondExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 485.000"]').style.opacity),
+            computedSecondExecutionArc: Number(getComputedStyle(document.querySelector('#execution-layer path[d*="A 485.000"]')).opacity),
             outerExecutionArc: Number(document.querySelector('#execution-layer path[d*="A 585.000"]').style.opacity),
         }));
 
@@ -172,7 +175,7 @@ try {
             throw new Error(viewport.name + ': initial layout ' + JSON.stringify(initial.layout));
         }
         if (vision.chapter !== 'vision' || Number(vision.middle) <= Number(vision.outer) * 8
-            || vision.secondExecutionArc !== 0 || vision.outerExecutionArc !== 0) {
+            || vision.secondExecutionArc !== 0 || vision.computedSecondExecutionArc !== 0 || vision.outerExecutionArc !== 0) {
             throw new Error(viewport.name + ': vision ring sequence ' + JSON.stringify(vision));
         }
         if (policy.chapter !== 'policy' || Number(policy.outer) <= Number(vision.outer) * 4
@@ -190,7 +193,8 @@ try {
             || annual.nowFilter === 'none' || annual.nowStroke === policy.nowStroke || annual.nowWidth === policy.nowWidth) {
             throw new Error(viewport.name + ': annual NOW emphasis ' + JSON.stringify({ policy, annual }));
         }
-        if (!(initial.root.innerArc > initial.root.outerArc * 6)) {
+        if (!(initial.root.innerArc > initial.root.outerArc * 6)
+            || initial.root.secondExecutionArc !== 0 || initial.root.outerExecutionArc !== 0) {
             throw new Error(viewport.name + ': ROOT emphasis is not concentrated in the inner rings');
         }
         if (initial.root.ringMotion.some(name => name === 'none') || initial.root.outerStroke !== 'rgb(53, 111, 123)') {
@@ -224,7 +228,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('policy-no-now-1') || !cacheIdentity.js.includes('policy-no-now-1')) {
+    if (!cacheIdentity.css.includes('no-vision-ring-flash-1') || !cacheIdentity.js.includes('no-vision-ring-flash-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
