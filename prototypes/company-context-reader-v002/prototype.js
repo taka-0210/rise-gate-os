@@ -348,12 +348,24 @@
         }
         brandEntryComplete = true;
         if (brandVisualCanvas) {
-            brandVisualCanvas.style.setProperty('--brand-canvas-duration', '1800ms');
+            brandVisualCanvas.style.setProperty('--brand-canvas-duration', '900ms');
         }
         body.dataset.brandEntry = 'entered';
+        window.removeEventListener('scroll', revealBrandVisualDuringTransition);
         window.setTimeout(function () {
             if (brandVisualCanvas) brandVisualCanvas.style.removeProperty('--brand-canvas-duration');
-        }, 1850);
+        }, 950);
+    }
+
+    function revealBrandVisualDuringTransition() {
+        if (brandEntryComplete) {
+            window.removeEventListener('scroll', revealBrandVisualDuringTransition);
+            return;
+        }
+        var philosophy = document.getElementById('philosophy');
+        if (philosophy && philosophy.getBoundingClientRect().top <= window.innerHeight * .82) {
+            revealBrandVisual();
+        }
     }
 
     function bindBrandTuning() {
@@ -456,6 +468,9 @@
             chapters.forEach(function (chapter) { chapterObserver.observe(chapter); });
         } else if (chapters[0]) {
             setCurrentChapter(chapters[0]);
+        }
+        if (!brandEntryComplete) {
+            window.addEventListener('scroll', revealBrandVisualDuringTransition, { passive: true });
         }
 
         initializationSubstage = 'CONTROL_LISTENERS';

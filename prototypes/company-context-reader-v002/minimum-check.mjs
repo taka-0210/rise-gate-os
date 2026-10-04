@@ -98,12 +98,23 @@ try {
             },
         }));
 
-        await activateChapter(page, 'philosophy');
-        await page.waitForTimeout(1500);
+        await page.evaluate(() => {
+            const philosophy = document.getElementById('philosophy');
+            const transitionY = window.scrollY + philosophy.getBoundingClientRect().top - window.innerHeight * .80;
+            window.scrollTo(0, Math.max(1, transitionY));
+        });
+        await page.waitForTimeout(80);
+        const brandEntryStart = await page.evaluate(() => ({
+            state: document.body.dataset.brandEntry,
+            duration: document.querySelector('[data-brand-visual-canvas]').style.getPropertyValue('--brand-canvas-duration'),
+            philosophyTop: document.getElementById('philosophy').getBoundingClientRect().top,
+        }));
+        await page.waitForTimeout(900);
         const brandEntry = await page.evaluate(() => ({
             state: document.body.dataset.brandEntry,
             opacity: getComputedStyle(document.querySelector('[data-brand-visual-canvas]')).opacity,
         }));
+        await activateChapter(page, 'philosophy');
 
         await activateChapter(page, 'vision');
         await page.waitForTimeout(250);
@@ -181,6 +192,10 @@ try {
         if (brandEntry.state !== 'entered' || brandEntry.opacity !== '1') {
             throw new Error(viewport.name + ': brand entry ' + JSON.stringify(brandEntry));
         }
+        if (brandEntryStart.state !== 'entered' || brandEntryStart.duration !== '900ms'
+            || brandEntryStart.philosophyTop < viewport.height * .70) {
+            throw new Error(viewport.name + ': brand entry did not start during section transition ' + JSON.stringify(brandEntryStart));
+        }
         if (initial.fade.duration !== '1350ms' || initial.fade.distance !== '40px' || initial.fade.blur !== '2.5px' || initial.fade.trigger !== '75') {
             throw new Error(viewport.name + ': fade ' + JSON.stringify(initial.fade));
         }
@@ -247,7 +262,7 @@ try {
     if (!Number.isFinite(panelViewportTop) || panelViewportTop < 0 || panelViewportTop >= 920 || panelRect.height <= 0) {
         throw new Error('review: tuning panel is outside the initial outer viewport ' + JSON.stringify({ iframeRect, panelRect }));
     }
-    if (!cacheIdentity.css.includes('policy-lines-annual-1') || !cacheIdentity.js.includes('policy-lines-annual-1')) {
+    if (!cacheIdentity.css.includes('intro-slide-fast-1') || !cacheIdentity.js.includes('intro-slide-fast-1')) {
         throw new Error('review: stale cache identity ' + JSON.stringify(cacheIdentity));
     }
     results.push({ viewport: 'review-wrapper', panelViewportTop, cacheIdentity });
