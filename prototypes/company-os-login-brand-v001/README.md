@@ -4,8 +4,13 @@
 
 ## 起動
 
-PowerShellで次を実行します。
+どのディレクトリからでも実行できる、次の絶対パスを使用します。
 
+    powershell -ExecutionPolicy Bypass -File C:\xampp\htdocs\rise-gate-os\prototypes\company-os-login-brand-v001\Open-CompanyOSLoginBrandPrototype.ps1
+
+相対パスを使う場合は、先にRepository直下へ移動します。
+
+    cd C:\xampp\htdocs\rise-gate-os
     powershell -ExecutionPolicy Bypass -File .\prototypes\company-os-login-brand-v001\Open-CompanyOSLoginBrandPrototype.ps1
 
 Review画面上部で「Desktop 1440×900」と「Mobile 390×844」を切り替えられます。
