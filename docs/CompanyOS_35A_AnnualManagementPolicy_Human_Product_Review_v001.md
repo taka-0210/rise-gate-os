@@ -1,12 +1,14 @@
 # Company OS｜35A Annual Management Policy｜Human Product Review v001
 
-Date: 2026-10-03 JST
+Initial review package: 2026-10-03 JST
 
-Binding: implementation commit `bc5234949a435c516b0184e9889f3c606f9cf240`
+Final Human Review: 2026-10-05 JST
 
-Status: **READY FOR HUMAN REVIEW / H01–H12 NOT YET HUMAN-PASSED**
+Binding Product HEAD: `1a4bb264a2484d6b12de137abb76452db6b8cb93`
 
-Automated tests establish technical behavior only. They do not grant Human PASS to any item below.
+Status: **HUMAN FINAL PASS / FORMAL CLOSE AUTHORIZED**
+
+Automated evidence establishes technical behavior. Human Authority completed the final Product Review and accepted the experience and supporting technical/browser evidence.
 
 ## Review fixture
 
@@ -17,24 +19,24 @@ Automated tests establish technical behavior only. They do not grant Human PASS 
 - Active and archived Groups, readable/unreadable Projects, and readable/unreadable Actions.
 - Drafts for empty optional collections, long Japanese text, multiple Themes/Priorities, and multiple Department Statements.
 - Desktop viewport (recommended 1440 px) and mobile viewport (390 px).
-- Environment and exact SHA must be recorded at review time. Screenshots and Human name/date remain pending until the actual review.
+- Environment, exact SHA and Browser results are recorded in the Formal Closure Evidence.
 
 ## Human review matrix
 
 | ID | Human action and expected experience | Automated support | Human status |
 |---|---|---|---|
-| H01 | Register a natural period name/start/end and read it back. | JST boundaries, overlap and version correction PASS | NOT REVIEWED |
-| H02 | Distinguish current/future/past, a gap with no current, and current without approved policy. | Resolver and index-state tests PASS | NOT REVIEWED |
-| H03 | Create a Draft for a selected period and recognize that it is not approved. | Draft≠Approve tests PASS | NOT REVIEWED |
-| H04 | Save/read Purpose, Background and Policy; confirm optional vs required meaning. | Snapshot/validation tests PASS | NOT REVIEWED |
-| H05 | Use zero and multiple Themes without forced placeholders. | Empty/many structure tests PASS | NOT REVIEWED |
-| H06 | Understand Priority nesting under Theme with zero/multiple items. | Stable nested identity tests PASS | NOT REVIEWED |
-| H07 | Distinguish Group from Department policy and manage multiple Statements. | Annual×Group uniqueness and statement validation PASS | NOT REVIEWED |
-| H08 | Follow Project/Action relations without re-entering execution truth. | Existing reader delegation and typed relation tests PASS | NOT REVIEWED |
-| H09 | Save without formalization; during revision confirm the old Approved version remains visible. | Immutable current revision tests PASS | NOT REVIEWED |
-| H10 | Review the entire snapshot, sharing mode and viewer/Draft/editor/approver counts before approval. | Access-state snapshot binding and stale-stop test PASS | NOT REVIEWED |
-| H11 | Distinguish current Draft, immutable old revisions, approval-time relation set and later relation versions. | Revision/relation version tests PASS | NOT REVIEWED |
-| H12 | Open Source Evidence and resolve the cited exact revision/range, including Japanese Unicode text. | Exact citation/currentness tests PASS | NOT REVIEWED |
+| H01 | Register a natural period name/start/end and read it back. | JST boundaries, overlap and version correction PASS | PASS |
+| H02 | Distinguish current/future/past, a gap with no current, and current without approved policy. | Resolver and index-state tests PASS | PASS |
+| H03 | Create a Draft for a selected period and recognize that it is not approved. | Draft≠Approve tests PASS | PASS |
+| H04 | Save/read Purpose, Background and Policy; confirm optional vs required meaning. | Snapshot/validation tests PASS | PASS |
+| H05 | Use zero and multiple Themes without forced placeholders. | Empty/many structure tests PASS | PASS |
+| H06 | Understand Priority nesting under Theme with zero/multiple items. | Stable nested identity tests PASS | PASS |
+| H07 | Distinguish Group from Department policy and manage multiple Statements. | Annual×Group uniqueness and statement validation PASS | PASS |
+| H08 | Follow Project/Action relations without re-entering execution truth. | Existing reader delegation and typed relation tests PASS | PASS |
+| H09 | Save without formalization; during revision confirm the old Approved version remains visible. | Immutable current revision tests PASS | PASS |
+| H10 | Review the entire snapshot, sharing mode and viewer/Draft/editor/approver counts before approval. | Access-state snapshot binding and stale-stop test PASS | PASS |
+| H11 | Distinguish current Draft, immutable old revisions, approval-time relation set and later relation versions. | Revision/relation version tests PASS | PASS |
+| H12 | Open Source Evidence and resolve the cited exact revision/range, including Japanese Unicode text. | Exact citation/currentness tests PASS | PASS |
 
 ## Permission scenarios to review
 
@@ -45,17 +47,41 @@ Automated tests establish technical behavior only. They do not grant Human PASS 
 5. Group and Position membership does not grant access.
 6. A suspended/left membership loses access immediately.
 
-## Evidence capture template
+## Final Human Review acceptance
 
-For each H item, record:
+Human Authority accepted the following on 2026-10-05 JST:
 
-- reviewer and JST timestamp;
-- implementation SHA and environment;
-- actor capability and Organization fixture;
-- viewport (`desktop` or `390px`);
-- exact route/action;
-- screenshot reference before/after when applicable;
-- observed result;
-- `PASS`, `STOP`, or `CHANGE REQUEST` entered by Human.
+1. Editor Japanese labels and input journey.
+2. Official-version sharing and policy-team separation.
+3. Fiscal term and year labels.
+4. Current / Planning / Past experience.
+5. Theme / Priority / Department Policy ordering.
+6. Department empty state and Draft preservation, accepting Technical / Browser Evidence.
+7. Desktop / 390px Application Shell and vertical spacing.
 
-No screenshot or Human outcome is fabricated in this package. Production, Deploy, Production Migration, Scope 35 retrieval, Scope 36 response generation, and Scope 37 voice are outside this review.
+Company Context Reader is separately Human Product Review PASS and Formal Closed.
+
+## Upcoming / Planning Product Decision
+
+- Planning is not a new Lifecycle or DB status.
+- Approved / Upcoming is presented as `計画中｜承認済み・開始前`.
+- Planning participants receive explicit existing Approved View access.
+- Draft, Edit, Approve, Owner, Manage, Position and Group do not automatically grant Approved View.
+- Draft is not mixed into the normal Reader.
+- Unauthorized staff receive no Upcoming Annual selector, count, metadata or content disclosure.
+
+## Publication Decision
+
+- Period start and publication to all staff are separate.
+- Becoming Effective does not change the sharing scope.
+- Human changes the official audience at the management-policy presentation timing.
+- Human-controlled Publication is the formal decision.
+- Automatic start-date publication, publication scheduling and a dedicated pre-start audience are OUT-LATER.
+
+## Human Review Result
+
+- Human Review Pending: **0**
+- Product Pending: **0**
+- Human result: **PASS**
+
+# **SCOPE 35A / HUMAN FINAL PASS**
