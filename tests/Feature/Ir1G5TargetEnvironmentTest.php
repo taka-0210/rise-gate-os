@@ -140,4 +140,52 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringNotContainsString('ssh ', $builder);
         $this->assertStringNotContainsString('scp ', $builder);
     }
+
+    public function test_g5b_target_anchor_discovery_is_read_only_and_rebinds_actual_home(): void
+    {
+        $script = (string) file_get_contents(base_path('deployment/g5-target-environment/inspect-target-anchor-read-only.sh'));
+
+        foreach ([
+            'IR1-G5B-READ-ONLY-TARGET-DISCOVERY',
+            'actual_home_not_assumed',
+            'app.company-os.jp',
+            'target_domain_owner_uid',
+            'target_public_entry_mode',
+            'legacy_physical_separation',
+            'target_filesystem_type',
+            'default_index_sha256',
+            'posix_capability_rehearsal=not_executed',
+            'production_mutation=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $script);
+        }
+        foreach (['mkdir ', 'rm ', 'rmdir ', 'mv ', 'cp ', 'ln ', 'chmod ', 'chown ', 'touch ', 'mysql', 'artisan'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $script);
+        }
+    }
+
+    public function test_g5b_helper_is_one_shot_host_key_bound_and_never_rehearses(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5BReadOnlyTargetDiscovery.ps1'));
+
+        foreach ([
+            'g5b-target-discovery-v1',
+            'g5b-target-discovery-corrective-1',
+            'G5B_RETRY_FORBIDDEN',
+            'INITIAL_STOP_STATE_REQUIRED',
+            'sanitized-target-observation.json',
+            'target_binding_mismatches',
+            'StrictHostKeyChecking=yes',
+            'HostKeyAlgorithms=ssh-ed25519',
+            'SSH_IDENTITY_FINGERPRINT_MISMATCH',
+            'HOST_KEY_FINGERPRINT_MISMATCH',
+            'actual_home_not_assumed',
+            'posix_capability_rehearsal=not_executed',
+            'production_mutation=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
+        $this->assertStringNotContainsString('rehearse-posix-capabilities.sh', $helper);
+        $this->assertStringNotContainsString('scp.exe', $helper);
+    }
 }
