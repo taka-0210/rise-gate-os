@@ -985,11 +985,19 @@ class Ir1G5TargetEnvironmentTest extends TestCase
                 '-Attempt', 'Corrective1', $mode,
             ], base_path());
             $process->setTimeout(30);
-            $process->mustRun();
+            $process->run();
             $output = $process->getOutput();
+            if (is_dir(base_path(
+                'storage/app/release-audit/production-g5-shared-state-corrective-1-'.self::CANDIDATE
+            ))) {
+                $this->assertSame(1, $process->getExitCode());
+                $this->assertStringContainsString('safe_error_code=CORRECTIVE_ATTEMPT_ALREADY_RECORDED', $output);
+            } else {
+                $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput().$output);
+                $this->assertStringContainsString('shared_state_operation=not_executed', $output);
+            }
             $this->assertStringContainsString('production_connection_attempted=false', $output);
             $this->assertStringContainsString('production_mutation=false', $output);
-            $this->assertStringContainsString('shared_state_operation=not_executed', $output);
         }
     }
 
@@ -1010,5 +1018,216 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringContainsString('production_connection_attempted=false', $output);
         $this->assertStringContainsString('production_mutation=false', $output);
         $this->assertStringContainsString('retry_available=false', $output);
+    }
+
+    public function test_g5_required_source_diagnostic_contract_keeps_required_and_allowlist_contracts_unchanged(): void
+    {
+        $contractPath = base_path(
+            'deployment/g5-target-environment/shared-state-required-diagnostic-contract.json'
+        );
+        $contract = json_decode((string) file_get_contents($contractPath), true, 512, JSON_THROW_ON_ERROR);
+        $base = json_decode((string) file_get_contents(
+            base_path('deployment/g5-target-environment/shared-state-contract.json')
+        ), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('company-os.ir1.g5-shared-state-required-diagnostic.v1', $contract['contract_id']);
+        $this->assertSame(self::CANDIDATE, $contract['candidate']);
+        $this->assertSame(
+            '403fdcbcc4b9d9cdae9e9d1ec99b07be48ce502ef9601ec7accaa31ec3a08331',
+            $contract['evidence_binding']['corrective1_stop_state_sha256'],
+        );
+        $this->assertSame(172, $contract['evidence_binding']['allowlist_count']);
+        $this->assertSame(
+            'd408775076252cb15ac0438b1d4ccc762f3f366e9ea10517e3e0f8b3f0d496ec',
+            $contract['evidence_binding']['allowlist_sha256'],
+        );
+        $this->assertSame(
+            $base['candidate_environment_contract']['required_source_keys'],
+            array_column($contract['required_items'], 'key'),
+        );
+        $this->assertSame(
+            ['rk01', 'rk02', 'rk03', 'rk04', 'rk05', 'rk06', 'rk07', 'rk08', 'rk09', 'rk10', 'rk11', 'rk12'],
+            array_column($contract['required_items'], 'id'),
+        );
+        $this->assertSame(
+            'feature_required_not_core_boot_required',
+            $contract['required_items'][11]['new_target_requirement'],
+        );
+        $this->assertSame(
+            'unsafe_for_continuity',
+            $contract['required_items'][0]['generated'],
+        );
+        $this->assertTrue($contract['key_name_safety']['stable_diagnostic_ids_only']);
+        $this->assertFalse($contract['key_name_safety']['execution_evidence_key_names_allowed']);
+        $this->assertFalse($contract['production_mutation_authorized']);
+        $this->assertFalse($contract['shared_state_creation_authorized']);
+        $this->assertFalse($contract['required_contract_change_authorized']);
+        $this->assertSame(
+            hash_file('sha256', base_path('deployment/g5-target-environment/diagnose-required-source.php')),
+            $contract['implementation_binding']['diagnostic_sha256'],
+        );
+        $this->assertSame(
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            $contract['PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION'],
+        );
+    }
+
+    public function test_g5_required_source_diagnostic_reports_only_stable_ids_and_value_states(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'g5-required-diagnostic-'.bin2hex(random_bytes(8));
+        mkdir($root, 0700, true);
+        $secret = 'required-diagnostic-secret-never-output';
+        $envPath = $root.DIRECTORY_SEPARATOR.'.env';
+        file_put_contents($envPath, implode("\n", [
+            'DB_CONNECTION=',
+            'DB_HOST=null',
+            'DB_PORT=3306',
+            'DB_DATABASE=fixture',
+            'DB_USERNAME=fixture',
+            'DB_PASSWORD='.$secret,
+            'MAIL_MAILER=smtp',
+            'MAIL_FROM_ADDRESS=fixture@example.com',
+            'MAIL_FROM_NAME=Fixture',
+            'ACCOUNT_MAIL_MAILER=smtp',
+            'OPENAI_API_KEY='.$secret,
+            '',
+        ]));
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                base_path('deployment/g5-target-environment/diagnose-required-source.php'),
+                'IR1-G5-SHARED-REQUIRED-DIAGNOSTIC-FIXTURE',
+                $envPath,
+            ], base_path());
+            $process->mustRun();
+            $output = $process->getOutput().$process->getErrorOutput();
+
+            $this->assertStringContainsString('G5_SHARED_REQUIRED_DIAGNOSTIC=PASS', $output);
+            $this->assertStringContainsString('rk01_state=missing', $output);
+            $this->assertStringContainsString('rk02_state=empty', $output);
+            $this->assertStringContainsString('rk03_state=null_equivalent', $output);
+            $this->assertStringContainsString('rk04_state=present', $output);
+            $this->assertStringContainsString('missing_count=1', $output);
+            $this->assertStringContainsString('empty_count=1', $output);
+            $this->assertStringContainsString('null_equivalent_count=1', $output);
+            $this->assertStringContainsString('present_count=9', $output);
+            $this->assertStringContainsString('storage_inventory=not_attempted', $output);
+            $this->assertStringContainsString('new_target_connection=not_attempted', $output);
+            $this->assertStringContainsString('secret_output=false', $output);
+            $this->assertStringContainsString('key_names_output=false', $output);
+            $this->assertStringContainsString('raw_env_output=false', $output);
+            $this->assertStringNotContainsString($secret, $output);
+            foreach (array_column(json_decode((string) file_get_contents(
+                base_path('deployment/g5-target-environment/shared-state-required-diagnostic-contract.json')
+            ), true, 512, JSON_THROW_ON_ERROR)['required_items'], 'key') as $key) {
+                $this->assertStringNotContainsString($key, $output);
+            }
+        } finally {
+            @unlink($envPath);
+            @rmdir($root);
+        }
+    }
+
+    public function test_g5_required_source_diagnostic_is_read_only_and_does_not_inventory_storage(): void
+    {
+        $diagnostic = (string) file_get_contents(
+            base_path('deployment/g5-target-environment/diagnose-required-source.php')
+        );
+
+        foreach ([
+            "PRODUCTION_SOURCE_ENV = '/home/xs257823/rise-gate.com/rise-gate-os/.env'",
+            "PRODUCTION_SOURCE_HOME = '/home/xs257823'",
+            'PRODUCTION_SOURCE_UID = 20222',
+            'PRODUCTION_SOURCE_GID = 1000',
+            'storage_inventory=not_attempted',
+            'new_target_connection=not_attempted',
+            'key_names_output=false',
+            'source_env_hash_output=false',
+            'production_change_scope=none_read_only_source',
+        ] as $required) {
+            $this->assertStringContainsString($required, $diagnostic);
+        }
+        foreach ([
+            'file_put_contents', 'unlink(', 'rename(', 'mkdir(', 'rmdir(', 'chmod(', 'chown(',
+            'shell_exec', 'exec(', 'system(', 'passthru(', 'proc_open(', 'curl_', 'mysqli_', 'PDO(',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $diagnostic);
+        }
+    }
+
+    public function test_g5_required_source_diagnostic_helper_is_one_shot_source_only_and_secret_safe(): void
+    {
+        $helper = (string) file_get_contents(
+            base_path('deployment/g5-target-environment/Invoke-G5SharedStateRequiredDiagnostic.ps1')
+        );
+        foreach ([
+            'g5-shared-state-required-diagnostic-v1',
+            'REQUIRED_DIAGNOSTIC_ATTEMPT_ALREADY_RECORDED',
+            'production-g5-shared-state-required-diagnostic-$Candidate',
+            'Assert-CorrectiveStopEvidence',
+            '403fdcbcc4b9d9cdae9e9d1ec99b07be48ce502ef9601ec7accaa31ec3a08331',
+            "'php','--',\$Confirmation,\$SourceEnv",
+            'remote_process_count=1',
+            'target_connection_attempted=false',
+            'production_mutation=false',
+            'shared_state_created=false',
+            'raw_output_stored=false',
+            'secret_values_output=false',
+            'key_names_output=false',
+            'source_env_hash_output=false',
+            'required_contract_disposition=unchanged_pending_human_reconciliation',
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            '[IO.File]::Replace($temporaryPath, $Path, $backupPath)',
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
+        foreach ([
+            'sv17169.xserver.jp', 'xs377816', 'scp.exe', 'Invoke-WebRequest', 'curl.exe',
+            'mysql.exe', 'php artisan', 'shared/.env', 'shared/storage',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $helper);
+        }
+        $processStart = strpos($helper, 'if (-not $process.Start())');
+        $connectionObserved = strpos($helper, '$script:ConnectionAttempted = $true');
+        $remoteInvocation = strpos($helper, '$result = Invoke-Native $ssh.Source');
+        $metadataSave = strpos($helper, '$State.step_streams.source_required_diagnostic', $remoteInvocation);
+        $safeParse = strpos($helper, '$diagnostic = Assert-DiagnosticPass $result', $remoteInvocation);
+        $this->assertIsInt($processStart);
+        $this->assertIsInt($connectionObserved);
+        $this->assertIsInt($remoteInvocation);
+        $this->assertIsInt($metadataSave);
+        $this->assertIsInt($safeParse);
+        $this->assertLessThan($connectionObserved, $processStart);
+        $this->assertLessThan($remoteInvocation, $connectionObserved);
+        $this->assertLessThan($safeParse, $metadataSave);
+    }
+
+    public function test_g5_required_source_diagnostic_verify_only_is_production_free(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('The G5 diagnostic Human helper runs under Windows PowerShell.');
+        }
+        $evidenceRoot = base_path(
+            'storage/app/release-audit/production-g5-shared-state-required-diagnostic-'.self::CANDIDATE
+        );
+        $this->assertDirectoryDoesNotExist($evidenceRoot);
+
+        $process = new Process([
+            'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+            base_path('deployment/g5-target-environment/Invoke-G5SharedStateRequiredDiagnostic.ps1'),
+            '-VerifyOnly',
+        ], base_path());
+        $process->setTimeout(30);
+        $process->mustRun();
+        $output = $process->getOutput();
+
+        $this->assertStringContainsString('G5_SHARED_REQUIRED_DIAGNOSTIC_VERIFY_ONLY=PASS', $output);
+        $this->assertStringContainsString('production_connection_attempted=false', $output);
+        $this->assertStringContainsString('target_connection_attempted=false', $output);
+        $this->assertStringContainsString('production_mutation=false', $output);
+        $this->assertStringContainsString('diagnostic_operation=not_executed', $output);
+        $this->assertStringContainsString('key_names_output=false', $output);
+        $this->assertDirectoryDoesNotExist($evidenceRoot);
     }
 }

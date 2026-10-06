@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5-shared-state-required-diagnostic.v1",
+  "release_case": "IR1-G5-SHARED-STATE-REQUIRED-DIAGNOSTIC",
+  "candidate": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "scope": "source_read_only_required_key_state_diagnostic",
+  "evidence_binding": {
+    "initial_stop_state_sha256": "bb98d39709625d619d0365b57850613580237be837dcc85a863d00adfbcb248d",
+    "corrective1_stop_state_sha256": "403fdcbcc4b9d9cdae9e9d1ec99b07be48ce502ef9601ec7accaa31ec3a08331",
+    "corrective1_status": "STOP",
+    "corrective1_safe_error_code": "REMOTE_STEP_FAILED",
+    "corrective1_remote_status": "REQUIRED_SOURCE_KEY_MISSING",
+    "base_contract_sha256": "cc11ad5a67e0f3f869da15091d91740f9e4d584d90995bd86d38ae22d7a282d1",
+    "corrective1_contract_sha256": "1637b67d6acc95c50e2433d9e48cb21328522d357ae7468c0bb1b973fa443064",
+    "allowlist_count": 172,
+    "allowlist_sha256": "d408775076252cb15ac0438b1d4ccc762f3f366e9ea10517e3e0f8b3f0d496ec"
+  },
+  "key_name_safety": {
+    "repository_contract_mapping_allowed": true,
+    "remote_stdout_key_names_allowed": false,
+    "terminal_key_names_allowed": false,
+    "execution_evidence_key_names_allowed": false,
+    "stable_diagnostic_ids_only": true,
+    "secret_values_allowed": false,
+    "raw_env_allowed": false,
+    "source_env_hash_allowed": false
+  },
+  "diagnostic_states": [
+    "missing",
+    "empty",
+    "null_equivalent",
+    "present"
+  ],
+  "required_contract_disposition": "unchanged_pending_id_diagnostic_and_human_reconciliation",
+  "required_items": [
+    {
+      "id": "rk01",
+      "key": "APP_KEY",
+      "runtime_class": "core_security_continuity",
+      "new_target_requirement": "required_core",
+      "candidate_basis": "config_app_encryption_key",
+      "legacy_or_new": "legacy_continuity_value",
+      "resolution_class": "preserve_exact_source_or_human_secret",
+      "default": "none",
+      "generated": "unsafe_for_continuity",
+      "derived": "not_allowed"
+    },
+    {
+      "id": "rk02",
+      "key": "DB_CONNECTION",
+      "runtime_class": "core_database_driver",
+      "new_target_requirement": "required_after_database_topology_decision",
+      "candidate_basis": "config_database_default_sqlite_is_not_target_authority",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_confirm_target_driver",
+      "default": "sqlite_candidate_default_not_safe_for_new_production",
+      "generated": "not_applicable",
+      "derived": "only_after_database_topology_binding"
+    },
+    {
+      "id": "rk03",
+      "key": "DB_HOST",
+      "runtime_class": "conditional_database_endpoint",
+      "new_target_requirement": "required_for_mysql_or_mariadb",
+      "candidate_basis": "config_database_mysql_mariadb",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_confirm_target_endpoint",
+      "default": "127_0_0_1_not_safe_across_server_boundary",
+      "generated": "not_applicable",
+      "derived": "not_before_database_topology_binding"
+    },
+    {
+      "id": "rk04",
+      "key": "DB_PORT",
+      "runtime_class": "conditional_database_endpoint",
+      "new_target_requirement": "required_for_mysql_or_mariadb",
+      "candidate_basis": "config_database_mysql_mariadb",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_confirm_target_endpoint",
+      "default": "3306_conditionally_safe_only_after_driver_and_topology_binding",
+      "generated": "not_applicable",
+      "derived": "conditional_human_confirmed_default"
+    },
+    {
+      "id": "rk05",
+      "key": "DB_DATABASE",
+      "runtime_class": "core_database_identity",
+      "new_target_requirement": "required_after_database_topology_decision",
+      "candidate_basis": "config_database_connection",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_or_restore_contract_value",
+      "default": "laravel_not_safe_for_new_production",
+      "generated": "not_allowed",
+      "derived": "not_allowed"
+    },
+    {
+      "id": "rk06",
+      "key": "DB_USERNAME",
+      "runtime_class": "database_credential_identifier",
+      "new_target_requirement": "required_after_database_topology_decision",
+      "candidate_basis": "config_database_connection",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_secret_source",
+      "default": "root_not_safe_for_new_production",
+      "generated": "not_allowed_by_this_gate",
+      "derived": "not_allowed"
+    },
+    {
+      "id": "rk07",
+      "key": "DB_PASSWORD",
+      "runtime_class": "database_secret",
+      "new_target_requirement": "required_when_selected_database_requires_password",
+      "candidate_basis": "config_database_connection",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_secret_source",
+      "default": "empty_not_safe_for_new_production",
+      "generated": "not_allowed_by_this_gate",
+      "derived": "not_allowed"
+    },
+    {
+      "id": "rk08",
+      "key": "MAIL_MAILER",
+      "runtime_class": "production_mail_delivery",
+      "new_target_requirement": "required_operational_choice",
+      "candidate_basis": "config_mail_default_log_does_not_deliver",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_select_configured_mailer",
+      "default": "log_boots_but_is_not_production_delivery",
+      "generated": "not_applicable",
+      "derived": "may_match_account_mailer_only_by_human_decision"
+    },
+    {
+      "id": "rk09",
+      "key": "MAIL_FROM_ADDRESS",
+      "runtime_class": "production_mail_identity",
+      "new_target_requirement": "required_when_mail_is_enabled",
+      "candidate_basis": "config_mail_sender",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_controlled_identity",
+      "default": "hello_example_com_not_safe_for_production",
+      "generated": "not_allowed",
+      "derived": "not_allowed"
+    },
+    {
+      "id": "rk10",
+      "key": "MAIL_FROM_NAME",
+      "runtime_class": "production_mail_presentation",
+      "new_target_requirement": "required_when_mail_is_enabled",
+      "candidate_basis": "config_mail_sender",
+      "legacy_or_new": "existing_candidate_key",
+      "resolution_class": "human_confirm_or_candidate_app_name",
+      "default": "candidate_app_name_available",
+      "generated": "not_applicable",
+      "derived": "company_os_is_safe_candidate_after_human_confirmation"
+    },
+    {
+      "id": "rk11",
+      "key": "ACCOUNT_MAIL_MAILER",
+      "runtime_class": "account_lifecycle_delivery",
+      "new_target_requirement": "required_for_invitation_and_account_mail",
+      "candidate_basis": "config_account_has_no_default",
+      "legacy_or_new": "candidate_capability_key_source_presence_unknown",
+      "resolution_class": "human_select_configured_delivery_mailer",
+      "default": "none",
+      "generated": "not_applicable",
+      "derived": "may_match_primary_mailer_only_by_human_decision"
+    },
+    {
+      "id": "rk12",
+      "key": "OPENAI_API_KEY",
+      "runtime_class": "optional_ai_capability_secret",
+      "new_target_requirement": "feature_required_not_core_boot_required",
+      "candidate_basis": "config_services_and_fail_closed_ai_service",
+      "legacy_or_new": "candidate_capability_key_source_presence_unknown",
+      "resolution_class": "human_secret_if_enabled_or_separate_required_contract_decision",
+      "default": "none",
+      "generated": "not_allowed",
+      "derived": "not_allowed"
+    }
+  ],
+  "diagnostic_operation": {
+    "production_connection": "separate_human_gate_source_read_only_maximum_once",
+    "source_host": "sv17033.xserver.jp",
+    "source_user": "xs257823",
+    "source_port": 10022,
+    "source_env": "/home/xs257823/rise-gate.com/rise-gate-os/.env",
+    "new_target_connection": "not_allowed",
+    "storage_inventory": "not_allowed",
+    "production_mutation": false,
+    "database_connection": "not_attempted",
+    "one_step_one_command": true,
+    "at_most_once": true,
+    "retry": false
+  },
+  "implementation_binding": {
+    "diagnostic_file": "diagnose-required-source.php",
+    "diagnostic_sha256": "6bf7e305f423d1a11a8604e8173dc712f82fdb28175ab12bfcce8932f98b19b2",
+    "human_helper_file": "Invoke-G5SharedStateRequiredDiagnostic.ps1"
+  },
+  "reconciliation_rules": {
+    "missing_or_empty_does_not_automatically_relax_required_contract": true,
+    "present_does_not_authorize_transfer_or_creation": true,
+    "source_presence_does_not_prove_new_target_correctness": true,
+    "core_continuity_secret_requires_exact_source_or_human_value": true,
+    "target_specific_value_requires_human_topology_decision": true,
+    "safe_default_or_derivation_requires_separate_human_acceptance": true,
+    "optional_capability_requires_enablement_decision": true
+  },
+  "continuing_blockers": [
+    "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE",
+    "usable_backup=unknown",
+    "db_restore_readiness=blocker",
+    "storage_final_delta_required=true",
+    "application_release_binding=not_attempted",
+    "release_marker_binding=not_attempted",
+    "dns_ssl_change=not_attempted",
+    "deploy_authorized=false"
+  ],
+  "production_mutation_authorized": false,
+  "shared_state_creation_authorized": false,
+  "required_contract_change_authorized": false,
+  "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION": "PENDING_G5_PUBLIC_ENTRY_GATE"
+}

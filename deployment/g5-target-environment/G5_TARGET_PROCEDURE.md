@@ -225,6 +225,42 @@ authorization. It maintains
 and returns to Human + ChatGPT without starting Application placement or any
 later gate.
 
+Corrective-1 was subsequently executed once and ended in Formal STOP at
+required source-key validation. Its sanitized remote status was
+`REQUIRED_SOURCE_KEY_MISSING`; the Source `.env` read/parse completed, storage
+inventory did not begin, NewTarget connection was zero and Production
+mutation was zero. The immutable Corrective-1 state SHA-256 is
+`403fdcbcc4b9d9cdae9e9d1ec99b07be48ce502ef9601ec7accaa31ec3a08331`.
+The Shared State operation must not be replayed.
+
+### Required Source Diagnostic Human gate
+
+`shared-state-required-diagnostic-contract.json` defines a separate,
+source-read-only diagnostic. It does not relax the 172-key allowlist or the
+existing 12-item required contract. Repository code contains the local
+mapping needed to evaluate the contract, but remote stdout, terminal output
+and execution Evidence use only stable IDs `rk01` through `rk12`. Values,
+key names, raw `.env` and the raw `.env` hash are excluded.
+
+The diagnostic classifies each stable ID as `missing`, `empty`,
+`null_equivalent` or `present`. Presence is not authorization to transfer or
+publish. Absence is not authorization to remove a required item. The result
+returns to Human + ChatGPT for a separate requirement reconciliation based on
+core continuity, target-specific database topology, operational mail choice
+or optional AI capability.
+
+The only possible Production operation is a separately authorized,
+at-most-once SSH command to the exact Legacy Source. The remote program binds
+the Source host/user/HOME/UID/GID and exact `.env` path, reads no storage,
+opens no database connection, connects to no NewTarget and performs no write.
+The helper binds the immutable initial and Corrective-1 STOP Evidence before
+native process start, saves stream hashes/counts before parsing, stores only
+stable ID states and refuses replay after either PASS or STOP.
+
+No required diagnostic has been executed against Production. Shared State
+creation, Application placement, Migration, public-entry change, DNS, SSL and
+Deploy remain unauthorized.
+
 ## Permission plan
 
 - `shared/.env`: target `0600`; no group/other permission.
@@ -259,8 +295,9 @@ transaction/metadata lock visibility and DB/Application collation difference
 remain open until separate Evidence closes them. POSIX symlink and atomic
 rename capability are closed by G5-C Formal PASS, and exact empty Skeleton
 construction is closed by Target Skeleton Build Formal PASS. Shared State
-initial attempt is STOP; Corrective-1 is Production-free verified but requires
-a new explicit Human Gate. No storage seed has been published. Any future
+initial and Corrective-1 attempts are both STOP and may not be replayed. The
+stable-ID required-source diagnostic is Production-free prepared but requires
+a separate explicit Human Gate. No storage seed has been published. Any future
 initial seed will not close the required final delta, usable backup or DB
 restore blocker. Application placement, `current` / `current.previous`,
 public-entry disposition and binding remain separate gates. DNS and SSL remain
