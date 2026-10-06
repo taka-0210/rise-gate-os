@@ -410,4 +410,165 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringContainsString('existing_g5c_evidence_modified=false', $output);
         $this->assertStringContainsString('g5c_posix_capability_rehearsal=not_executed', $output);
     }
+
+    public function test_g5_target_skeleton_contract_creates_only_three_empty_directories(): void
+    {
+        $contract = json_decode((string) file_get_contents(
+            base_path('deployment/g5-target-environment/target-skeleton-contract.json')
+        ), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('company-os.ir1.g5-target-skeleton.v1', $contract['contract_id']);
+        $this->assertSame('924af91188cc60d33ff87c91b94ecc1d539566e6', $contract['candidate']);
+        $this->assertSame([
+            'company-os.jp/company-os-app',
+            'company-os.jp/company-os-app/releases',
+            'company-os.jp/company-os-app/shared',
+        ], array_column($contract['creation_set'], 'relative_path'));
+        foreach ($contract['creation_set'] as $entry) {
+            $this->assertSame('directory', $entry['type']);
+            $this->assertSame('0750', $entry['mode']);
+            $this->assertSame(20046, $entry['owner_uid']);
+            $this->assertSame(1000, $entry['group_gid']);
+        }
+        foreach ([
+            'company-os.jp/company-os-app/shared/.env',
+            'company-os.jp/company-os-app/shared/storage',
+            'company-os.jp/company-os-app/current',
+            'company-os.jp/company-os-app/current.previous',
+            'company-os.jp/public_html/app.company-os.jp',
+            'application placement',
+            'migration',
+            'release marker binding',
+            'dns',
+            'ssl',
+            'deploy',
+        ] as $excluded) {
+            $this->assertContains($excluded, $contract['excluded_set']);
+        }
+        $this->assertFalse($contract['public_entry_guard']['content_read']);
+        $this->assertFalse($contract['public_entry_guard']['mutation_allowed']);
+        $this->assertSame('PENDING_G5_PUBLIC_ENTRY_GATE', $contract['public_entry_guard']['disposition']);
+        $this->assertTrue($contract['operation']['at_most_once']);
+        $this->assertFalse($contract['operation']['blind_retry']);
+        $this->assertFalse($contract['operation']['success_replay']);
+        $this->assertFalse($contract['cleanup_and_rollback']['recursive_delete']);
+        $this->assertSame('SEPARATE_HUMAN_GATE', $contract['cleanup_and_rollback']['post_pass_rollback']);
+        $this->assertFalse($contract['production_mutation_authorized']);
+    }
+
+    public function test_g5_target_skeleton_remote_script_is_exact_atomic_and_fail_closed(): void
+    {
+        $script = (string) file_get_contents(base_path('deployment/g5-target-environment/build-target-skeleton.sh'));
+
+        foreach ([
+            "EXPECTED_CONFIRM='IR1-G5-TARGET-SKELETON-BUILD'",
+            "EXPECTED_HOME='/home/xs377816'",
+            "EXPECTED_UID='20046'",
+            "EXPECTED_GID='1000'",
+            'TARGET_TOPOLOGY_ROOT="$TARGET_DOMAIN/company-os-app"',
+            'mkdir -m 0750 -- "$STAGING_ROOT"',
+            'mkdir -m 0750 -- "$STAGING_ROOT/releases" "$STAGING_ROOT/shared"',
+            'mv -T -- "$STAGING_ROOT" "$TARGET_TOPOLOGY_ROOT"',
+            'rmdir -- "$STAGING_ROOT/shared" "$STAGING_ROOT/releases" "$STAGING_ROOT"',
+            'rmdir -- "$TARGET_TOPOLOGY_ROOT/shared" "$TARGET_TOPOLOGY_ROOT/releases" "$TARGET_TOPOLOGY_ROOT"',
+            "test ! -e \"\$TARGET_TOPOLOGY_ROOT/shared/.env\"",
+            "test ! -e \"\$TARGET_TOPOLOGY_ROOT/shared/storage\"",
+            "test ! -e \"\$TARGET_TOPOLOGY_ROOT/current\"",
+            "test ! -e \"\$TARGET_TOPOLOGY_ROOT/current.previous\"",
+            "'target_public_entry_changed=false'",
+            "'env_created=false'",
+            "'shared_storage_created=false'",
+            "'application_release_created=false'",
+            "'migration=not_attempted'",
+            "'release_marker_binding=not_attempted'",
+            "'dns_ssl_change=not_attempted'",
+            "'deploy=not_attempted'",
+            "'PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE'",
+        ] as $required) {
+            $this->assertStringContainsString($required, $script);
+        }
+        foreach (['rm -rf', 'unlink ', 'ln -s', 'chmod ', 'chown ', 'mysql', 'artisan', 'curl ', 'wget ', 'scp '] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $script);
+        }
+    }
+
+    public function test_g5_target_skeleton_helper_is_g5c_bound_one_shot_and_connection_truthful(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5TargetSkeletonBuild.ps1'));
+
+        foreach ([
+            'g5-target-skeleton-build-v1',
+            'de5476fbd019ab48909a4a9b82d9d12999dd21d29a0b3c4020da9d54ed728869',
+            'bbd05048b982b751861c48f84d2ba2c0ecaade333dd2d55f7d71b4646e57a0ff',
+            'a1dd2871236868affe3b4a9d5454dc87eb614b15f1049e3a555c3700dec59faf',
+            'e696b86dbb818c85f99d0115f547408cf193eb1fd67693807a7dd9f28d2ed99c',
+            'sv17169.xserver.jp',
+            'xs377816',
+            'SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8',
+            'production-g5-target-skeleton-build-$Candidate',
+            'SKELETON_BUILD_ATTEMPT_ALREADY_RECORDED',
+            'G5C_FORMAL_PASS_MISMATCH',
+            '[IO.File]::Replace($temporaryPath, $Path, $backupPath)',
+            'exact_empty_target_skeleton_created',
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            'deploy_authorized=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
+        foreach (['sv17033.xserver.jp', 'scp.exe', 'Invoke-WebRequest', 'curl.exe', 'mysql', 'artisan'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $helper);
+        }
+
+        $processStart = strpos($helper, 'if (-not $process.Start())');
+        $connectionObserved = strpos($helper, '$script:ConnectionAttempted = $true');
+        $remoteInvoke = strpos($helper, '$result = Invoke-CapturedProcess $ssh.Source $arguments $scriptText $true');
+        $this->assertIsInt($processStart);
+        $this->assertIsInt($connectionObserved);
+        $this->assertIsInt($remoteInvoke);
+        $this->assertLessThan($connectionObserved, $processStart);
+        $this->assertLessThan($remoteInvoke, $connectionObserved);
+    }
+
+    public function test_g5_target_skeleton_boundary_simulation_is_production_free(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            base_path('deployment/g5-target-environment/simulate-target-skeleton.php'),
+        ], base_path());
+        $process->setTimeout(30);
+        $process->mustRun();
+
+        $output = $process->getOutput();
+        $this->assertStringContainsString('G5_TARGET_SKELETON_SIMULATION=PASS', $output);
+        $this->assertStringContainsString('scenarios=6', $output);
+        $this->assertStringContainsString('assertions=13', $output);
+        $this->assertStringContainsString('production_connection_attempted=false', $output);
+        $this->assertStringContainsString('production_mutation=false', $output);
+    }
+
+    public function test_g5_target_skeleton_human_helper_verify_modes_do_not_connect(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('The G5 Skeleton Human helper runs under Windows PowerShell.');
+        }
+
+        $helper = base_path('deployment/g5-target-environment/Invoke-G5TargetSkeletonBuild.ps1');
+        foreach (['-VerifyPersistenceOnly', '-VerifyOnly'] as $mode) {
+            $process = new Process([
+                'powershell.exe',
+                '-NoProfile',
+                '-ExecutionPolicy',
+                'Bypass',
+                '-File',
+                $helper,
+                $mode,
+            ], base_path());
+            $process->setTimeout(30);
+            $process->mustRun();
+            $output = $process->getOutput();
+            $this->assertStringContainsString('production_connection_attempted=false', $output);
+            $this->assertStringContainsString('production_mutation=false', $output);
+            $this->assertStringContainsString('target_skeleton_build=not_executed', $output);
+        }
+    }
 }

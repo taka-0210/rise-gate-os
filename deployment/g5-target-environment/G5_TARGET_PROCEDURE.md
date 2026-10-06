@@ -81,6 +81,54 @@ helper stops before SSH. PASS or STOP exhausts this authorization; no further
 retry is permitted. G5 remains OPEN for Human + ChatGPT review after execution,
 and a G5-C PASS is not Deploy authorization.
 
+The Corrective1 execution subsequently completed with G5-C Formal PASS. The
+receipt proves POSIX symlink, same-filesystem atomic rename, mode 0600,
+isolated public-entry following `current`, cleanup complete and residual zero.
+This closes the filesystem capability gap only. It does not create the actual
+target topology or authorize Deploy.
+
+### Target Skeleton Build Human gate
+
+The next separately authorized operation uses only
+`Invoke-G5TargetSkeletonBuild.ps1`. It is bound to the G5-B reconciled receipt,
+the G5-C Corrective1 PASS receipt/state, the NewTarget SSH and Host Key identity,
+`target-skeleton-contract.json`, and `build-target-skeleton.sh`.
+
+The exact creation set is limited to three empty directories owned by UID
+`20046`, GID `1000`, with mode `0750`:
+
+```text
+/home/xs377816/company-os.jp/company-os-app/
+  releases/
+  shared/
+```
+
+The operation builds the empty structure under the exact candidate-bound
+staging sibling and atomically renames it to `company-os-app`. Existing
+topology or staging paths cause a pre-mutation STOP. The local helper records
+one attempt before SSH and refuses any later invocation, whether the first
+result is PASS or STOP. This is at-most-once fail-closed behavior; successful
+execution is not replayed and blind retry is prohibited.
+
+The build expressly excludes `shared/.env`, `shared/storage`, application
+releases, `current`, `current.previous`, release-marker binding, Migration,
+DNS, SSL and Deploy. It snapshots the live public-entry metadata before and
+after and requires the exact pre-existing `.user.ini`, `default_page.png` and
+`index.html` set to remain unchanged. Their content is not read.
+
+Before atomic publish, failure cleanup uses `rmdir` only on the exact empty
+staging directories. A post-publish failure may roll back only an exact empty
+G5-created skeleton, again using `rmdir`. Recursive deletion is prohibited;
+unknown or non-empty state is retained for Human review. Rollback after a PASS
+is a separate Human gate and is not included in the build command.
+
+PASS requires exact type, owner, group, mode and empty-entry verification,
+atomic publish, staging residual zero, protected public-entry metadata
+unchanged, and a sanitized local receipt. PASS or STOP returns to Human +
+ChatGPT; neither result authorizes another attempt or a following operation.
+`PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE`
+continues unchanged.
+
 ## Permission plan
 
 - `shared/.env`: target `0600`; no group/other permission.
@@ -109,5 +157,7 @@ hardening operation proves that the PHP runtime can read the hardened file.
 
 Usable backup, DB restore readiness, legacy marker/application binding,
 `.env` hardening, user cron, external writer enablement, active
-transaction/metadata lock visibility, DB/Application collation difference and
-POSIX symlink/atomic rename remain open until separate Evidence closes them.
+transaction/metadata lock visibility and DB/Application collation difference
+remain open until separate Evidence closes them. POSIX symlink and atomic
+rename capability are closed by G5-C Formal PASS; actual topology construction,
+shared state, public binding and application placement remain separate gates.

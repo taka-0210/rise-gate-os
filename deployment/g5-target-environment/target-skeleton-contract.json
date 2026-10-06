@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5-target-skeleton.v1",
+  "release_case": "IR1-G5-TARGET-SKELETON-BUILD",
+  "candidate": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "release_id": "ir1-924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "new_target": {
+    "host": "sv17169.xserver.jp",
+    "user": "xs377816",
+    "port": 10022,
+    "home": "/home/xs377816",
+    "owner_uid": 20046,
+    "group_gid": 1000,
+    "host_key_algorithm": "ssh-ed25519",
+    "host_key_fingerprint": "SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8"
+  },
+  "prerequisite_evidence": {
+    "g5b_reconciled_receipt_sha256": "ec24b30e62c34564aaaaccfa928edbac98f95e7e4748594422b641f4bbbae7c3",
+    "g5c_corrective1_receipt_sha256": "a1dd2871236868affe3b4a9d5454dc87eb614b15f1049e3a555c3700dec59faf",
+    "g5c_corrective1_state_sha256": "e696b86dbb818c85f99d0115f547408cf193eb1fd67693807a7dd9f28d2ed99c",
+    "g5c_required_status": "PASS",
+    "g5c_required_cleanup_state": "complete",
+    "g5c_required_residual_entry_count": 0
+  },
+  "build_script": {
+    "file": "build-target-skeleton.sh",
+    "sha256": "bbd05048b982b751861c48f84d2ba2c0ecaade333dd2d55f7d71b4646e57a0ff",
+    "confirmation": "IR1-G5-TARGET-SKELETON-BUILD"
+  },
+  "creation_set": [
+    {
+      "relative_path": "company-os.jp/company-os-app",
+      "type": "directory",
+      "mode": "0750",
+      "owner_uid": 20046,
+      "group_gid": 1000
+    },
+    {
+      "relative_path": "company-os.jp/company-os-app/releases",
+      "type": "directory",
+      "mode": "0750",
+      "owner_uid": 20046,
+      "group_gid": 1000
+    },
+    {
+      "relative_path": "company-os.jp/company-os-app/shared",
+      "type": "directory",
+      "mode": "0750",
+      "owner_uid": 20046,
+      "group_gid": 1000
+    }
+  ],
+  "excluded_set": [
+    "company-os.jp/company-os-app/shared/.env",
+    "company-os.jp/company-os-app/shared/storage",
+    "company-os.jp/company-os-app/releases/<release-id>",
+    "company-os.jp/company-os-app/current",
+    "company-os.jp/company-os-app/current.previous",
+    "company-os.jp/public_html/app.company-os.jp",
+    "rise-gate.com/",
+    "application placement",
+    "migration",
+    "release marker binding",
+    "dns",
+    "ssl",
+    "deploy"
+  ],
+  "public_entry_guard": {
+    "path": "company-os.jp/public_html/app.company-os.jp",
+    "required_type": "directory",
+    "required_entries": [
+      {
+        "name": ".user.ini",
+        "type": "file",
+        "mode": "0600"
+      },
+      {
+        "name": "default_page.png",
+        "type": "file",
+        "mode": "0644"
+      },
+      {
+        "name": "index.html",
+        "type": "file",
+        "mode": "0644"
+      }
+    ],
+    "content_read": false,
+    "before_after_metadata_snapshot_required": true,
+    "mutation_allowed": false,
+    "disposition": "PENDING_G5_PUBLIC_ENTRY_GATE"
+  },
+  "operation": {
+    "staging_relative_path": "company-os.jp/.ir1-g5-skeleton-build-924af91188cc60d33ff87c91b94ecc1d539566e6",
+    "atomic_publish": true,
+    "same_filesystem_required": true,
+    "one_step_one_command": true,
+    "at_most_once": true,
+    "blind_retry": false,
+    "success_replay": false,
+    "existing_topology_disposition": "STOP",
+    "existing_attempt_evidence_disposition": "STOP"
+  },
+  "cleanup_and_rollback": {
+    "pre_commit": "rmdir_exact_empty_staging_paths_only",
+    "post_commit_failure": "rmdir_exact_empty_created_skeleton_only",
+    "recursive_delete": false,
+    "unknown_or_nonempty_path": "STOP_AND_REVIEW",
+    "post_pass_rollback": "SEPARATE_HUMAN_GATE",
+    "shared_env_or_storage_delete": false,
+    "public_entry_change": false,
+    "legacy_change": false
+  },
+  "evidence_contract": {
+    "result": "PASS_OR_STOP",
+    "raw_output_stored": false,
+    "secret_output": false,
+    "receipt_required_on_pass": true,
+    "incremental_state_required": true,
+    "protected_boundary_fields_required": true,
+    "retry_available": false,
+    "next_action": "RETURN_TO_HUMAN_CHATGPT"
+  },
+  "production_mutation_authorized": false,
+  "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION": "PENDING_G5_PUBLIC_ENTRY_GATE"
+}
