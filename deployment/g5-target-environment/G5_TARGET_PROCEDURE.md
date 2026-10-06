@@ -32,8 +32,9 @@ entry after a separate Human authorization.
    the target domain root, test POSIX symlink, same-filesystem atomic rename,
    an isolated public-entry following `current`, mode 0600 and cleanup, then
    remove it.
-3. Target skeleton build: separately authorized creation of
-   `company-os-app/releases` and `company-os-app/shared/storage`.
+3. Target skeleton build: separately authorized creation of the exact empty
+   `company-os-app`, `company-os-app/releases` and `company-os-app/shared`
+   directories.
 4. Shared state: migrate `.env` without outputting values and seed storage
    through an authorized inventory/checksum procedure. Direct linking to the
    legacy storage is prohibited.
@@ -129,6 +130,29 @@ ChatGPT; neither result authorizes another attempt or a following operation.
 `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE`
 continues unchanged.
 
+The one authorized Human execution subsequently completed with Target
+Skeleton Build Formal PASS. The candidate-bound receipt and final state prove
+the exact empty three-directory Skeleton, UID `20046`, GID `1000`, mode
+`0750`, same-filesystem atomic publish, complete cleanup and zero staging
+residual. The public entry and Legacy remained unchanged; `.env`, shared
+storage, Application releases, `current`, `current.previous`, DB, Migration,
+Release marker, DNS, SSL and Deploy were not attempted. The one-shot
+authorization is exhausted and must not be replayed.
+
+Formal PASS Evidence:
+
+- `target-skeleton-build.json` SHA-256:
+  `51fb756414218c7b4a742c03620d197783d3191cbb0ef5f803a74ac3e91c2057`
+- `execution-state.json` SHA-256:
+  `54bb6edcc1e5d23fc2066f30b8cfa40d713da8168dbf10ec22e6c03349c9a0d3`
+- Production-free formal reconciliation: 86 assertions PASS
+
+The next sequence item is Shared State. It is not command-ready until a
+separate Production-free preparation binds the source/target inventory,
+runtime owner and readability, exact storage seed and final-delta procedure,
+permissions, backup/restore dependency, cleanup and Evidence Contract. No
+Shared State mutation is authorized by the Skeleton PASS.
+
 ## Permission plan
 
 - `shared/.env`: target `0600`; no group/other permission.
@@ -159,5 +183,8 @@ Usable backup, DB restore readiness, legacy marker/application binding,
 `.env` hardening, user cron, external writer enablement, active
 transaction/metadata lock visibility and DB/Application collation difference
 remain open until separate Evidence closes them. POSIX symlink and atomic
-rename capability are closed by G5-C Formal PASS; actual topology construction,
-shared state, public binding and application placement remain separate gates.
+rename capability are closed by G5-C Formal PASS, and exact empty Skeleton
+construction is closed by Target Skeleton Build Formal PASS. Shared state,
+application placement, `current` / `current.previous`, public-entry disposition
+and binding remain separate gates. DNS and SSL remain G6-only; Migration and
+Deploy remain unapproved.
