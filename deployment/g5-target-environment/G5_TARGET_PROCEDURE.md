@@ -30,7 +30,8 @@ entry after a separate Human authorization.
    PHP version, device identity and disk without writing.
 2. Isolated capability rehearsal: create one exact temporary directory below
    the target domain root, test POSIX symlink, same-filesystem atomic rename,
-   public-entry following `current`, mode 0600 and cleanup, then remove it.
+   an isolated public-entry following `current`, mode 0600 and cleanup, then
+   remove it.
 3. Target skeleton build: separately authorized creation of
    `company-os-app/releases` and `company-os-app/shared/storage`.
 4. Shared state: migrate `.env` without outputting values and seed storage
@@ -41,6 +42,25 @@ entry after a separate Human authorization.
 
 Each numbered operation is a separate **1 Step = 1 Command / PASS or STOP**
 Human gate. A PASS or STOP is terminal; blind retry is prohibited.
+
+### G5-C NewTarget binding
+
+The approved G5-C rehearsal uses only
+`Invoke-G5CNewTargetPosixRehearsal.ps1`. The older generic
+`Invoke-G5TargetEnvironment.ps1 -Step Rehearse` path remains bound to the
+legacy SSH alias and must not be used for the NewTarget gate.
+
+G5-C is bound to the reconciled G5-B PASS receipt, the explicit
+`sv17169.xserver.jp` / `xs377816` SSH identity, the Xserver-panel ED25519 Host
+Key trust anchor and the candidate-specific rehearsal script. It may create
+and remove only
+`/home/xs377816/company-os.jp/.ir1-g5-capability-924af91188cc60d33ff87c91b94ecc1d539566e6`.
+
+The helper records an attempt before starting SSH and refuses any second
+attempt. PASS requires protected target topology and public-entry snapshots to
+remain unchanged, cleanup to complete and residual entries to be zero.
+`PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE`
+continues after G5-C.
 
 ## Permission plan
 

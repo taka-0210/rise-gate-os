@@ -54,8 +54,19 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringContainsString('chmod 0600', $script);
         $this->assertStringContainsString('cleanup_state=complete', $script);
         $this->assertStringContainsString('residual_entry_count=0', $script);
+        $this->assertStringContainsString('target_topology_changed=false', $script);
+        $this->assertStringContainsString('target_public_entry_changed=false', $script);
+        $this->assertStringContainsString('env_changed=false', $script);
+        $this->assertStringContainsString('shared_storage_changed=false', $script);
         $this->assertStringContainsString('legacy_production_changed=false', $script);
+        $this->assertStringContainsString("EXPECTED_HOME='/home/xs377816'", $script);
+        $this->assertStringContainsString("CREATED_ROOT='no'", $script);
+        $this->assertStringContainsString('if test "$CREATED_ROOT" != \'yes\'', $script);
+        $this->assertStringContainsString('PUBLIC_ENTRY_SNAPSHOT_BEFORE', $script);
+        $this->assertStringContainsString('PUBLIC_ENTRY_SNAPSHOT_AFTER', $script);
         $this->assertStringNotContainsString('rise-gate.com', $script);
+        $this->assertStringNotContainsString('$REHEARSAL_ROOT/shared', $script);
+        $this->assertStringNotContainsString('.env.fixture', $script);
         $this->assertStringNotContainsString('mysql', $script);
         $this->assertStringNotContainsString('artisan', $script);
     }
@@ -256,6 +267,61 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         }
         foreach (['ssh.exe', 'Invoke-WebRequest', 'curl.exe', 'rehearse-posix-capabilities.sh'] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $script);
+        }
+    }
+
+    public function test_g5c_new_target_helper_is_receipt_bound_explicit_and_one_shot(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5CNewTargetPosixRehearsal.ps1'));
+
+        foreach ([
+            'g5c-new-target-posix-rehearsal-v1',
+            '8d8ea110d0d7069af519f8c9cab8240891a050e7f366a620f5efc9fe86d852f3',
+            'ec24b30e62c34564aaaaccfa928edbac98f95e7e4748594422b641f4bbbae7c3',
+            'G5-B RECONCILED FORMAL PASS / G5-C POSIX CAPABILITY REHEARSAL READY',
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            'sv17169.xserver.jp',
+            'xs377816',
+            'codex-company-os-target-production',
+            'SHA256:GvM1nK35B8W444sHzoURREhsjSFmY5JTOfxqXG1IT9g',
+            'SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8',
+            'HostKeyAlgorithms=ssh-ed25519',
+            'StrictHostKeyChecking=yes',
+            'ConnectionAttempts=1',
+            'G5C_ATTEMPT_ALREADY_RECORDED',
+            'candidate_bound_isolated_rehearsal_completed_and_cleaned',
+            'deploy_authorized=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
+
+        $this->assertStringNotContainsString("'company-os-production'", $helper);
+        $this->assertStringNotContainsString('sv17033.xserver.jp', $helper);
+        $this->assertStringNotContainsString('scp.exe', $helper);
+        $this->assertStringNotContainsString('Invoke-WebRequest', $helper);
+        $this->assertStringNotContainsString('curl.exe', $helper);
+        $this->assertStringNotContainsString('mysql', $helper);
+        $this->assertStringNotContainsString('artisan', $helper);
+    }
+
+    public function test_g5c_remote_pass_requires_cleanup_and_protected_boundaries_unchanged(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5CNewTargetPosixRehearsal.ps1'));
+
+        foreach ([
+            "cleanup_state='complete'",
+            "residual_entry_count='0'",
+            "target_topology_changed='false'",
+            "target_public_entry_changed='false'",
+            "legacy_production_changed='false'",
+            "env_changed='false'",
+            "shared_storage_changed='false'",
+            "database_connection='not_attempted'",
+            "dns_ssl_change='not_attempted'",
+            "deploy='not_attempted'",
+            "retry_available='false'",
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
         }
     }
 }
