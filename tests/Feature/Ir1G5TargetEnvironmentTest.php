@@ -289,6 +289,14 @@ class Ir1G5TargetEnvironmentTest extends TestCase
             'StrictHostKeyChecking=yes',
             'ConnectionAttempts=1',
             'G5C_ATTEMPT_ALREADY_RECORDED',
+            "[ValidateSet('Initial', 'Corrective1')]",
+            '81a82f1fa237fc3012ae7a6fa60bd854b3100c42947df01f3f0d8b650b099b96',
+            'e3defa570f9f361812522715e15b702be37b11532bbb1ff63bd9215ec4fabd09',
+            'production-g5c-new-target-rehearsal-corrective-1-$Candidate',
+            'Assert-InitialAttemptEvidence',
+            'human_approved_corrective_retry',
+            'initial_attempt_evidence_immutable',
+            'corrective_retry_number',
             '[IO.File]::Replace($temporaryPath, $Path, $backupPath)',
             '[IO.File]::Move($temporaryPath, $Path)',
             'G5C_LOCAL_STATE_PERSISTENCE_CORRECTIVE_VERIFY_ONLY=PASS',
@@ -315,6 +323,39 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertIsInt($remoteInvoke);
         $this->assertLessThan($connectionObserved, $processStart);
         $this->assertLessThan($remoteInvoke, $connectionObserved);
+    }
+
+    public function test_g5c_corrective_retry_preserves_initial_evidence_and_uses_separate_one_shot_root(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5CNewTargetPosixRehearsal.ps1'));
+
+        $initialRoot = strpos($helper, '$InitialEvidenceRoot = Join-Path $Root "storage\\app\\release-audit\\production-g5c-new-target-rehearsal-$Candidate"');
+        $correctiveRoot = strpos($helper, '$CorrectiveEvidenceRoot = Join-Path $Root "storage\\app\\release-audit\\production-g5c-new-target-rehearsal-corrective-1-$Candidate"');
+        $selectedRoot = strpos($helper, '$EvidenceRoot = if ($IsCorrectiveRetry) { $CorrectiveEvidenceRoot } else { $InitialEvidenceRoot }');
+        $attemptGuard = strpos($helper, "Stop-G5C 'G5C_ATTEMPT_ALREADY_RECORDED'");
+        $remoteInvoke = strpos($helper, '$result = Invoke-CapturedProcess $ssh.Source $arguments $scriptText');
+
+        $this->assertIsInt($initialRoot);
+        $this->assertIsInt($correctiveRoot);
+        $this->assertIsInt($selectedRoot);
+        $this->assertIsInt($attemptGuard);
+        $this->assertIsInt($remoteInvoke);
+        $this->assertLessThan($correctiveRoot, $initialRoot);
+        $this->assertLessThan($selectedRoot, $correctiveRoot);
+        $this->assertLessThan($remoteInvoke, $attemptGuard);
+
+        foreach ([
+            'INITIAL_ATTEMPT_EVIDENCE_ENTRY_MISMATCH',
+            'INITIAL_ATTEMPT_EVIDENCE_HASH_MISMATCH',
+            'INITIAL_ATTEMPT_STATE_MISMATCH',
+            'INITIAL_ATTEMPT_TEMPORARY_STATE_MISMATCH',
+            'initial_state_sha256=$(if ($IsCorrectiveRetry)',
+            'initial_temporary_state_sha256=$(if ($IsCorrectiveRetry)',
+            'blind_retry=$false',
+            "Write-Output 'retry_available=false'",
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
     }
 
     public function test_g5c_remote_pass_requires_cleanup_and_protected_boundaries_unchanged(): void

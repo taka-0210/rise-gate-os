@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [switch] $VerifyOnly,
-    [switch] $VerifyPersistenceOnly
+    [switch] $VerifyPersistenceOnly,
+    [ValidateSet('Initial', 'Corrective1')]
+    [string] $Attempt = 'Initial'
 )
 
 Set-StrictMode -Version Latest
@@ -21,7 +23,11 @@ $ExpectedIdentityFingerprint = 'SHA256:GvM1nK35B8W444sHzoURREhsjSFmY5JTOfxqXG1IT
 $ExpectedHostKeyFingerprint = 'SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8'
 $ExpectedRemoteHeader = 'G5C_POSIX_CAPABILITY_REHEARSAL'
 $ExpectedConfirmation = 'IR1-G5C-POSIX-CAPABILITY-REHEARSAL'
+$ExpectedInitialStateSha256 = '81a82f1fa237fc3012ae7a6fa60bd854b3100c42947df01f3f0d8b650b099b96'
+$ExpectedInitialTemporaryStateSha256 = 'e3defa570f9f361812522715e15b702be37b11532bbb1ff63bd9215ec4fabd09'
+$ExpectedInitialHelperGeneration = 'g5c-new-target-posix-rehearsal-v1'
 $Utf8NoBom = [Text.UTF8Encoding]::new($false)
+$IsCorrectiveRetry = $Attempt -eq 'Corrective1'
 
 $ConnectionAttempted = $false
 $NativeProcessStarted = $false
@@ -249,6 +255,67 @@ function Assert-PassEvidence([Collections.Specialized.OrderedDictionary] $Eviden
     if ($Evidence.Count -ne $expected.Count) { Stop-G5C 'REMOTE_PASS_EVIDENCE_UNEXPECTED_FIELD' }
 }
 
+function Assert-InitialAttemptEvidence([string] $InitialEvidenceRoot) {
+    if (-not [IO.Directory]::Exists($InitialEvidenceRoot)) {
+        Stop-G5C 'INITIAL_ATTEMPT_EVIDENCE_MISSING'
+    }
+    $entries = @(Get-ChildItem -LiteralPath $InitialEvidenceRoot -Force)
+    $entryNames = @($entries | ForEach-Object { $_.Name } | Sort-Object)
+    if ($entries.Count -ne 2 -or
+        ($entryNames -join '|') -ne 'execution-state.json|execution-state.json.tmp' -or
+        ($entries | Where-Object { -not $_.PSIsContainer }).Count -ne 2) {
+        Stop-G5C 'INITIAL_ATTEMPT_EVIDENCE_ENTRY_MISMATCH'
+    }
+
+    $initialStatePath = Join-Path $InitialEvidenceRoot 'execution-state.json'
+    $initialTemporaryStatePath = Join-Path $InitialEvidenceRoot 'execution-state.json.tmp'
+    $initialStateHash = Get-FileSha256 $initialStatePath
+    $initialTemporaryStateHash = Get-FileSha256 $initialTemporaryStatePath
+    if ($initialStateHash -ne $ExpectedInitialStateSha256 -or
+        $initialTemporaryStateHash -ne $ExpectedInitialTemporaryStateSha256) {
+        Stop-G5C 'INITIAL_ATTEMPT_EVIDENCE_HASH_MISMATCH'
+    }
+
+    $initialState = Get-Content -Raw -LiteralPath $initialStatePath | ConvertFrom-Json
+    $initialTemporaryState = Get-Content -Raw -LiteralPath $initialTemporaryStatePath | ConvertFrom-Json
+    if ($initialState.candidate -ne $Candidate -or
+        $initialState.helper_generation -ne $ExpectedInitialHelperGeneration -or
+        $initialState.status -ne 'ATTEMPT_STARTED' -or
+        [bool] $initialState.production_connection_attempted -or
+        [bool] $initialState.native_process_started -or
+        $null -ne $initialState.remote_exit_code -or
+        [int] $initialState.stdout_bytes -ne 0 -or
+        [int] $initialState.stderr_bytes -ne 0 -or
+        $initialState.local_processing_substage -ne 'ATTEMPT_INITIALIZED' -or
+        $initialState.PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION -ne 'PENDING_G5_PUBLIC_ENTRY_GATE') {
+        Stop-G5C 'INITIAL_ATTEMPT_STATE_MISMATCH'
+    }
+    if ($initialTemporaryState.candidate -ne $Candidate -or
+        $initialTemporaryState.helper_generation -ne $ExpectedInitialHelperGeneration -or
+        $initialTemporaryState.status -ne 'STOP' -or
+        -not [bool] $initialTemporaryState.production_connection_attempted -or
+        [bool] $initialTemporaryState.native_process_started -or
+        $null -ne $initialTemporaryState.remote_exit_code -or
+        [int] $initialTemporaryState.stdout_bytes -ne 0 -or
+        [int] $initialTemporaryState.stderr_bytes -ne 0 -or
+        $initialTemporaryState.ssh_authentication -ne 'unknown' -or
+        $initialTemporaryState.remote_shell -ne 'unknown' -or
+        $initialTemporaryState.remote_contract -ne 'unknown' -or
+        $initialTemporaryState.safe_error_code -ne 'UNEXPECTED_LOCAL_FAILURE' -or
+        $initialTemporaryState.local_processing_substage -ne 'REMOTE_PROCESS_START' -or
+        $initialTemporaryState.PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION -ne 'PENDING_G5_PUBLIC_ENTRY_GATE') {
+        Stop-G5C 'INITIAL_ATTEMPT_TEMPORARY_STATE_MISMATCH'
+    }
+
+    return [pscustomobject]@{
+        state_sha256=$initialStateHash
+        temporary_state_sha256=$initialTemporaryStateHash
+        effective_new_target_ssh_process_started=$false
+        effective_production_connection_attempted=$false
+        effective_production_mutation=$false
+    }
+}
+
 try {
     if ($VerifyOnly -and $VerifyPersistenceOnly) { Stop-G5C 'VERIFY_MODE_CONFLICT' }
     $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -257,13 +324,20 @@ try {
     $HostBindingRoot = Join-Path $Root "storage\app\release-audit\production-g5b-new-target-binding-$Candidate"
     $HostReceiptPath = Join-Path $HostBindingRoot 'host-key-verification.json'
     $KnownHostsPath = Join-Path $HostBindingRoot 'known_hosts'
-    $EvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5c-new-target-rehearsal-$Candidate"
+    $InitialEvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5c-new-target-rehearsal-$Candidate"
+    $CorrectiveEvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5c-new-target-rehearsal-corrective-1-$Candidate"
+    $EvidenceRoot = if ($IsCorrectiveRetry) { $CorrectiveEvidenceRoot } else { $InitialEvidenceRoot }
     $ReceiptPath = Join-Path $EvidenceRoot 'capability-rehearsal.json'
     $StatePath = Join-Path $EvidenceRoot 'execution-state.json'
     $LegacyEvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5-target-$Candidate"
     $LegacyReceiptPath = Join-Path $LegacyEvidenceRoot 'capability-rehearsal.json'
     $LegacyStatePath = Join-Path $LegacyEvidenceRoot 'capability-rehearsal-corrective-2-state.json'
     $ExpectedIdentityPath = Join-Path ([Environment]::GetFolderPath('UserProfile')) ".ssh\$ExpectedIdentityLeaf"
+
+    $InitialAttemptEvidence = $null
+    if ($IsCorrectiveRetry) {
+        $InitialAttemptEvidence = Assert-InitialAttemptEvidence $InitialEvidenceRoot
+    }
 
     if (-not (Test-Path -LiteralPath $ScriptPath -PathType Leaf) -or
         (Get-FileSha256 $ScriptPath) -ne $ExpectedScriptSha256) {
@@ -383,6 +457,7 @@ try {
         if ($fixture.G5C_POSIX_CAPABILITY_REHEARSAL -ne 'STOP') { Stop-G5C 'SAFE_OUTPUT_PARSER_SELF_TEST_FAILED' }
         Write-Output 'G5C_NEW_TARGET_REHEARSAL_VERIFY_ONLY=PASS'
         Write-Output "candidate=$Candidate"
+        Write-Output "attempt=$Attempt"
         Write-Output "helper_generation=$HelperGeneration"
         Write-Output "script_sha256=$ExpectedScriptSha256"
         Write-Output "g5b_receipt_sha256=$ExpectedG5BReceiptSha256"
@@ -391,6 +466,12 @@ try {
         Write-Output "ssh_port=$ExpectedPort"
         Write-Output "identity_fingerprint=$ExpectedIdentityFingerprint"
         Write-Output "host_key_fingerprint=$ExpectedHostKeyFingerprint"
+        if ($IsCorrectiveRetry) {
+            Write-Output "initial_state_sha256=$($InitialAttemptEvidence.state_sha256)"
+            Write-Output "initial_temporary_state_sha256=$($InitialAttemptEvidence.temporary_state_sha256)"
+            Write-Output 'initial_attempt_evidence_immutable=true'
+            Write-Output 'corrective_retry_number=1'
+        }
         Write-Output 'production_connection_attempted=false'
         Write-Output 'production_mutation=false'
         Write-Output 'g5c_posix_capability_rehearsal=not_executed'
@@ -399,14 +480,20 @@ try {
 
     New-Item -ItemType Directory -Path $EvidenceRoot | Out-Null
     $State = [ordered]@{
-        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; status='ATTEMPT_STARTED'
+        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; attempt=$Attempt
+        execution_kind=$(if ($IsCorrectiveRetry) { 'human_approved_corrective_retry' } else { 'initial_human_execution' })
+        corrective_retry_number=$(if ($IsCorrectiveRetry) { 1 } else { 0 }); blind_retry=$false
+        supersedes_local_stop=$(if ($IsCorrectiveRetry) { 'initial_attempt_local_state_persistence_stop' } else { $null })
+        initial_state_sha256=$(if ($IsCorrectiveRetry) { $InitialAttemptEvidence.state_sha256 } else { $null })
+        initial_temporary_state_sha256=$(if ($IsCorrectiveRetry) { $InitialAttemptEvidence.temporary_state_sha256 } else { $null })
+        initial_attempt_evidence_immutable=$(if ($IsCorrectiveRetry) { $true } else { $null }); status='ATTEMPT_STARTED'
         g5b_receipt_sha256=$ExpectedG5BReceiptSha256; script_sha256=$ExpectedScriptSha256
         ssh_binding='explicit_new_target'; ssh_host=$ExpectedHost; ssh_user=$ExpectedUser; ssh_port=[int] $ExpectedPort
         production_connection_attempted=$false; production_mutation_scope='none'; native_process_started=$false
         remote_exit_code=$null; stdout_sha256=$null; stdout_bytes=0; stderr_sha256=$null; stderr_bytes=0
         ssh_authentication='unknown'; remote_shell='unknown'; remote_contract='unknown'; remote_evidence=$null
         local_processing_substage='ATTEMPT_INITIALIZED'; cleanup_state='unknown'; residual_entry_count='unknown'
-        raw_output_stored=$false; retry_performed=$false; safe_error_code=$null
+        raw_output_stored=$false; retry_performed=$IsCorrectiveRetry; safe_error_code=$null
         local_state_generation=0
         PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION='PENDING_G5_PUBLIC_ENTRY_GATE'
     }
@@ -426,6 +513,10 @@ try {
     $LocalProcessingSubstage = 'REMOTE_PROCESS_PENDING'
     $State.local_processing_substage = $LocalProcessingSubstage
     Save-State
+
+    if ($IsCorrectiveRetry) {
+        $InitialAttemptEvidence = Assert-InitialAttemptEvidence $InitialEvidenceRoot
+    }
 
     $result = Invoke-CapturedProcess $ssh.Source $arguments $scriptText
     $RemoteExitCode = $result.ExitCode
@@ -452,9 +543,22 @@ try {
         Stop-G5C 'REMOTE_STEP_FAILED'
     }
     Assert-PassEvidence $ParsedRemoteEvidence
+    if ($IsCorrectiveRetry) {
+        $InitialAttemptEvidence = Assert-InitialAttemptEvidence $InitialEvidenceRoot
+    }
 
     $receipt = [ordered]@{
-        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; status='PASS'
+        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; attempt=$Attempt
+        execution_kind=$(if ($IsCorrectiveRetry) { 'human_approved_corrective_retry' } else { 'initial_human_execution' })
+        corrective_retry_number=$(if ($IsCorrectiveRetry) { 1 } else { 0 }); blind_retry=$false
+        initial_attempt=$(if ($IsCorrectiveRetry) { [ordered]@{
+            state_sha256=$InitialAttemptEvidence.state_sha256
+            temporary_state_sha256=$InitialAttemptEvidence.temporary_state_sha256
+            evidence_immutable=$true
+            effective_new_target_ssh_process_started=$false
+            effective_production_connection_attempted=$false
+            effective_production_mutation=$false
+        } } else { $null }); status='PASS'
         g5b_receipt_sha256=$ExpectedG5BReceiptSha256; script_sha256=$ExpectedScriptSha256
         ssh=[ordered]@{
             binding='explicit_new_target'; alias=$null; host=$ExpectedHost; user=$ExpectedUser; port=[int] $ExpectedPort
@@ -466,7 +570,7 @@ try {
             production_mutation_scope='candidate_bound_isolated_rehearsal_completed_and_cleaned'
             target_topology_changed=$false; target_public_entry_changed=$false; legacy_production_changed=$false
             env_changed=$false; shared_storage_changed=$false; database_connection='not_attempted'
-            dns_ssl_change='not_attempted'; deploy='not_attempted'; retry_performed=$false
+            dns_ssl_change='not_attempted'; deploy='not_attempted'; retry_performed=$IsCorrectiveRetry
         }
         stream=[ordered]@{
             remote_exit_code=$RemoteExitCode; stdout_sha256=(Get-TextSha256 $result.Stdout)
@@ -487,6 +591,8 @@ try {
     Save-State
 
     Write-Output 'G5C_POSIX_CAPABILITY_REHEARSAL=PASS'
+    Write-Output "attempt=$Attempt"
+    Write-Output "corrective_retry_number=$(if ($IsCorrectiveRetry) { 1 } else { 0 })"
     Write-Output 'production_connection_attempted=true'
     Write-Output 'production_mutation=candidate_bound_isolated_rehearsal_completed_and_cleaned'
     Write-Output 'cleanup_state=complete'
@@ -520,11 +626,13 @@ try {
     Write-Output 'G5C_POSIX_CAPABILITY_REHEARSAL=STOP'
     Write-Output "safe_error_code=$safeCode"
     Write-Output "failure_stage=$FailureStage"
+    Write-Output "attempt=$Attempt"
+    Write-Output "corrective_retry_number=$(if ($IsCorrectiveRetry) { 1 } else { 0 })"
     Write-Output "production_connection_attempted=$($ConnectionAttempted.ToString().ToLowerInvariant())"
     Write-Output "native_process_started=$($NativeProcessStarted.ToString().ToLowerInvariant())"
     Write-Output "production_mutation=$(if ($ConnectionAttempted) { 'isolated_rehearsal_unknown_review_evidence' } else { 'false' })"
     Write-Output "local_state_persistence=$statePersistenceStatus"
-    Write-Output 'retry_performed=false'
+    Write-Output "retry_performed=$($IsCorrectiveRetry.ToString().ToLowerInvariant())"
     Write-Output 'deploy_authorized=false'
     Write-Output 'PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE'
     Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'

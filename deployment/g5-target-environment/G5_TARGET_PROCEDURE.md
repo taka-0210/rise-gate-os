@@ -68,8 +68,18 @@ Its `execution-state.json` and `execution-state.json.tmp` are immutable failure
 Evidence and must not be removed, overwritten, or used to enable a retry. The
 source corrective replaces an existing state file atomically with
 `System.IO.File.Replace` and includes a Production-free three-generation
-persistence verification mode. This corrective does not authorize a second
-G5-C execution. G5 remains OPEN pending a separate Human + ChatGPT decision.
+persistence verification mode.
+
+Human + ChatGPT approved exactly one corrective execution on 2026-10-07. It
+must be invoked with `-Attempt Corrective1`. Before SSH starts, the helper
+verifies the exact hashes, two-entry shape and sanitized state contract of the
+initial Evidence. It never writes into that initial directory. The corrective
+attempt records only below the separate one-shot Evidence root
+`production-g5c-new-target-rehearsal-corrective-1-924af91188cc60d33ff87c91b94ecc1d539566e6`.
+If that root already exists, or any initial Evidence binding differs, the
+helper stops before SSH. PASS or STOP exhausts this authorization; no further
+retry is permitted. G5 remains OPEN for Human + ChatGPT review after execution,
+and a G5-C PASS is not Deploy authorization.
 
 ## Permission plan
 
