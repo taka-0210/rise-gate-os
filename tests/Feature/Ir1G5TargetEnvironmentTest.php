@@ -188,4 +188,24 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringNotContainsString('rehearse-posix-capabilities.sh', $helper);
         $this->assertStringNotContainsString('scp.exe', $helper);
     }
+
+    public function test_g5b_new_target_profile_is_explicitly_bound_and_does_not_reuse_legacy_alias(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5BReadOnlyTargetDiscovery.ps1'));
+
+        foreach ([
+            "ValidateSet('Initial', 'Corrective1', 'NewTarget')",
+            'g5b-new-target-discovery-v1',
+            'sv17169.xserver.jp',
+            'xs377816',
+            'codex-company-os-target-production',
+            'SHA256:GvM1nK35B8W444sHzoURREhsjSFmY5JTOfxqXG1IT9g',
+            'SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8',
+            'ba34cd1acb3c594d282a6c78a4352971f9f4831097c30f4423f6a326ceaa8983',
+            'UserKnownHostsFile=$KnownHostsPath',
+            "binding=if (\$IsNewTarget) { 'explicit_new_target' }",
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
+    }
 }

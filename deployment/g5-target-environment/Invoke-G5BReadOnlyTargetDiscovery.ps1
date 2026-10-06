@@ -1,21 +1,37 @@
 [CmdletBinding()]
 param(
     [switch] $VerifyOnly,
-    [ValidateSet('Initial', 'Corrective1')][string] $Attempt = 'Initial'
+    [ValidateSet('Initial', 'Corrective1', 'NewTarget')][string] $Attempt = 'Initial'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $Candidate = '924af91188cc60d33ff87c91b94ecc1d539566e6'
-$SshAlias = 'company-os-production'
-$ExpectedHost = 'sv17033.xserver.jp'
+$IsNewTarget = $Attempt -eq 'NewTarget'
+$SshAlias = if ($IsNewTarget) { $null } else { 'company-os-production' }
+$ExpectedHost = if ($IsNewTarget) { 'sv17169.xserver.jp' } else { 'sv17033.xserver.jp' }
 $ExpectedPort = '10022'
-$ExpectedIdentityLeaf = 'codex-company-os-production'
-$ExpectedIdentityFingerprint = 'SHA256:d/dPUPa6KjfXVOpG1Sqqp66GMFjYtxYUR1dqhaRBQBg'
-$ExpectedHostKeyFingerprint = 'SHA256:lkUHlNS7K7nVe/slV97qC08nvzqNzsgUsVD9p2Q1KCs'
+$ExpectedUser = if ($IsNewTarget) { 'xs377816' } else { $null }
+$ExpectedIdentityLeaf = if ($IsNewTarget) { 'codex-company-os-target-production' } else { 'codex-company-os-production' }
+$ExpectedIdentityFingerprint = if ($IsNewTarget) {
+    'SHA256:GvM1nK35B8W444sHzoURREhsjSFmY5JTOfxqXG1IT9g'
+} else {
+    'SHA256:d/dPUPa6KjfXVOpG1Sqqp66GMFjYtxYUR1dqhaRBQBg'
+}
+$ExpectedHostKeyFingerprint = if ($IsNewTarget) {
+    'SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8'
+} else {
+    'SHA256:lkUHlNS7K7nVe/slV97qC08nvzqNzsgUsVD9p2Q1KCs'
+}
 $ExpectedScriptSha256 = '11796c27cdf80ff695ec8d0f4053b991ea793a408334c000b2c06bbcb9922f14'
-$HelperGeneration = if ($Attempt -eq 'Corrective1') { 'g5b-target-discovery-corrective-1' } else { 'g5b-target-discovery-v1' }
+$HelperGeneration = if ($IsNewTarget) {
+    'g5b-new-target-discovery-v1'
+} elseif ($Attempt -eq 'Corrective1') {
+    'g5b-target-discovery-corrective-1'
+} else {
+    'g5b-target-discovery-v1'
+}
 $Utf8NoBom = [Text.UTF8Encoding]::new($false)
 
 function Stop-G5B([string] $Code) { throw [InvalidOperationException]::new($Code) }
@@ -94,11 +110,21 @@ function Save-Json([string] $Path, [object] $Value) {
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $ScriptPath = Join-Path $PSScriptRoot 'inspect-target-anchor-read-only.sh'
 $InitialEvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5b-target-discovery-$Candidate"
-$EvidenceRoot = if ($Attempt -eq 'Corrective1') {
+$NewTargetBindingRoot = Join-Path $Root "storage\app\release-audit\production-g5b-new-target-binding-$Candidate"
+$EvidenceRoot = if ($IsNewTarget) {
+    Join-Path $Root "storage\app\release-audit\production-g5b-new-target-discovery-$Candidate"
+} elseif ($Attempt -eq 'Corrective1') {
     Join-Path $Root "storage\app\release-audit\production-g5b-target-discovery-corrective-1-$Candidate"
 } else {
     $InitialEvidenceRoot
 }
+$ExpectedIdentityPath = Join-Path ([Environment]::GetFolderPath('UserProfile')) ".ssh\$ExpectedIdentityLeaf"
+$KnownHostsPath = if ($IsNewTarget) {
+    Join-Path $NewTargetBindingRoot 'known_hosts'
+} else {
+    Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ssh\known_hosts'
+}
+$ExpectedKnownHostsSha256 = if ($IsNewTarget) { 'ba34cd1acb3c594d282a6c78a4352971f9f4831097c30f4423f6a326ceaa8983' } else { $null }
 $ReceiptPath = Join-Path $EvidenceRoot 'read-only-target-discovery.json'
 $ObservationPath = Join-Path $EvidenceRoot 'sanitized-target-observation.json'
 $StatePath = Join-Path $EvidenceRoot 'execution-state.json'
@@ -118,7 +144,14 @@ try {
     $keygen = Get-Command ssh-keygen.exe -ErrorAction SilentlyContinue
     if ($null -eq $ssh -or $null -eq $keygen) { Stop-G5B 'OPENSSH_CLIENT_UNAVAILABLE' }
 
-    $configResult = Invoke-CapturedProcess $ssh.Source @('-G', $SshAlias) $null
+    $configArguments = if ($IsNewTarget) {
+        @('-G', '-p', $ExpectedPort, '-l', $ExpectedUser, '-i', $ExpectedIdentityPath,
+            '-o', 'IdentitiesOnly=yes', '-o', "UserKnownHostsFile=$KnownHostsPath",
+            '-o', 'StrictHostKeyChecking=yes', $ExpectedHost)
+    } else {
+        @('-G', $SshAlias)
+    }
+    $configResult = Invoke-CapturedProcess $ssh.Source $configArguments $null
     if ($configResult.ExitCode -ne 0) { Stop-G5B 'SSH_CONFIG_UNAVAILABLE' }
     $config = @{}
     foreach ($line in ($configResult.Stdout -split '\r?\n')) {
@@ -131,23 +164,26 @@ try {
     if ($config.hostname -ne $ExpectedHost -or $config.port -ne $ExpectedPort -or
         (Split-Path -Leaf $config.identityfile.Trim('"')) -ne $ExpectedIdentityLeaf -or
         $config.identitiesonly -ne 'yes') { Stop-G5B 'SSH_BINDING_MISMATCH' }
+    if ($IsNewTarget -and $config.user -ne $ExpectedUser) { Stop-G5B 'SSH_USER_BINDING_MISMATCH' }
     foreach ($key in @('remotecommand', 'localcommand', 'proxycommand', 'proxyjump')) {
         if ($config.ContainsKey($key) -and -not [string]::IsNullOrWhiteSpace($config[$key]) -and $config[$key] -ne 'none') {
             Stop-G5B 'SSH_AUTOMATIC_COMMAND_FORBIDDEN'
         }
     }
 
-    $identityPath = $config.identityfile.Trim('"')
+    $identityPath = if ($IsNewTarget) { $ExpectedIdentityPath } else { $config.identityfile.Trim('"') }
     if (-not (Test-Path -LiteralPath $identityPath -PathType Leaf)) { Stop-G5B 'SSH_IDENTITY_MISSING' }
     $identityResult = Invoke-CapturedProcess $keygen.Source @('-lf', $identityPath) $null
     if ($identityResult.ExitCode -ne 0 -or $identityResult.Stdout -notmatch [regex]::Escape($ExpectedIdentityFingerprint)) {
         Stop-G5B 'SSH_IDENTITY_FINGERPRINT_MISMATCH'
     }
 
-    $knownHostsPath = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ssh\known_hosts'
-    if (-not (Test-Path -LiteralPath $knownHostsPath -PathType Leaf)) { Stop-G5B 'KNOWN_HOSTS_MISSING' }
+    if (-not (Test-Path -LiteralPath $KnownHostsPath -PathType Leaf)) { Stop-G5B 'KNOWN_HOSTS_MISSING' }
+    if ($IsNewTarget -and (Get-FileSha256 $KnownHostsPath) -ne $ExpectedKnownHostsSha256) {
+        Stop-G5B 'KNOWN_HOSTS_BINDING_MISMATCH'
+    }
     $lookup = "[$ExpectedHost]:$ExpectedPort"
-    $knownResult = Invoke-CapturedProcess $keygen.Source @('-F', $lookup, '-f', $knownHostsPath) $null
+    $knownResult = Invoke-CapturedProcess $keygen.Source @('-F', $lookup, '-f', $KnownHostsPath) $null
     if ($knownResult.ExitCode -ne 0) { Stop-G5B 'HOST_KEY_NOT_REGISTERED' }
     $knownKeyLines = (($knownResult.Stdout -split '\r?\n' | Where-Object { $_ -ne '' -and $_ -notmatch '^#' }) -join [Environment]::NewLine)
     $knownFingerprint = Invoke-CapturedProcess $keygen.Source @('-lf', '-') $knownKeyLines
@@ -177,6 +213,7 @@ try {
         Write-Output "script_sha256=$ExpectedScriptSha256"
         Write-Output "ssh_host=$ExpectedHost"
         Write-Output "ssh_port=$ExpectedPort"
+        if ($IsNewTarget) { Write-Output "ssh_user=$ExpectedUser" }
         Write-Output "identity_fingerprint=$ExpectedIdentityFingerprint"
         Write-Output "host_key_fingerprint=$ExpectedHostKeyFingerprint"
         Write-Output 'production_connection_attempted=false'
@@ -197,12 +234,23 @@ try {
     }
     Save-Json $StatePath $State
 
-    $arguments = @(
-        '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'NumberOfPasswordPrompts=0',
-        '-o', 'ConnectionAttempts=1', '-o', 'ConnectTimeout=10', '-o', 'ClearAllForwardings=yes',
-        '-o', 'LogLevel=ERROR', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-T', $SshAlias,
-        'sh', '-s', '--', 'IR1-G5B-READ-ONLY-TARGET-DISCOVERY'
-    )
+    $arguments = if ($IsNewTarget) {
+        @(
+            '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'NumberOfPasswordPrompts=0',
+            '-o', 'ConnectionAttempts=1', '-o', 'ConnectTimeout=10', '-o', 'ClearAllForwardings=yes',
+            '-o', 'LogLevel=ERROR', '-o', 'HostKeyAlgorithms=ssh-ed25519',
+            '-o', "UserKnownHostsFile=$KnownHostsPath", '-p', $ExpectedPort, '-l', $ExpectedUser,
+            '-i', $identityPath, '-T', $ExpectedHost,
+            'sh', '-s', '--', 'IR1-G5B-READ-ONLY-TARGET-DISCOVERY'
+        )
+    } else {
+        @(
+            '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'NumberOfPasswordPrompts=0',
+            '-o', 'ConnectionAttempts=1', '-o', 'ConnectTimeout=10', '-o', 'ClearAllForwardings=yes',
+            '-o', 'LogLevel=ERROR', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-T', $SshAlias,
+            'sh', '-s', '--', 'IR1-G5B-READ-ONLY-TARGET-DISCOVERY'
+        )
+    }
     Assert-NativeArguments $arguments
     $ConnectionAttempted = $true
     $State.production_connection_attempted = $true
@@ -267,7 +315,10 @@ try {
         schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; status='PASS'
         script_sha256=$ExpectedScriptSha256
         ssh=[ordered]@{
-            alias=$SshAlias; host=$ExpectedHost; port=[int]$ExpectedPort
+            binding=if ($IsNewTarget) { 'explicit_new_target' } else { 'legacy_alias' }
+            alias=if ($IsNewTarget) { $null } else { $SshAlias }
+            user=if ($IsNewTarget) { $ExpectedUser } else { $null }
+            host=$ExpectedHost; port=[int]$ExpectedPort
             identity_fingerprint=$ExpectedIdentityFingerprint; host_key_algorithm='ssh-ed25519'
             host_key_fingerprint=$ExpectedHostKeyFingerprint; authentication='established'; remote_shell='established'
         }
