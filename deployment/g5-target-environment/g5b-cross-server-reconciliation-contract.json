@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5b-cross-server-reconciliation.v1",
+  "candidate": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "operation": "production_free_local_evidence_reconciliation",
+  "inputs": [
+    {
+      "id": "target_contract",
+      "relative_path": "deployment/g5-target-environment/target-contract.json",
+      "sha256": "d28f0ad0ff29bcd9c07238252c9fc6a0598a355c0e8b04a8e8bc549f2a6be04f"
+    },
+    {
+      "id": "g5b_discovery_helper",
+      "relative_path": "deployment/g5-target-environment/Invoke-G5BReadOnlyTargetDiscovery.ps1",
+      "sha256": "3f95f8a7386072c78af3250986d155280054e6b50563d4f3b58d6f0b9d468d16"
+    },
+    {
+      "id": "legacy_binding_record",
+      "relative_path": "docs/CompanyOS_IR1_G5B_ReadOnly_Target_Discovery_STOP_Corrective1_v001.md",
+      "sha256": "1134a45d509cf1c0d2d239ce4734a0ecd633bd58c679bfc0250726e9a30c4d46"
+    },
+    {
+      "id": "new_target_host_key_record",
+      "relative_path": "docs/CompanyOS_IR1_G5B_New_Target_Host_Key_Verification_v001.md",
+      "sha256": "ee94aac8dda1a260c030eda68a90c19a7ca9f86368e2dc383e256babc384b693"
+    },
+    {
+      "id": "legacy_execution_state",
+      "relative_path": "storage/app/release-audit/production-g5b-target-discovery-corrective-1-924af91188cc60d33ff87c91b94ecc1d539566e6/execution-state.json",
+      "sha256": "58b55436c81a05e82465c7f1d9b0b0630282b3164ac90e27566b104bc8dd005d"
+    },
+    {
+      "id": "legacy_observation",
+      "relative_path": "storage/app/release-audit/production-g5b-target-discovery-corrective-1-924af91188cc60d33ff87c91b94ecc1d539566e6/sanitized-target-observation.json",
+      "sha256": "238e048c26ba73ad864a27bdb2855440770f055b19dfd9e1ac6f447641e79b90"
+    },
+    {
+      "id": "new_target_host_key_receipt",
+      "relative_path": "storage/app/release-audit/production-g5b-new-target-binding-924af91188cc60d33ff87c91b94ecc1d539566e6/host-key-verification.json",
+      "sha256": "834b0309366619f960c12e34a27d41f3633e2a8cf0f09fdc29fa18b96d4526ba"
+    },
+    {
+      "id": "new_target_execution_state",
+      "relative_path": "storage/app/release-audit/production-g5b-new-target-discovery-924af91188cc60d33ff87c91b94ecc1d539566e6/execution-state.json",
+      "sha256": "10edbf65c463a8464203f594a4bc530e18eb77aab610440ea49ba800c8d2d8d5"
+    },
+    {
+      "id": "new_target_observation",
+      "relative_path": "storage/app/release-audit/production-g5b-new-target-discovery-924af91188cc60d33ff87c91b94ecc1d539566e6/sanitized-target-observation.json",
+      "sha256": "648a1a19c5b5672a3978c565fc47f3dfaa4db08785ed6e726138686862f74666"
+    }
+  ],
+  "trusted_endpoints": {
+    "legacy": {
+      "host": "sv17033.xserver.jp",
+      "host_key_fingerprint": "SHA256:lkUHlNS7K7nVe/slV97qC08nvzqNzsgUsVD9p2Q1KCs",
+      "login_uid": "20222",
+      "actual_home_sha256": "3a5eeb7c2657b29e58aa5d2007a53e385d2c07adef89b93ef237cfd52570fcfc"
+    },
+    "new_target": {
+      "server_id": "xs377816",
+      "host": "sv17169.xserver.jp",
+      "ip": "85.131.221.130",
+      "host_key_fingerprint": "SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8",
+      "login_uid": "20046",
+      "actual_home": "/home/xs377816",
+      "actual_home_sha256": "ee25b4b48a89a11f9270f7d9ca9d7f7990cbda506f343a3dbf6a15e513379682",
+      "target_public_entry": "/home/xs377816/company-os.jp/public_html/app.company-os.jp",
+      "target_public_entry_sha256": "6775715bfc45e378b2b072f0d3fbd9b62cb688496294e8ba139222297d7e3905"
+    }
+  },
+  "management_plane_attestation": {
+    "authority": "Human",
+    "attested_date_jst": "2026-10-07",
+    "xserver_server_id": "xs377816",
+    "subdomain": "app.company-os.jp",
+    "subdomain_state": "normal",
+    "file_manager_breadcrumb": "company-os.jp/public_html/app.company-os.jp",
+    "content_viewed": false,
+    "production_mutation": false,
+    "entries": [
+      {
+        "name": ".user.ini",
+        "permission": "600",
+        "classification": "other_file"
+      },
+      {
+        "name": "default_page.png",
+        "permission": "644",
+        "classification": "png_image"
+      },
+      {
+        "name": "index.html",
+        "permission": "644",
+        "classification": "html_document"
+      }
+    ]
+  },
+  "required_disposition": {
+    "remote_legacy_physical_separation": "unknown",
+    "cross_server_identity": "PASS",
+    "effective_legacy_separation": "yes",
+    "separation_basis": "cross_server_trusted_host_identity",
+    "target_anchor_binding": "PASS",
+    "VHOST_DOCUMENT_ROOT_BINDING": "PASS",
+    "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION": "PENDING_G5_PUBLIC_ENTRY_GATE",
+    "g5_c_posix_capability_rehearsal": "not_executed",
+    "g6_ssl": "OPEN"
+  },
+  "safety": {
+    "production_connection_authorized": false,
+    "ssh_connection_authorized": false,
+    "http_request_authorized": false,
+    "filesystem_mutation_authorized": false,
+    "dns_or_ssl_change_authorized": false,
+    "existing_evidence_mutation_authorized": false
+  }
+}

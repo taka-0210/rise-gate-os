@@ -208,4 +208,54 @@ class Ir1G5TargetEnvironmentTest extends TestCase
             $this->assertStringContainsString($required, $helper);
         }
     }
+
+    public function test_g5b_cross_server_reconciliation_is_candidate_bound_and_production_free(): void
+    {
+        $contract = json_decode(
+            (string) file_get_contents(base_path('deployment/g5-target-environment/g5b-cross-server-reconciliation-contract.json')),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+        $script = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5BCrossServerReconciliation.ps1'));
+
+        $this->assertSame('company-os.ir1.g5b-cross-server-reconciliation.v1', $contract['contract_id']);
+        $this->assertSame(self::CANDIDATE, $contract['candidate']);
+        $this->assertSame('unknown', $contract['required_disposition']['remote_legacy_physical_separation']);
+        $this->assertSame('PASS', $contract['required_disposition']['cross_server_identity']);
+        $this->assertSame('yes', $contract['required_disposition']['effective_legacy_separation']);
+        $this->assertSame('cross_server_trusted_host_identity', $contract['required_disposition']['separation_basis']);
+        $this->assertSame('PASS', $contract['required_disposition']['target_anchor_binding']);
+        $this->assertSame('PASS', $contract['required_disposition']['VHOST_DOCUMENT_ROOT_BINDING']);
+        $this->assertSame(
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            $contract['required_disposition']['PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION'],
+        );
+        $this->assertFalse($contract['safety']['production_connection_authorized']);
+        $this->assertFalse($contract['safety']['ssh_connection_authorized']);
+        $this->assertFalse($contract['safety']['http_request_authorized']);
+        $this->assertFalse($contract['safety']['filesystem_mutation_authorized']);
+        $this->assertCount(9, $contract['inputs']);
+        $this->assertCount(3, $contract['management_plane_attestation']['entries']);
+
+        foreach ([
+            'production_free_local_evidence_reconciliation',
+            'INPUT_EVIDENCE_HASH_MISMATCH',
+            'CROSS_SERVER_HOST_NOT_DISTINCT',
+            'CROSS_SERVER_HOST_KEY_NOT_DISTINCT',
+            'LEGACY_PATH_PRESENT_ON_NEW_TARGET',
+            'xserver_management_plane_triangulation',
+            'G5-B RECONCILED FORMAL PASS / G5-C POSIX CAPABILITY REHEARSAL READY',
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            'production_connection_attempted = $false',
+            'ssh_connection_attempted = $false',
+            'http_request_attempted = $false',
+            'g5_c_posix_capability_rehearsal=not_executed',
+        ] as $required) {
+            $this->assertStringContainsString($required, $script);
+        }
+        foreach (['ssh.exe', 'Invoke-WebRequest', 'curl.exe', 'rehearse-posix-capabilities.sh'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $script);
+        }
+    }
 }
