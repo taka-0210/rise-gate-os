@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5-shared-state.v1",
+  "release_case": "IR1-G5-SHARED-STATE",
+  "candidate": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "release_id": "ir1-924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "source": {
+    "role": "legacy_authoritative_shared_state_source",
+    "host": "sv17033.xserver.jp",
+    "user": "xs257823",
+    "port": 10022,
+    "home": "/home/xs257823",
+    "owner_uid": 20222,
+    "group_gid": 1000,
+    "application_root": "/home/xs257823/rise-gate.com/rise-gate-os",
+    "env_path": "/home/xs257823/rise-gate.com/rise-gate-os/.env",
+    "storage_seed_path": "/home/xs257823/rise-gate.com/rise-gate-os/storage/app",
+    "identity_leaf": "codex-company-os-production",
+    "identity_fingerprint": "SHA256:d/dPUPa6KjfXVOpG1Sqqp66GMFjYtxYUR1dqhaRBQBg",
+    "host_key_algorithm": "ssh-ed25519",
+    "host_key_fingerprint": "SHA256:lkUHlNS7K7nVe/slV97qC08nvzqNzsgUsVD9p2Q1KCs",
+    "read_only": true
+  },
+  "target": {
+    "host": "sv17169.xserver.jp",
+    "user": "xs377816",
+    "port": 10022,
+    "home": "/home/xs377816",
+    "owner_uid": 20046,
+    "group_gid": 1000,
+    "identity_leaf": "codex-company-os-target-production",
+    "identity_fingerprint": "SHA256:GvM1nK35B8W444sHzoURREhsjSFmY5JTOfxqXG1IT9g",
+    "host_key_algorithm": "ssh-ed25519",
+    "host_key_fingerprint": "SHA256:JW8I6QkDccWlz2UNvbmnKlZzVn9Dc3GL7JLAmUjSLt8",
+    "topology_root": "/home/xs377816/company-os.jp/company-os-app",
+    "shared_root": "/home/xs377816/company-os.jp/company-os-app/shared",
+    "env_path": "/home/xs377816/company-os.jp/company-os-app/shared/.env",
+    "storage_path": "/home/xs377816/company-os.jp/company-os-app/shared/storage"
+  },
+  "prerequisite_evidence": {
+    "g5b_reconciled_receipt_sha256": "ec24b30e62c34564aaaaccfa928edbac98f95e7e4748594422b641f4bbbae7c3",
+    "g5c_corrective1_receipt_sha256": "a1dd2871236868affe3b4a9d5454dc87eb614b15f1049e3a555c3700dec59faf",
+    "g5c_corrective1_state_sha256": "e696b86dbb818c85f99d0115f547408cf193eb1fd67693807a7dd9f28d2ed99c",
+    "target_skeleton_receipt_sha256": "51fb756414218c7b4a742c03620d197783d3191cbb0ef5f803a74ac3e91c2057",
+    "target_skeleton_state_sha256": "54bb6edcc1e5d23fc2066f30b8cfa40d713da8168dbf10ec22e6c03349c9a0d3",
+    "source_g1_evidence_sha256": "15e20d272f39d1bd69290af6b5c2f681b52bb42a09273b783ca77ad7eacf4340",
+    "source_host_evidence_sha256": "03f0a69dbeac35747082f06c34e2b492f03cd0bcc8ebd18dc251c81372d0a7ac",
+    "target_host_receipt_sha256": "834b0309366619f960c12e34a27d41f3633e2a8cf0f09fdc29fa18b96d4526ba",
+    "target_known_hosts_sha256": "ba34cd1acb3c594d282a6c78a4352971f9f4831097c30f4423f6a326ceaa8983"
+  },
+  "candidate_environment_contract": {
+    "source": "exact_candidate_dotenv_example_and_config_php_union",
+    "allowlist_file": "shared-state-env-allowlist.txt",
+    "allowlist_count": 172,
+    "allowlist_sha256": "d408775076252cb15ac0438b1d4ccc762f3f366e9ea10517e3e0f8b3f0d496ec",
+    "unknown_legacy_keys": "omit",
+    "missing_required_key": "stop_without_publish",
+    "required_source_keys": [
+      "APP_KEY",
+      "DB_CONNECTION",
+      "DB_HOST",
+      "DB_PORT",
+      "DB_DATABASE",
+      "DB_USERNAME",
+      "DB_PASSWORD",
+      "MAIL_MAILER",
+      "MAIL_FROM_ADDRESS",
+      "MAIL_FROM_NAME",
+      "ACCOUNT_MAIL_MAILER",
+      "OPENAI_API_KEY"
+    ],
+    "target_fixed_values": {
+      "APP_URL": "https://app.company-os.jp",
+      "APP_ENV": "production",
+      "APP_DEBUG": "false",
+      "APP_TIMEZONE": "Asia/Tokyo",
+      "APP_DISPLAY_TIMEZONE": "Asia/Tokyo",
+      "SESSION_DOMAIN": "null",
+      "SESSION_SECURE_COOKIE": "true",
+      "PRODUCT_UX_OPERATION_FIXTURE_SEED_ENABLED": "false"
+    },
+    "secret_values_output": false,
+    "raw_source_env_stored_locally": false,
+    "raw_source_env_published": false
+  },
+  "implementation_binding": {
+    "source_inspector_file": "inspect-shared-source.sh",
+    "source_inspector_sha256": "72f7d8016d6d42dd25ceb44994b00a31e279bc7daad3e4fb5911b00f6539d683",
+    "target_manager_file": "manage-shared-target.sh",
+    "target_manager_sha256": "6b019523e95688ebc013f01e3bfc58d895e0e6afbe6af1e34e193da8fc3ddf7f",
+    "projector_file": "shared-state-projector.php",
+    "projector_sha256": "5f438829ab57f3327797f9889cd6e9287219e644f2dd0dd5b5d99b12090f9509",
+    "human_helper_file": "Invoke-G5SharedState.ps1"
+  },
+  "transfer_contract": {
+    "transport": "openssh_scp_3_local_relay_encrypted_no_local_persistence",
+    "source_env_destination": "candidate_bound_target_staging_only",
+    "storage_seed_scope": "storage/app",
+    "source_mutation": false,
+    "target_staging_mode": "0700",
+    "raw_source_env_staging_mode": "0600",
+    "raw_source_env_removed_before_publish": true
+  },
+  "target_permission_contract": {
+    "env_type": "regular_file",
+    "env_mode": "0600",
+    "storage_directory_mode": "0750",
+    "storage_file_mode": "0640",
+    "owner_uid": 20046,
+    "group_gid": 1000,
+    "runtime_owner": "php_cli_effective_uid_20046",
+    "env_readability_probe": true,
+    "storage_writeability_probe": true,
+    "web_runtime_smoke": "deferred_application_release_binding_gate"
+  },
+  "storage_contract": {
+    "initial_seed": "exact_manifest_copy_of_legacy_storage_app",
+    "manifest_fields": [
+      "relative_type",
+      "relative_path",
+      "file_size",
+      "file_sha256"
+    ],
+    "manifest_paths_output": false,
+    "runtime_directories_created_empty": [
+      "storage/app/private",
+      "storage/app/public",
+      "storage/framework/cache/data",
+      "storage/framework/sessions",
+      "storage/framework/testing",
+      "storage/framework/views",
+      "storage/logs"
+    ],
+    "final_delta_required": true,
+    "final_delta_gate": "separate_human_gate_before_public_entry_or_traffic_binding"
+  },
+  "application_release_binding": {
+    "performed_by_shared_state_gate": false,
+    "future_release_env_link": "<release>/.env -> shared/.env",
+    "future_release_storage_link": "<release>/storage -> shared/storage",
+    "release_marker_binding": "not_attempted",
+    "application_placement": "not_attempted"
+  },
+  "operation": {
+    "confirmation": "IR1-G5-SHARED-STATE",
+    "one_step_one_command": true,
+    "at_most_once": true,
+    "idempotency": "not_replayable_at_most_once_collision_stop",
+    "blind_retry": false,
+    "success_replay": false,
+    "source_connections_read_only": true,
+    "database_connection": "not_attempted",
+    "migration": "not_attempted",
+    "deploy": "not_attempted",
+    "public_entry_change": false,
+    "dns_ssl_change": false
+  },
+  "cleanup_and_rollback": {
+    "pre_publish": "remove_exact_candidate_bound_staging_after_marker_and_identity_validation",
+    "published_shared_state": "retain_and_return_for_separate_human_rollback_gate",
+    "legacy_source": "never_changed",
+    "public_entry": "never_changed",
+    "application_release": "never_created",
+    "automatic_live_rollback": false
+  },
+  "backup_restore_dependency": {
+    "source_copy_is_read_only": true,
+    "usable_backup": "unknown",
+    "database_restore_readiness": "blocker",
+    "blockers_resolved_by_this_gate": false,
+    "shared_state_seed_is_not_a_backup": true
+  },
+  "evidence_contract": {
+    "result": "PASS_OR_STOP",
+    "raw_remote_output_stored": false,
+    "secret_values_stored": false,
+    "secret_values_terminal_output": false,
+    "incremental_local_state": true,
+    "receipt_required_on_pass": true,
+    "hashes_counts_permissions_and_boundaries_only": true,
+    "retry_available": false,
+    "next_action": "RETURN_TO_HUMAN_CHATGPT"
+  },
+  "excluded_set": [
+    "application placement",
+    "migration",
+    "release marker binding",
+    "live public-entry symlink",
+    "current symlink",
+    "current.previous symlink",
+    "database connection",
+    "database restore",
+    "dns",
+    "ssl",
+    "deploy"
+  ],
+  "continuing_blockers": [
+    "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE",
+    "usable_backup=unknown",
+    "db_restore_readiness=blocker",
+    "storage_final_delta_required=true",
+    "application_release_binding=not_attempted",
+    "release_marker_binding=not_attempted",
+    "dns_ssl_change=not_attempted",
+    "deploy_authorized=false"
+  ],
+  "production_mutation_authorized": false,
+  "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION": "PENDING_G5_PUBLIC_ENTRY_GATE"
+}

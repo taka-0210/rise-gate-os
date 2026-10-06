@@ -564,11 +564,276 @@ class Ir1G5TargetEnvironmentTest extends TestCase
                 $mode,
             ], base_path());
             $process->setTimeout(30);
+            $process->run();
+            $output = $process->getOutput();
+            if ($mode === '-VerifyOnly' && is_dir(base_path(
+                'storage/app/release-audit/production-g5-target-skeleton-build-'.self::CANDIDATE
+            ))) {
+                $this->assertSame(1, $process->getExitCode());
+                $this->assertStringContainsString('safe_error_code=SKELETON_BUILD_ATTEMPT_ALREADY_RECORDED', $output);
+            } else {
+                $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput().$output);
+                $this->assertStringContainsString('target_skeleton_build=not_executed', $output);
+            }
+            $this->assertStringContainsString('production_connection_attempted=false', $output);
+            $this->assertStringContainsString('production_mutation=false', $output);
+        }
+    }
+
+    public function test_g5_shared_state_contract_is_candidate_bound_and_keeps_blockers_open(): void
+    {
+        $contract = json_decode((string) file_get_contents(
+            base_path('deployment/g5-target-environment/shared-state-contract.json')
+        ), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('company-os.ir1.g5-shared-state.v1', $contract['contract_id']);
+        $this->assertSame(self::CANDIDATE, $contract['candidate']);
+        $this->assertSame('legacy_authoritative_shared_state_source', $contract['source']['role']);
+        $this->assertTrue($contract['source']['read_only']);
+        $this->assertSame('/home/xs377816/company-os.jp/company-os-app/shared/.env', $contract['target']['env_path']);
+        $this->assertSame('0600', $contract['target_permission_contract']['env_mode']);
+        $this->assertSame('0750', $contract['target_permission_contract']['storage_directory_mode']);
+        $this->assertSame('0640', $contract['target_permission_contract']['storage_file_mode']);
+        $this->assertSame(20046, $contract['target_permission_contract']['owner_uid']);
+        $this->assertSame(1000, $contract['target_permission_contract']['group_gid']);
+        $this->assertSame(172, $contract['candidate_environment_contract']['allowlist_count']);
+        $this->assertSame(
+            'd408775076252cb15ac0438b1d4ccc762f3f366e9ea10517e3e0f8b3f0d496ec',
+            $contract['candidate_environment_contract']['allowlist_sha256'],
+        );
+        $this->assertFalse($contract['candidate_environment_contract']['secret_values_output']);
+        $this->assertFalse($contract['candidate_environment_contract']['raw_source_env_stored_locally']);
+        foreach ([
+            'source_inspector_sha256' => 'inspect-shared-source.sh',
+            'target_manager_sha256' => 'manage-shared-target.sh',
+            'projector_sha256' => 'shared-state-projector.php',
+        ] as $binding => $file) {
+            $this->assertSame(
+                hash_file('sha256', base_path('deployment/g5-target-environment/'.$file)),
+                $contract['implementation_binding'][$binding],
+            );
+        }
+        $this->assertTrue($contract['storage_contract']['final_delta_required']);
+        $this->assertSame('unknown', $contract['backup_restore_dependency']['usable_backup']);
+        $this->assertSame('blocker', $contract['backup_restore_dependency']['database_restore_readiness']);
+        $this->assertFalse($contract['backup_restore_dependency']['blockers_resolved_by_this_gate']);
+        $this->assertSame('not_attempted', $contract['operation']['database_connection']);
+        $this->assertFalse($contract['production_mutation_authorized']);
+        $this->assertSame(
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            $contract['PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION'],
+        );
+    }
+
+    public function test_g5_shared_state_allowlist_is_exact_frozen_candidate_environment_union(): void
+    {
+        $gitList = new Process(['git', 'ls-tree', '-r', '--name-only', self::CANDIDATE, 'config'], base_path());
+        $gitList->mustRun();
+        $paths = array_values(array_filter(preg_split('/\R/', trim($gitList->getOutput())) ?: []));
+        $paths[] = '.env.example';
+        $keys = [];
+        foreach ($paths as $path) {
+            $show = new Process(['git', 'show', self::CANDIDATE.':'.$path], base_path());
+            $show->mustRun();
+            $content = $show->getOutput();
+            if ($path === '.env.example') {
+                preg_match_all('/^\s*([A-Z][A-Z0-9_]*)\s*=/m', $content, $matches);
+            } else {
+                preg_match_all('/env\(\s*[\'\"]([A-Z][A-Z0-9_]*)[\'\"]/', $content, $matches);
+            }
+            foreach ($matches[1] as $key) {
+                $keys[$key] = true;
+            }
+        }
+        $expected = array_keys($keys);
+        sort($expected, SORT_STRING);
+        $actualRaw = (string) file_get_contents(base_path('deployment/g5-target-environment/shared-state-env-allowlist.txt'));
+        $actual = array_values(array_filter(explode("\n", str_replace("\r\n", "\n", $actualRaw))));
+
+        $this->assertSame($expected, $actual);
+        $this->assertCount(172, $actual);
+        $this->assertSame(
+            'd408775076252cb15ac0438b1d4ccc762f3f366e9ea10517e3e0f8b3f0d496ec',
+            hash('sha256', str_replace("\r\n", "\n", $actualRaw)),
+        );
+    }
+
+    public function test_g5_shared_state_projector_inventory_never_outputs_fixture_secrets(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'g5-shared-projector-'.bin2hex(random_bytes(8));
+        mkdir($root, 0700, true);
+        mkdir($root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'nested', 0700, true);
+        file_put_contents($root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'nested'.DIRECTORY_SEPARATOR.'fixture.txt', 'fixture');
+        $secret = 'fixture-secret-never-output';
+        $env = implode("\n", [
+            'APP_KEY=base64:'.$secret,
+            'DB_CONNECTION=mysql',
+            'DB_HOST=localhost',
+            'DB_PORT=3306',
+            'DB_DATABASE=fixture',
+            'DB_USERNAME=fixture',
+            'DB_PASSWORD='.$secret,
+            'MAIL_MAILER=smtp',
+            'MAIL_HOST=localhost',
+            'MAIL_PORT=2525',
+            'MAIL_FROM_ADDRESS=fixture@example.com',
+            'MAIL_FROM_NAME=Fixture',
+            'ACCOUNT_MAIL_MAILER=smtp',
+            'OPENAI_API_KEY='.$secret,
+            'UNKNOWN_LEGACY_ONLY='.$secret,
+            '',
+        ]);
+        $envPath = $root.DIRECTORY_SEPARATOR.'.env';
+        file_put_contents($envPath, $env);
+        $allowlist = (string) file_get_contents(base_path('deployment/g5-target-environment/shared-state-env-allowlist.txt'));
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                base_path('deployment/g5-target-environment/shared-state-projector.php'),
+                'inspect-source',
+                $envPath,
+                $root.DIRECTORY_SEPARATOR.'app',
+                base64_encode($allowlist),
+            ], base_path());
+            $process->mustRun();
+            $output = $process->getOutput();
+            $this->assertStringContainsString('G5_SHARED_SOURCE_INVENTORY=PASS', $output);
+            $this->assertStringContainsString('candidate_allowlist_count=172', $output);
+            $this->assertStringContainsString('unknown_key_count=1', $output);
+            $this->assertStringContainsString('target_app_url_binding=app.company-os.jp', $output);
+            $this->assertStringContainsString('target_timezone=Asia_Tokyo', $output);
+            $this->assertStringContainsString('secret_output=false', $output);
+            $this->assertStringNotContainsString($secret, $output);
+            $this->assertStringNotContainsString('APP_KEY', $output);
+            $this->assertStringNotContainsString('DB_PASSWORD', $output);
+            $this->assertStringNotContainsString('OPENAI_API_KEY', $output);
+        } finally {
+            @unlink($root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'nested'.DIRECTORY_SEPARATOR.'fixture.txt');
+            @rmdir($root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'nested');
+            @rmdir($root.DIRECTORY_SEPARATOR.'app');
+            @unlink($envPath);
+            @rmdir($root);
+        }
+    }
+
+    public function test_g5_shared_state_remote_scripts_bound_mutation_and_preserve_public_entry(): void
+    {
+        $source = (string) file_get_contents(base_path('deployment/g5-target-environment/inspect-shared-source.sh'));
+        $target = (string) file_get_contents(base_path('deployment/g5-target-environment/manage-shared-target.sh'));
+        $projector = (string) file_get_contents(base_path('deployment/g5-target-environment/shared-state-projector.php'));
+
+        foreach ([
+            "EXPECTED_HOME='/home/xs257823'",
+            "SOURCE_ENV=\"\$SOURCE_APPLICATION_ROOT/.env\"",
+            'production_change_scope=none_read_only_source',
+            'secret_output=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $source);
+        }
+        foreach (['mkdir ', 'rm ', 'mv ', 'chmod ', 'chown ', 'mysql', 'artisan'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $source);
+        }
+        foreach ([
+            "STAGING_ROOT=\"\$SHARED_ROOT/.g5-shared-state-\$CANDIDATE\"",
+            'TARGET_ENV="$SHARED_ROOT/.env"',
+            'TARGET_STORAGE="$SHARED_ROOT/storage"',
+            'chmod 0600 -- "$STAGING_SOURCE_ENV"',
+            'find "$STAGING_STORAGE" -xdev -type d -exec chmod 0750',
+            'find "$STAGING_STORAGE" -xdev -type f -exec chmod 0640',
+            'PUBLIC_ENTRY_CHANGED_DURING_OPERATION',
+            'PUBLISHED_SHARED_STATE_RETAINED',
+            'storage_final_delta_required=true',
+            'db_restore_readiness=blocker',
+            'PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE',
+        ] as $required) {
+            $this->assertStringContainsString($required, $target);
+        }
+        foreach (['mysql', 'artisan', 'curl ', 'wget '] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $target);
+        }
+        foreach ([
+            "'APP_URL' => 'https://app.company-os.jp'",
+            "'APP_ENV' => 'production'",
+            "'APP_DEBUG' => 'false'",
+            "'APP_TIMEZONE' => 'Asia/Tokyo'",
+            "'APP_DISPLAY_TIMEZONE' => 'Asia/Tokyo'",
+            "'SESSION_SECURE_COOKIE' => 'true'",
+            'SOURCE_ENV_COPY_DRIFT',
+            'TARGET_ENV_STAGING_COLLISION',
+            'target_env_values_output=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $projector);
+        }
+    }
+
+    public function test_g5_shared_state_helper_is_one_shot_secret_safe_and_connection_truthful(): void
+    {
+        $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5SharedState.ps1'));
+        foreach ([
+            'g5-shared-state-v1',
+            'SHARED_STATE_ATTEMPT_ALREADY_RECORDED',
+            'scp.exe',
+            "'-3','-q'",
+            'g5-legacy-source',
+            'g5-new-target',
+            'raw_source_env_stored_locally=$false',
+            'secret_values_output=$false',
+            'sourceInventory.source_env_sha256',
+            '[IO.File]::Replace($temporaryPath, $Path, $backupPath)',
+            'storage_final_delta_required=true',
+            'db_restore_readiness=blocker',
+            'application_release_binding=not_attempted',
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            'retry_available=false',
+            'deploy_authorized=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
+        foreach (['Invoke-WebRequest', 'curl.exe', 'mysql.exe', 'php artisan migrate'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $helper);
+        }
+        $processStart = strpos($helper, 'if (-not $process.Start())');
+        $connectionObserved = strpos($helper, '$script:ConnectionAttempted = $true');
+        $sourceInvocation = strpos($helper, '$sourcePreflightResult = Invoke-Native');
+        $this->assertIsInt($processStart);
+        $this->assertIsInt($connectionObserved);
+        $this->assertIsInt($sourceInvocation);
+        $this->assertLessThan($connectionObserved, $processStart);
+        $this->assertLessThan($sourceInvocation, $connectionObserved);
+    }
+
+    public function test_g5_shared_state_simulation_is_production_free(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            base_path('deployment/g5-target-environment/simulate-shared-state.php'),
+        ], base_path());
+        $process->mustRun();
+        $output = $process->getOutput();
+        $this->assertStringContainsString('G5_SHARED_STATE_SIMULATION=PASS', $output);
+        $this->assertStringContainsString('scenarios=7', $output);
+        $this->assertStringContainsString('assertions=36', $output);
+        $this->assertStringContainsString('production_connection_attempted=false', $output);
+        $this->assertStringContainsString('production_mutation=false', $output);
+        $this->assertStringContainsString('secret_values_output=false', $output);
+    }
+
+    public function test_g5_shared_state_human_helper_verify_modes_do_not_connect(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('The G5 Shared State Human helper runs under Windows PowerShell.');
+        }
+        $helper = base_path('deployment/g5-target-environment/Invoke-G5SharedState.ps1');
+        foreach (['-VerifyPersistenceOnly', '-VerifyOnly'] as $mode) {
+            $process = new Process([
+                'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $helper, $mode,
+            ], base_path());
+            $process->setTimeout(30);
             $process->mustRun();
             $output = $process->getOutput();
             $this->assertStringContainsString('production_connection_attempted=false', $output);
             $this->assertStringContainsString('production_mutation=false', $output);
-            $this->assertStringContainsString('target_skeleton_build=not_executed', $output);
+            $this->assertStringContainsString('shared_state_operation=not_executed', $output);
         }
     }
 }

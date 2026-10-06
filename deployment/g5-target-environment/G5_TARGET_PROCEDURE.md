@@ -153,17 +153,69 @@ runtime owner and readability, exact storage seed and final-delta procedure,
 permissions, backup/restore dependency, cleanup and Evidence Contract. No
 Shared State mutation is authorized by the Skeleton PASS.
 
+### Shared State Human gate
+
+The Production-free preparation is now command-ready through only
+`Invoke-G5SharedState.ps1`. Its frozen source is the Legacy application's
+existing `.env` and `storage/app`, but the existing `.env` is **not** copied as
+the published NewTarget configuration. The helper derives the exact 172-key
+allowlist from the frozen candidate contract, omits unknown Legacy keys,
+requires the candidate's security-critical keys and reconstructs a sorted
+target payload with explicit NewTarget values for `APP_URL`, production mode,
+debug off, JST, secure session cookie and fixture seed off.
+
+Secret bytes never enter Repository, audit Evidence, terminal output or a
+local persistent file. OpenSSH `scp -3` relays the exact source `.env` and
+`storage/app` over authenticated encrypted channels into the candidate-bound
+NewTarget staging root. The raw source `.env` is mode `0600` in staging and is
+removed before publish. Only hashes, byte/count totals, modes and disposition
+fields are retained as Evidence.
+
+The exact publish set is:
+
+```text
+/home/xs377816/company-os.jp/company-os-app/shared/.env      regular 0600 20046:1000
+/home/xs377816/company-os.jp/company-os-app/shared/storage/ directory 0750 20046:1000
+```
+
+Seeded storage files are normalized to `0640`; directories are `0750`.
+`storage/app` is manifest-matched by relative type/path, size and SHA-256.
+Required runtime directories are created empty, and PHP CLI running as UID
+`20046` must prove `.env` readability and storage write/delete capability.
+Web-runtime proof remains deferred until a release is bound.
+
+This is an initial storage seed only. A separately authorized final delta is
+required before any public-entry or traffic binding. The operation does not
+connect to the database and does not prove backup usability or DB restore
+readiness. `usable_backup=unknown` and `db_restore_readiness=blocker` remain
+open.
+
+Before publish, failure cleanup may remove only the exact candidate-bound
+staging root after its marker, owner and mode are validated. Once either
+published `.env` or storage exists, automated deletion is prohibited; state
+is retained for a separate Human rollback gate. Legacy, the three existing
+public-entry files, releases, `current`, `current.previous`, Migration,
+Release marker, DNS, SSL and Deploy are excluded.
+
+The helper records one local attempt before connecting and refuses replay.
+PASS or STOP exhausts the authorization. It maintains
+`PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE`
+and returns to Human + ChatGPT without starting Application placement or any
+later gate.
+
 ## Permission plan
 
 - `shared/.env`: target `0600`; no group/other permission.
-- `shared/storage`: owner writable. Exact directory/file modes are fixed only
-  after the PHP runtime owner is established. World write is prohibited.
+- `shared/storage`: directories `0750`, files `0640`, owned by
+  `20046:1000`; PHP CLI owner-read/write probes are mandatory. World write is
+  prohibited.
 - Releases: immutable after verification; runtime write is limited to shared
   storage.
 - No permission is changed during read-only discovery.
 
-The current legacy `.env` mode `0604` remains a blocker until an authorized
-hardening operation proves that the PHP runtime can read the hardened file.
+The current Legacy `.env` mode `0604` is not changed by this gate. The
+NewTarget published `.env` is independently reconstructed as `0600`; no
+Legacy permission hardening is implied.
 
 ## Rollback and cleanup
 
@@ -180,11 +232,14 @@ hardening operation proves that the PHP runtime can read the hardened file.
 ## Continuing blockers
 
 Usable backup, DB restore readiness, legacy marker/application binding,
-`.env` hardening, user cron, external writer enablement, active
+user cron, external writer enablement, active
 transaction/metadata lock visibility and DB/Application collation difference
 remain open until separate Evidence closes them. POSIX symlink and atomic
 rename capability are closed by G5-C Formal PASS, and exact empty Skeleton
-construction is closed by Target Skeleton Build Formal PASS. Shared state,
+construction is closed by Target Skeleton Build Formal PASS. Shared state is
+Human-gate ready but not executed. Its initial storage seed does not close the
+required final delta, usable backup or DB restore blocker. Application
+placement,
 application placement, `current` / `current.previous`, public-entry disposition
 and binding remain separate gates. DNS and SSL remain G6-only; Migration and
 Deploy remain unapproved.
