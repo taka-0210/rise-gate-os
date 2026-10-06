@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('Initial', 'Corrective1')]
+    [string] $Attempt = 'Initial',
     [switch] $VerifyOnly,
     [switch] $VerifyPersistenceOnly
 )
@@ -8,13 +10,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $Candidate = '924af91188cc60d33ff87c91b94ecc1d539566e6'
-$HelperGeneration = 'g5-shared-state-v1'
-$ExpectedContractId = 'company-os.ir1.g5-shared-state.v1'
-$ExpectedContractSha256 = 'cc11ad5a67e0f3f869da15091d91740f9e4d584d90995bd86d38ae22d7a282d1'
+$IsCorrectiveRetry = $Attempt -eq 'Corrective1'
+$HelperGeneration = if ($IsCorrectiveRetry) { 'g5-shared-state-corrective-1' } else { 'g5-shared-state-v1' }
+$ExpectedBaseContractId = 'company-os.ir1.g5-shared-state.v1'
+$ExpectedBaseContractSha256 = 'cc11ad5a67e0f3f869da15091d91740f9e4d584d90995bd86d38ae22d7a282d1'
+$ExpectedCorrectiveContractId = 'company-os.ir1.g5-shared-state-corrective1.v1'
+$ExpectedCorrectiveContractSha256 = '1637b67d6acc95c50e2433d9e48cb21328522d357ae7468c0bb1b973fa443064'
 $ExpectedSourceInspectorSha256 = '72f7d8016d6d42dd25ceb44994b00a31e279bc7daad3e4fb5911b00f6539d683'
 $ExpectedTargetManagerSha256 = '6b019523e95688ebc013f01e3bfc58d895e0e6afbe6af1e34e193da8fc3ddf7f'
-$ExpectedProjectorSha256 = '5f438829ab57f3327797f9889cd6e9287219e644f2dd0dd5b5d99b12090f9509'
+$ExpectedProjectorSha256 = 'aecc7a4f16ab4559f13a836bfecc9a8b95349c45eb55efa8d6a79ab8465e44e2'
 $ExpectedAllowlistSha256 = 'd408775076252cb15ac0438b1d4ccc762f3f366e9ea10517e3e0f8b3f0d496ec'
+$ExpectedInitialStateSha256 = 'bb98d39709625d619d0365b57850613580237be837dcc85a863d00adfbcb248d'
 $ExpectedG5BReceiptSha256 = 'ec24b30e62c34564aaaaccfa928edbac98f95e7e4748594422b641f4bbbae7c3'
 $ExpectedG5CReceiptSha256 = 'a1dd2871236868affe3b4a9d5454dc87eb614b15f1049e3a555c3700dec59faf'
 $ExpectedG5CStateSha256 = 'e696b86dbb818c85f99d0115f547408cf193eb1fd67693807a7dd9f28d2ed99c'
@@ -274,10 +280,55 @@ function Assert-FileBinding([string] $Path, [string] $Hash, [string] $Code) {
     }
 }
 
+function Assert-InitialAttemptEvidence([string] $InitialRoot, [string] $InitialStatePath) {
+    if (-not (Test-Path -LiteralPath $InitialRoot -PathType Container)) {
+        Stop-G5Shared 'INITIAL_ATTEMPT_EVIDENCE_MISSING'
+    }
+    $entries = @(Get-ChildItem -LiteralPath $InitialRoot -Force)
+    if ($entries.Count -ne 1 -or $entries[0].Name -ne 'execution-state.json' -or
+        -not (Test-Path -LiteralPath $InitialStatePath -PathType Leaf)) {
+        Stop-G5Shared 'INITIAL_ATTEMPT_EVIDENCE_ENTRY_MISMATCH'
+    }
+    if ((Get-FileSha256 $InitialStatePath) -ne $ExpectedInitialStateSha256) {
+        Stop-G5Shared 'INITIAL_ATTEMPT_EVIDENCE_HASH_MISMATCH'
+    }
+    $initial = Get-Content -Raw -LiteralPath $InitialStatePath | ConvertFrom-Json
+    if ($initial.schema_version -ne 1 -or $initial.candidate -ne $Candidate -or
+        $initial.helper_generation -ne 'g5-shared-state-v1' -or $initial.status -ne 'STOP' -or
+        $initial.contract_sha256 -ne $ExpectedBaseContractSha256 -or
+        -not [bool] $initial.production_connection_attempted -or
+        -not [bool] $initial.source_connection_attempted -or [bool] $initial.target_connection_attempted -or
+        [int] $initial.remote_process_count -ne 2 -or $initial.production_mutation_scope -ne 'false' -or
+        [bool] $initial.target_prepared -or [bool] $initial.target_finalized -or
+        $initial.cleanup_state -ne 'not_required' -or $initial.rollback_state -ne 'not_required' -or
+        [int] $initial.transient_config_residual_count -ne 0 -or [bool] $initial.raw_output_stored -or
+        [bool] $initial.secret_values_output -or [bool] $initial.retry_performed -or
+        [bool] $initial.retry_available -or
+        $initial.local_processing_substage -ne 'SOURCE_INVENTORY_PROCESS_PENDING' -or
+        $initial.safe_error_code -ne 'REMOTE_STATUS_MISSING' -or [int] $initial.local_state_generation -ne 4 -or
+        $initial.PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION -ne 'PENDING_G5_PUBLIC_ENTRY_GATE') {
+        Stop-G5Shared 'INITIAL_ATTEMPT_STATE_MISMATCH'
+    }
+}
+
+function Record-StepMetadata([string] $Name, [object] $Result) {
+    if ($null -eq $script:State) { return }
+    $script:State.step_streams[$Name] = [ordered]@{
+        exit_code = [int] $Result.ExitCode
+        stdout_sha256 = Get-TextSha256 $Result.Stdout
+        stdout_bytes = $Utf8NoBom.GetByteCount($Result.Stdout)
+        stderr_sha256 = Get-TextSha256 $Result.Stderr
+        stderr_bytes = $Utf8NoBom.GetByteCount($Result.Stderr)
+        raw_output_stored = $false
+    }
+    Save-State
+}
+
 try {
     if ($VerifyOnly -and $VerifyPersistenceOnly) { Stop-G5Shared 'VERIFY_MODE_CONFLICT' }
     $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-    $ContractPath = Join-Path $PSScriptRoot 'shared-state-contract.json'
+    $BaseContractPath = Join-Path $PSScriptRoot 'shared-state-contract.json'
+    $ContractPath = Join-Path $PSScriptRoot 'shared-state-corrective1-contract.json'
     $SourceInspectorPath = Join-Path $PSScriptRoot 'inspect-shared-source.sh'
     $TargetManagerPath = Join-Path $PSScriptRoot 'manage-shared-target.sh'
     $ProjectorPath = Join-Path $PSScriptRoot 'shared-state-projector.php'
@@ -294,7 +345,9 @@ try {
     $TargetBindingRoot = Join-Path $Root "storage\app\release-audit\production-g5b-new-target-binding-$Candidate"
     $TargetHostReceiptPath = Join-Path $TargetBindingRoot 'host-key-verification.json'
     $TargetKnownHostsPath = Join-Path $TargetBindingRoot 'known_hosts'
-    $EvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5-shared-state-$Candidate"
+    $InitialEvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5-shared-state-$Candidate"
+    $InitialStatePath = Join-Path $InitialEvidenceRoot 'execution-state.json'
+    $EvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5-shared-state-corrective-1-$Candidate"
     $ReceiptPath = Join-Path $EvidenceRoot 'shared-state.json'
     $StatePath = Join-Path $EvidenceRoot 'execution-state.json'
     $UserSshRoot = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ssh'
@@ -302,7 +355,15 @@ try {
     $TargetIdentityPath = Join-Path $UserSshRoot $TargetIdentityLeaf
     $SourceKnownHostsPath = Join-Path $UserSshRoot 'known_hosts'
 
-    Assert-FileBinding $ContractPath $ExpectedContractSha256 'SHARED_STATE_CONTRACT_BINDING_MISMATCH'
+    if (-not $IsCorrectiveRetry) {
+        if (Test-Path -LiteralPath $InitialEvidenceRoot) { Stop-G5Shared 'SHARED_STATE_ATTEMPT_ALREADY_RECORDED' }
+        Stop-G5Shared 'INITIAL_EXECUTION_PATH_RETIRED'
+    }
+    Assert-InitialAttemptEvidence $InitialEvidenceRoot $InitialStatePath
+    if (Test-Path -LiteralPath $EvidenceRoot) { Stop-G5Shared 'CORRECTIVE_ATTEMPT_ALREADY_RECORDED' }
+
+    Assert-FileBinding $BaseContractPath $ExpectedBaseContractSha256 'BASE_CONTRACT_BINDING_MISMATCH'
+    Assert-FileBinding $ContractPath $ExpectedCorrectiveContractSha256 'CORRECTIVE_CONTRACT_BINDING_MISMATCH'
     Assert-FileBinding $SourceInspectorPath $ExpectedSourceInspectorSha256 'SOURCE_INSPECTOR_BINDING_MISMATCH'
     Assert-FileBinding $TargetManagerPath $ExpectedTargetManagerSha256 'TARGET_MANAGER_BINDING_MISMATCH'
     Assert-FileBinding $ProjectorPath $ExpectedProjectorSha256 'PROJECTOR_BINDING_MISMATCH'
@@ -317,8 +378,12 @@ try {
     Assert-FileBinding $TargetHostReceiptPath $ExpectedTargetHostReceiptSha256 'TARGET_HOST_RECEIPT_BINDING_MISMATCH'
     Assert-FileBinding $TargetKnownHostsPath $ExpectedTargetKnownHostsSha256 'TARGET_KNOWN_HOSTS_BINDING_MISMATCH'
 
+    $baseContract = Get-Content -Raw -LiteralPath $BaseContractPath | ConvertFrom-Json
     $contract = Get-Content -Raw -LiteralPath $ContractPath | ConvertFrom-Json
-    if ($contract.contract_id -ne $ExpectedContractId -or $contract.candidate -ne $Candidate -or
+    if ($baseContract.contract_id -ne $ExpectedBaseContractId -or
+        $contract.contract_id -ne $ExpectedCorrectiveContractId -or $contract.candidate -ne $Candidate -or
+        $contract.base_contract_sha256 -ne $ExpectedBaseContractSha256 -or
+        $contract.initial_stop_evidence.execution_state_sha256 -ne $ExpectedInitialStateSha256 -or
         $contract.candidate_environment_contract.allowlist_count -ne 172 -or
         $contract.candidate_environment_contract.allowlist_sha256 -ne $ExpectedAllowlistSha256 -or
         $contract.implementation_binding.source_inspector_sha256 -ne $ExpectedSourceInspectorSha256 -or
@@ -344,6 +409,8 @@ try {
     $persistence = Invoke-StatePersistenceSelfTest
     if ($VerifyPersistenceOnly) {
         Write-Output 'G5_SHARED_STATE_PERSISTENCE_VERIFY_ONLY=PASS'
+        Write-Output 'attempt=Corrective1'
+        Write-Output 'corrective_retry_number=1'
         Write-Output "helper_generation=$HelperGeneration"
         Write-Output "generation_count=$($persistence.generations)"
         Write-Output "atomic_initial_move=$($persistence.atomic_initial_move)"
@@ -377,7 +444,6 @@ try {
         Stop-G5Shared 'SOURCE_SSH_BINDING_MISMATCH'
     }
 
-    if (Test-Path -LiteralPath $EvidenceRoot) { Stop-G5Shared 'SHARED_STATE_ATTEMPT_ALREADY_RECORDED' }
     $allowlistRaw = Read-LfText $AllowlistPath
     if (-not $allowlistRaw.EndsWith("`n")) { Stop-G5Shared 'ALLOWLIST_FINAL_NEWLINE_MISSING' }
     $allowlistB64 = [Convert]::ToBase64String($Utf8NoBom.GetBytes($allowlistRaw))
@@ -443,9 +509,13 @@ Host g5-new-target
         $fixture = Parse-SafeOutput "G5_SHARED_SOURCE_PREFLIGHT=STOP`nsafe_error_code=VERIFY_ONLY_FIXTURE`nsecret_output=false`n" 'G5_SHARED_SOURCE_PREFLIGHT'
         if ($fixture.G5_SHARED_SOURCE_PREFLIGHT -ne 'STOP') { Stop-G5Shared 'SAFE_OUTPUT_PARSER_SELF_TEST_FAILED' }
         Write-Output 'G5_SHARED_STATE_VERIFY_ONLY=PASS'
+        Write-Output 'attempt=Corrective1'
+        Write-Output 'corrective_retry_number=1'
         Write-Output "candidate=$Candidate"
         Write-Output "helper_generation=$HelperGeneration"
-        Write-Output "contract_sha256=$ExpectedContractSha256"
+        Write-Output "base_contract_sha256=$ExpectedBaseContractSha256"
+        Write-Output "corrective_contract_sha256=$ExpectedCorrectiveContractSha256"
+        Write-Output "initial_state_sha256=$ExpectedInitialStateSha256"
         Write-Output "allowlist_sha256=$ExpectedAllowlistSha256"
         Write-Output 'allowlist_key_count=172'
         Write-Output 'secret_source=legacy_allowlisted_projection'
@@ -465,15 +535,18 @@ Host g5-new-target
 
     [IO.Directory]::CreateDirectory($EvidenceRoot) | Out-Null
     $State = [ordered]@{
-        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; status='ATTEMPT_STARTED'
-        contract_sha256=$ExpectedContractSha256; source_inspector_sha256=$ExpectedSourceInspectorSha256
+        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; attempt='Corrective1'
+        corrective_retry_number=1; status='ATTEMPT_STARTED'; base_contract_sha256=$ExpectedBaseContractSha256
+        contract_sha256=$ExpectedCorrectiveContractSha256; initial_state_sha256=$ExpectedInitialStateSha256
+        source_inspector_sha256=$ExpectedSourceInspectorSha256
         target_manager_sha256=$ExpectedTargetManagerSha256; projector_sha256=$ExpectedProjectorSha256
         allowlist_sha256=$ExpectedAllowlistSha256; production_connection_attempted=$false
         source_connection_attempted=$false; target_connection_attempted=$false; remote_process_count=0
         production_mutation_scope='none'; target_prepared=$false; target_finalized=$false
         cleanup_state='not_required'; rollback_state='not_required'; transient_config_residual_count='unknown'
         raw_output_stored=$false; secret_values_output=$false; retry_performed=$false; retry_available=$false
-        local_processing_substage='ATTEMPT_INITIALIZED'; safe_error_code=$null; local_state_generation=0
+        step_streams=[ordered]@{}; local_processing_substage='ATTEMPT_INITIALIZED'
+        safe_error_code=$null; local_state_generation=0
         PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION='PENDING_G5_PUBLIC_ENTRY_GATE'
     }
     Save-State
@@ -481,6 +554,7 @@ Host g5-new-target
     $FailureStage = 'SOURCE_READ_ONLY_PREFLIGHT'
     $LocalSubstage = 'SOURCE_PREFLIGHT_PROCESS_PENDING'
     $sourcePreflightResult = Invoke-Native $ssh.Source ($sourceArgs + @('sh','-s','--',$Confirmation)) $sourceInspector 'source'
+    Record-StepMetadata 'source_preflight' $sourcePreflightResult
     $sourcePreflight = Assert-RemotePass $sourcePreflightResult 'G5_SHARED_SOURCE_PREFLIGHT'
     if ($sourcePreflight.production_change_scope -ne 'none_read_only_source' -or
         $sourcePreflight.source_binding -ne 'exact_legacy_application') {
@@ -492,6 +566,7 @@ Host g5-new-target
     $sourceInventoryResult = Invoke-Native $ssh.Source ($sourceArgs + @(
         'php','--','inspect-source',$SourceEnv,$SourceStorageApp,$allowlistB64
     )) $projector 'source'
+    Record-StepMetadata 'source_inventory' $sourceInventoryResult
     $sourceInventory = Assert-RemotePass $sourceInventoryResult 'G5_SHARED_SOURCE_INVENTORY'
     foreach ($key in @('source_env_sha256','env_payload_sha256','env_payload_bytes','storage_app_manifest_sha256',
         'storage_app_file_count','storage_app_directory_count','storage_app_total_bytes')) {
@@ -508,6 +583,7 @@ Host g5-new-target
     $prepareResult = Invoke-Native $ssh.Source ($targetArgs + @(
         'bash','-s','--',$Confirmation,'prepare',$sourceInventory.storage_app_total_bytes
     )) $targetManager 'target'
+    Record-StepMetadata 'target_prepare' $prepareResult
     $prepare = Assert-RemotePass $prepareResult 'G5_SHARED_TARGET_PREPARE'
     if ($prepare.production_change_scope -ne 'candidate_bound_shared_staging_created' -or
         $prepare.staging_source_env_mode -ne '0600' -or $prepare.target_public_entry_changed -ne 'false') {
@@ -525,6 +601,7 @@ Host g5-new-target
         '-3','-q','-F',$TransientConfigPath,
         "g5-legacy-source:$SourceEnv","g5-new-target:$TargetStagingSourceEnv"
     ) $null 'both'
+    Record-StepMetadata 'env_transfer' $envScp
     if ($envScp.ExitCode -ne 0) { Stop-G5Shared 'ENV_TRANSFER_FAILED' }
 
     $FailureStage = 'ENCRYPTED_STORAGE_SEED_TRANSFER'
@@ -533,14 +610,17 @@ Host g5-new-target
         '-3','-q','-r','-F',$TransientConfigPath,
         "g5-legacy-source:$SourceStorageApp","g5-new-target:$TargetStagingStorage/"
     ) $null 'both'
+    Record-StepMetadata 'storage_transfer' $storageScp
     if ($storageScp.ExitCode -ne 0) { Stop-G5Shared 'STORAGE_TRANSFER_FAILED' }
 
     $FailureStage = 'TARGET_ENV_ALLOWLIST_PROJECTION'
     $LocalSubstage = 'TARGET_ENV_PROJECTION_PROCESS_PENDING'
     $projectionResult = Invoke-Native $ssh.Source ($targetArgs + @(
         'php','--','project-target',$TargetStagingSourceEnv,$TargetStagingProjectedEnv,$allowlistB64,
-        $sourceInventory.env_payload_sha256,$sourceInventory.env_payload_bytes,$sourceInventory.source_env_sha256
+        $sourceInventory.env_payload_sha256,$sourceInventory.env_payload_bytes,
+        $sourceInventory.source_env_sha256
     )) $projector 'target'
+    Record-StepMetadata 'target_env_projection' $projectionResult
     $projection = Assert-RemotePass $projectionResult 'G5_SHARED_ENV_PROJECTION'
     if ($projection.env_payload_sha256 -ne $sourceInventory.env_payload_sha256 -or
         $projection.source_env_sha256 -ne $sourceInventory.source_env_sha256 -or
@@ -551,9 +631,11 @@ Host g5-new-target
     $FailureStage = 'TARGET_STORAGE_MANIFEST_VERIFY'
     $LocalSubstage = 'TARGET_STORAGE_VERIFY_PROCESS_PENDING'
     $storageResult = Invoke-Native $ssh.Source ($targetArgs + @(
-        'php','--','inspect-target-storage',$TargetStagingStorageApp,$sourceInventory.storage_app_manifest_sha256,
-        $sourceInventory.storage_app_file_count,$sourceInventory.storage_app_directory_count,$sourceInventory.storage_app_total_bytes
+        'php','--','inspect-target-storage',$TargetStagingStorageApp,
+        $sourceInventory.storage_app_manifest_sha256,$sourceInventory.storage_app_file_count,
+        $sourceInventory.storage_app_directory_count,$sourceInventory.storage_app_total_bytes
     )) $projector 'target'
+    Record-StepMetadata 'target_storage_verification' $storageResult
     $storage = Assert-RemotePass $storageResult 'G5_SHARED_TARGET_STORAGE'
 
     $FailureStage = 'TARGET_SHARED_STATE_FINALIZE'
@@ -563,6 +645,7 @@ Host g5-new-target
         $sourceInventory.storage_app_manifest_sha256,$sourceInventory.storage_app_file_count,
         $sourceInventory.storage_app_directory_count,$sourceInventory.storage_app_total_bytes
     )) $targetManager 'target'
+    Record-StepMetadata 'target_finalize' $finalizeResult
     $finalize = Assert-RemotePass $finalizeResult 'G5_SHARED_TARGET_FINALIZE'
     foreach ($pair in (@{
         target_shared_env_created='true'; target_shared_env_mode='0600'; target_shared_storage_created='true'
@@ -589,8 +672,10 @@ Host g5-new-target
     if ($TransientResidualCount -ne 0) { Stop-G5Shared 'TRANSIENT_SSH_CONFIG_RESIDUAL' }
 
     $receipt = [ordered]@{
-        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; status='PASS'
-        contract_sha256=$ExpectedContractSha256; allowlist_sha256=$ExpectedAllowlistSha256
+        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; attempt='Corrective1'
+        corrective_retry_number=1; status='PASS'; base_contract_sha256=$ExpectedBaseContractSha256
+        contract_sha256=$ExpectedCorrectiveContractSha256; initial_state_sha256=$ExpectedInitialStateSha256
+        allowlist_sha256=$ExpectedAllowlistSha256
         prerequisite_evidence=[ordered]@{
             g5b_receipt_sha256=$ExpectedG5BReceiptSha256; g5c_receipt_sha256=$ExpectedG5CReceiptSha256
             g5c_state_sha256=$ExpectedG5CStateSha256; skeleton_receipt_sha256=$ExpectedSkeletonReceiptSha256
@@ -612,6 +697,7 @@ Host g5-new-target
             cleanup_state='complete'; rollback_state='not_required'; transient_config_residual_count=0
             retry_performed=$false; retry_available=$false; deploy_authorized=$false
         }
+        step_streams=$State.step_streams
         blockers=[ordered]@{
             usable_backup='unknown'; db_restore_readiness='blocker'; storage_final_delta_required=$true
             application_release_binding='not_attempted'; public_entry_disposition='PENDING_G5_PUBLIC_ENTRY_GATE'
@@ -632,6 +718,8 @@ Host g5-new-target
     Save-State
 
     Write-Output 'G5_SHARED_STATE=PASS'
+    Write-Output 'attempt=Corrective1'
+    Write-Output 'corrective_retry_number=1'
     Write-Output 'production_connection_attempted=true'
     Write-Output 'production_mutation=exact_new_target_shared_env_and_storage_seed'
     Write-Output 'secret_source=legacy_allowlisted_projection'
@@ -662,6 +750,7 @@ Host g5-new-target
             $FailureStage = 'TARGET_PREPUBLISH_CLEANUP'
             $LocalSubstage = 'TARGET_CLEANUP_PROCESS_PENDING'
             $cleanupResult = Invoke-Native $ssh.Source ($targetArgs + @('bash','-s','--',$Confirmation,'cleanup')) $targetManager 'target'
+            Record-StepMetadata 'target_cleanup' $cleanupResult
             $cleanup = Assert-RemotePass $cleanupResult 'G5_SHARED_TARGET_CLEANUP'
             if ($cleanup.cleanup_state -eq 'complete' -and $cleanup.staging_residual_entry_count -eq '0') {
                 $CleanupState = 'complete'
@@ -702,6 +791,8 @@ Host g5-new-target
         try { Save-State; $statePersistence = 'saved' } catch { $statePersistence = 'failed' }
     }
     Write-Output 'G5_SHARED_STATE=STOP'
+    Write-Output "attempt=$Attempt"
+    Write-Output "corrective_retry_number=$(if ($IsCorrectiveRetry) { '1' } else { '0' })"
     Write-Output "safe_error_code=$safeCode"
     Write-Output "failure_stage=$FailureStage"
     Write-Output "production_connection_attempted=$($ConnectionAttempted.ToString().ToLowerInvariant())"

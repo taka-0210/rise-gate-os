@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 function stop(string $header, string $code): never
 {
-    fwrite(STDOUT, $header."=STOP\n");
-    fwrite(STDOUT, "safe_error_code={$code}\n");
-    fwrite(STDOUT, "secret_output=false\n");
-    fwrite(STDOUT, "next_action=RETURN_TO_HUMAN_CHATGPT\n");
+    echo $header."=STOP\n";
+    echo "safe_error_code={$code}\n";
+    echo "secret_output=false\n";
+    echo "next_action=RETURN_TO_HUMAN_CHATGPT\n";
     exit(1);
 }
 
@@ -224,33 +224,33 @@ if ($mode === 'inspect-source') {
     );
     [$storageHash, $storageFiles, $storageDirectories, $storageBytes] = storage_manifest($argv[3], $header);
 
-    fwrite(STDOUT, "{$header}=PASS\n");
-    fwrite(STDOUT, 'candidate_allowlist_count='.count($allowlist)."\n");
-    fwrite(STDOUT, 'candidate_allowlist_sha256='.hash('sha256', $allowlistRaw)."\n");
-    fwrite(STDOUT, 'source_env_sha256='.hash('sha256', $sourceContent)."\n");
-    fwrite(STDOUT, 'source_key_count='.count($sourceValues)."\n");
-    fwrite(STDOUT, "selected_key_count={$selectedCount}\n");
-    fwrite(STDOUT, "unknown_key_count={$unknownCount}\n");
-    fwrite(STDOUT, "required_key_count={$requiredCount}\n");
-    fwrite(STDOUT, "target_fixed_key_count={$fixedCount}\n");
-    fwrite(STDOUT, 'env_payload_sha256='.hash('sha256', $payload)."\n");
-    fwrite(STDOUT, 'env_payload_bytes='.strlen($payload)."\n");
-    fwrite(STDOUT, "target_app_url_binding=app.company-os.jp\n");
-    fwrite(STDOUT, "target_environment=production\n");
-    fwrite(STDOUT, "target_debug=false\n");
-    fwrite(STDOUT, "target_timezone=Asia_Tokyo\n");
-    fwrite(STDOUT, "target_session_secure_cookie=true\n");
-    fwrite(STDOUT, "target_fixture_seed=false\n");
-    fwrite(STDOUT, "storage_seed_scope=storage_app_only\n");
-    fwrite(STDOUT, "storage_app_manifest_sha256={$storageHash}\n");
-    fwrite(STDOUT, "storage_app_file_count={$storageFiles}\n");
-    fwrite(STDOUT, "storage_app_directory_count={$storageDirectories}\n");
-    fwrite(STDOUT, "storage_app_total_bytes={$storageBytes}\n");
-    fwrite(STDOUT, "storage_symlink_count=0\n");
-    fwrite(STDOUT, "storage_special_entry_count=0\n");
-    fwrite(STDOUT, "production_change_scope=none_read_only_source\n");
-    fwrite(STDOUT, "secret_output=false\n");
-    fwrite(STDOUT, "next_action=CONTINUE_SAME_AUTHORIZED_HELPER\n");
+    echo "{$header}=PASS\n";
+    echo 'candidate_allowlist_count='.count($allowlist)."\n";
+    echo 'candidate_allowlist_sha256='.hash('sha256', $allowlistRaw)."\n";
+    echo 'source_env_sha256='.hash('sha256', $sourceContent)."\n";
+    echo 'source_key_count='.count($sourceValues)."\n";
+    echo "selected_key_count={$selectedCount}\n";
+    echo "unknown_key_count={$unknownCount}\n";
+    echo "required_key_count={$requiredCount}\n";
+    echo "target_fixed_key_count={$fixedCount}\n";
+    echo 'env_payload_sha256='.hash('sha256', $payload)."\n";
+    echo 'env_payload_bytes='.strlen($payload)."\n";
+    echo "target_app_url_binding=app.company-os.jp\n";
+    echo "target_environment=production\n";
+    echo "target_debug=false\n";
+    echo "target_timezone=Asia_Tokyo\n";
+    echo "target_session_secure_cookie=true\n";
+    echo "target_fixture_seed=false\n";
+    echo "storage_seed_scope=storage_app_only\n";
+    echo "storage_app_manifest_sha256={$storageHash}\n";
+    echo "storage_app_file_count={$storageFiles}\n";
+    echo "storage_app_directory_count={$storageDirectories}\n";
+    echo "storage_app_total_bytes={$storageBytes}\n";
+    echo "storage_symlink_count=0\n";
+    echo "storage_special_entry_count=0\n";
+    echo "production_change_scope=none_read_only_source\n";
+    echo "secret_output=false\n";
+    echo "next_action=CONTINUE_SAME_AUTHORIZED_HELPER\n";
     exit(0);
 }
 
@@ -299,18 +299,18 @@ if ($mode === 'project-target') {
         stop($header, 'TARGET_ENV_STAGING_VERIFY_FAILED');
     }
 
-    fwrite(STDOUT, "{$header}=PASS\n");
-    fwrite(STDOUT, "selected_key_count={$selectedCount}\n");
-    fwrite(STDOUT, "unknown_key_count={$unknownCount}\n");
-    fwrite(STDOUT, "required_key_count={$requiredCount}\n");
-    fwrite(STDOUT, "target_fixed_key_count={$fixedCount}\n");
-    fwrite(STDOUT, 'source_env_sha256='.hash('sha256', $sourceContent)."\n");
-    fwrite(STDOUT, "env_payload_sha256={$payloadHash}\n");
-    fwrite(STDOUT, "env_payload_bytes={$payloadBytes}\n");
-    fwrite(STDOUT, "target_env_mode=0600\n");
-    fwrite(STDOUT, "target_env_values_output=false\n");
-    fwrite(STDOUT, "secret_output=false\n");
-    fwrite(STDOUT, "next_action=CONTINUE_SAME_AUTHORIZED_HELPER\n");
+    echo "{$header}=PASS\n";
+    echo "selected_key_count={$selectedCount}\n";
+    echo "unknown_key_count={$unknownCount}\n";
+    echo "required_key_count={$requiredCount}\n";
+    echo "target_fixed_key_count={$fixedCount}\n";
+    echo 'source_env_sha256='.hash('sha256', $sourceContent)."\n";
+    echo "env_payload_sha256={$payloadHash}\n";
+    echo "env_payload_bytes={$payloadBytes}\n";
+    echo "target_env_mode=0600\n";
+    echo "target_env_values_output=false\n";
+    echo "secret_output=false\n";
+    echo "next_action=CONTINUE_SAME_AUTHORIZED_HELPER\n";
     exit(0);
 }
 
@@ -323,15 +323,15 @@ if ($mode === 'inspect-target-storage') {
         || (string) $storageDirectories !== $argv[5] || (string) $storageBytes !== $argv[6]) {
         stop($header, 'TARGET_STORAGE_SEED_MISMATCH');
     }
-    fwrite(STDOUT, "{$header}=PASS\n");
-    fwrite(STDOUT, "storage_app_manifest_sha256={$storageHash}\n");
-    fwrite(STDOUT, "storage_app_file_count={$storageFiles}\n");
-    fwrite(STDOUT, "storage_app_directory_count={$storageDirectories}\n");
-    fwrite(STDOUT, "storage_app_total_bytes={$storageBytes}\n");
-    fwrite(STDOUT, "storage_symlink_count=0\n");
-    fwrite(STDOUT, "storage_special_entry_count=0\n");
-    fwrite(STDOUT, "secret_output=false\n");
-    fwrite(STDOUT, "next_action=CONTINUE_SAME_AUTHORIZED_HELPER\n");
+    echo "{$header}=PASS\n";
+    echo "storage_app_manifest_sha256={$storageHash}\n";
+    echo "storage_app_file_count={$storageFiles}\n";
+    echo "storage_app_directory_count={$storageDirectories}\n";
+    echo "storage_app_total_bytes={$storageBytes}\n";
+    echo "storage_symlink_count=0\n";
+    echo "storage_special_entry_count=0\n";
+    echo "secret_output=false\n";
+    echo "next_action=CONTINUE_SAME_AUTHORIZED_HELPER\n";
     exit(0);
 }
 

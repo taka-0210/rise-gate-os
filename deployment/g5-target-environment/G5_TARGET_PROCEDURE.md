@@ -147,16 +147,37 @@ Formal PASS Evidence:
   `54bb6edcc1e5d23fc2066f30b8cfa40d713da8168dbf10ec22e6c03349c9a0d3`
 - Production-free formal reconciliation: 86 assertions PASS
 
-The next sequence item is Shared State. It is not command-ready until a
-separate Production-free preparation binds the source/target inventory,
-runtime owner and readability, exact storage seed and final-delta procedure,
-permissions, backup/restore dependency, cleanup and Evidence Contract. No
-Shared State mutation is authorized by the Skeleton PASS.
+The next sequence item is Shared State. Its Production-free preparation bound
+the source/target inventory, runtime owner and readability, exact storage seed
+and final-delta procedure, permissions, backup/restore dependency, cleanup
+and Evidence Contract. No Shared State mutation was authorized by the
+Skeleton PASS alone.
 
 ### Shared State Human gate
 
-The Production-free preparation is now command-ready through only
-`Invoke-G5SharedState.ps1`. Its frozen source is the Legacy application's
+The initially authorized `Invoke-G5SharedState.ps1` command ran once and
+stopped at `SOURCE_READ_ONLY_INVENTORY` with `REMOTE_STATUS_MISSING`. The
+retained state SHA-256 is
+`bb98d39709625d619d0365b57850613580237be837dcc85a863d00adfbcb248d`.
+It proves two Source native process starts, the successful read-only preflight,
+zero Target connections and zero Production mutation. The inventory process
+exit code, stdout/stderr metadata, remote projector start, `.env` value read
+and storage inventory start are UNKNOWN because the initial Evidence Contract
+did not persist them. The initial attempt must not be replayed.
+
+Production-free execution of the initial projector through the exact
+`php -- inspect-source ...` stdin/argv shape reproduces the implementation
+mismatch: PHP executes the stdin script, but the initial projector's `STDOUT`
+constant output fails in stdin execution before a sanitized status can be
+emitted. Corrective-1 keeps the same stdin/argv shape and uses `echo`; it also
+saves exit code plus stdout/stderr hash and byte counts before safe-output
+parsing. Actual initial remote exit/stderr content remains UNKNOWN because it
+was not persisted. Raw streams and secret values remain unstored.
+Corrective-1 is bound to the immutable initial Evidence and a separate
+Evidence directory. Its Production-free verification is PASS, but no
+Corrective-1 Production execution or retry is authorized.
+
+The frozen source remains the Legacy application's
 existing `.env` and `storage/app`, but the existing `.env` is **not** copied as
 the published NewTarget configuration. The helper derives the exact 172-key
 allowlist from the frozen candidate contract, omits unknown Legacy keys,
@@ -197,8 +218,9 @@ is retained for a separate Human rollback gate. Legacy, the three existing
 public-entry files, releases, `current`, `current.previous`, Migration,
 Release marker, DNS, SSL and Deploy are excluded.
 
-The helper records one local attempt before connecting and refuses replay.
-PASS or STOP exhausts the authorization. It maintains
+The helper records a separate Corrective generation before connecting and
+refuses replay. PASS or STOP exhausts any future explicit one-shot
+authorization. It maintains
 `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE`
 and returns to Human + ChatGPT without starting Application placement or any
 later gate.
@@ -236,10 +258,10 @@ user cron, external writer enablement, active
 transaction/metadata lock visibility and DB/Application collation difference
 remain open until separate Evidence closes them. POSIX symlink and atomic
 rename capability are closed by G5-C Formal PASS, and exact empty Skeleton
-construction is closed by Target Skeleton Build Formal PASS. Shared state is
-Human-gate ready but not executed. Its initial storage seed does not close the
-required final delta, usable backup or DB restore blocker. Application
-placement,
-application placement, `current` / `current.previous`, public-entry disposition
-and binding remain separate gates. DNS and SSL remain G6-only; Migration and
-Deploy remain unapproved.
+construction is closed by Target Skeleton Build Formal PASS. Shared State
+initial attempt is STOP; Corrective-1 is Production-free verified but requires
+a new explicit Human Gate. No storage seed has been published. Any future
+initial seed will not close the required final delta, usable backup or DB
+restore blocker. Application placement, `current` / `current.previous`,
+public-entry disposition and binding remain separate gates. DNS and SSL remain
+G6-only; Migration and Deploy remain unapproved.

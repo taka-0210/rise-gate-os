@@ -606,13 +606,16 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         foreach ([
             'source_inspector_sha256' => 'inspect-shared-source.sh',
             'target_manager_sha256' => 'manage-shared-target.sh',
-            'projector_sha256' => 'shared-state-projector.php',
         ] as $binding => $file) {
             $this->assertSame(
                 hash_file('sha256', base_path('deployment/g5-target-environment/'.$file)),
                 $contract['implementation_binding'][$binding],
             );
         }
+        $this->assertSame(
+            '5f438829ab57f3327797f9889cd6e9287219e644f2dd0dd5b5d99b12090f9509',
+            $contract['implementation_binding']['projector_sha256'],
+        );
         $this->assertTrue($contract['storage_contract']['final_delta_required']);
         $this->assertSame('unknown', $contract['backup_restore_dependency']['usable_backup']);
         $this->assertSame('blocker', $contract['backup_restore_dependency']['database_restore_readiness']);
@@ -716,6 +719,145 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         }
     }
 
+    public function test_g5_shared_state_initial_stop_evidence_is_exact_and_immutable(): void
+    {
+        $root = base_path(
+            'storage/app/release-audit/production-g5-shared-state-'.self::CANDIDATE
+        );
+        $entries = array_values(array_diff(scandir($root) ?: [], ['.', '..']));
+
+        $this->assertSame(['execution-state.json'], $entries);
+        $statePath = $root.DIRECTORY_SEPARATOR.'execution-state.json';
+        $this->assertSame(
+            'bb98d39709625d619d0365b57850613580237be837dcc85a863d00adfbcb248d',
+            hash_file('sha256', $statePath),
+        );
+        $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('STOP', $state['status']);
+        $this->assertSame('REMOTE_STATUS_MISSING', $state['safe_error_code']);
+        $this->assertSame('SOURCE_INVENTORY_PROCESS_PENDING', $state['local_processing_substage']);
+        $this->assertTrue($state['production_connection_attempted']);
+        $this->assertTrue($state['source_connection_attempted']);
+        $this->assertFalse($state['target_connection_attempted']);
+        $this->assertSame(2, $state['remote_process_count']);
+        $this->assertSame('false', $state['production_mutation_scope']);
+        $this->assertFalse($state['raw_output_stored']);
+        $this->assertFalse($state['secret_values_output']);
+        $this->assertSame(4, $state['local_state_generation']);
+    }
+
+    public function test_g5_shared_state_corrective_contract_binds_initial_stop_and_current_implementation(): void
+    {
+        $contractPath = base_path(
+            'deployment/g5-target-environment/shared-state-corrective1-contract.json'
+        );
+        $contract = json_decode((string) file_get_contents($contractPath), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('company-os.ir1.g5-shared-state-corrective1.v1', $contract['contract_id']);
+        $this->assertSame(self::CANDIDATE, $contract['candidate']);
+        $this->assertSame(
+            'bb98d39709625d619d0365b57850613580237be837dcc85a863d00adfbcb248d',
+            $contract['initial_stop_evidence']['execution_state_sha256'],
+        );
+        $this->assertSame('immutable', $contract['initial_stop_evidence']['preservation']);
+        $this->assertSame(
+            'HELPER_PROJECTOR_STDIN_OUTPUT_AND_EVIDENCE_CONTRACT',
+            $contract['root_cause']['classification'],
+        );
+        $this->assertSame(
+            'PROJECTOR_STDOUT_CONSTANT_INCOMPATIBLE_WITH_STDIN_EXECUTION',
+            $contract['root_cause']['helper_invocation_defect'],
+        );
+        $this->assertSame('UNKNOWN', $contract['root_cause']['initial_remote_exit_code']);
+        $this->assertTrue($contract['corrective']['step_stream_metadata_saved_before_parse']);
+        $this->assertFalse($contract['corrective']['raw_output_stored']);
+        $this->assertFalse($contract['corrective_execution_authorized']);
+        $this->assertFalse($contract['production_mutation_authorized']);
+        foreach ([
+            'source_inspector_sha256' => 'inspect-shared-source.sh',
+            'target_manager_sha256' => 'manage-shared-target.sh',
+            'projector_sha256' => 'shared-state-projector.php',
+        ] as $binding => $file) {
+            $this->assertSame(
+                hash_file('sha256', base_path('deployment/g5-target-environment/'.$file)),
+                $contract['implementation_binding'][$binding],
+            );
+        }
+        $this->assertSame(
+            '1637b67d6acc95c50e2433d9e48cb21328522d357ae7468c0bb1b973fa443064',
+            hash_file('sha256', $contractPath),
+        );
+    }
+
+    public function test_g5_shared_state_corrective_repairs_stdin_output_and_preserves_argv_contract(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'g5-shared-entrypoint-'.bin2hex(random_bytes(8));
+        mkdir($root, 0700, true);
+        mkdir($root.DIRECTORY_SEPARATOR.'app', 0700, true);
+        file_put_contents($root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'fixture.txt', 'fixture');
+        $secret = 'corrective-fixture-secret-never-output';
+        $envPath = $root.DIRECTORY_SEPARATOR.'.env';
+        file_put_contents($envPath, implode("\n", [
+            'APP_KEY=base64:'.$secret,
+            'DB_CONNECTION=mysql',
+            'DB_HOST=localhost',
+            'DB_PORT=3306',
+            'DB_DATABASE=fixture',
+            'DB_USERNAME=fixture',
+            'DB_PASSWORD='.$secret,
+            'MAIL_MAILER=smtp',
+            'MAIL_HOST=localhost',
+            'MAIL_PORT=2525',
+            'MAIL_FROM_ADDRESS=fixture@example.com',
+            'MAIL_FROM_NAME=Fixture',
+            'ACCOUNT_MAIL_MAILER=smtp',
+            'OPENAI_API_KEY='.$secret,
+            '',
+        ]));
+        $projector = (string) file_get_contents(
+            base_path('deployment/g5-target-environment/shared-state-projector.php')
+        );
+        $allowlist = (string) file_get_contents(
+            base_path('deployment/g5-target-environment/shared-state-env-allowlist.txt')
+        );
+        $encodedAllowlist = base64_encode($allowlist);
+
+        try {
+            $initialProjectorProcess = new Process([
+                'git', 'show',
+                '622f0b016ed4aa77de2befab9b64419c578ddf2c:deployment/g5-target-environment/shared-state-projector.php',
+            ], base_path());
+            $initialProjectorProcess->mustRun();
+            $initialProjector = $initialProjectorProcess->getOutput();
+            $initial = new Process([
+                PHP_BINARY, '--', 'inspect-source', $envPath,
+                $root.DIRECTORY_SEPARATOR.'app', $encodedAllowlist,
+            ], base_path());
+            $initial->setInput($initialProjector);
+            $initial->run();
+            $this->assertNotSame(0, $initial->getExitCode());
+            $this->assertStringNotContainsString('G5_SHARED_SOURCE_INVENTORY=', $initial->getOutput());
+            $this->assertStringContainsString('Undefined constant "STDOUT"', $initial->getErrorOutput());
+
+            $corrective = new Process([
+                PHP_BINARY, '--', 'inspect-source', $envPath,
+                $root.DIRECTORY_SEPARATOR.'app', $encodedAllowlist,
+            ], base_path());
+            $corrective->setInput($projector);
+            $corrective->mustRun();
+            $output = $corrective->getOutput();
+            $this->assertStringContainsString('G5_SHARED_SOURCE_INVENTORY=PASS', $output);
+            $this->assertStringContainsString('secret_output=false', $output);
+            $this->assertSame('', $corrective->getErrorOutput());
+            $this->assertStringNotContainsString($secret, $output.$corrective->getErrorOutput());
+        } finally {
+            @unlink($root.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'fixture.txt');
+            @rmdir($root.DIRECTORY_SEPARATOR.'app');
+            @unlink($envPath);
+            @rmdir($root);
+        }
+    }
+
     public function test_g5_shared_state_remote_scripts_bound_mutation_and_preserve_public_entry(): void
     {
         $source = (string) file_get_contents(base_path('deployment/g5-target-environment/inspect-shared-source.sh'));
@@ -771,7 +913,10 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5SharedState.ps1'));
         foreach ([
             'g5-shared-state-v1',
+            'g5-shared-state-corrective-1',
             'SHARED_STATE_ATTEMPT_ALREADY_RECORDED',
+            'Assert-InitialAttemptEvidence',
+            'INITIAL_ATTEMPT_EVIDENCE_HASH_MISMATCH',
             'scp.exe',
             "'-3','-q'",
             'g5-legacy-source',
@@ -786,6 +931,9 @@ class Ir1G5TargetEnvironmentTest extends TestCase
             'PENDING_G5_PUBLIC_ENTRY_GATE',
             'retry_available=false',
             'deploy_authorized=false',
+            "'php','--','inspect-source'",
+            "Record-StepMetadata 'source_inventory'",
+            'step_streams=[ordered]@{}',
         ] as $required) {
             $this->assertStringContainsString($required, $helper);
         }
@@ -800,6 +948,13 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertIsInt($sourceInvocation);
         $this->assertLessThan($connectionObserved, $processStart);
         $this->assertLessThan($sourceInvocation, $connectionObserved);
+        $inventoryInvocation = strpos($helper, '$sourceInventoryResult = Invoke-Native');
+        $streamMetadata = strpos($helper, "Record-StepMetadata 'source_inventory'", $inventoryInvocation);
+        $safeParse = strpos($helper, '$sourceInventory = Assert-RemotePass', $inventoryInvocation);
+        $this->assertIsInt($inventoryInvocation);
+        $this->assertIsInt($streamMetadata);
+        $this->assertIsInt($safeParse);
+        $this->assertLessThan($safeParse, $streamMetadata);
     }
 
     public function test_g5_shared_state_simulation_is_production_free(): void
@@ -826,7 +981,8 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $helper = base_path('deployment/g5-target-environment/Invoke-G5SharedState.ps1');
         foreach (['-VerifyPersistenceOnly', '-VerifyOnly'] as $mode) {
             $process = new Process([
-                'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $helper, $mode,
+                'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $helper,
+                '-Attempt', 'Corrective1', $mode,
             ], base_path());
             $process->setTimeout(30);
             $process->mustRun();
@@ -835,5 +991,24 @@ class Ir1G5TargetEnvironmentTest extends TestCase
             $this->assertStringContainsString('production_mutation=false', $output);
             $this->assertStringContainsString('shared_state_operation=not_executed', $output);
         }
+    }
+
+    public function test_g5_shared_state_initial_execution_path_is_retired_without_connection(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('The G5 Shared State Human helper runs under Windows PowerShell.');
+        }
+        $process = new Process([
+            'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+            base_path('deployment/g5-target-environment/Invoke-G5SharedState.ps1'),
+        ], base_path());
+        $process->setTimeout(30);
+        $process->run();
+        $output = $process->getOutput();
+        $this->assertSame(1, $process->getExitCode());
+        $this->assertStringContainsString('safe_error_code=SHARED_STATE_ATTEMPT_ALREADY_RECORDED', $output);
+        $this->assertStringContainsString('production_connection_attempted=false', $output);
+        $this->assertStringContainsString('production_mutation=false', $output);
+        $this->assertStringContainsString('retry_available=false', $output);
     }
 }
