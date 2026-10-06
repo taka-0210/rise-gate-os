@@ -1,13 +1,14 @@
 [CmdletBinding()]
 param(
-    [switch] $VerifyOnly
+    [switch] $VerifyOnly,
+    [switch] $VerifyPersistenceOnly
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $Candidate = '924af91188cc60d33ff87c91b94ecc1d539566e6'
-$HelperGeneration = 'g5c-new-target-posix-rehearsal-v1'
+$HelperGeneration = 'g5c-new-target-posix-rehearsal-corrective-1'
 $ExpectedScriptSha256 = '8d8ea110d0d7069af519f8c9cab8240891a050e7f366a620f5efc9fe86d852f3'
 $ExpectedG5BReceiptSha256 = 'ec24b30e62c34564aaaaccfa928edbac98f95e7e4748594422b641f4bbbae7c3'
 $ExpectedHostReceiptSha256 = '834b0309366619f960c12e34a27d41f3633e2a8cf0f09fdc29fa18b96d4526ba'
@@ -30,6 +31,7 @@ $StatePath = $null
 $FailureStage = 'LOCAL_PRECONDITIONS'
 $LocalProcessingSubstage = 'LOCAL_PRECONDITIONS'
 $ParsedRemoteEvidence = $null
+$StateWriteGeneration = 0
 
 function Stop-G5C([string] $Code) {
     throw [InvalidOperationException]::new($Code)
@@ -74,13 +76,88 @@ function Assert-NativeArguments([string[]] $Arguments) {
 function Save-Json([string] $Path, [object] $Value) {
     $json = $Value | ConvertTo-Json -Depth 10
     $temporaryPath = $Path + '.tmp'
+    $backupPath = $Path + '.previous'
+    if ([IO.File]::Exists($temporaryPath) -or [IO.File]::Exists($backupPath)) {
+        Stop-G5C 'STATE_PERSISTENCE_RESIDUAL_PRESENT'
+    }
     [IO.File]::WriteAllText($temporaryPath, $json + [Environment]::NewLine, $Utf8NoBom)
-    Move-Item -LiteralPath $temporaryPath -Destination $Path
+    if ([IO.File]::Exists($Path)) {
+        [IO.File]::Replace($temporaryPath, $Path, $backupPath)
+        [IO.File]::Delete($backupPath)
+    } else {
+        [IO.File]::Move($temporaryPath, $Path)
+    }
 }
 
 function Save-State {
     if ($null -ne $script:State -and -not [string]::IsNullOrWhiteSpace($script:StatePath)) {
+        $script:StateWriteGeneration++
+        $script:State.local_state_generation = $script:StateWriteGeneration
         Save-Json $script:StatePath $script:State
+    }
+}
+
+function Invoke-StatePersistenceSelfTest {
+    $savedState = $script:State
+    $savedStatePath = $script:StatePath
+    $savedGeneration = $script:StateWriteGeneration
+    $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) ("company-os-g5c-state-contract-$PID-" + [guid]::NewGuid().ToString('N'))
+    $fixturePath = Join-Path $fixtureRoot 'execution-state.json'
+    try {
+        [IO.Directory]::CreateDirectory($fixtureRoot) | Out-Null
+        $script:StateWriteGeneration = 0
+        $script:StatePath = $fixturePath
+        $script:State = [ordered]@{
+            schema_version=1
+            helper_generation=$HelperGeneration
+            status='ATTEMPT_STARTED'
+            production_connection_attempted=$false
+            native_process_started=$false
+            local_processing_substage='ATTEMPT_INITIALIZED'
+            local_state_generation=0
+        }
+        Save-State
+        $generation1Hash = Get-FileSha256 $fixturePath
+        if ((Test-Path -LiteralPath ($fixturePath + '.tmp')) -or
+            (Test-Path -LiteralPath ($fixturePath + '.previous')) -or
+            (Get-Content -Raw -LiteralPath $fixturePath | ConvertFrom-Json).local_state_generation -ne 1) {
+            Stop-G5C 'STATE_PERSISTENCE_GENERATION_1_FAILED'
+        }
+
+        $script:State.local_processing_substage = 'REMOTE_PROCESS_PENDING'
+        Save-State
+        $generation2Hash = Get-FileSha256 $fixturePath
+        if ($generation2Hash -eq $generation1Hash -or (Test-Path -LiteralPath ($fixturePath + '.tmp')) -or
+            (Test-Path -LiteralPath ($fixturePath + '.previous')) -or
+            (Get-Content -Raw -LiteralPath $fixturePath | ConvertFrom-Json).local_state_generation -ne 2) {
+            Stop-G5C 'STATE_PERSISTENCE_GENERATION_2_FAILED'
+        }
+
+        $script:State.status = 'STOP'
+        $script:State.local_processing_substage = 'LOCAL_CORRECTIVE_FIXTURE_STOP'
+        Save-State
+        $generation3Hash = Get-FileSha256 $fixturePath
+        $roundTrip = Get-Content -Raw -LiteralPath $fixturePath | ConvertFrom-Json
+        if ($generation3Hash -eq $generation2Hash -or (Test-Path -LiteralPath ($fixturePath + '.tmp')) -or
+            (Test-Path -LiteralPath ($fixturePath + '.previous')) -or
+            $roundTrip.local_state_generation -ne 3 -or $roundTrip.status -ne 'STOP') {
+            Stop-G5C 'STATE_PERSISTENCE_GENERATION_3_FAILED'
+        }
+        return [pscustomobject]@{
+            generations=3
+            atomic_initial_move='PASS'
+            atomic_existing_replace='PASS'
+            tmp_residual=0
+            backup_residual=0
+            final_status='STOP'
+        }
+    } finally {
+        $script:State = $savedState
+        $script:StatePath = $savedStatePath
+        $script:StateWriteGeneration = $savedGeneration
+        if ([IO.Directory]::Exists($fixtureRoot)) {
+            [IO.Directory]::Delete($fixtureRoot, $true)
+        }
     }
 }
 
@@ -101,6 +178,9 @@ function Invoke-CapturedProcess([string] $File, [string[]] $Arguments, [AllowNul
         $script:NativeProcessStarted = $true
         $script:LocalProcessingSubstage = 'NATIVE_PROCESS_STARTED'
         if ($null -ne $script:State) {
+            $script:ConnectionAttempted = $true
+            $script:State.production_connection_attempted = $true
+            $script:State.production_mutation_scope = 'candidate_bound_isolated_rehearsal_possible'
             $script:State.native_process_started = $true
             $script:State.local_processing_substage = $script:LocalProcessingSubstage
             Save-State
@@ -170,6 +250,7 @@ function Assert-PassEvidence([Collections.Specialized.OrderedDictionary] $Eviden
 }
 
 try {
+    if ($VerifyOnly -and $VerifyPersistenceOnly) { Stop-G5C 'VERIFY_MODE_CONFLICT' }
     $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     $ScriptPath = Join-Path $PSScriptRoot 'rehearse-posix-capabilities.sh'
     $G5BReceiptPath = Join-Path $Root "storage\app\release-audit\production-g5b-cross-server-reconciliation-$Candidate\g5b-reconciled-disposition.json"
@@ -189,6 +270,23 @@ try {
         Stop-G5C 'REHEARSAL_SCRIPT_BINDING_MISMATCH'
     }
     $scriptText = Read-LfScript $ScriptPath
+
+    if ($VerifyPersistenceOnly) {
+        $persistence = Invoke-StatePersistenceSelfTest
+        Write-Output 'G5C_LOCAL_STATE_PERSISTENCE_CORRECTIVE_VERIFY_ONLY=PASS'
+        Write-Output "helper_generation=$HelperGeneration"
+        Write-Output "generation_count=$($persistence.generations)"
+        Write-Output "atomic_initial_move=$($persistence.atomic_initial_move)"
+        Write-Output "atomic_existing_replace=$($persistence.atomic_existing_replace)"
+        Write-Output "tmp_residual=$($persistence.tmp_residual)"
+        Write-Output "backup_residual=$($persistence.backup_residual)"
+        Write-Output "final_status=$($persistence.final_status)"
+        Write-Output 'production_connection_attempted=false'
+        Write-Output 'production_mutation=false'
+        Write-Output 'existing_g5c_evidence_modified=false'
+        Write-Output 'g5c_posix_capability_rehearsal=not_executed'
+        exit 0
+    }
 
     if (-not (Test-Path -LiteralPath $G5BReceiptPath -PathType Leaf) -or
         (Get-FileSha256 $G5BReceiptPath) -ne $ExpectedG5BReceiptSha256) {
@@ -309,6 +407,7 @@ try {
         ssh_authentication='unknown'; remote_shell='unknown'; remote_contract='unknown'; remote_evidence=$null
         local_processing_substage='ATTEMPT_INITIALIZED'; cleanup_state='unknown'; residual_entry_count='unknown'
         raw_output_stored=$false; retry_performed=$false; safe_error_code=$null
+        local_state_generation=0
         PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION='PENDING_G5_PUBLIC_ENTRY_GATE'
     }
     Save-State
@@ -324,10 +423,7 @@ try {
     )
     Assert-NativeArguments $arguments
     $FailureStage = 'PRODUCTION_ISOLATED_POSIX_CAPABILITY_REHEARSAL'
-    $LocalProcessingSubstage = 'REMOTE_PROCESS_START'
-    $ConnectionAttempted = $true
-    $State.production_connection_attempted = $true
-    $State.production_mutation_scope = 'candidate_bound_isolated_rehearsal_possible'
+    $LocalProcessingSubstage = 'REMOTE_PROCESS_PENDING'
     $State.local_processing_substage = $LocalProcessingSubstage
     Save-State
 
@@ -401,6 +497,7 @@ try {
     Write-Output 'next_action=RETURN_TO_HUMAN_CHATGPT'
 } catch {
     $safeCode = Get-SafeErrorCode $_.Exception
+    $statePersistenceStatus = 'not_applicable'
     if ($null -ne $State) {
         $State.status = 'STOP'
         $State.safe_error_code = $safeCode
@@ -413,7 +510,12 @@ try {
             if ($ParsedRemoteEvidence.Contains('cleanup_state')) { $State.cleanup_state = $ParsedRemoteEvidence.cleanup_state }
             if ($ParsedRemoteEvidence.Contains('residual_entry_count')) { $State.residual_entry_count = $ParsedRemoteEvidence.residual_entry_count }
         }
-        Save-State
+        try {
+            Save-State
+            $statePersistenceStatus = 'saved'
+        } catch {
+            $statePersistenceStatus = 'failed'
+        }
     }
     Write-Output 'G5C_POSIX_CAPABILITY_REHEARSAL=STOP'
     Write-Output "safe_error_code=$safeCode"
@@ -421,6 +523,7 @@ try {
     Write-Output "production_connection_attempted=$($ConnectionAttempted.ToString().ToLowerInvariant())"
     Write-Output "native_process_started=$($NativeProcessStarted.ToString().ToLowerInvariant())"
     Write-Output "production_mutation=$(if ($ConnectionAttempted) { 'isolated_rehearsal_unknown_review_evidence' } else { 'false' })"
+    Write-Output "local_state_persistence=$statePersistenceStatus"
     Write-Output 'retry_performed=false'
     Write-Output 'deploy_authorized=false'
     Write-Output 'PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE'

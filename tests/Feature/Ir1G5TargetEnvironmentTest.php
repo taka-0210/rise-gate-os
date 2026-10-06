@@ -275,7 +275,7 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $helper = (string) file_get_contents(base_path('deployment/g5-target-environment/Invoke-G5CNewTargetPosixRehearsal.ps1'));
 
         foreach ([
-            'g5c-new-target-posix-rehearsal-v1',
+            'g5c-new-target-posix-rehearsal-corrective-1',
             '8d8ea110d0d7069af519f8c9cab8240891a050e7f366a620f5efc9fe86d852f3',
             'ec24b30e62c34564aaaaccfa928edbac98f95e7e4748594422b641f4bbbae7c3',
             'G5-B RECONCILED FORMAL PASS / G5-C POSIX CAPABILITY REHEARSAL READY',
@@ -289,6 +289,9 @@ class Ir1G5TargetEnvironmentTest extends TestCase
             'StrictHostKeyChecking=yes',
             'ConnectionAttempts=1',
             'G5C_ATTEMPT_ALREADY_RECORDED',
+            '[IO.File]::Replace($temporaryPath, $Path, $backupPath)',
+            '[IO.File]::Move($temporaryPath, $Path)',
+            'G5C_LOCAL_STATE_PERSISTENCE_CORRECTIVE_VERIFY_ONLY=PASS',
             'candidate_bound_isolated_rehearsal_completed_and_cleaned',
             'deploy_authorized=false',
         ] as $required) {
@@ -302,6 +305,16 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringNotContainsString('curl.exe', $helper);
         $this->assertStringNotContainsString('mysql', $helper);
         $this->assertStringNotContainsString('artisan', $helper);
+        $this->assertStringNotContainsString('Move-Item -LiteralPath $temporaryPath -Destination $Path', $helper);
+
+        $processStart = strpos($helper, 'if (-not $process.Start())');
+        $connectionObserved = strpos($helper, '$script:ConnectionAttempted = $true');
+        $remoteInvoke = strpos($helper, '$result = Invoke-CapturedProcess $ssh.Source $arguments $scriptText');
+        $this->assertIsInt($processStart);
+        $this->assertIsInt($connectionObserved);
+        $this->assertIsInt($remoteInvoke);
+        $this->assertLessThan($connectionObserved, $processStart);
+        $this->assertLessThan($remoteInvoke, $connectionObserved);
     }
 
     public function test_g5c_remote_pass_requires_cleanup_and_protected_boundaries_unchanged(): void
@@ -323,5 +336,37 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         ] as $required) {
             $this->assertStringContainsString($required, $helper);
         }
+    }
+
+    public function test_g5c_local_state_persistence_corrective_uses_real_helper_path_without_connection(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('The G5-C Human helper runs under Windows PowerShell.');
+        }
+
+        $helper = base_path('deployment/g5-target-environment/Invoke-G5CNewTargetPosixRehearsal.ps1');
+        $process = new Process([
+            'powershell.exe',
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            $helper,
+            '-VerifyPersistenceOnly',
+        ], base_path());
+        $process->setTimeout(30);
+        $process->mustRun();
+
+        $output = $process->getOutput();
+        $this->assertStringContainsString('G5C_LOCAL_STATE_PERSISTENCE_CORRECTIVE_VERIFY_ONLY=PASS', $output);
+        $this->assertStringContainsString('generation_count=3', $output);
+        $this->assertStringContainsString('atomic_initial_move=PASS', $output);
+        $this->assertStringContainsString('atomic_existing_replace=PASS', $output);
+        $this->assertStringContainsString('tmp_residual=0', $output);
+        $this->assertStringContainsString('backup_residual=0', $output);
+        $this->assertStringContainsString('production_connection_attempted=false', $output);
+        $this->assertStringContainsString('production_mutation=false', $output);
+        $this->assertStringContainsString('existing_g5c_evidence_modified=false', $output);
+        $this->assertStringContainsString('g5c_posix_capability_rehearsal=not_executed', $output);
     }
 }

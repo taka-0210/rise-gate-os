@@ -62,6 +62,15 @@ remain unchanged, cleanup to complete and residual entries to be zero.
 `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE`
 continues after G5-C.
 
+The first Human execution attempt on 2026-10-07 stopped in the local
+incremental-state persistence step before the NewTarget SSH process started.
+Its `execution-state.json` and `execution-state.json.tmp` are immutable failure
+Evidence and must not be removed, overwritten, or used to enable a retry. The
+source corrective replaces an existing state file atomically with
+`System.IO.File.Replace` and includes a Production-free three-generation
+persistence verification mode. This corrective does not authorize a second
+G5-C execution. G5 remains OPEN pending a separate Human + ChatGPT decision.
+
 ## Permission plan
 
 - `shared/.env`: target `0600`; no group/other permission.
