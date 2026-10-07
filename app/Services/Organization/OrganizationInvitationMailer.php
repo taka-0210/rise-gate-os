@@ -4,6 +4,7 @@ namespace App\Services\Organization;
 
 use App\Jobs\SendOrganizationInvitationMail;
 use App\Models\OrganizationInvitation;
+use App\Services\AccountMailDispatcher;
 use RuntimeException;
 
 class OrganizationInvitationMailer
@@ -21,6 +22,7 @@ class OrganizationInvitationMailer
 
     public function assertConfigured(): void
     {
+        app(AccountMailDispatcher::class)->assertConfigured();
         $mailer = (string) config('account.mail.mailer');
         $transport = config('mail.mailers.'.$mailer.'.transport');
         if ($mailer === '' || $transport === null || $transport === 'log'

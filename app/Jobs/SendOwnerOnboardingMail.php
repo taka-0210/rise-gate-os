@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Mail\AccountActionMail;
 use App\Models\OwnerOnboarding;
 use App\Models\User;
+use App\Services\AccountMailDelivery;
 use App\Services\Organization\OwnerOnboardingLegal;
 use App\Services\Organization\OwnerOnboardingMailer;
 use Illuminate\Bus\Queueable;
@@ -13,7 +14,6 @@ use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class SendOwnerOnboardingMail implements ShouldBeEncrypted, ShouldQueueAfterCommit
@@ -21,6 +21,8 @@ class SendOwnerOnboardingMail implements ShouldBeEncrypted, ShouldQueueAfterComm
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
+    public array $backoff = [60, 300, 900];
 
     public function __construct(
         private readonly int $onboardingId,
@@ -41,17 +43,22 @@ class SendOwnerOnboardingMail implements ShouldBeEncrypted, ShouldQueueAfterComm
             return;
         }
 
-        Mail::mailer($this->mailer)->to($onboarding->normalized_email)->send(new AccountActionMail(
-            'Company OS Owner開始のご案内',
-            $onboarding->organization_name.' のCompany OSを開始する承認案内です。心当たりがある場合のみ期限内に手続きを進めてください。',
-            $mailer->trustedUrl($onboarding, $this->token),
-            '会社の開始手続きへ',
-        ));
+        app(AccountMailDelivery::class)->send(
+            'onboarding:'.$this->onboardingId.':'.$this->generation,
+            $onboarding->normalized_email,
+            $this->mailer,
+            new AccountActionMail(
+                'Company OS Owner開始のご案内',
+                $onboarding->organization_name.' のCompany OSを開始する承認案内です。心当たりがある場合のみ期限内に手続きを進めてください。',
+                $mailer->trustedUrl($onboarding, $this->token),
+                '会社の開始手続きへ',
+            ));
 
         OwnerOnboarding::query()
             ->whereKey($onboarding->id)
             ->where('status', OwnerOnboarding::STATUS_ISSUED)
             ->where('token_generation', $this->generation)
+            ->where('delivery_status', '!=', OwnerOnboarding::DELIVERY_SENT)
             ->update([
                 'delivery_status' => OwnerOnboarding::DELIVERY_SENT,
                 'delivered_at' => now(),
@@ -61,6 +68,7 @@ class SendOwnerOnboardingMail implements ShouldBeEncrypted, ShouldQueueAfterComm
 
     public function failed(?Throwable $exception): void
     {
+        app(AccountMailDelivery::class)->markExhausted('onboarding:'.$this->onboardingId.':'.$this->generation);
         OwnerOnboarding::query()
             ->whereKey($this->onboardingId)
             ->where('status', OwnerOnboarding::STATUS_ISSUED)

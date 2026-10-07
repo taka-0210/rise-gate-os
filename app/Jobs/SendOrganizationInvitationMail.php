@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Mail\AccountActionMail;
 use App\Models\OrganizationInvitation;
 use App\Models\OrganizationUser;
+use App\Services\AccountMailDelivery;
 use App\Services\Organization\OrganizationInvitationMailer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -12,7 +13,6 @@ use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class SendOrganizationInvitationMail implements ShouldBeEncrypted, ShouldQueueAfterCommit
@@ -20,6 +20,8 @@ class SendOrganizationInvitationMail implements ShouldBeEncrypted, ShouldQueueAf
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
+    public array $backoff = [60, 300, 900];
 
     public function __construct(
         private readonly int $invitationId,
@@ -35,17 +37,22 @@ class SendOrganizationInvitationMail implements ShouldBeEncrypted, ShouldQueueAf
             return;
         }
 
-        Mail::mailer($this->mailer)->to($invitation->normalized_email)->send(new AccountActionMail(
-            'Company OSへの招待',
-            $invitation->organization->name.' のCompany OSへ招待されました。心当たりがある場合のみ期限内に手続きを進めてください。',
-            $mailer->trustedUrl($invitation, $this->token),
-            '招待を確認する',
-        ));
+        app(AccountMailDelivery::class)->send(
+            'invitation:'.$this->invitationId.':'.$this->generation,
+            $invitation->normalized_email,
+            $this->mailer,
+            new AccountActionMail(
+                'Company OSへの招待',
+                $invitation->organization->name.' のCompany OSへ招待されました。心当たりがある場合のみ期限内に手続きを進めてください。',
+                $mailer->trustedUrl($invitation, $this->token),
+                '招待を確認する',
+            ));
 
         OrganizationInvitation::query()
             ->whereKey($invitation->id)
             ->where('status', OrganizationInvitation::STATUS_PENDING)
             ->where('token_generation', $this->generation)
+            ->where('delivery_status', '!=', OrganizationInvitation::DELIVERY_SENT)
             ->update([
                 'delivery_status' => OrganizationInvitation::DELIVERY_SENT,
                 'delivered_at' => now(),
@@ -55,6 +62,7 @@ class SendOrganizationInvitationMail implements ShouldBeEncrypted, ShouldQueueAf
 
     public function failed(?Throwable $exception): void
     {
+        app(AccountMailDelivery::class)->markExhausted('invitation:'.$this->invitationId.':'.$this->generation);
         OrganizationInvitation::query()
             ->whereKey($this->invitationId)
             ->where('status', OrganizationInvitation::STATUS_PENDING)

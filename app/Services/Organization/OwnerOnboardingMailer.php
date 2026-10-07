@@ -4,6 +4,7 @@ namespace App\Services\Organization;
 
 use App\Jobs\SendOwnerOnboardingMail;
 use App\Models\OwnerOnboarding;
+use App\Services\AccountMailDispatcher;
 use RuntimeException;
 
 class OwnerOnboardingMailer
@@ -23,6 +24,7 @@ class OwnerOnboardingMailer
 
     public function assertConfigured(): void
     {
+        app(AccountMailDispatcher::class)->assertConfigured();
         $this->legal->assertReady();
         $mailer = (string) config('account.mail.mailer');
         $transport = config('mail.mailers.'.$mailer.'.transport');

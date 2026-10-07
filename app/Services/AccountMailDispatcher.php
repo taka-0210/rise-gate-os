@@ -7,6 +7,7 @@ use App\Models\AccountEmailRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\URL;
 use RuntimeException;
+use Symfony\Component\Mailer\Bridge\Postmark\Transport\PostmarkApiTransport;
 
 class AccountMailDispatcher
 {
@@ -73,6 +74,20 @@ class AccountMailDispatcher
         ) {
             throw new RuntimeException('Account mailer must use a non-log configured transport.');
         }
+
+        if ($transport === 'postmark') {
+            $token = trim((string) config('services.postmark.key'));
+            $from = (string) config('mail.from.address');
+            if (! class_exists(PostmarkApiTransport::class)
+                || $token === '' || in_array(strtolower($token), ['null', 'false'], true)
+                || ! config('mail.mailers.postmark.message_stream_id')
+                || ! filter_var($from, FILTER_VALIDATE_EMAIL)
+                || preg_match('/@(example\.(com|org|net)|localhost)$/i', $from)
+                || trim((string) config('mail.from.name')) === ''
+                || (app()->environment('production') && (config('mail.default') !== $mailer || config('queue.default') === 'sync'))) {
+                throw new RuntimeException('ACCOUNT_MAIL_POSTMARK_CONFIGURATION_INCOMPLETE');
+            }
+        }
     }
 
     private function dispatch(
@@ -95,6 +110,7 @@ class AccountMailDispatcher
             $actionUrl,
             $actionLabel,
             (string) config('account.mail.mailer'),
+            (string) $user->credential_generation,
         );
     }
 
