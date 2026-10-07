@@ -382,3 +382,46 @@ initial seed will not close the required final delta, usable backup or DB
 restore blocker. Application placement, `current` / `current.previous`,
 public-entry disposition and binding remain separate gates. DNS and SSL remain
 G6-only; Migration and Deploy remain unapproved.
+
+## Postmark Production Mail decision and corrective gate
+
+Human Decision `IR1-G5-POSTMARK-PRODUCTION-MAIL` selects Postmark API as the
+Primary Production Mailer and binds `ACCOUNT_MAIL_MAILER` to that same named
+Postmark mailer. Amazon SES is retained only as the future Second Choice for a
+domestic-region requirement, materially larger multi-tenant reputation
+partitioning, or materially higher volume. Postmark US data processing and
+Webhook Basic Auth plus an official-source IP allowlist are accepted.
+
+`postmark-production-mail-contract.json` is the Production-free decision and
+security contract. It limits Scope to Account lifecycle mail and explicitly
+excludes Broadcast Mail, Marketing Mail and notification-center expansion.
+Provider-specific behavior is confined to the Laravel transport and a
+Postmark Webhook adapter; the Account domain and delivery state remain
+provider-neutral.
+
+The unchanged Frozen RC contains the Postmark config skeleton and API-key
+environment binding, but it does not contain `symfony/postmark-mailer` or
+`symfony/http-client`. Its Message Stream binding remains commented, and it
+has no Account Mail delivery ledger, outbound dedupe, Postmark Webhook route
+or Webhook receipt dedupe. Therefore adding target `.env` values alone cannot
+establish safe Production mail.
+
+The next gate is `G5_POSTMARK_APPLICATION_CORRECTIVE`, a repository-only,
+Production-free corrective. It may add the locked transport packages, active
+Message Stream binding, provider-neutral minimal ledger, additive schema,
+Postmark adapter, bounded retry and focused tests. Production Migration,
+Postmark operations, credentials, DNS/SSL, Shared State creation, Application
+placement, public-entry change and Deploy remain excluded. Any new Candidate
+or re-freeze requires a later explicit Human review.
+
+The proposed sender identity (`mail.company-os.jp`,
+`no-reply@mail.company-os.jp`, `pm-bounces.mail.company-os.jp`) remains pending
+a separate Human Identity Gate. Postmark-generated DNS values are never
+stored in Repository Evidence. Existing Shared State initial and Corrective-1
+attempts remain exhausted; a new generation is required only after the
+Application, Provider, DNS and Secret gates pass.
+
+`simulate-postmark-production-mail.php` proves the current Candidate stops at
+Application Corrective, rejects Provider coupling and Scope expansion,
+rejects Shared State creation before Application readiness, and preserves the
+Production-free / DNS-free / Deploy NO-GO boundary.

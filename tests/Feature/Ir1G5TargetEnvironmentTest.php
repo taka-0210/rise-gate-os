@@ -1531,8 +1531,9 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $evidenceRoot = base_path(
             'storage/app/release-audit/production-g5-primary-mailer-diagnostic-corrective-1-'.self::CANDIDATE
         );
+        $statePath = $evidenceRoot.DIRECTORY_SEPARATOR.'execution-state.json';
         $this->assertDirectoryDoesNotExist($initialEvidenceRoot);
-        $this->assertDirectoryDoesNotExist($evidenceRoot);
+        $stateHashBefore = is_file($statePath) ? hash_file('sha256', $statePath) : null;
 
         $process = new Process([
             'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
@@ -1556,6 +1557,115 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringContainsString('production_mutation=false', $output);
         $this->assertStringContainsString('diagnostic_operation=not_executed', $output);
         $this->assertDirectoryDoesNotExist($initialEvidenceRoot);
-        $this->assertDirectoryDoesNotExist($evidenceRoot);
+        if ($stateHashBefore === null) {
+            $this->assertDirectoryDoesNotExist($evidenceRoot);
+        } else {
+            $this->assertDirectoryExists($evidenceRoot);
+            $this->assertSame($stateHashBefore, hash_file('sha256', $statePath));
+        }
+    }
+
+    public function test_g5_postmark_contract_binds_decision_scope_and_next_human_gate(): void
+    {
+        $contract = json_decode((string) file_get_contents(base_path(
+            'deployment/g5-target-environment/postmark-production-mail-contract.json'
+        )), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('company-os.ir1.g5-postmark-production-mail.v1', $contract['contract_id']);
+        $this->assertSame(self::CANDIDATE, $contract['candidate']);
+        $this->assertSame('unchanged_no_refreeze', $contract['frozen_candidate_disposition']);
+        $this->assertSame('postmark', $contract['decision']['provider']);
+        $this->assertSame('postmark_api', $contract['decision']['transport']);
+        $this->assertSame('postmark', $contract['decision']['primary_production_mailer']);
+        $this->assertSame('same_as_primary_postmark_mailer', $contract['decision']['account_mail_mailer']);
+        $this->assertSame('amazon_ses', $contract['decision']['second_choice']);
+        $this->assertSame('accepted', $contract['decision']['postmark_us_data_processing']);
+        $this->assertSame('accepted', $contract['decision']['webhook_basic_auth']);
+        $this->assertSame('accepted', $contract['decision']['webhook_ip_allowlist']);
+        $this->assertSame('in_scope', $contract['decision']['application_send_and_webhook_deduplication']);
+        $this->assertContains('broadcast mail', $contract['scope']['excluded']);
+        $this->assertContains('marketing mail', $contract['scope']['excluded']);
+        $this->assertContains('notification center', $contract['scope']['excluded']);
+        $this->assertSame('server_api_token_only', $contract['postmark_topology']['application_token']);
+        $this->assertFalse($contract['postmark_topology']['account_api_token_in_application']);
+        $this->assertSame('transactional', $contract['postmark_topology']['message_stream']['type']);
+        $this->assertSame('G5_POSTMARK_APPLICATION_CORRECTIVE', $contract['next_human_gate']['id']);
+        $this->assertFalse($contract['next_human_gate']['production_connection']);
+        $this->assertFalse($contract['next_human_gate']['provider_account_operation']);
+        $this->assertFalse($contract['production_mutation_authorized']);
+        $this->assertFalse($contract['dns_ssl_change_authorized']);
+        $this->assertFalse($contract['deploy_authorized']);
+        $this->assertSame('PENDING_G5_PUBLIC_ENTRY_GATE', $contract['PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION']);
+    }
+
+    public function test_g5_postmark_contract_records_exact_frozen_candidate_gaps_without_refreeze(): void
+    {
+        $contract = json_decode((string) file_get_contents(base_path(
+            'deployment/g5-target-environment/postmark-production-mail-contract.json'
+        )), true, 512, JSON_THROW_ON_ERROR);
+
+        $composer = new Process(['git', 'show', self::CANDIDATE.':composer.json'], base_path());
+        $composer->mustRun();
+        $composerContract = json_decode($composer->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+        $mail = new Process(['git', 'show', self::CANDIDATE.':config/mail.php'], base_path());
+        $mail->mustRun();
+
+        $this->assertArrayNotHasKey('symfony/postmark-mailer', $composerContract['require']);
+        $this->assertArrayNotHasKey('symfony/http-client', $composerContract['require']);
+        $this->assertStringContainsString("// 'message_stream_id' => env('POSTMARK_MESSAGE_STREAM_ID')", $mail->getOutput());
+        $this->assertSame('absent', $contract['frozen_candidate_audit']['symfony_postmark_mailer_package']);
+        $this->assertSame('absent', $contract['frozen_candidate_audit']['symfony_http_client_package']);
+        $this->assertSame('commented_inactive', $contract['frozen_candidate_audit']['message_stream_binding']);
+        $this->assertSame('absent', $contract['frozen_candidate_audit']['provider_neutral_account_delivery_ledger']);
+        $this->assertSame('absent', $contract['frozen_candidate_audit']['postmark_webhook_endpoint']);
+        $this->assertSame('application_corrective_required_before_shared_state', $contract['frozen_candidate_audit']['result']);
+        $this->assertTrue($contract['application_corrective_contract']['required']);
+        $this->assertSame('not_authorized_by_this_preparation', $contract['application_corrective_contract']['authorization']);
+        $this->assertSame('separate_human_review_required_after_corrective', $contract['application_corrective_contract']['candidate_refreeze']);
+    }
+
+    public function test_g5_postmark_contract_keeps_secrets_dedupe_and_shared_state_fail_closed(): void
+    {
+        $contract = json_decode((string) file_get_contents(base_path(
+            'deployment/g5-target-environment/postmark-production-mail-contract.json'
+        )), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('human_supplied_target_required_secret', $contract['target_environment_contract']['POSTMARK_API_KEY']);
+        $this->assertSame('0600', $contract['target_environment_contract']['shared_env_mode']);
+        $this->assertFalse($contract['target_environment_contract']['secret_values_in_repository_evidence_or_terminal']);
+        $this->assertSame('unique_hmac_dedupe_key_over_event_source_generation_and_recipient_identity', $contract['delivery_ledger']['outbound_dedupe']);
+        $this->assertFalse($contract['delivery_ledger']['mail_body_storage']);
+        $this->assertFalse($contract['delivery_ledger']['raw_webhook_storage']);
+        $this->assertSame('mark_delivery_unknown_and_do_not_blindly_resend', $contract['delivery_ledger']['ambiguous_send_failure']);
+        $this->assertSame('basic_auth', $contract['webhook_contract']['authentication']);
+        $this->assertSame('postmark_published_source_ip_allowlist_captured_at_human_gate', $contract['webhook_contract']['network_boundary']);
+        $this->assertSame('exhausted_stop_no_replay', $contract['shared_state_corrective']['existing_initial_attempt']);
+        $this->assertSame('exhausted_stop_no_replay', $contract['shared_state_corrective']['existing_corrective1_attempt']);
+        $this->assertFalse($contract['shared_state_corrective']['rk11_source_presence_required']);
+        $this->assertSame('human_decision_fixed_target_value_postmark', $contract['shared_state_corrective']['rk11_classification']);
+        $this->assertSame('blocked_until_application_corrective_and_provider_dns_gates_pass', $contract['shared_state_corrective']['shared_state_creation']);
+    }
+
+    public function test_g5_postmark_production_mail_simulation_enforces_gate_order_and_no_go(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            base_path('deployment/g5-target-environment/simulate-postmark-production-mail.php'),
+        ], base_path());
+        $process->mustRun();
+        $output = $process->getOutput().$process->getErrorOutput();
+
+        $this->assertStringContainsString('G5_POSTMARK_PRODUCTION_MAIL_SIMULATION=PASS', $output);
+        $this->assertStringContainsString('scenarios=8', $output);
+        $this->assertStringContainsString('current_state=application_corrective_required', $output);
+        $this->assertStringContainsString('next_human_gate=G5_POSTMARK_APPLICATION_CORRECTIVE', $output);
+        $this->assertStringContainsString('frozen_candidate_disposition=unchanged_no_refreeze', $output);
+        $this->assertStringContainsString('production_connection_attempted=false', $output);
+        $this->assertStringContainsString('production_mutation=false', $output);
+        $this->assertStringContainsString('provider_operation=false', $output);
+        $this->assertStringContainsString('dns_change=false', $output);
+        $this->assertStringContainsString('secret_values_output=false', $output);
+        $this->assertStringContainsString('deploy_authorized=false', $output);
+        $this->assertStringContainsString('PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE', $output);
     }
 }

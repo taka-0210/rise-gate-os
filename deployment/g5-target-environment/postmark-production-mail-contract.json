@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5-postmark-production-mail.v1",
+  "release_case": "IR1-G5-POSTMARK-PRODUCTION-MAIL",
+  "candidate": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "frozen_candidate_disposition": "unchanged_no_refreeze",
+  "decision": {
+    "provider": "postmark",
+    "transport": "postmark_api",
+    "primary_production_mailer": "postmark",
+    "account_mail_mailer": "same_as_primary_postmark_mailer",
+    "second_choice": "amazon_ses",
+    "second_choice_trigger": [
+      "domestic_region_requirement",
+      "large_scale_multi_tenant_reputation_partitioning",
+      "material_delivery_volume_growth"
+    ],
+    "postmark_us_data_processing": "accepted",
+    "webhook_basic_auth": "accepted",
+    "webhook_ip_allowlist": "accepted",
+    "application_send_and_webhook_deduplication": "in_scope",
+    "provider_portability": "required"
+  },
+  "scope": {
+    "included": [
+      "password reset",
+      "email verification and change",
+      "organization invitation",
+      "owner onboarding",
+      "account lifecycle notification",
+      "minimal delivery ledger",
+      "delivery, bounce and complaint webhook receipt"
+    ],
+    "excluded": [
+      "broadcast mail",
+      "marketing mail",
+      "notification center",
+      "campaign analytics",
+      "multi-tenant provider provisioning"
+    ]
+  },
+  "postmark_topology": {
+    "account": "rise_gate_corporate_owned_mfa_required",
+    "server": "dedicated_company_os_production_server",
+    "message_stream": {
+      "type": "transactional",
+      "proposed_id": "account-lifecycle",
+      "broadcast_stream": false
+    },
+    "application_token": "server_api_token_only",
+    "account_api_token_in_application": false,
+    "server_isolation_is_permission_boundary": true,
+    "staging_server": "out_of_scope_separate_future_gate"
+  },
+  "proposed_sender_identity": {
+    "sending_domain": "mail.company-os.jp",
+    "from_address": "no-reply@mail.company-os.jp",
+    "from_name": "Company OS",
+    "custom_return_path": "pm-bounces.mail.company-os.jp",
+    "status": "recommended_pending_human_identity_gate"
+  },
+  "dns_contract": {
+    "dkim": "postmark_generated_record_required",
+    "custom_return_path": "postmark_generated_cname_required",
+    "spf": "use_postmark_return_path_alignment_do_not_create_duplicate_spf_record",
+    "dmarc": "staged_policy_with_reporting_then_separate_human_tightening_gate",
+    "record_values": "provider_generated_values_must_not_be_in_repository",
+    "dns_change_authorized": false
+  },
+  "application_boundary": {
+    "core_dispatch": "laravel_named_mailer_and_provider_neutral_delivery_service",
+    "provider_adapter": "postmark_transport_and_postmark_webhook_adapter_only",
+    "provider_sdk_calls_in_account_domain": false,
+    "provider_event_mapping": "map_to_generic_accepted_delivered_bounced_complained_suppressed_failed_unknown",
+    "future_provider_change": "replace_transport_and_webhook_adapter_without_account_domain_rewrite"
+  },
+  "frozen_candidate_audit": {
+    "mail_postmark_config": "present",
+    "services_postmark_api_key_config": "present",
+    "account_named_mailer_binding": "present",
+    "symfony_postmark_mailer_package": "absent",
+    "symfony_http_client_package": "absent",
+    "message_stream_binding": "commented_inactive",
+    "provider_neutral_account_delivery_ledger": "absent",
+    "postmark_webhook_endpoint": "absent",
+    "webhook_deduplication": "absent",
+    "result": "application_corrective_required_before_shared_state"
+  },
+  "application_corrective_contract": {
+    "required": true,
+    "authorization": "not_authorized_by_this_preparation",
+    "required_changes": [
+      "add symfony/postmark-mailer and symfony/http-client with locked compatible versions",
+      "activate POSTMARK_MESSAGE_STREAM_ID in the postmark mailer",
+      "add provider-neutral account mail delivery ledger and provider event receipt deduplication",
+      "capture provider message identity without storing mail body or Secret",
+      "add Postmark webhook adapter behind Basic Auth and trusted-proxy-safe IP allowlist",
+      "add generic delivery state transitions and fail-closed payload validation",
+      "add account mail send dedupe and ambiguous-delivery handling",
+      "add bounded queue retry and queue readiness checks",
+      "add Secret-safe target environment validation",
+      "add focused transport, webhook, dedupe and retry tests"
+    ],
+    "database_migration": "application_corrective_contains_additive_schema_but_production_migration_remains_separate_unauthorized_gate",
+    "candidate_refreeze": "separate_human_review_required_after_corrective",
+    "production_connection": false,
+    "production_mutation": false
+  },
+  "delivery_ledger": {
+    "scope": "account_mail_only",
+    "outbound_dedupe": "unique_hmac_dedupe_key_over_event_source_generation_and_recipient_identity",
+    "dedupe_secret_source": "application_key_derived_context_specific_hmac_no_new_plaintext_secret",
+    "payload_reuse_guard": "same_dedupe_key_with_different_payload_hash_is_rejected",
+    "provider_message_id": "stored_after_provider_acceptance_when_available",
+    "recipient_storage": "opaque_hmac_or_existing_foreign_key_no_new_plaintext_recipient_copy",
+    "mail_body_storage": false,
+    "raw_webhook_storage": false,
+    "provider_event_dedupe": "unique_provider_and_stable_event_identity",
+    "ambiguous_send_failure": "mark_delivery_unknown_and_do_not_blindly_resend",
+    "generic_statuses": [
+      "queued",
+      "sending",
+      "accepted",
+      "delivered",
+      "bounced",
+      "complained",
+      "suppressed",
+      "failed",
+      "delivery_unknown"
+    ]
+  },
+  "webhook_contract": {
+    "transport": "https_post",
+    "authentication": "basic_auth",
+    "network_boundary": "postmark_published_source_ip_allowlist_captured_at_human_gate",
+    "proxy_boundary": "do_not_trust_forwarded_for_until_xserver_proxy_chain_is_evidenced",
+    "accepted_scope": "exact_server_and_account_lifecycle_message_stream",
+    "accepted_events": [
+      "delivery",
+      "bounce",
+      "spam_complaint"
+    ],
+    "open_click_tracking": "out_of_scope",
+    "duplicate_response": "idempotent_2xx",
+    "authentication_failure": "401_or_403_no_retry_expected",
+    "malformed_payload": "4xx_no_retry_expected",
+    "transient_processing_failure": "5xx_provider_retry_expected",
+    "secret_or_raw_payload_evidence": false
+  },
+  "queue_and_retry": {
+    "existing_account_jobs_encrypted": true,
+    "existing_after_commit": true,
+    "existing_tries": 3,
+    "required_corrective": "explicit_bounded_backoff_and_retryability_classification",
+    "provider_accepted_means_delivered": false,
+    "blind_retry_after_ambiguous_handoff": false,
+    "queue_connection": "database_recommended_pending_runtime_gate",
+    "queue_worker_readiness": "deferred_application_release_gate",
+    "failed_job_monitoring": "required_before_production_mail_enablement"
+  },
+  "target_environment_contract": {
+    "MAIL_MAILER": "postmark",
+    "ACCOUNT_MAIL_MAILER": "postmark",
+    "POSTMARK_API_KEY": "human_supplied_target_required_secret",
+    "POSTMARK_MESSAGE_STREAM_ID": "human_approved_nonsecret_exact_value",
+    "MAIL_FROM_ADDRESS": "human_approved_verified_sender",
+    "MAIL_FROM_NAME": "Company OS",
+    "POSTMARK_WEBHOOK_BASIC_USER": "human_supplied_target_required_secret_or_sensitive_identifier",
+    "POSTMARK_WEBHOOK_BASIC_PASSWORD": "human_generated_target_required_secret",
+    "POSTMARK_WEBHOOK_ALLOWED_CIDRS": "postmark_official_values_bound_at_human_gate",
+    "QUEUE_CONNECTION": "database_pending_runtime_and_schema_gate",
+    "shared_env_mode": "0600",
+    "runtime_owner_readability": "required",
+    "secret_values_in_repository_evidence_or_terminal": false
+  },
+  "shared_state_corrective": {
+    "existing_initial_attempt": "exhausted_stop_no_replay",
+    "existing_corrective1_attempt": "exhausted_stop_no_replay",
+    "new_generation_required": true,
+    "rk11_target_requiredness": "maintained",
+    "rk11_source_presence_required": false,
+    "rk11_classification": "human_decision_fixed_target_value_postmark",
+    "postmark_token_source": "newtarget_human_supplied_secret_not_legacy",
+    "from_identity_source": "human_approved_postmark_verified_identity",
+    "shared_state_creation": "blocked_until_application_corrective_and_provider_dns_gates_pass",
+    "production_mutation_authorized": false
+  },
+  "human_provider_operations": {
+    "status": "not_authorized",
+    "future_gates": [
+      "create corporate Postmark account and enable MFA",
+      "create dedicated Company OS Production server",
+      "create dedicated Transactional account-lifecycle message stream",
+      "add and verify exact Sending Domain",
+      "apply provider-generated DKIM and Return-Path DNS records",
+      "establish DMARC reporting policy",
+      "generate Server API token without terminal or Evidence output",
+      "configure HTTPS webhook with Basic Auth and IP allowlist",
+      "perform separately authorized non-user delivery smoke test"
+    ]
+  },
+  "next_human_gate": {
+    "id": "G5_POSTMARK_APPLICATION_CORRECTIVE",
+    "type": "production_free_repository_corrective",
+    "approval_phrase_id": "APPROVE_ONE_G5_POSTMARK_APPLICATION_CORRECTIVE_PRODUCTION_FREE",
+    "production_connection": false,
+    "provider_account_operation": false,
+    "credential_generation": false,
+    "dns_change": false,
+    "shared_state_creation": false,
+    "application_placement": false,
+    "migration_execution": false,
+    "deploy": false
+  },
+  "continuing_blockers": [
+    "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE",
+    "postmark_application_corrective=required",
+    "postmark_account_server_stream=not_created",
+    "sending_domain_from_identity=human_gate_pending",
+    "postmark_api_token=not_created",
+    "webhook_basic_auth_and_allowlist=not_configured",
+    "queue_runtime_readiness=deferred_application_release_gate",
+    "usable_backup=unknown",
+    "db_restore_readiness=blocker",
+    "storage_final_delta_required=true",
+    "application_release_binding=not_attempted",
+    "release_marker_binding=not_attempted",
+    "dns_ssl_change=not_attempted",
+    "deploy_authorized=false"
+  ],
+  "production_connection_authorized": false,
+  "production_mutation_authorized": false,
+  "provider_operation_authorized": false,
+  "dns_ssl_change_authorized": false,
+  "deploy_authorized": false,
+  "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION": "PENDING_G5_PUBLIC_ENTRY_GATE"
+}
