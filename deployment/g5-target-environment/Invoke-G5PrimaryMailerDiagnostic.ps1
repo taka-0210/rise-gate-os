@@ -1,15 +1,20 @@
 [CmdletBinding()]
 param(
-    [switch] $VerifyOnly
+    [switch] $VerifyOnly,
+    [ValidateSet('Corrective1')][string] $Attempt
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $Candidate = '924af91188cc60d33ff87c91b94ecc1d539566e6'
-$HelperGeneration = 'g5-primary-mailer-diagnostic-v1'
-$ExpectedContractId = 'company-os.ir1.g5-shared-state-primary-mailer-diagnostic.v1'
-$ExpectedContractSha256 = '3e6203c88cbe8e1f843bb3397fc512b6daafba28637b067a72652bea42ea08b6'
+$HelperGeneration = 'g5-primary-mailer-diagnostic-corrective-1'
+$ExpectedContractId = 'company-os.ir1.g5-shared-state-primary-mailer-diagnostic-corrective1.v1'
+$ExpectedContractSha256 = 'eedc8c4e26915e472e26772e3f58ceb17811d2f5514b81ccffe3c3e5b8b925bb'
+$ExpectedBasePrimaryMailerContractSha256 = '3e6203c88cbe8e1f843bb3397fc512b6daafba28637b067a72652bea42ea08b6'
+$ExpectedInitialImplementationCommit = '6af2b4f57a510bec8c237fd8bd26d0234a5e7089'
+$ExpectedInitialHelperGitBlob = '301705eb393dbb4118e3e8a5c7b29f81fe835cef'
+$ExpectedInitialContractGitBlob = '2335651bce3370f6b096a6e95953e68d2fae6e47'
 $ExpectedSourceDiagnosticSha256 = 'e66ad708648c28494606902a5d0d0e270dd016cf020950e71f727dfebc8317ea'
 $ExpectedTargetCapabilitySha256 = '362efb10ae5a4752b28469c4c2b670b351bf514f55bc6edd288e2fe70ec9eec4'
 $ExpectedRequiredStateSha256 = '570d8d67eb5a035b5c92ede17c5f42fd6fafa65e6de49d73385201bedaacae47'
@@ -252,20 +257,28 @@ function Assert-RequiredDiagnosticEvidence([string] $StatePath, [string] $Receip
     }
 }
 
-function Assert-CandidateBlob(
+function Assert-GitBlob(
     [string] $Git,
+    [string] $RepositoryRoot,
+    [string] $Revision,
     [string] $Path,
-    [string] $ExpectedBlob
+    [string] $ExpectedBlob,
+    [string] $StableId
 ) {
-    $result = Invoke-Native $Git @('rev-parse',"$Candidate`:$Path") $null 'none'
-    if ($result.ExitCode -ne 0 -or $result.Stderr -ne '' -or $result.Stdout.Trim() -ne $ExpectedBlob) {
-        Stop-G5PrimaryMailer 'CANDIDATE_BLOB_BINDING_MISMATCH'
+    $result = Invoke-Native $Git @('-C',$RepositoryRoot,'rev-parse',"$Revision`:$Path") $null 'none'
+    if ($result.ExitCode -ne 0 -or $result.Stderr -ne '') {
+        Stop-G5PrimaryMailer "GIT_BLOB_${StableId}_RESOLUTION_FAILED"
+    }
+    if ($result.Stdout.Trim() -ne $ExpectedBlob) {
+        Stop-G5PrimaryMailer "GIT_BLOB_${StableId}_IDENTITY_MISMATCH"
     }
 }
 
 try {
     $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-    $ContractPath = Join-Path $PSScriptRoot 'shared-state-primary-mailer-contract.json'
+    if ($Attempt -ne 'Corrective1') { Stop-G5PrimaryMailer 'CORRECTIVE_ATTEMPT_REQUIRED' }
+    $BasePrimaryMailerContractPath = Join-Path $PSScriptRoot 'shared-state-primary-mailer-contract.json'
+    $ContractPath = Join-Path $PSScriptRoot 'shared-state-primary-mailer-corrective1-contract.json'
     $SourceDiagnosticPath = Join-Path $PSScriptRoot 'diagnose-primary-mailer.php'
     $TargetCapabilityPath = Join-Path $PSScriptRoot 'inspect-primary-mailer-target-capability.sh'
     $BaseContractPath = Join-Path $PSScriptRoot 'shared-state-contract.json'
@@ -276,7 +289,8 @@ try {
     $RequiredStatePath = Join-Path $RequiredEvidenceRoot 'execution-state.json'
     $RequiredReceiptPath = Join-Path $RequiredEvidenceRoot 'required-source-diagnostic.json'
     $TargetBindingRoot = Join-Path $Root "storage\app\release-audit\production-g5b-new-target-binding-$Candidate"
-    $EvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5-primary-mailer-diagnostic-$Candidate"
+    $InitialEvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5-primary-mailer-diagnostic-$Candidate"
+    $EvidenceRoot = Join-Path $Root "storage\app\release-audit\production-g5-primary-mailer-diagnostic-corrective-1-$Candidate"
     $StatePath = Join-Path $EvidenceRoot 'execution-state.json'
     $ReceiptPath = Join-Path $EvidenceRoot 'primary-mailer-diagnostic.json'
     $SshRoot = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.ssh'
@@ -286,6 +300,7 @@ try {
     $TargetKnownHostsPath = Join-Path $TargetBindingRoot 'known_hosts'
 
     Assert-FileBinding $ContractPath $ExpectedContractSha256 'PRIMARY_MAILER_CONTRACT_BINDING_MISMATCH'
+    Assert-FileBinding $BasePrimaryMailerContractPath $ExpectedBasePrimaryMailerContractSha256 'BASE_PRIMARY_MAILER_CONTRACT_BINDING_MISMATCH'
     Assert-FileBinding $SourceDiagnosticPath $ExpectedSourceDiagnosticSha256 'SOURCE_DIAGNOSTIC_BINDING_MISMATCH'
     Assert-FileBinding $TargetCapabilityPath $ExpectedTargetCapabilitySha256 'TARGET_CAPABILITY_BINDING_MISMATCH'
     Assert-FileBinding $BaseContractPath $ExpectedBaseContractSha256 'BASE_CONTRACT_BINDING_MISMATCH'
@@ -297,14 +312,20 @@ try {
 
     $contract = Get-Content -Raw -LiteralPath $ContractPath | ConvertFrom-Json
     if ($contract.contract_id -ne $ExpectedContractId -or $contract.candidate -ne $Candidate -or
-        $contract.human_decision.account_mailer -ne 'same_as_primary_production_mailer' -or
-        [bool] $contract.human_decision.dedicated_account_mailer -or
-        [bool] $contract.human_decision.human_manual_mailer_name_input -or
-        [bool] $contract.human_decision.human_manual_credential_input -or
-        $contract.required_contract_reconciliation.rk11_target_value_source -ne 'exact_primary_mailer_in_memory' -or
-        [bool] $contract.required_contract_reconciliation.base_required_contract_changed_by_this_preparation -or
-        [bool] $contract.production_mutation_authorized -or [bool] $contract.shared_state_creation_authorized -or
-        [bool] $contract.required_contract_change_authorized -or
+        $contract.frozen_candidate_disposition -ne 'unchanged_no_refreeze' -or
+        $contract.initial_stop.safe_error_code -ne 'CANDIDATE_BLOB_BINDING_MISMATCH' -or
+        $contract.initial_stop.failure_stage -ne 'LOCAL_PRECONDITIONS' -or
+        $contract.initial_implementation_binding.commit -ne $ExpectedInitialImplementationCommit -or
+        $contract.initial_implementation_binding.helper_git_blob -ne $ExpectedInitialHelperGitBlob -or
+        $contract.initial_implementation_binding.contract_git_blob -ne $ExpectedInitialContractGitBlob -or
+        $contract.root_cause.code -ne 'LOCAL_GIT_REPOSITORY_CONTEXT_NOT_BOUND' -or
+        $contract.root_cause.first_comparison_id -ne 'cb01' -or
+        -not [bool] $contract.root_cause.explicit_repository_root_missing -or
+        [bool] $contract.root_cause.frozen_candidate_changed -or
+        [bool] $contract.root_cause.current_head_compared -or
+        $contract.corrective.attempt -ne 'Corrective1' -or
+        $contract.corrective.helper_generation -ne $HelperGeneration -or
+        [bool] $contract.corrective.production_execution_authorized -or
         $contract.PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION -ne 'PENDING_G5_PUBLIC_ENTRY_GATE') {
         Stop-G5PrimaryMailer 'PRIMARY_MAILER_CONTRACT_MISMATCH'
     }
@@ -315,16 +336,26 @@ try {
     if ($null -eq $git -or $null -eq $ssh -or $null -eq $keygen) {
         Stop-G5PrimaryMailer 'REQUIRED_NATIVE_TOOL_UNAVAILABLE'
     }
+    Assert-GitBlob $git.Source $Root $ExpectedInitialImplementationCommit `
+        'deployment/g5-target-environment/Invoke-G5PrimaryMailerDiagnostic.ps1' `
+        $ExpectedInitialHelperGitBlob 'IH01'
+    Assert-GitBlob $git.Source $Root $ExpectedInitialImplementationCommit `
+        'deployment/g5-target-environment/shared-state-primary-mailer-contract.json' `
+        $ExpectedInitialContractGitBlob 'IC01'
     foreach ($binding in @(
-        @('config/mail.php','e32e88da2cc82d4139c032c28b03005afc6008c6'),
-        @('config/services.php','053964d3eb9264c652878012048a4bcca60735e7'),
-        @('config/queue.php','79c2c0a23cd06bcb6d22ea0a2b218e22a6d51198'),
-        @('config/database.php','64709ce5a3de66194ebc80ba108a336c0dfc35a4'),
-        @('config/account.php','24cd9d36bbf59e07518adf5af181ba3d27c604cf'),
-        @('app/Services/AccountMailDispatcher.php','2242c1bb2398e035fd2ffb2bead803d2f3ccc9e5'),
-        @('app/Jobs/SendAccountActionMail.php','e1b4241b4ec424b93fe27d26d34b883c1c0d8d2f')
+        @('CB01','config/mail.php','e32e88da2cc82d4139c032c28b03005afc6008c6'),
+        @('CB02','config/services.php','053964d3eb9264c652878012048a4bcca60735e7'),
+        @('CB03','config/queue.php','79c2c0a23cd06bcb6d22ea0a2b218e22a6d51198'),
+        @('CB04','config/database.php','64709ce5a3de66194ebc80ba108a336c0dfc35a4'),
+        @('CB05','config/account.php','24cd9d36bbf59e07518adf5af181ba3d27c604cf'),
+        @('CB06','app/Services/AccountMailDispatcher.php','2242c1bb2398e035fd2ffb2bead803d2f3ccc9e5'),
+        @('CB07','app/Jobs/SendAccountActionMail.php','e1b4241b4ec424b93fe27d26d34b883c1c0d8d2f')
     )) {
-        Assert-CandidateBlob $git.Source $binding[0] $binding[1]
+        Assert-GitBlob $git.Source $Root $Candidate $binding[1] $binding[2] $binding[0]
+    }
+
+    if (Test-Path -LiteralPath $InitialEvidenceRoot) {
+        Stop-G5PrimaryMailer 'INITIAL_EVIDENCE_ROOT_UNEXPECTED'
     }
 
     Assert-KeyFingerprint $keygen.Source $SourceIdentityPath $SourceIdentityFingerprint
@@ -347,8 +378,11 @@ try {
             Stop-G5PrimaryMailer 'SAFE_OUTPUT_PARSER_SELF_TEST_FAILED'
         }
         Write-Output 'G5_PRIMARY_MAILER_DIAGNOSTIC_VERIFY_ONLY=PASS'
+        Write-Output 'attempt=Corrective1'
+        Write-Output 'corrective_retry_number=1'
         Write-Output "candidate=$Candidate"
         Write-Output "contract_sha256=$ExpectedContractSha256"
+        Write-Output "base_primary_mailer_contract_sha256=$ExpectedBasePrimaryMailerContractSha256"
         Write-Output "source_diagnostic_sha256=$ExpectedSourceDiagnosticSha256"
         Write-Output "target_capability_sha256=$ExpectedTargetCapabilitySha256"
         Write-Output 'account_mail_binding=primary_exact'
@@ -366,12 +400,17 @@ try {
     }
 
     if (Test-Path -LiteralPath $EvidenceRoot) {
-        Stop-G5PrimaryMailer 'PRIMARY_MAILER_DIAGNOSTIC_ATTEMPT_ALREADY_RECORDED'
+        Stop-G5PrimaryMailer 'PRIMARY_MAILER_CORRECTIVE1_ATTEMPT_ALREADY_RECORDED'
     }
     [IO.Directory]::CreateDirectory($EvidenceRoot) | Out-Null
     $State = [ordered]@{
-        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; status='ATTEMPT_STARTED'
-        contract_sha256=$ExpectedContractSha256; source_diagnostic_sha256=$ExpectedSourceDiagnosticSha256
+        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; attempt='Corrective1'
+        corrective_retry_number=1; status='ATTEMPT_STARTED'; contract_sha256=$ExpectedContractSha256
+        base_primary_mailer_contract_sha256=$ExpectedBasePrimaryMailerContractSha256
+        initial_implementation_commit=$ExpectedInitialImplementationCommit
+        initial_helper_git_blob=$ExpectedInitialHelperGitBlob
+        initial_contract_git_blob=$ExpectedInitialContractGitBlob
+        source_diagnostic_sha256=$ExpectedSourceDiagnosticSha256
         target_capability_sha256=$ExpectedTargetCapabilitySha256
         required_diagnostic_state_sha256=$ExpectedRequiredStateSha256
         required_diagnostic_receipt_sha256=$ExpectedRequiredReceiptSha256
@@ -467,8 +506,14 @@ try {
     }
 
     $receipt = [ordered]@{
-        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; status='PASS'
-        contract_sha256=$ExpectedContractSha256; source_diagnostic_sha256=$ExpectedSourceDiagnosticSha256
+        schema_version=1; candidate=$Candidate; helper_generation=$HelperGeneration; attempt='Corrective1'
+        corrective_retry_number=1; status='PASS'; contract_sha256=$ExpectedContractSha256
+        base_primary_mailer_contract_sha256=$ExpectedBasePrimaryMailerContractSha256
+        initial_implementation_binding=[ordered]@{
+            commit=$ExpectedInitialImplementationCommit; helper_git_blob=$ExpectedInitialHelperGitBlob
+            contract_git_blob=$ExpectedInitialContractGitBlob; evidence_root_created=$false
+        }
+        source_diagnostic_sha256=$ExpectedSourceDiagnosticSha256
         target_capability_sha256=$ExpectedTargetCapabilitySha256
         evidence_binding=[ordered]@{
             required_diagnostic_state_sha256=$ExpectedRequiredStateSha256
@@ -514,6 +559,8 @@ try {
     Save-State
 
     Write-Output 'G5_PRIMARY_MAILER_DIAGNOSTIC=PASS'
+    Write-Output 'attempt=Corrective1'
+    Write-Output 'corrective_retry_number=1'
     Write-Output "primary_mailer_id=$($source.primary_mailer_id)"
     Write-Output 'primary_transport_state=delivery_capable'
     Write-Output "primary_credential_presence=$($source.primary_credential_presence)"
@@ -548,6 +595,8 @@ try {
         try { Save-State; $statePersistence = 'saved' } catch { $statePersistence = 'failed' }
     }
     Write-Output 'G5_PRIMARY_MAILER_DIAGNOSTIC=STOP'
+    Write-Output 'attempt=Corrective1'
+    Write-Output 'corrective_retry_number=1'
     Write-Output "safe_error_code=$safeCode"
     Write-Output "failure_stage=$FailureStage"
     Write-Output "production_connection_attempted=$($ConnectionAttempted.ToString().ToLowerInvariant())"

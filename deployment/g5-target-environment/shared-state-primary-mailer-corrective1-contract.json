@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5-shared-state-primary-mailer-diagnostic-corrective1.v1",
+  "release_case": "IR1-G5-SHARED-STATE-PRIMARY-MAILER-DIAGNOSTIC-CORRECTIVE1",
+  "candidate": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "frozen_candidate_disposition": "unchanged_no_refreeze",
+  "initial_stop": {
+    "human_reported_status": "STOP",
+    "safe_error_code": "CANDIDATE_BLOB_BINDING_MISMATCH",
+    "failure_stage": "LOCAL_PRECONDITIONS",
+    "production_connection_attempted": false,
+    "source_connection_attempted": false,
+    "target_connection_attempted": false,
+    "production_mutation": false,
+    "shared_state_created": false,
+    "secret_values_output": false,
+    "primary_mailer_name_output": false,
+    "credential_values_output": false,
+    "local_state_persistence": "not_applicable",
+    "evidence_root_created": false,
+    "actual_caller_working_directory": "UNKNOWN_NOT_PERSISTED",
+    "actual_git_exit_code": "UNKNOWN_NOT_PERSISTED",
+    "actual_git_stdout": "UNKNOWN_NOT_PERSISTED",
+    "actual_git_stderr": "UNKNOWN_NOT_PERSISTED",
+    "retry_available": false,
+    "deploy_authorized": false
+  },
+  "initial_implementation_binding": {
+    "commit": "6af2b4f57a510bec8c237fd8bd26d0234a5e7089",
+    "helper_path": "deployment/g5-target-environment/Invoke-G5PrimaryMailerDiagnostic.ps1",
+    "helper_git_blob": "301705eb393dbb4118e3e8a5c7b29f81fe835cef",
+    "helper_sha256": "a0f54c7cdc5a932fbab5b81e3e503d1b0e224b5cc2987cbed640ced8c2ed2e5e",
+    "contract_path": "deployment/g5-target-environment/shared-state-primary-mailer-contract.json",
+    "contract_git_blob": "2335651bce3370f6b096a6e95953e68d2fae6e47",
+    "contract_sha256": "3e6203c88cbe8e1f843bb3397fc512b6daafba28637b067a72652bea42ea08b6"
+  },
+  "root_cause": {
+    "code": "LOCAL_GIT_REPOSITORY_CONTEXT_NOT_BOUND",
+    "first_comparison_id": "cb01",
+    "initial_invocation_shape": "git rev-parse candidate:path",
+    "defect": "native_git_inherited_human_caller_working_directory",
+    "explicit_repository_root_missing": true,
+    "candidate_identity_wrong": false,
+    "frozen_candidate_changed": false,
+    "current_head_compared": false,
+    "scope34_frozen_rc_separated_from_later_head": true,
+    "reproduction": {
+      "outside_repository_without_dash_c": "not_a_git_repository",
+      "same_directory_with_explicit_dash_c": "cb01_exact_match",
+      "production_connection": false,
+      "production_mutation": false
+    }
+  },
+  "candidate_blob_binding": [
+    {
+      "id": "cb01",
+      "path": "config/mail.php",
+      "expected": "e32e88da2cc82d4139c032c28b03005afc6008c6",
+      "candidate_actual": "e32e88da2cc82d4139c032c28b03005afc6008c6",
+      "match": true
+    },
+    {
+      "id": "cb02",
+      "path": "config/services.php",
+      "expected": "053964d3eb9264c652878012048a4bcca60735e7",
+      "candidate_actual": "053964d3eb9264c652878012048a4bcca60735e7",
+      "match": true,
+      "current_head_actual": "1b89c171773e5ff6d447495d795593477316b99f",
+      "head_difference_disposition": "later_development_not_used_for_frozen_binding"
+    },
+    {
+      "id": "cb03",
+      "path": "config/queue.php",
+      "expected": "79c2c0a23cd06bcb6d22ea0a2b218e22a6d51198",
+      "candidate_actual": "79c2c0a23cd06bcb6d22ea0a2b218e22a6d51198",
+      "match": true
+    },
+    {
+      "id": "cb04",
+      "path": "config/database.php",
+      "expected": "64709ce5a3de66194ebc80ba108a336c0dfc35a4",
+      "candidate_actual": "64709ce5a3de66194ebc80ba108a336c0dfc35a4",
+      "match": true
+    },
+    {
+      "id": "cb05",
+      "path": "config/account.php",
+      "expected": "24cd9d36bbf59e07518adf5af181ba3d27c604cf",
+      "candidate_actual": "24cd9d36bbf59e07518adf5af181ba3d27c604cf",
+      "match": true
+    },
+    {
+      "id": "cb06",
+      "path": "app/Services/AccountMailDispatcher.php",
+      "expected": "2242c1bb2398e035fd2ffb2bead803d2f3ccc9e5",
+      "candidate_actual": "2242c1bb2398e035fd2ffb2bead803d2f3ccc9e5",
+      "match": true
+    },
+    {
+      "id": "cb07",
+      "path": "app/Jobs/SendAccountActionMail.php",
+      "expected": "e1b4241b4ec424b93fe27d26d34b883c1c0d8d2f",
+      "candidate_actual": "e1b4241b4ec424b93fe27d26d34b883c1c0d8d2f",
+      "match": true
+    }
+  ],
+  "binding_source": {
+    "authoritative_git_object": "924af91188cc60d33ff87c91b94ecc1d539566e6:path",
+    "repository_root": "helper_resolved_root_from_psscriptroot",
+    "corrective_invocation_shape": "git -C repository_root rev-parse candidate:path",
+    "current_head_content": "not_authoritative",
+    "working_tree_content": "not_authoritative",
+    "human_caller_working_directory": "not_authoritative"
+  },
+  "corrective": {
+    "attempt": "Corrective1",
+    "corrective_retry_number": 1,
+    "helper_generation": "g5-primary-mailer-diagnostic-corrective-1",
+    "evidence_root": "production-g5-primary-mailer-diagnostic-corrective-1-924af91188cc60d33ff87c91b94ecc1d539566e6",
+    "explicit_repository_root_required": true,
+    "stable_blob_ids": true,
+    "distinct_resolution_and_identity_failure_codes": true,
+    "initial_evidence_absence_bound": true,
+    "at_most_once": true,
+    "retry": false,
+    "production_execution_authorized": false
+  },
+  "unchanged_safety_contract": {
+    "secret_values_output": false,
+    "primary_mailer_name_output": false,
+    "credential_values_output": false,
+    "raw_remote_output_stored": false,
+    "shared_state_creation": false,
+    "production_mutation": false,
+    "application_placement": false,
+    "migration": false,
+    "deploy": false,
+    "public_entry_change": false,
+    "dns_ssl_change": false
+  },
+  "continuing_blockers": [
+    "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE",
+    "usable_backup=unknown",
+    "db_restore_readiness=blocker",
+    "storage_final_delta_required=true",
+    "queue_runtime_readiness=deferred_application_release_gate",
+    "application_release_binding=not_attempted",
+    "release_marker_binding=not_attempted",
+    "deploy_authorized=false"
+  ],
+  "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION": "PENDING_G5_PUBLIC_ENTRY_GATE"
+}

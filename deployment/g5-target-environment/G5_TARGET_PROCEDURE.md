@@ -314,7 +314,29 @@ Shared State creation or Deploy.
 The separate Human command may be authorized at most once. It creates only
 local candidate-bound sanitized Evidence, refuses replay after PASS or STOP,
 and returns to Human + ChatGPT. It never invokes the retired Shared State
-attempt or Corrective-1.
+initial attempt or the retired Shared State Corrective-1 operation.
+
+The initial Primary Mailer Diagnostic command was subsequently executed once
+and stopped at `LOCAL_PRECONDITIONS` with
+`CANDIDATE_BLOB_BINDING_MISMATCH`. It created no Evidence root, made zero
+Source/Target connections and made zero Production mutations. The initial
+helper used `git rev-parse <candidate>:<path>` without binding the repository
+root, so native Git inherited the Human caller working directory. The actual
+caller CWD and Git streams were not persisted and remain UNKNOWN.
+
+Production-free reconciliation using the explicit local repository root proves
+all seven expected blobs exactly match the unchanged Frozen RC. Current HEAD
+was not compared by the initial helper; its later `config/services.php` change
+is correctly outside the Frozen RC binding. Root Cause is
+`LOCAL_GIT_REPOSITORY_CONTEXT_NOT_BOUND`, not a Candidate change.
+
+Corrective-1 binds the initial helper/contract Git objects, uses
+`git -C <helper-resolved-root> rev-parse <candidate>:<path>`, distinguishes
+stable resolution and identity failure codes, and uses a separate one-shot
+Evidence root. Its Production-free VerifyOnly path must pass from a
+non-repository caller directory before a new Human Gate can be proposed. The
+initial generation remains exhausted; Corrective-1 Production execution is
+not authorized by preparation alone.
 
 Shared State creation, Application placement, Migration, public-entry change,
 DNS, SSL and Deploy remain unauthorized.

@@ -1282,6 +1282,44 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertSame('PENDING_G5_PUBLIC_ENTRY_GATE', $contract['PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION']);
     }
 
+    public function test_g5_primary_mailer_corrective_contract_preserves_frozen_candidate_and_isolates_caller_cwd(): void
+    {
+        $contract = json_decode((string) file_get_contents(base_path(
+            'deployment/g5-target-environment/shared-state-primary-mailer-corrective1-contract.json'
+        )), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame(
+            'company-os.ir1.g5-shared-state-primary-mailer-diagnostic-corrective1.v1',
+            $contract['contract_id'],
+        );
+        $this->assertSame(self::CANDIDATE, $contract['candidate']);
+        $this->assertSame('unchanged_no_refreeze', $contract['frozen_candidate_disposition']);
+        $this->assertSame('CANDIDATE_BLOB_BINDING_MISMATCH', $contract['initial_stop']['safe_error_code']);
+        $this->assertSame('LOCAL_PRECONDITIONS', $contract['initial_stop']['failure_stage']);
+        $this->assertFalse($contract['initial_stop']['production_connection_attempted']);
+        $this->assertFalse($contract['initial_stop']['evidence_root_created']);
+        $this->assertSame('UNKNOWN_NOT_PERSISTED', $contract['initial_stop']['actual_caller_working_directory']);
+        $this->assertSame('LOCAL_GIT_REPOSITORY_CONTEXT_NOT_BOUND', $contract['root_cause']['code']);
+        $this->assertSame('cb01', $contract['root_cause']['first_comparison_id']);
+        $this->assertTrue($contract['root_cause']['explicit_repository_root_missing']);
+        $this->assertFalse($contract['root_cause']['frozen_candidate_changed']);
+        $this->assertFalse($contract['root_cause']['current_head_compared']);
+        $this->assertSame(
+            ['cb01', 'cb02', 'cb03', 'cb04', 'cb05', 'cb06', 'cb07'],
+            array_column($contract['candidate_blob_binding'], 'id'),
+        );
+        foreach ($contract['candidate_blob_binding'] as $binding) {
+            $this->assertTrue($binding['match']);
+            $this->assertSame($binding['expected'], $binding['candidate_actual']);
+        }
+        $this->assertSame('Corrective1', $contract['corrective']['attempt']);
+        $this->assertSame('git -C repository_root rev-parse candidate:path', $contract['binding_source']['corrective_invocation_shape']);
+        $this->assertFalse($contract['corrective']['production_execution_authorized']);
+        $this->assertFalse($contract['unchanged_safety_contract']['production_mutation']);
+        $this->assertFalse($contract['unchanged_safety_contract']['shared_state_creation']);
+        $this->assertSame('PENDING_G5_PUBLIC_ENTRY_GATE', $contract['PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION']);
+    }
+
     public function test_g5_primary_mailer_diagnostic_validates_smtp_from_and_queue_without_values(): void
     {
         $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'g5-primary-mailer-'.bin2hex(random_bytes(8));
@@ -1429,15 +1467,23 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/(?m)^\s*(mkdir|rm|rmdir|mv|cp|ln|chmod|chown|touch|tee)\b/', $target);
     }
 
-    public function test_g5_primary_mailer_helper_is_one_shot_conditional_target_and_value_safe(): void
+    public function test_g5_primary_mailer_corrective_helper_is_repo_bound_one_shot_conditional_target_and_value_safe(): void
     {
         $helper = (string) file_get_contents(base_path(
             'deployment/g5-target-environment/Invoke-G5PrimaryMailerDiagnostic.ps1'
         ));
         foreach ([
-            'g5-primary-mailer-diagnostic-v1',
-            'PRIMARY_MAILER_DIAGNOSTIC_ATTEMPT_ALREADY_RECORDED',
-            'production-g5-primary-mailer-diagnostic-$Candidate',
+            'g5-primary-mailer-diagnostic-corrective-1',
+            'CORRECTIVE_ATTEMPT_REQUIRED',
+            'PRIMARY_MAILER_CORRECTIVE1_ATTEMPT_ALREADY_RECORDED',
+            'production-g5-primary-mailer-diagnostic-corrective-1-$Candidate',
+            'shared-state-primary-mailer-corrective1-contract.json',
+            'eedc8c4e26915e472e26772e3f58ceb17811d2f5514b81ccffe3c3e5b8b925bb',
+            '301705eb393dbb4118e3e8a5c7b29f81fe835cef',
+            '2335651bce3370f6b096a6e95953e68d2fae6e47',
+            "@('-C',\$RepositoryRoot,'rev-parse',\"\$Revision`:\$Path\")",
+            'GIT_BLOB_${StableId}_RESOLUTION_FAILED',
+            'GIT_BLOB_${StableId}_IDENTITY_MISMATCH',
             'Assert-RequiredDiagnosticEvidence',
             '570d8d67eb5a035b5c92ede17c5f42fd6fafa65e6de49d73385201bedaacae47',
             "'php','--',\$Confirmation,\$SourceEnv",
@@ -1455,6 +1501,7 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         ] as $required) {
             $this->assertStringContainsString($required, $helper);
         }
+        $this->assertStringNotContainsString("@('rev-parse',\"\$Candidate`:\$Path\")", $helper);
         foreach (['scp.exe', 'Invoke-WebRequest', 'curl.exe', 'mysql.exe', 'php artisan', 'shared/.env', 'shared/storage'] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $helper);
         }
@@ -1473,26 +1520,33 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertLessThan($sourceParse, $sourceMetadata);
     }
 
-    public function test_g5_primary_mailer_helper_verify_only_is_production_free(): void
+    public function test_g5_primary_mailer_corrective_verify_only_is_caller_cwd_independent_and_production_free(): void
     {
         if (PHP_OS_FAMILY !== 'Windows') {
             $this->markTestSkipped('The G5 Primary Mailer Human helper runs under Windows PowerShell.');
         }
-        $evidenceRoot = base_path(
+        $initialEvidenceRoot = base_path(
             'storage/app/release-audit/production-g5-primary-mailer-diagnostic-'.self::CANDIDATE
         );
+        $evidenceRoot = base_path(
+            'storage/app/release-audit/production-g5-primary-mailer-diagnostic-corrective-1-'.self::CANDIDATE
+        );
+        $this->assertDirectoryDoesNotExist($initialEvidenceRoot);
         $this->assertDirectoryDoesNotExist($evidenceRoot);
 
         $process = new Process([
             'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
             base_path('deployment/g5-target-environment/Invoke-G5PrimaryMailerDiagnostic.ps1'),
+            '-Attempt', 'Corrective1',
             '-VerifyOnly',
-        ], base_path());
+        ], sys_get_temp_dir());
         $process->setTimeout(30);
         $process->mustRun();
         $output = $process->getOutput();
 
         $this->assertStringContainsString('G5_PRIMARY_MAILER_DIAGNOSTIC_VERIFY_ONLY=PASS', $output);
+        $this->assertStringContainsString('attempt=Corrective1', $output);
+        $this->assertStringContainsString('corrective_retry_number=1', $output);
         $this->assertStringContainsString('account_mail_binding=primary_exact', $output);
         $this->assertStringContainsString('primary_mailer_name_output=false', $output);
         $this->assertStringContainsString('credential_values_output=false', $output);
@@ -1501,6 +1555,7 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertStringContainsString('target_connection_attempted=false', $output);
         $this->assertStringContainsString('production_mutation=false', $output);
         $this->assertStringContainsString('diagnostic_operation=not_executed', $output);
+        $this->assertDirectoryDoesNotExist($initialEvidenceRoot);
         $this->assertDirectoryDoesNotExist($evidenceRoot);
     }
 }

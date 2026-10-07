@@ -2,11 +2,12 @@
 
 ## Status
 
-**PRODUCTION-FREE CONTRACT READY / ONE READ-ONLY HUMAN GATE NOT YET EXECUTED**
+**INITIAL FORMAL STOP / CORRECTIVE-1 PRODUCTION-FREE READY**
 
 - G5: `OPEN`
 - Deploy: `NO-GO`
-- Production connection during preparation/verification: `0`
+- Initial Human execution Production connection: `0`
+- Corrective preparation/verification Production connection: `0`
 - Production mutation during preparation/verification: `0`
 - Shared State initial attempt / Corrective-1 replay: `0`
 - `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION`:
@@ -26,6 +27,72 @@
 
 This preparation does not modify the 172-key allowlist or the existing
 required contract. It does not create NewTarget Shared State.
+
+## Initial Human execution / Formal STOP
+
+The authorized initial command ran once and stopped during
+`LOCAL_PRECONDITIONS` with:
+
+```text
+safe_error_code=CANDIDATE_BLOB_BINDING_MISMATCH
+production_connection_attempted=false
+source_connection_attempted=false
+target_connection_attempted=false
+production_mutation=false
+shared_state_created=false
+```
+
+The stop occurred before the candidate-bound Evidence root was created;
+therefore actual caller working directory, Git exit code and raw Git streams
+were not persisted and remain `UNKNOWN`. No Secret, Primary Mailer name or
+credential was output. The initial generation is exhausted and is not
+replayed.
+
+## Exact local mismatch reconciliation
+
+The initial helper compared the first binding (`cb01`, `config/mail.php`) by
+invoking:
+
+```text
+git rev-parse 924af91188cc60d33ff87c91b94ecc1d539566e6:config/mail.php
+```
+
+It did not set a Git repository root or native-process working directory, so
+Git inherited the Human caller's directory. A Production-free reproduction
+from `C:\Users\takaf` returns `not a git repository`; from the same directory,
+adding `git -C C:\xampp\htdocs\rise-gate-os` resolves the exact expected blob.
+
+All seven bindings were reconciled with an explicit repository root and match
+the unchanged Frozen RC. The Frozen RC is still a Git commit and was neither
+updated nor re-frozen. Current HEAD is not authoritative for this comparison.
+Only `config/services.php` differs between Frozen RC and current HEAD, due to
+later development, but the initial invocation explicitly named the Frozen RC
+and did not compare `HEAD:path`.
+
+| ID | Frozen path | Expected / actual Frozen blob | Result |
+|---|---|---|---|
+| cb01 | `config/mail.php` | `e32e88da2cc82d4139c032c28b03005afc6008c6` | MATCH |
+| cb02 | `config/services.php` | `053964d3eb9264c652878012048a4bcca60735e7` | MATCH |
+| cb03 | `config/queue.php` | `79c2c0a23cd06bcb6d22ea0a2b218e22a6d51198` | MATCH |
+| cb04 | `config/database.php` | `64709ce5a3de66194ebc80ba108a336c0dfc35a4` | MATCH |
+| cb05 | `config/account.php` | `24cd9d36bbf59e07518adf5af181ba3d27c604cf` | MATCH |
+| cb06 | `app/Services/AccountMailDispatcher.php` | `2242c1bb2398e035fd2ffb2bead803d2f3ccc9e5` | MATCH |
+| cb07 | `app/Jobs/SendAccountActionMail.php` | `e1b4241b4ec424b93fe27d26d34b883c1c0d8d2f` | MATCH |
+
+Root Cause:
+
+**`LOCAL_GIT_REPOSITORY_CONTEXT_NOT_BOUND`**
+
+Corrective-1 uses `git -C <helper-resolved-repository-root> rev-parse
+<frozen-candidate>:<path>`, binds the initial helper/contract Git objects and
+emits stable per-binding resolution/identity failure codes. It uses a separate
+Evidence generation and does not make the initial attempt retryable.
+
+Corrective contract:
+
+- `shared-state-primary-mailer-corrective1-contract.json`
+- SHA-256:
+  `eedc8c4e26915e472e26772e3f58ceb17811d2f5514b81ccffe3c3e5b8b925bb`
 
 ## Immutable prerequisite Evidence
 
@@ -110,7 +177,7 @@ A PASS or STOP creates a separate local Evidence generation:
 
 ```text
 storage/app/release-audit/
-  production-g5-primary-mailer-diagnostic-924af91188cc60d33ff87c91b94ecc1d539566e6/
+  production-g5-primary-mailer-diagnostic-corrective-1-924af91188cc60d33ff87c91b94ecc1d539566e6/
     execution-state.json
     primary-mailer-diagnostic.json   # PASS only
 ```
@@ -122,11 +189,11 @@ exhausts the gate and `retry_available=false` remains binding.
 
 ## Human Gate
 
-This command is **prepared but not executed**. A separate explicit Human
+Corrective-1 is **prepared but not executed**. A separate explicit Human
 approval is required. If approved, run exactly once:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\xampp\htdocs\rise-gate-os\deployment\g5-target-environment\Invoke-G5PrimaryMailerDiagnostic.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\xampp\htdocs\rise-gate-os\deployment\g5-target-environment\Invoke-G5PrimaryMailerDiagnostic.ps1" -Attempt Corrective1
 ```
 
 After PASS or STOP, do not rerun. Return the terminal's sanitized contract to
@@ -142,8 +209,8 @@ Human + ChatGPT. A PASS is not Shared State or Deploy authorization.
   - Target connection: `0`
   - Production mutation: `0`
   - Evidence generation: `0`
-- Primary Mailer focused regression: 7 tests / 110 assertions PASS
-- G5 target-environment regression: 43 tests / 737 assertions PASS
+- Primary Mailer focused regression: 8 tests / 157 assertions PASS
+- G5 target-environment regression: 44 tests / 784 assertions PASS
 - Repository-wide regression baseline: 790 PASS / 17 skipped / 8 pre-existing
   unrelated FAIL
   - one Company Navigation intended-URL expectation failure;
