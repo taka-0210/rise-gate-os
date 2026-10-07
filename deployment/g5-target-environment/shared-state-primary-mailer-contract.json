@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "contract_id": "company-os.ir1.g5-shared-state-primary-mailer-diagnostic.v1",
+  "release_case": "IR1-G5-SHARED-STATE-PRIMARY-MAILER-DIAGNOSTIC",
+  "candidate": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+  "human_decision": {
+    "decision_id": "G5-SS-PD-RK11-PRIMARY-SAME",
+    "account_mailer": "same_as_primary_production_mailer",
+    "dedicated_account_mailer": false,
+    "human_manual_mailer_name_input": false,
+    "human_manual_credential_input": false,
+    "human_manual_env_value_inspection": false,
+    "binding_method": "derive_exact_primary_value_in_memory_after_read_only_validation"
+  },
+  "evidence_binding": {
+    "required_diagnostic_state_sha256": "570d8d67eb5a035b5c92ede17c5f42fd6fafa65e6de49d73385201bedaacae47",
+    "required_diagnostic_receipt_sha256": "9060f96a9e001499a32949b475d83b4d33f882c31f414a6578029ad0b7507bc7",
+    "required_diagnostic_contract_sha256": "b124b9f9688fdda86a089e80525bb608b955b7a30a2589c65d3c3303fa1a8f78",
+    "required_diagnostic_status": "PASS",
+    "required_diagnostic_failing_id": "rk11",
+    "base_contract_sha256": "cc11ad5a67e0f3f869da15091d91740f9e4d584d90995bd86d38ae22d7a282d1",
+    "corrective1_contract_sha256": "1637b67d6acc95c50e2433d9e48cb21328522d357ae7468c0bb1b973fa443064",
+    "allowlist_count": 172,
+    "allowlist_sha256": "d408775076252cb15ac0438b1d4ccc762f3f366e9ea10517e3e0f8b3f0d496ec"
+  },
+  "candidate_blob_binding": {
+    "config_mail": "e32e88da2cc82d4139c032c28b03005afc6008c6",
+    "config_services": "053964d3eb9264c652878012048a4bcca60735e7",
+    "config_queue": "79c2c0a23cd06bcb6d22ea0a2b218e22a6d51198",
+    "config_database": "64709ce5a3de66194ebc80ba108a336c0dfc35a4",
+    "config_account": "24cd9d36bbf59e07518adf5af181ba3d27c604cf",
+    "account_mail_dispatcher": "2242c1bb2398e035fd2ffb2bead803d2f3ccc9e5",
+    "account_mail_job": "e1b4241b4ec424b93fe27d26d34b883c1c0d8d2f"
+  },
+  "primary_mailer_catalog": [
+    {
+      "id": "mt01",
+      "mailer": "smtp",
+      "required_presence": ["MAIL_HOST", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD"],
+      "alternate_complete_source": "MAIL_URL_with_host_port_user_password",
+      "target_capability": "none"
+    },
+    {
+      "id": "mt02",
+      "mailer": "ses",
+      "required_presence": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"],
+      "target_capability": "none"
+    },
+    {
+      "id": "mt03",
+      "mailer": "postmark",
+      "required_presence": ["POSTMARK_API_KEY"],
+      "target_capability": "none"
+    },
+    {
+      "id": "mt04",
+      "mailer": "resend",
+      "required_presence": ["RESEND_API_KEY"],
+      "target_capability": "none"
+    },
+    {
+      "id": "mt05",
+      "mailer": "sendmail",
+      "required_presence": [],
+      "endpoint_presence": "not_applicable",
+      "credential_presence": "not_applicable",
+      "target_capability": "tc01_exact_default_sendmail_executable"
+    },
+    {
+      "id": "mt06",
+      "mailer": "failover",
+      "disposition": "unsafe_candidate_contains_log_fallback"
+    },
+    {
+      "id": "mt07",
+      "mailer": "roundrobin",
+      "required_presence": [
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_DEFAULT_REGION",
+        "POSTMARK_API_KEY"
+      ],
+      "target_capability": "none"
+    },
+    {
+      "id": "mt90",
+      "mailer": "log",
+      "disposition": "unsafe_not_delivery"
+    },
+    {
+      "id": "mt91",
+      "mailer": "array",
+      "disposition": "unsafe_production"
+    }
+  ],
+  "from_contract": {
+    "address": "present_valid_non_placeholder_email",
+    "name": "present_resolved_non_framework_placeholder",
+    "values_output": false
+  },
+  "queue_catalog": [
+    {"id": "q01", "connection": "sync", "worker_dependency": "not_required"},
+    {"id": "q02", "connection": "database", "worker_dependency": "required"},
+    {"id": "q03", "connection": "beanstalkd", "worker_dependency": "required"},
+    {"id": "q04", "connection": "sqs", "worker_dependency": "required"},
+    {"id": "q05", "connection": "redis", "worker_dependency": "required"},
+    {"id": "q06", "connection": "deferred", "worker_dependency": "not_required"},
+    {"id": "q07", "connection": "background", "worker_dependency": "not_required", "target_capability": "tc02_php_proc_open"},
+    {"id": "q08", "connection": "failover", "worker_dependency": "conditional"}
+  ],
+  "queue_runtime_contract": {
+    "configuration_presence_checked": true,
+    "credential_presence_checked_when_applicable": true,
+    "worker_dependency_classified": true,
+    "worker_process_readiness": "deferred_application_release_gate",
+    "database_jobs_table_readiness": "deferred_database_migration_gate",
+    "external_queue_reachability": "not_attempted",
+    "blockers_resolved_by_this_diagnostic": false
+  },
+  "safety_contract": {
+    "repository_mapping_may_name_candidate_keys_and_catalog_entries": true,
+    "remote_stdout_environment_key_names_allowed": false,
+    "remote_stdout_environment_values_allowed": false,
+    "remote_stdout_mailer_name_allowed": false,
+    "remote_stdout_credential_values_allowed": false,
+    "terminal_environment_values_allowed": false,
+    "evidence_environment_values_allowed": false,
+    "raw_env_allowed": false,
+    "source_env_hash_allowed": false,
+    "stable_mailer_queue_capability_ids_only": true
+  },
+  "diagnostic_operation": {
+    "source_connection": "read_only_required",
+    "source_host": "sv17033.xserver.jp",
+    "source_user": "xs257823",
+    "source_port": 10022,
+    "source_env": "/home/xs257823/rise-gate.com/rise-gate-os/.env",
+    "target_connection": "conditional_read_only_only_for_tc01_tc02_tc03",
+    "target_host": "sv17169.xserver.jp",
+    "target_user": "xs377816",
+    "target_port": 10022,
+    "storage_inventory": "not_attempted",
+    "database_connection": "not_attempted",
+    "external_mail_or_queue_connection": "not_attempted",
+    "production_mutation": false,
+    "one_step_one_command": true,
+    "at_most_once": true,
+    "retry": false
+  },
+  "required_contract_reconciliation": {
+    "base_required_contract_changed_by_this_preparation": false,
+    "rk11_source_presence_required_recommended": false,
+    "rk11_target_presence_required": true,
+    "rk11_target_value_source": "exact_primary_mailer_in_memory",
+    "rk11_unsafe_transport_rejection": "preserve",
+    "future_corrective_generation_required": true,
+    "shared_state_attempt_reuse": false,
+    "corrective1_attempt_reuse": false
+  },
+  "implementation_binding": {
+    "source_diagnostic_file": "diagnose-primary-mailer.php",
+    "source_diagnostic_sha256": "e66ad708648c28494606902a5d0d0e270dd016cf020950e71f727dfebc8317ea",
+    "target_capability_file": "inspect-primary-mailer-target-capability.sh",
+    "target_capability_sha256": "362efb10ae5a4752b28469c4c2b670b351bf514f55bc6edd288e2fe70ec9eec4",
+    "human_helper_file": "Invoke-G5PrimaryMailerDiagnostic.ps1"
+  },
+  "continuing_blockers": [
+    "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE",
+    "usable_backup=unknown",
+    "db_restore_readiness=blocker",
+    "storage_final_delta_required=true",
+    "queue_runtime_readiness=deferred_application_release_gate",
+    "application_release_binding=not_attempted",
+    "release_marker_binding=not_attempted",
+    "dns_ssl_change=not_attempted",
+    "deploy_authorized=false"
+  ],
+  "production_mutation_authorized": false,
+  "shared_state_creation_authorized": false,
+  "required_contract_change_authorized": false,
+  "PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION": "PENDING_G5_PUBLIC_ENTRY_GATE"
+}

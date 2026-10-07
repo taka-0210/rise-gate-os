@@ -257,9 +257,67 @@ The helper binds the immutable initial and Corrective-1 STOP Evidence before
 native process start, saves stream hashes/counts before parsing, stores only
 stable ID states and refuses replay after either PASS or STOP.
 
-No required diagnostic has been executed against Production. Shared State
-creation, Application placement, Migration, public-entry change, DNS, SSL and
-Deploy remain unauthorized.
+The one authorized Required Source Diagnostic subsequently completed with
+PASS. Stable IDs `rk01` through `rk10` and `rk12` were `present`; only `rk11`
+was `missing`. The diagnostic made one Source read-only connection, zero
+NewTarget connections and zero Production mutations. Storage was not
+inventoried, and no key name, environment value, raw `.env`, source `.env`
+hash or Secret was emitted or retained. The authorization is exhausted and
+must not be replayed.
+
+Immutable diagnostic Evidence:
+
+- `execution-state.json` SHA-256:
+  `570d8d67eb5a035b5c92ede17c5f42fd6fafa65e6de49d73385201bedaacae47`
+- `required-source-diagnostic.json` SHA-256:
+  `9060f96a9e001499a32949b475d83b4d33f882c31f414a6578029ad0b7507bc7`
+
+Repository-only reconciliation maps `rk11` to `ACCOUNT_MAIL_MAILER`. It is a
+NewTarget operational requirement for Account lifecycle mail, not a safe
+generated value. Human Decision `G5-SS-PD-RK11-PRIMARY-SAME` binds it to the
+same Production delivery Mailer as the Primary Mailer and explicitly rejects
+a dedicated Account Mailer or manual Human inspection/input of the Mailer
+name, credentials or `.env` value.
+
+### Primary Production Mailer Diagnostic Human gate
+
+`shared-state-primary-mailer-contract.json` defines the separate read-only
+contract required to implement that Human Decision safely. It binds the
+frozen candidate mail, service, queue and Account Mail code blobs plus the
+immutable Required Source Diagnostic Evidence. It does not change the base
+172-key allowlist or required contract; a later separately authorized Shared
+State corrective generation is still required before creating target state.
+
+The Source diagnostic reads the exact Legacy `.env` in memory and returns
+stable IDs only. It verifies that the selected Primary Mailer is a real
+delivery transport, that its endpoint and credential inputs are present,
+that the From address/name are operational rather than placeholders, and that
+the configured Queue driver's inputs are present. `log` and Production
+`array` are rejected. The frozen `failover` definition is rejected because it
+contains the non-delivery `log` fallback. No endpoint, credential, mailer
+name, environment key/value, email address, raw `.env` or source `.env` hash
+is emitted or stored.
+
+When and only when the stable Source result requires NewTarget-local
+capability, the same one-shot helper performs one conditional read-only
+NewTarget check. The exact default sendmail executable and/or PHP
+`proc_open` capability may be checked; no file, permission or process state is
+changed. SMTP/API transport reachability and delivery are not attempted.
+
+Queue configuration and whether a worker is required are classified. Actual
+worker process readiness, database jobs-table readiness and external queue
+reachability remain deferred to the Application Release / DB gate because no
+Application release is bound on NewTarget. Therefore a diagnostic PASS does
+not by itself prove end-to-end Account Mail delivery and does not authorize
+Shared State creation or Deploy.
+
+The separate Human command may be authorized at most once. It creates only
+local candidate-bound sanitized Evidence, refuses replay after PASS or STOP,
+and returns to Human + ChatGPT. It never invokes the retired Shared State
+attempt or Corrective-1.
+
+Shared State creation, Application placement, Migration, public-entry change,
+DNS, SSL and Deploy remain unauthorized.
 
 ## Permission plan
 

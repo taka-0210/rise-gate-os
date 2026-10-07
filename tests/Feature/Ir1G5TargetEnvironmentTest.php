@@ -1203,7 +1203,7 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $this->assertLessThan($safeParse, $metadataSave);
     }
 
-    public function test_g5_required_source_diagnostic_verify_only_is_production_free(): void
+    public function test_g5_required_source_diagnostic_refuses_replay_and_preserves_pass_evidence(): void
     {
         if (PHP_OS_FAMILY !== 'Windows') {
             $this->markTestSkipped('The G5 diagnostic Human helper runs under Windows PowerShell.');
@@ -1211,7 +1211,17 @@ class Ir1G5TargetEnvironmentTest extends TestCase
         $evidenceRoot = base_path(
             'storage/app/release-audit/production-g5-shared-state-required-diagnostic-'.self::CANDIDATE
         );
-        $this->assertDirectoryDoesNotExist($evidenceRoot);
+        $statePath = $evidenceRoot.DIRECTORY_SEPARATOR.'execution-state.json';
+        $receiptPath = $evidenceRoot.DIRECTORY_SEPARATOR.'required-source-diagnostic.json';
+        $this->assertDirectoryExists($evidenceRoot);
+        $this->assertSame(
+            '570d8d67eb5a035b5c92ede17c5f42fd6fafa65e6de49d73385201bedaacae47',
+            hash_file('sha256', $statePath),
+        );
+        $this->assertSame(
+            '9060f96a9e001499a32949b475d83b4d33f882c31f414a6578029ad0b7507bc7',
+            hash_file('sha256', $receiptPath),
+        );
 
         $process = new Process([
             'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
@@ -1219,15 +1229,278 @@ class Ir1G5TargetEnvironmentTest extends TestCase
             '-VerifyOnly',
         ], base_path());
         $process->setTimeout(30);
-        $process->mustRun();
+        $process->run();
         $output = $process->getOutput();
 
-        $this->assertStringContainsString('G5_SHARED_REQUIRED_DIAGNOSTIC_VERIFY_ONLY=PASS', $output);
+        $this->assertSame(1, $process->getExitCode());
+        $this->assertStringContainsString('G5_SHARED_REQUIRED_DIAGNOSTIC=STOP', $output);
+        $this->assertStringContainsString('safe_error_code=REQUIRED_DIAGNOSTIC_ATTEMPT_ALREADY_RECORDED', $output);
         $this->assertStringContainsString('production_connection_attempted=false', $output);
         $this->assertStringContainsString('target_connection_attempted=false', $output);
         $this->assertStringContainsString('production_mutation=false', $output);
-        $this->assertStringContainsString('diagnostic_operation=not_executed', $output);
         $this->assertStringContainsString('key_names_output=false', $output);
+        $this->assertSame(
+            '570d8d67eb5a035b5c92ede17c5f42fd6fafa65e6de49d73385201bedaacae47',
+            hash_file('sha256', $statePath),
+        );
+        $this->assertSame(
+            '9060f96a9e001499a32949b475d83b4d33f882c31f414a6578029ad0b7507bc7',
+            hash_file('sha256', $receiptPath),
+        );
+    }
+
+    public function test_g5_primary_mailer_contract_binds_human_decision_and_keeps_shared_state_closed(): void
+    {
+        $contract = json_decode((string) file_get_contents(base_path(
+            'deployment/g5-target-environment/shared-state-primary-mailer-contract.json'
+        )), true, 512, JSON_THROW_ON_ERROR);
+        $base = json_decode((string) file_get_contents(base_path(
+            'deployment/g5-target-environment/shared-state-contract.json'
+        )), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('company-os.ir1.g5-shared-state-primary-mailer-diagnostic.v1', $contract['contract_id']);
+        $this->assertSame(self::CANDIDATE, $contract['candidate']);
+        $this->assertSame('same_as_primary_production_mailer', $contract['human_decision']['account_mailer']);
+        $this->assertFalse($contract['human_decision']['dedicated_account_mailer']);
+        $this->assertFalse($contract['human_decision']['human_manual_mailer_name_input']);
+        $this->assertFalse($contract['human_decision']['human_manual_credential_input']);
+        $this->assertSame('exact_primary_mailer_in_memory', $contract['required_contract_reconciliation']['rk11_target_value_source']);
+        $this->assertFalse($contract['required_contract_reconciliation']['base_required_contract_changed_by_this_preparation']);
+        $this->assertSame('64709ce5a3de66194ebc80ba108a336c0dfc35a4', $contract['candidate_blob_binding']['config_database']);
+        $this->assertContains('ACCOUNT_MAIL_MAILER', $base['candidate_environment_contract']['required_source_keys']);
+        $this->assertSame(
+            hash_file('sha256', base_path('deployment/g5-target-environment/diagnose-primary-mailer.php')),
+            $contract['implementation_binding']['source_diagnostic_sha256'],
+        );
+        $this->assertSame(
+            hash_file('sha256', base_path('deployment/g5-target-environment/inspect-primary-mailer-target-capability.sh')),
+            $contract['implementation_binding']['target_capability_sha256'],
+        );
+        $this->assertFalse($contract['production_mutation_authorized']);
+        $this->assertFalse($contract['shared_state_creation_authorized']);
+        $this->assertFalse($contract['required_contract_change_authorized']);
+        $this->assertSame('PENDING_G5_PUBLIC_ENTRY_GATE', $contract['PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION']);
+    }
+
+    public function test_g5_primary_mailer_diagnostic_validates_smtp_from_and_queue_without_values(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'g5-primary-mailer-'.bin2hex(random_bytes(8));
+        mkdir($root, 0700, true);
+        $secret = 'primary-mailer-secret-never-output';
+        $envPath = $root.DIRECTORY_SEPARATOR.'.env';
+        file_put_contents($envPath, implode("\n", [
+            'MAIL_MAILER=smtp',
+            'MAIL_HOST=mail.internal.test',
+            'MAIL_PORT=587',
+            'MAIL_USERNAME=delivery-user',
+            'MAIL_PASSWORD='.$secret,
+            'MAIL_FROM_ADDRESS=noreply@company-os.jp',
+            'MAIL_FROM_NAME=Company OS',
+            'QUEUE_CONNECTION=sync',
+            '',
+        ]));
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                base_path('deployment/g5-target-environment/diagnose-primary-mailer.php'),
+                'IR1-G5-PRIMARY-MAILER-DIAGNOSTIC-FIXTURE',
+                $envPath,
+            ], base_path());
+            $process->mustRun();
+            $output = $process->getOutput().$process->getErrorOutput();
+
+            $this->assertStringContainsString('G5_PRIMARY_MAILER_DIAGNOSTIC=PASS', $output);
+            $this->assertStringContainsString('primary_mailer_id=mt01', $output);
+            $this->assertStringContainsString('primary_credential_presence=complete', $output);
+            $this->assertStringContainsString('from_address_state=valid', $output);
+            $this->assertStringContainsString('queue_driver_id=q01', $output);
+            $this->assertStringContainsString('queue_worker_dependency=not_required', $output);
+            $this->assertStringContainsString('account_mail_value_source=derived_in_memory', $output);
+            $this->assertStringContainsString('primary_mailer_name_output=false', $output);
+            $this->assertStringContainsString('credential_values_output=false', $output);
+            $this->assertStringNotContainsString($secret, $output);
+            $this->assertStringNotContainsString('delivery-user', $output);
+            $this->assertStringNotContainsString('noreply@company-os.jp', $output);
+        } finally {
+            @unlink($envPath);
+            @rmdir($root);
+        }
+    }
+
+    public function test_g5_primary_mailer_diagnostic_rejects_non_delivery_primary_mailer(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'g5-primary-mailer-stop-'.bin2hex(random_bytes(8));
+        mkdir($root, 0700, true);
+        $envPath = $root.DIRECTORY_SEPARATOR.'.env';
+        file_put_contents($envPath, "MAIL_MAILER=log\n");
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                base_path('deployment/g5-target-environment/diagnose-primary-mailer.php'),
+                'IR1-G5-PRIMARY-MAILER-DIAGNOSTIC-FIXTURE',
+                $envPath,
+            ], base_path());
+            $process->run();
+            $output = $process->getOutput().$process->getErrorOutput();
+
+            $this->assertSame(1, $process->getExitCode());
+            $this->assertStringContainsString('G5_PRIMARY_MAILER_DIAGNOSTIC=STOP', $output);
+            $this->assertStringContainsString('safe_error_code=PRIMARY_MAILER_UNSAFE', $output);
+            $this->assertStringContainsString('environment_values_output=false', $output);
+        } finally {
+            @unlink($envPath);
+            @rmdir($root);
+        }
+    }
+
+    public function test_g5_primary_mailer_diagnostic_classifies_sendmail_and_background_capabilities(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'g5-primary-mailer-capability-'.bin2hex(random_bytes(8));
+        mkdir($root, 0700, true);
+        $envPath = $root.DIRECTORY_SEPARATOR.'.env';
+        file_put_contents($envPath, implode("\n", [
+            'MAIL_MAILER=sendmail',
+            'MAIL_FROM_ADDRESS=noreply@company-os.jp',
+            'MAIL_FROM_NAME=Company OS',
+            'QUEUE_CONNECTION=background',
+            '',
+        ]));
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                base_path('deployment/g5-target-environment/diagnose-primary-mailer.php'),
+                'IR1-G5-PRIMARY-MAILER-DIAGNOSTIC-FIXTURE',
+                $envPath,
+            ], base_path());
+            $process->mustRun();
+            $output = $process->getOutput().$process->getErrorOutput();
+
+            $this->assertStringContainsString('primary_mailer_id=mt05', $output);
+            $this->assertStringContainsString('primary_endpoint_presence=not_applicable', $output);
+            $this->assertStringContainsString('primary_credential_presence=not_applicable', $output);
+            $this->assertStringContainsString('queue_driver_id=q07', $output);
+            $this->assertStringContainsString('target_capability_id=tc03', $output);
+            $this->assertStringContainsString('credential_values_output=false', $output);
+        } finally {
+            @unlink($envPath);
+            @rmdir($root);
+        }
+    }
+
+    public function test_g5_primary_mailer_remote_programs_are_read_only_and_secret_safe(): void
+    {
+        $source = (string) file_get_contents(base_path(
+            'deployment/g5-target-environment/diagnose-primary-mailer.php'
+        ));
+        $target = (string) file_get_contents(base_path(
+            'deployment/g5-target-environment/inspect-primary-mailer-target-capability.sh'
+        ));
+
+        foreach ([
+            "PRIMARY_MAILER_SOURCE_ENV = '/home/xs257823/rise-gate.com/rise-gate-os/.env'",
+            'primary_mailer_name_output=false',
+            'credential_values_output=false',
+            'account_mail_value_source=derived_in_memory',
+            'queue_runtime_readiness=deferred_application_release_gate',
+            'production_change_scope=none_read_only_source',
+        ] as $required) {
+            $this->assertStringContainsString($required, $source);
+        }
+        foreach ([
+            'file_put_contents', 'unlink(', 'rename(', 'mkdir(', 'rmdir(', 'chmod(', 'chown(',
+            'shell_exec', 'exec(', 'system(', 'passthru(', 'proc_open(', 'curl_', 'mysqli_', 'PDO(',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $source);
+        }
+        foreach ([
+            "EXPECTED_HOME='/home/xs377816'",
+            "EXPECTED_UID='20046'",
+            "EXPECTED_GID='1000'",
+            '[ -x /usr/sbin/sendmail ]',
+            'function_exists("proc_open")',
+            'production_change_scope=none_read_only_target',
+            'secret_output=false',
+        ] as $required) {
+            $this->assertStringContainsString($required, $target);
+        }
+        $this->assertDoesNotMatchRegularExpression('/(?m)^\s*(mkdir|rm|rmdir|mv|cp|ln|chmod|chown|touch|tee)\b/', $target);
+    }
+
+    public function test_g5_primary_mailer_helper_is_one_shot_conditional_target_and_value_safe(): void
+    {
+        $helper = (string) file_get_contents(base_path(
+            'deployment/g5-target-environment/Invoke-G5PrimaryMailerDiagnostic.ps1'
+        ));
+        foreach ([
+            'g5-primary-mailer-diagnostic-v1',
+            'PRIMARY_MAILER_DIAGNOSTIC_ATTEMPT_ALREADY_RECORDED',
+            'production-g5-primary-mailer-diagnostic-$Candidate',
+            'Assert-RequiredDiagnosticEvidence',
+            '570d8d67eb5a035b5c92ede17c5f42fd6fafa65e6de49d73385201bedaacae47',
+            "'php','--',\$Confirmation,\$SourceEnv",
+            "if (\$source.target_capability_id -ne 'tc00')",
+            "'sh','-s','--',\$Confirmation,\$source.target_capability_id",
+            'raw_output_stored=$false',
+            'secret_values_output=$false',
+            'primary_mailer_name_output=$false',
+            'credential_values_output=$false',
+            'production_mutation=false',
+            'shared_state_created=false',
+            'queue_runtime_readiness=deferred_application_release_gate',
+            'PENDING_G5_PUBLIC_ENTRY_GATE',
+            '[IO.File]::Replace($temporaryPath, $Path, $backupPath)',
+        ] as $required) {
+            $this->assertStringContainsString($required, $helper);
+        }
+        foreach (['scp.exe', 'Invoke-WebRequest', 'curl.exe', 'mysql.exe', 'php artisan', 'shared/.env', 'shared/storage'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $helper);
+        }
+        $processStart = strpos($helper, 'if (-not $process.Start())');
+        $connectionObserved = strpos($helper, '$script:ConnectionAttempted = $true');
+        $sourceInvocation = strpos($helper, '$sourceResult = Invoke-Native $ssh.Source');
+        $sourceMetadata = strpos($helper, "Record-StepMetadata 'source_primary_mailer_diagnostic'", $sourceInvocation);
+        $sourceParse = strpos($helper, '$source = Parse-SafeOutput $sourceResult.Stdout', $sourceInvocation);
+        $this->assertIsInt($processStart);
+        $this->assertIsInt($connectionObserved);
+        $this->assertIsInt($sourceInvocation);
+        $this->assertIsInt($sourceMetadata);
+        $this->assertIsInt($sourceParse);
+        $this->assertLessThan($connectionObserved, $processStart);
+        $this->assertLessThan($sourceInvocation, $connectionObserved);
+        $this->assertLessThan($sourceParse, $sourceMetadata);
+    }
+
+    public function test_g5_primary_mailer_helper_verify_only_is_production_free(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('The G5 Primary Mailer Human helper runs under Windows PowerShell.');
+        }
+        $evidenceRoot = base_path(
+            'storage/app/release-audit/production-g5-primary-mailer-diagnostic-'.self::CANDIDATE
+        );
+        $this->assertDirectoryDoesNotExist($evidenceRoot);
+
+        $process = new Process([
+            'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+            base_path('deployment/g5-target-environment/Invoke-G5PrimaryMailerDiagnostic.ps1'),
+            '-VerifyOnly',
+        ], base_path());
+        $process->setTimeout(30);
+        $process->mustRun();
+        $output = $process->getOutput();
+
+        $this->assertStringContainsString('G5_PRIMARY_MAILER_DIAGNOSTIC_VERIFY_ONLY=PASS', $output);
+        $this->assertStringContainsString('account_mail_binding=primary_exact', $output);
+        $this->assertStringContainsString('primary_mailer_name_output=false', $output);
+        $this->assertStringContainsString('credential_values_output=false', $output);
+        $this->assertStringContainsString('production_connection_attempted=false', $output);
+        $this->assertStringContainsString('source_connection_attempted=false', $output);
+        $this->assertStringContainsString('target_connection_attempted=false', $output);
+        $this->assertStringContainsString('production_mutation=false', $output);
+        $this->assertStringContainsString('diagnostic_operation=not_executed', $output);
         $this->assertDirectoryDoesNotExist($evidenceRoot);
     }
 }
