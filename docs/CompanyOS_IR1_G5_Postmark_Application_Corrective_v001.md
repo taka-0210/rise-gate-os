@@ -62,3 +62,45 @@ Actual Postmark Webhook verification performs external HTTP requests. It must wa
 `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE`; usable backup, DB restore readiness, storage final delta, Queue runtime, Candidate/refreeze, Release binding, Sender/DNS/SSL and Shared State remain open.
 
 References: [Laravel Postmark API transport](https://laravel.com/docs/12.x/mail), [Postmark Webhook security/retry](https://postmarkapp.com/developer/webhooks/webhooks-overview), [Postmark Spam Complaint payload](https://postmarkapp.com/developer/webhooks/spam-complaint-webhook).
+
+## Continuation: DNS verification and downstream preparation — 2026-10-10 JST
+
+This section is a later disposition. Earlier Application Corrective observations and frozen contracts above are retained; their historical flags are not rewritten as current remote observations.
+
+### Human Evidence carried forward
+
+- Dedicated Server: `Company OS Production`, non-secret Server ID `21093973`, type Live. Stream: `Account Lifecycle`, exact ID `account-lifecycle`, Transactional. Initial Server unchanged. Account sending approval remains unconfirmed/test mode as reported; Live Server type is not sending authorization.
+- Adopted Sending Domain: `mail.company-os.jp`; From: `no-reply@mail.company-os.jp`; Return-Path: `pm-bounces.mail.company-os.jp`.
+- Human reports adding only DKIM TXT and Return-Path CNAME in the `company-os.jp` zone, TTL 3600. No intentional existing-record edit/deletion. No Verify, send or Token operation.
+- Wildcard dependency was accepted by Human for the system-mail-only namespace. Known existing use was not identified; absence of all unknown integrations was not claimed. Future corporate-mail clients must not use this namespace as their SMTP/IMAP/POP endpoint.
+- Independent Postmark-value comparison by Human: **NOT REPORTED / UNKNOWN** for both records. Before/after full DNS inventory comparison: **NOT REPORTED / UNKNOWN**. Exact input reported by Human is not substituted for independent comparison.
+
+### Latest read-only observation
+
+| Record | Xserver ns1–ns5 | Cloudflare DNS-over-HTTPS | Google DNS-over-HTTPS |
+| --- | --- | --- | --- |
+| `20261008224642pm._domainkey.mail.company-os.jp` TXT | One RR each, TTL 3600, values mutually equal | One RR, equal to ns1 | Status 0, zero target TXT RRs; not equal |
+| `pm-bounces.mail.company-os.jp` CNAME | One RR each, TTL 3600, values mutually equal | One RR, equal to ns1 | One RR, equal to ns1 |
+
+TXT segments were concatenated in memory; CNAME comparison normalizes case and final dot. No record values, fingerprints, raw DNS packets or HTTP response bodies are printed or stored. Only comparison outcomes/counts are retained. Source-value equality is deliberately UNKNOWN because the Human-held source was not provided to this process.
+
+Both `company-os.jp` and `app.company-os.jp` return one A RR and zero CNAME RRs through ns1, 1.1.1.1 and 8.8.8.8. These counts are consistent with earlier observations; this does not establish exact before/after value equality or all-zone non-mutation. There is no pre-change full-zone snapshot available to the assistant. No zone transfer or Production HTTP/SSH/SMTP connection was attempted.
+
+**DNS Read-only Verification: PARTIAL.** Google DKIM non-agreement persists. Cache, propagation or any other cause is not established. Do not re-add, edit, delete or rotate DNS/Domain records to resolve this observation. A later read-only recheck needs no new mutation gate. Human source-value/inventory comparisons may be completed while this observation remains pending.
+
+### Production-free dependency plan completed
+
+1. **Sender verification:** retain exact Domain/From/Return-Path binding. Once DNS resolver agreement and Human value comparison are established, present the existing Postmark Verify gate, limited to DKIM and Return-Path verification for this Domain. That operation remains unapproved. A successful Domain verification does not prove mailbox existence, Account Email Verification, sending approval or delivery readiness. No extra individual Sender Signature is automatically required or created.
+2. **Account Email Verification UNKNOWN:** keep the previously identified pending condition. Use available non-mutating Account/Profile evidence or a Human support response to establish whether a distinct requirement exists and, if required, whether it is satisfied. Existing login/MFA/Sender activation alone is not promoted to confirmation. No automatic email resend, profile change or new gate solely for reading status. Resolve at Credential/sending readiness review as already agreed; do not block unrelated local design work.
+3. **Credential binding:** future intake must bind only the dedicated Server API Token to Server `21093973`; Application uses `MAIL_MAILER=postmark`, `ACCOUNT_MAIL_MAILER=postmark`, `POSTMARK_MESSAGE_STREAM_ID=account-lifecycle` and the adopted From identity. Never inherit the unsafe Legacy mailer or use an Account API Token. The process must accept secrets without terminal/history/Evidence output and return only sanitized validation outcomes. No Token display/copy/intake or authenticated Provider request is authorized now. A token's mere presence is not proof of Server ownership or runtime readiness.
+4. **Shared State Corrective:** original 172-key frozen allowlist and initial/Corrective1 attempts remain immutable/exhausted. Required `rk11` remains required on NewTarget and is target-bound to `postmark`; source-only requiredness reconciliation follows the approved design, not an unreviewed fallback. A future separate generation must bind its candidate manifest, additional Postmark/Webhook keys, source/storage inventory, seed/checksum/final delta, owner/readability and `0600` environment permission. It cannot create state until the required Provider/Sender/DNS/Credential dependencies and existing backup/restore constraints are satisfied.
+5. **Application/Candidate:** reuse the 106-test / 1,476-assertion focused corrective Evidence above. Current correction is not part of Frozen RC `924af91188cc60d33ff87c91b94ecc1d539566e6`. Candidate review must bind the application delta, lockfile and additive ledger migration. Do not silently refreeze, apply a migration, or alter old deployment manifests.
+6. **Queue / ledger / Webhook:** local dedupe, 429 retry, ambiguous no-resend, authenticated Webhook reconciliation and JST tests are already evidenced. Actual Queue worker supervision, jobs/failed-jobs/schema, worker timeout/retry_after, and runtime permissions remain unverified. Webhook stays disabled until its HTTPS route, Basic Auth, current provider IP allowlist, ServerID/Stream and test-ledger fixture are explicitly bound. Provider Webhook Test/Verify, send and real delivery smoke require their existing runtime gates; no live runtime PASS is inferred from local tests.
+
+### Next review and continuing blockers
+
+Next review combines a further authorized read-only DNS recheck with Human comparison outcomes. No recurring schedule was created and no mutation is authorized. If those conditions pass, present **ONE POSTMARK DOMAIN AUTHENTICATION VERIFY / HUMAN ONLY**: check only this Domain's DKIM/Return-Path, report booleans/statuses, stop on failure without retry/edit/rotation, and do not send mail or touch Token/Webhook/Account approval. This is preparation of the already-required Verify boundary, not its execution or approval.
+
+G5 overall remains **OPEN / DEPLOY NO-GO**. Account verification UNKNOWN, usable backup/restore, public-entry disposition, Shared State creation, storage final delta, Candidate/release binding, runtime Queue/Webhook/ledger readiness, SSL and existing security/regression findings remain unresolved. `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE` is unchanged.
+
+This continuation changes documentation only. No Production/Provider management operation, DNS mutation, Postmark Verify, send, Token operation, Shared State change, operational migration, Deploy, public entry or SSL change was performed. DNS inquiries were the only external target-related reads. No new runtime regression is claimed; existing validated code Evidence is reused.
