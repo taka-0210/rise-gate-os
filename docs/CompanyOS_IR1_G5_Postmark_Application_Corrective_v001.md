@@ -128,3 +128,36 @@ For a future recurrence, all-authority agreement plus independent resolver agree
 Next required input remains the already-requested Human source-value and inventory comparison outcomes. No new Human Gate is added. Postmark Verify, sending, Token operations, Shared State and Deploy remain unapproved. Account Email Verification UNKNOWN, backup/restore blockers and `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE` remain unchanged. **G5 OPEN / DEPLOY NO-GO**.
 
 Diagnostic reference: [Google JSON DoH parameters and response flags](https://developers.google.com/speed/public-dns/docs/doh/json). No Application/runtime code or immutable frozen contract changed; this is documentation of read-only investigation only.
+
+## Human Domain Authentication completion disposition — 2026-10-10 JST
+
+Review base HEAD: `3c0b576dfd0f47abda972c95e6f971669cb43cd5`. This additive disposition preserves all preceding observations and immutable contracts. No new DNS or Provider query was performed for this review.
+
+### Formal evaluation
+
+**DNS READ-ONLY VERIFICATION / FORMAL PASS (bounded scope).** Human independently confirmed both Postmark/Xserver values exactly match without sharing or saving values. Human compared the management-plane inventory: existing A 3, MX 1, SPF TXT 1, NS 5 and existing DKIM TXT 4 retained; only the approved TXT and CNAME were added, with no unexpected Hostname/type. Combine these reports with the preceding five-authority / Cloudflare / Google agreement. Existing-record before/after value equality remains **UNVERIFIED**; this is not an all-zone invariance certification. No contrary observation requires reopening this bounded verification.
+
+**ONE POSTMARK DOMAIN AUTHENTICATION VERIFY / FORMAL PASS.** Human reports the exact Sending Domain `mail.company-os.jp`, DKIM Verified, Return-Path Verified and authenticated Domain display. This is Human management-plane Evidence, not an independently retrieved Provider response. Human reports no DNS edit, send, Token operation, Shared State, Migration or Deploy in this step. The adopted From identity remains `no-reply@mail.company-os.jp`; verification does not establish receipt, successful delivery or Account sending approval.
+
+### Production-free downstream reconciliation completed
+
+- Sender/DNS prerequisites are now closed at their stated scope. Do not repeat registration, DNS application or Verify merely to advance another gate.
+- Bind future credential validation to dedicated Server `21093973` and Transactional Stream `account-lifecycle`; bind Primary and Account Mailer to `postmark`. Credential must be a Server API Token, not an Account API Token or a Legacy credential. The token's presence/Server ownership is still unverified.
+- Existing deployment workflow uses the GitHub `production` Environment. Proposed protected intake destination is its Environment Secret `POSTMARK_API_KEY`; this is a proposal, not a created secret or an implemented transfer path. Existing workflow does not establish Postmark credential transfer to Shared State. No workflow execution/change is authorized by this review.
+- Before an executable credential-intake command is offered, locally verify its protected input/output path, fixed endpoint/TLS/no-redirect/timeouts, sanitized status-only projection and absence of secret-bearing logs/artifacts. Authenticated Provider read validation needs its own explicit approval; it must never persist a raw response that could contain tokens. Do not ask Human to paste credentials into chat, shell arguments or Evidence. No such helper is claimed complete in this documentation-only review.
+- Shared State remains blocked on candidate/application/migration/environment reconciliation and credential/runtime/backup dependencies. Frozen RC `924af91188cc60d33ff87c91b94ecc1d539566e6`, original 172-key contract and exhausted Shared State attempts are unchanged. `rk11` remains NewTarget-required. No new generation is executed.
+- Reuse recorded local Account ledger/dedup/retry/Webhook tests; do not promote them to actual Queue, Webhook, migration, sending or restore readiness. DMARC policy, account sending approval/test mode, runtime Queue and enabled Webhook remain separate unresolved dependencies.
+
+### Next Human Gate proposal — not authorization
+
+**ONE POSTMARK SERVER API TOKEN / SECRET-SAFE INTAKE** is the next credential boundary, not another DNS gate. Proposed Human operation: after approval and protected intake verification, select only `Company OS Production` / Server `21093973`, obtain its Server API Token and store it directly in the approved protected Secret destination. Never report its value. Do not rotate/delete existing tokens, use an Account API Token, change Sender/DNS/Webhook, approve sending, send a message or run deployment. Report only protected storage completion and the non-secret Server ID.
+
+STOP before token access if the selected Server differs, the protected destination/access policy is unconfirmed, a UI action changes other configuration, or secret-safe handling cannot be maintained. No retry/rotation is implicitly authorized. Token-to-Server verification and Shared State consumption remain separately bound and unexecuted.
+
+Account Email Verification remains **UNKNOWN**, independently of Sender authentication. Before approving this credential Gate, Human + ChatGPT must review that retained dependency using non-mutating Account/Profile information or a support response; do not silently waive it or request another verification email automatically. Preparation may continue without resolving it, but this document does not authorize credential access while that readiness review is outstanding.
+
+### Continuing status and verification
+
+**G5 OPEN / DEPLOY NO-GO.** Usable backup / DB restore readiness, storage final delta, Shared State, candidate/release/migration binding, credential binding, actual sending approval, Queue/Webhook/ledger runtime readiness, SSL and previously recorded security/regression findings remain open. `PUBLIC_ENTRY_PREEXISTING_CONTENT_DISPOSITION=PENDING_G5_PUBLIC_ENTRY_GATE` remains unchanged.
+
+Documentation-only delta: existing 106 tests / 1,476 assertions focused PASS reused; no new test run or full-suite PASS claimed. Validate this delta with `git diff --check`. No new Production/Provider/DNS connection, secret intake, Production mutation, operational migration or Deploy occurred. Unrelated Human files are preserved. The delivery report identifies the resulting documentation commit.
