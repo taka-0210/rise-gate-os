@@ -1,0 +1,26 @@
+{
+  "status": "CO LIVE AI SMOKE TEST / HUMAN PASS / FORMAL CLOSED",
+  "scope": "One local text-only connectivity, response display and persisted history smoke; not meeting quality, company-context accuracy, Limited Context Product close or Release Candidate approval",
+  "date_jst": "2026-10-11",
+  "implementation_head": "dacfeff984c3d3ecfb53abdd696584114ee105bf",
+  "authority": "Human explicitly approved Gate, performed the send, supplied response screenshot and reported reload persistence PASS",
+  "target": {"organization_id": 4, "user_id": 5},
+  "approved_contract": {"model": "gpt-5.6-terra", "max_provider_attempts": 2, "max_completion_tokens_per_attempt": 2048, "timeout_seconds_per_attempt": 30, "human_questions": 1, "context": "New empty Shared room, neutral non-confidential purpose, no selected documents/history/audio Session", "consent": "Organization AI and common_entry only; all other permissions remain OFF under approved gate"},
+  "human_observation": {"real_provider_answer": "PASS", "state": "answer_ready / published", "question_answer_display": "PASS", "browser_reload_history": "PASS", "additional_questions": 0},
+  "verification_limits": {"basis": "Human report and supplied screenshot; no new provider calls or local DB query performed for this record", "actual_provider_attempt_count": "UNKNOWN; maximum 2 is contract, not measured execution count", "actual_tokens_and_billed_cost": "UNKNOWN; reference estimate is not billing Evidence", "actual_outbound_payload_audit": "Not independently captured; no raw payload stored", "consent_persistence_audit": "Not independently queried after Human operation; no auto-changes by Codex"},
+  "nonblocking_observation": {"assistant_label": "Author未記録 in screenshot", "disposition": "Presentation issue pending investigation; does not prevent the narrowly scoped response/history smoke close. AI author label should be corrected or dispositioned before broader Human meeting acceptance."},
+  "reused_verification": "42 tests / 176 assertions PASS including removed temporary diagnostic HTTP 404; Pint PASS. No runtime change in this documentation-only update, so no repeat full regression.",
+  "next_context_review": {
+    "status": "PROPOSAL ONLY / NOT AUTHORIZED",
+    "minimum": "Start with one department and one bounded request; expand to three-department scenarios only after the first reference check is accepted",
+    "human_decisions_needed": ["Target Annual period and exact approved Revision", "First target department and its policy in that approved Snapshot", "Approved View for every actual participant, including explicitly shared Planning if applicable", "Explicit company_management category and parent Annual document AI consent; do not enable unrelated categories/documents", "Exact non-confidential evaluation question and understood provider data disclosure", "Bounded request count, completion cap and updated input-inclusive reference cost"],
+    "checks": ["Reader versus CO period/department/Revision/source consistency", "Correct statements, no invented source or Draft", "Planning not misrepresented as currently effective", "Human decisions versus proposals/unresolved matters", "No automatic Project/Action writes"],
+    "safety": "New isolated Shared room, explicit source selection, no audio, no reused smoke history. Do not run real-provider negative permission experiments or change business permissions without separate approval. Existing Fake-provider safety Evidence retained. If approved content exceeds existing context limit, STOP rather than truncate.",
+    "remaining": "Real policy reference accuracy, three-department meeting quality, physical tablet operation and known eleven regression failure impact resolution remain pending. No new RC or Product Formal Close implied."
+  },
+  "codex_additional_provider_calls": 0,
+  "codex_consent_or_db_changes": 0,
+  "production_operations": 0,
+  "g5": "OPEN",
+  "deploy": "NO-GO"
+}
