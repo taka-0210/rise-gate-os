@@ -47,6 +47,7 @@ class AiCommonSourceManifest
         private readonly BusinessDomainAccess $domains,
         private readonly CaptureAccess $captures,
         private readonly AiCommonAttachmentAccess $attachments,
+        private readonly AiCommonManagementContext $management,
     ) {}
 
     public function select(User $actor, Organization $organization, AiCommonConversation $conversation, string $type, string $publicId, string $reason): AiCommonSource
@@ -218,11 +219,12 @@ class AiCommonSourceManifest
             $actor,
             $organization,
             $category,
-            $type,
-            $publicId,
+            $resolved[5] ?? $type,
+            $resolved[6] ?? $publicId,
             $resolved[4] ?? null,
         );
-        $projection = $this->limitProjection($projection);
+        $projection = $this->limitProjection($projection, in_array($type, AiCommonManagementContext::TYPES, true)
+            ? self::MAX_CONTEXT_CHARS : self::MAX_SOURCE_CHARS);
         $membership = OrganizationUser::query()
             ->where('organization_id', $organization->id)
             ->where('user_id', $actor->id)
@@ -254,6 +256,7 @@ class AiCommonSourceManifest
     private function resolve(User $actor, Organization $organization, string $type, string $publicId, ?int $conversationId): array
     {
         return match ($type) {
+            'management_design', 'annual_management_policy', 'department_policy' => $this->management->resolve($actor, $organization, $type, $publicId),
             'project' => $this->project($actor, $organization, $publicId),
             'action' => $this->action($actor, $organization, $publicId),
             'business_domain' => $this->domain($actor, $organization, $publicId),
@@ -388,10 +391,10 @@ class AiCommonSourceManifest
         return [(int) $organizationPolicy->version, (int) $resource->version];
     }
 
-    private function limitProjection(array $projection): array
+    private function limitProjection(array $projection, int $limit = self::MAX_SOURCE_CHARS): array
     {
         $encoded = json_encode($projection, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if (mb_strlen((string) $encoded) > self::MAX_SOURCE_CHARS) {
+        if (mb_strlen((string) $encoded) > $limit) {
             throw ValidationException::withMessages(['source' => 'The selected source exceeds the source context limit.']);
         }
 

@@ -216,8 +216,13 @@ class AiCommonSharedCoWriter
             $longMessages = $this->longContext->contextForRequest($actor, $organization, $conversation, $session, $query, $checkpoint)['messages'];
         }
 
+        $meetingInstructions = [];
+        if (collect($sources)->contains(fn ($source) => in_array($source['type'], AiCommonManagementContext::TYPES, true))) {
+            $meetingInstructions[] = ['role' => 'system', 'content' => '会社の正式方針を参照する会議支援です。提供された出典・年度・部署・Revisionだけを根拠に、論点、決定済み事項、未決事項、次に人間が判断する事項を区別して整理してください。提案を決定済みと断定せず、方針との整合と不足情報を示してください。計画中の方針を現在有効と扱わないでください。最終判断とProject/Action登録は人間が行います。過去の全発言を保持していると主張せず、必要なら最新の決定・未決メモを求めてください。'];
+        }
+
         return [
-            'messages' => array_merge([['role' => 'system', 'content' => 'Shared Conversation purpose: '.$purpose->purpose]], $longMessages, $history['messages']),
+            'messages' => array_merge([['role' => 'system', 'content' => 'Shared Conversation purpose: '.$purpose->purpose]], $meetingInstructions, $longMessages, $history['messages']),
             'sources' => $sources,
             'source_ids' => $selected->pluck('id')->all(),
             'revision_ids' => $revisions->pluck('id')->all(),

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AiResourcePolicy;
 use App\Models\OrganizationAiPolicy;
 use App\Services\AiCommon\AiCommonAccess;
+use App\Services\AiCommon\AiCommonManagementContext;
 use App\Services\AiCommon\AiCommonPolicyWriter;
 use App\Services\AiCommon\AiCommonResourcePolicyWriter;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +22,7 @@ class AiCommonPolicyController extends Controller
         return view('ai-common.policy', [
             'policy' => OrganizationAiPolicy::query()->where('organization_id', $organization->id)->first(),
             'resourcePolicies' => AiResourcePolicy::query()->where('organization_id', $organization->id)->latest('id')->get(),
+            'managementDocuments' => app(AiCommonManagementContext::class)->catalogue($request->user(), $organization),
         ]);
     }
 

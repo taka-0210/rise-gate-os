@@ -23,6 +23,7 @@ class AiCommonResourcePolicyWriter
         private readonly ProjectExecutionAccess $projects,
         private readonly BusinessDomainAccess $domains,
         private readonly CaptureAccess $captures,
+        private readonly AiCommonManagementContext $management,
     ) {}
 
     public function update(User $actor, Organization $organization, string $type, string $publicId, bool $allows): AiResourcePolicy
@@ -48,6 +49,11 @@ class AiCommonResourcePolicyWriter
 
     private function authorizeResource(User $actor, Organization $organization, string $type, string $publicId): void
     {
+        if (in_array($type, ['management_design', 'annual_management_policy'], true)) {
+            $this->management->resolve($actor, $organization, $type, $publicId);
+
+            return;
+        }
         $allowed = match ($type) {
             'project' => $this->projects->canManageStructure($actor, Project::query()->where('organization_id', $organization->id)->where('public_id', $publicId)->firstOrFail()),
             'action' => $this->projects->canEditAction($actor, Task::query()->where('organization_id', $organization->id)->where('public_id', $publicId)->firstOrFail()),

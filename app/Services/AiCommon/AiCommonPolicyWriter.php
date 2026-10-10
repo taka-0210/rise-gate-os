@@ -18,6 +18,7 @@ class AiCommonPolicyWriter
         OrganizationAiPolicy::CATEGORY_DOMAIN,
         OrganizationAiPolicy::CATEGORY_CAPTURE,
         OrganizationAiPolicy::CATEGORY_ATTACHMENT,
+        OrganizationAiPolicy::CATEGORY_MANAGEMENT,
     ];
 
     public function __construct(private readonly AiCommonAccess $access) {}

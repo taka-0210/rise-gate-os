@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "status": "CO MEETING LIMITED CONTEXT / HUMAN PRODUCT REVIEW",
+  "review_date_jst": "2026-10-10",
+  "implementation_base_head": "401ba448ed2487accc7ef53d9e5e68c3466da89d",
+  "exact_commit_binding": "The Git commit containing this Evidence and implementation is the implementation identity; it is not a Release Candidate freeze.",
+  "human_decision": {
+    "organization_category": "company_management",
+    "label": "会社の経営指針",
+    "default": "OFF",
+    "inherit_existing_consent": false,
+    "owner_view_bypass": false,
+    "reader_access_is_ai_consent": false,
+    "document_types": ["management_design", "annual_management_policy"],
+    "department_consent": "Requires parent annual document consent and current Approved View; no independent department consent",
+    "publication": "Human-controlled; period start does not change sharing"
+  },
+  "implementation": {
+    "source_types": ["management_design", "annual_management_policy", "department_policy"],
+    "management_design": "Existing immutable active saveOfficial Revision, not a new approval lifecycle",
+    "annual_and_department": "Existing immutable approved Snapshot only; no draft mode or unapproved department lookup",
+    "department_selector": "annual public ULID:approved department public ULID; parent document permission is canonical",
+    "metadata": ["period", "fiscal term", "department name at approval", "revision_no", "content_hash", "exact revision source_url", "effective_status", "Asia/Tokyo"],
+    "sharing": "Existing Shared audience intersection, membership/credential epochs, document view, organization and document AI policy, source version/fingerprint",
+    "reauthorization": ["selection", "before each provider attempt", "before publication", "history reuse"],
+    "ux": "Existing AI Policy screen: organization switches and view-authorized official document permit list. Existing CO screen: named document selection, permit status, source/revision display, explicit text request with checked sources. No public ID typing for these documents.",
+    "meeting": "One department room on one logged-in device; no audio/session/realtime requirement. CO receives meeting purpose and instructions to distinguish issues, decisions, unresolved matters and Human judgments.",
+    "long_meeting": "Explicitly checked official sources are reauthorized and supplied each request independently of recent-message history. Existing last-10/12000-character text history remains bounded. Human maintains latest decision/unresolved notes; no all-history memory guarantee.",
+    "limits": "Existing 20 sources and 20000-character total context limit retained. Management documents may use the total limit rather than the legacy 2000-character per-source limit. No silent truncation; overflow stops. Unrelated source limits unchanged.",
+    "schema": "No migration required: existing resource-type string, public-id string and JSON policy/projection/revision columns are reused. Repository migration count remains 114.",
+    "automatic_business_writes_added": false
+  },
+  "verification": {
+    "new_focused": {"passed": 15, "assertions": 46, "fixture": "SQLite memory, Fake Provider; includes three browser-export directory guard assertions"},
+    "final_connected_regression": {"passed": 119, "failed": 0, "assertions": 760, "duration_seconds": 38.07, "execution": "sequential after full suite"},
+    "full_regression": {"passed": 818, "skipped": 17, "failed": 11, "assertions": 7437, "duration_seconds": 529.70, "verdict": "NOT FULL PASS"},
+    "full_failure_disposition": [
+      {"class": "CompanyNavigationTest", "count": 1, "disposition": "Previously recorded stale forbidden intended-URL expectation; unrelated source/test unchanged"},
+      {"class": "Ir1G2PreflightV2ExecutionTest", "count": 7, "disposition": "Previously recorded pre-execution absence assumption conflicts with preserved immutable corrective execution Evidence; no Evidence deletion or alteration"},
+      {"class": "ScopeNineActionExecutionTest", "count": 3, "disposition": "Previously recorded execution/current-time fixture symptoms; unchanged. No claim these are repaired or release-ready"}
+    ],
+    "baseline_reference": "docs/CompanyOS_IR1_G5_Postmark_Application_Corrective_v001.md, full regression classification; its ReleaseHardening migration-count failure no longer appears in this run",
+    "parallel_test_observation": "An overlapping focused/full invocation produced two S11 Delta B P5 temporary-audio integrity failures. Both use Storage::fake(ai_common_temporary_audio); Laravel clears the same disk root without a ParallelTesting token. Full suite P5 passed; subsequent non-overlapping final focused suite passed. Do not overlap these suites. No production audio or product data was used.",
+    "browser": {
+      "mode": "Offline Chrome, actual Blade responses from synthetic HTTP test fixture; requests aborted and scripts removed. Layout/form presence verification, not a live-provider browser journey",
+      "screens": ["AI Policy", "Shared CO text meeting"],
+      "widths": [1440, 1024, 768, 390],
+      "passed": 8,
+      "horizontal_overflow": 0,
+      "result_sha256": "bcb511d0b90cc73203ac94decf0a09ed97ff2b90d248abdc6a3969c89ef895ed",
+      "synthetic_artifacts": "C:/Users/takaf/AppData/Local/Temp/company-os-co-meeting-44ce528a58ce4497a83cd6bcf2b50374"
+    },
+    "pint": "PASS",
+    "git_diff_check": "PASS",
+    "production_connections": 0,
+    "real_ai_provider_calls": 0
+  },
+  "pending": [
+    "Human Product Review of permit configuration and department meeting flow",
+    "Separately authorized real AI Provider credential/model/consent and response-quality rehearsal",
+    "Real PC/tablet meeting rehearsal, including physical audience authorization",
+    "Actual meeting document size/context-limit suitability; no real company data was queried in this implementation",
+    "First Release Candidate composition, compatibility acceptance and freeze are separate Human Decisions"
+  ],
+  "done_review": {
+    "new_default_off_category_and_document_consent": "PASS",
+    "no_legacy_category_inheritance_or_owner_bypass": "PASS",
+    "philosophy_vision_company_policy_official_revision": "PASS",
+    "approved_annual_department_and_planning_explicit_sharing": "PASS",
+    "draft_exclusion_and_organization_boundary": "PASS",
+    "complete_shared_audience_authorization": "PASS",
+    "consent_loss_during_provider_io_discard": "PASS",
+    "history_reauthorization_and_revision_reselection": "PASS",
+    "late_text_turn_official_source_retention": "PASS_SYNTHETIC",
+    "meeting_response_quality": "PENDING_REAL_PROVIDER_AND_HUMAN",
+    "reader_relation_connected_regression": "PASS",
+    "mobile_tablet_layout": "PASS_OFFLINE_RENDER",
+    "full_repository_regression": "KNOWN_FAILURES_RETAINED_NOT_FULL_PASS"
+  },
+  "protected_boundary": {
+    "frozen_rc": "924af91188cc60d33ff87c91b94ecc1d539566e6",
+    "frozen_rc_changed": false,
+    "scope34_g5": "OPEN",
+    "deploy": "NO-GO",
+    "production_mutation": false,
+    "production_migration": false,
+    "new_rc_assembly_or_freeze": false,
+    "github_protection_or_secret_operation": false,
+    "existing_g5_evidence_changed": false,
+    "scope35_36_full_implementation": false,
+    "scope37_voice": false
+  }
+}

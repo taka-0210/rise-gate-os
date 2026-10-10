@@ -3,6 +3,7 @@
 @section('title', $conversation->title.' - Shared Conversation')
 
 @section('content')
+@if($conversation->status === 'active')<p><a href="#co-text-meeting">テキスト会議へ（音声の準備は不要です）</a></p>@endif
 @include('ai-common._shared-session')
 <style>
 .shared-wrap{max-width:900px;margin:auto}.shared-card{background:#fff;border:1px solid #d7e1e5;border-radius:14px;padding:18px;margin:14px 0}.shared-row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}.shared-message{border-left:4px solid #24576a}.shared-muted{color:#64748b}.shared-card input,.shared-card textarea,.shared-card select{width:100%;box-sizing:border-box}.shared-state-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.shared-state-grid div{border:1px solid #d7e1e5;border-radius:10px;padding:8px}.shared-state-grid dt{font-size:.8rem;color:#64748b}.shared-state-grid dd{margin:4px 0 0}.shared-context-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:20rem;overflow:auto}.shared-waveform{width:100%;height:96px;background:#0f172a;border-radius:10px}.shared-partial{min-height:1.5rem;color:#475569;font-style:italic}.shared-durable-finals{padding-left:1.5rem}.shared-realtime-states dd{overflow-wrap:anywhere}@media(max-width:390px){.shared-card{padding:14px}.shared-row form,.shared-row button{width:100%}.shared-state-grid{grid-template-columns:1fr 1fr}}@media(prefers-reduced-motion:reduce){.shared-presence *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
@@ -23,12 +24,14 @@
 <article class="shared-card shared-message">
     <strong>{{ $message->sharedAuthor?->author?->name ?? 'Author未記録' }}</strong>
     <p style="white-space:pre-wrap">{{ $message->content }}</p>
+    @include('ai-common._management-citations')
     <small>{{ $message->created_at->timezone('Asia/Tokyo')->format('Y/m/d H:i') }} JST</small>
 </article>
 @endif
 @endforeach
 
 @if($conversation->status === 'active')
+@include('ai-common._management-context')
 <form class="shared-card" method="post" action="{{ route('ai-common.shared.human-messages.store', $conversation) }}">
     @csrf
     <input type="hidden" name="operation_id" value="{{ Str::uuid() }}">

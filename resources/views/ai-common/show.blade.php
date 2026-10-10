@@ -20,6 +20,7 @@
     <article class="co-panel co-message {{ $row['message']->role === 'user' ? 'co-message--user' : '' }} {{ !$row['visible'] ? 'co-revoked' : '' }}">
         <strong>{{ $row['message']->role === 'user' ? 'あなた' : 'CO（AI回答）' }}</strong>
         @if($row['visible'])<p style="white-space:pre-wrap">{{ $row['message']->content }}</p>
+            @include('ai-common._management-citations')
             @foreach($row['sources'] as $source)<span class="co-source">{{ $source['type'] }} / {{ $source['handle'] }}</span>@endforeach
         @else<p>参照元の現在権限・Policy・版を確認できないため、この回答本文と次turnへの再投入を停止しました。</p>@endif
     </article>
@@ -27,6 +28,7 @@
 @include('ai-common._input')
 <section class="co-panel"><h2>Contextを明示選択</h2><p>全件探索はしません。Ownerでも他人のCaptureは選択できません。</p>
 @if($conversation->status === 'active')
+@include('ai-common._management-context')
 <form class="co-form-grid" method="post" action="{{ route('ai-common.sources.store',$conversation) }}">@csrf
 <label>Type<select name="resource_type"><option value="project">Project</option><option value="action">Action</option><option value="business_domain">Business Domain</option><option value="capture">Capture</option><option value="attachment_extract">Attachment Extract</option><option value="attachment_transcript">Attachment Transcript</option></select></label>
 <label>Public ID<input name="resource_public_id" required></label><label class="wide">選択理由<input name="selection_reason" maxlength="160" required></label><button type="submit">Contextへ追加</button></form>@endif
