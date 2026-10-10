@@ -6,6 +6,21 @@ use PHPUnit\Framework\TestCase;
 
 class PostmarkCredentialIntakeReadinessTest extends TestCase
 {
+    public function test_actual_destination_review_keeps_intake_closed_despite_account_dependency_approval(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $review = json_decode(file_get_contents($root.'/deployment/g5-target-environment/postmark-credential-destination-review.json'), true, 512, JSON_THROW_ON_ERROR);
+        $simulate = require $root.'/deployment/g5-target-environment/simulate-postmark-intake-readiness.php';
+        $this->assertTrue($review['account_dependency_review_approved']);
+        $this->assertSame('UNKNOWN', $review['account_email_verification']);
+        $this->assertFalse($review['protected_destination_confirmed']);
+        $this->assertSame('STOP', $simulate(['account_dependency_review_approved', 'protected_destination_confirmed'], $review)['result']);
+        $this->assertFalse($review['intake_gate_ready']);
+        $this->assertFalse($review['token_access_authorized']);
+        $this->assertSame(1299275262, $review['repository_id']);
+        $this->assertSame(18364212084, $review['environment_id']);
+    }
+
     public function test_every_required_check_fails_closed_for_missing_false_and_untrusted_values(): void
     {
         $root = dirname(__DIR__, 2);
