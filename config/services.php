@@ -52,6 +52,7 @@ return [
     ],
 
     'ai_common' => [
+        'max_completion_tokens' => env('AI_COMMON_MAX_COMPLETION_TOKENS', 2048),
         'timeout_seconds' => env('AI_COMMON_TIMEOUT_SECONDS', 30),
         'transcription_timeout_seconds' => env('AI_COMMON_TRANSCRIPTION_TIMEOUT_SECONDS', 60),
         'pdftotext_binary' => env('AI_COMMON_PDFTOTEXT_BINARY', 'pdftotext'),

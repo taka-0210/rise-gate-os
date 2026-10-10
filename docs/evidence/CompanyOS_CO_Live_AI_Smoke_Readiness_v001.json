@@ -1,0 +1,43 @@
+{
+  "status": "MINIMAL CORRECTIVE CODE COMPLETE / READINESS PARTIAL / HUMAN GATE WITHHELD",
+  "date_jst": "2026-10-11",
+  "base_head": "a2665c13799701651d3321c381e41b240b36f606",
+  "model": "gpt-5.6-terra",
+  "official_sources": ["https://developers.openai.com/api/docs/models/gpt-5.6-terra", "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create"],
+  "corrective": {
+    "parameter": "max_completion_tokens",
+    "default_and_hard_ceiling": 2048,
+    "scope": "Existing OpenAiCommonProvider only; includes reasoning and visible output tokens. No new model management, provider selection, conversation or meeting feature.",
+    "configuration": "AI_COMMON_MAX_COMPLETION_TOKENS; integer 1..2048, invalid values stop before transport",
+    "fail_closed": "finish_reason=length or reported completion_tokens above configured limit discards response using existing non-retryable provider_invalid_response",
+    "provider_attempts": "Existing gateway maximum 2 retained; invalid response stops without second attempt",
+    "timeout": "Local file-derived 30 seconds per attempt; not a total wall-clock bound",
+    "input_limits_unchanged": "Shared visible history last 10 messages / 12000 characters; selected source context max 20 sources / 20000 characters; new Shared purpose max 4000 characters; query max 4000 characters. Characters are not tokens; serialized source metadata/system instructions add overhead. Existing realtime checkpoint path is excluded from proposed first smoke."
+  },
+  "cost": {
+    "official_standard_usd_per_million": {"input": 2, "output": 12},
+    "formula_two_attempts": "2 * (estimated_input_tokens * 2 + 2048 * 12) / 1000000",
+    "example_if_input_1000_tokens_each": 0.053152,
+    "not_a_strict_total_cost_cap": true,
+    "limitations": "Input tokens not measured; possible cache-write/service-tier billing and unknown result after timeout. Completion cap cannot prevent input charges or refund charged failed attempts. Existing usage ledger price defaults 2.50/15.00 are not current model-specific official rates; left unchanged and not used as authoritative billing. Account access and key validity unverified.",
+    "human_budget": "Not yet approved; example is an estimate only, not a readiness acceptance condition"
+  },
+  "local_readiness": {
+    "file_config": "API key nonempty; model gpt-5.6-terra; no config cache; local URL and SQLite configuration observed. Secret values not printed or recorded.",
+    "effective_web_config": "UNKNOWN; CLI/file inspection does not establish Apache environment overrides or effective running Web configuration",
+    "organization_consent": "UNKNOWN; exact target actor/organization not provided. Sanitized read-only SQLite inspection stopped before successful query; SQLite3 extension unavailable. No DB writes or policy changes.",
+    "first_smoke_context": "Fresh Shared room, operator only, neutral non-confidential name/purpose, no selected sources, no prior messages/assistant source revisions, no audio/realtime session. Provider receives its system instructions, serialized empty sources, neutral room purpose and one user question; no automatic organization-wide retrieval.",
+    "existing_room_warning": "Deselecting sources does not remove history-associated source revisions. Do not reuse an existing business room.",
+    "persistence_conditions": "Authenticated active user with matching organization eligibility/membership, existing common_entry AI consent, Shared audience access, local DB/schema and storage/session availability. Initial question/request/state and usage ledger are written locally; successful response published after reauthorization. Failures can leave a saved user request with unavailable state.",
+    "verification_procedure_after_approval": "Human creates new empty local room, confirms zero sources/messages/session and non-confidential purpose; sends one approved question once, waits without reload/resend; records sanitized success/error, reopens same room to verify saved question/answer, then stops. Maximum two internal provider attempts, no manual retry.",
+    "gate": "WITHHELD until exact actor/organization consent, effective Web configuration, protected secret handling and Human cost approval are established"
+  },
+  "verification": {"focused_and_connected": "41 tests PASS / 175 assertions", "pint": "PASS", "diff_check": "PASS", "full_suite": "Not repeated for bounded provider payload/validation delta; existing 11 full-suite failures remain unresolved before new RC"},
+  "provider_calls": 0,
+  "production_connections": 0,
+  "secret_output": false,
+  "environment_or_consent_changes": false,
+  "migration_or_deploy": false,
+  "g5": "OPEN",
+  "deploy": "NO-GO"
+}

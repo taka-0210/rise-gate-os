@@ -17,10 +17,16 @@ class OpenAiCommonProvider implements AiCommonProvider
             throw new RuntimeException('provider_unavailable');
         }
         $model = (string) config('services.openai.chat_model');
+        $limit = filter_var(config('services.ai_common.max_completion_tokens', 2048), FILTER_VALIDATE_INT);
+        if ($model === '' || $limit === false || $limit < 1 || $limit > 2048) {
+            throw new RuntimeException('provider_invalid_response');
+        }
         $system = 'You are Company OS business_common. Use only the supplied source handles. '
             .'Never call tools or infer internal IDs. Return JSON with answer and citations (source handles only).';
         $payload = [
             'model' => $model,
+            // Includes reasoning tokens; not a bound on input tokens or total API cost.
+            'max_completion_tokens' => $limit,
             'messages' => [
                 ['role' => 'system', 'content' => $system],
                 ['role' => 'system', 'content' => json_encode(['sources' => $sources], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
@@ -32,6 +38,12 @@ class OpenAiCommonProvider implements AiCommonProvider
             ->post('https://api.openai.com/v1/chat/completions', $payload);
         if (! $response->successful()) {
             throw new RuntimeException('provider_error');
+        }
+        if ($response->json('choices.0.finish_reason') === 'length'
+            || (is_numeric($response->json('usage.completion_tokens'))
+                && (int) $response->json('usage.completion_tokens') > $limit)) {
+            // Never publish a truncated result or a provider-reported limit violation.
+            throw new RuntimeException('provider_invalid_response');
         }
         $decoded = json_decode((string) $response->json('choices.0.message.content'), true);
         if (! is_array($decoded) || ! is_string($decoded['answer'] ?? null)) {
