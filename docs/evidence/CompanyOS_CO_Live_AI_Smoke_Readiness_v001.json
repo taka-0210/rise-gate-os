@@ -1,5 +1,31 @@
 {
-  "status": "MINIMAL CORRECTIVE CODE COMPLETE / READINESS PARTIAL / HUMAN GATE WITHHELD",
+  "status": "LOCAL RUNTIME HUMAN VERIFICATION PASS / ONE HUMAN SMOKE GATE READY / NOT AUTHORIZED",
+  "human_runtime_verification": {
+    "sqlite_binding_match": true,
+    "user_id": 5,
+    "organization_id": 4,
+    "provider": "openai",
+    "provider_key_present": true,
+    "model": "gpt-5.6-terra",
+    "max_completion_tokens": 2048,
+    "timeout_seconds": 30,
+    "organization_ai_enabled": false,
+    "common_entry_enabled": false,
+    "other_enabled_categories": [],
+    "transcription_enabled": false,
+    "provider_calls": 0,
+    "basis": "Human reported the authenticated loopback-only temporary Web diagnostic result; supersedes earlier CLI-only UNKNOWN observations below. Credential validity/provider access remains untested until an approved live request.",
+    "temporary_route": "Removed after Human verification; routes/web.php restored to committed content; regression asserts HTTP 404 at removed path"
+  },
+  "human_gate": {
+    "status": "AWAITING EXPLICIT HUMAN APPROVAL",
+    "mutation_boundary": "Human enables organization AI and common_entry only for organization 4, creates one empty local Shared room as user 5, sends one non-confidential text question, checks saved answer/history; local policy/conversation/request/usage records allowed only after approval. No business document, Project/Action, production or migration changes.",
+    "source_boundary": "Neutral room purpose, operator only, no sources, messages/history or audio Session at creation. No files or documents selected; all other category/document permissions remain OFF.",
+    "limit": "One Human send; up to two internal Provider attempts, 2048 completion tokens per attempt, 30-second request timeout per attempt. No manual retry/reload-resend.",
+    "cost": "Reference estimate USD 0.053152 if 1000 input tokens per attempt at current standard rates; not an enforced total billing ceiling. Human has accepted estimate as reference; actual execution still requires approval.",
+    "stop": "Wrong user/company, nonempty source/history/session, unexpected permissions, missing response/error/timeout or unexpected data disclosure: stop without resend; return sanitized result for Human review",
+    "consent": "Currently OFF; must be explicitly saved by Human under this same gate before sending. Do not describe consent as already granted."
+  },
   "date_jst": "2026-10-11",
   "base_head": "a2665c13799701651d3321c381e41b240b36f606",
   "model": "gpt-5.6-terra",

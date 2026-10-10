@@ -9,6 +9,11 @@ use Tests\TestCase;
 
 class CoLiveAiCompletionLimitTest extends TestCase
 {
+    public function test_temporary_local_diagnostic_is_unreachable(): void
+    {
+        $this->get('/company/settings/co-local-readiness')->assertNotFound();
+    }
+
     public function test_completion_limit_is_sent_without_changing_context(): void
     {
         config(['services.openai.api_key' => 'synthetic-test-only', 'services.openai.chat_model' => 'gpt-5.6-terra']);
