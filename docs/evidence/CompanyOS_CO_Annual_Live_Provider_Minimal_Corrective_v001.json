@@ -1,0 +1,67 @@
+{
+  "status": "CODE_COMPLETE_HUMAN_REVIEW_WAITING",
+  "date": "2026-10-11",
+  "timezone": "Asia/Tokyo",
+  "baseline_commit": "c5e095a28f2805329d37303ee6b79005541d850d",
+  "scope": "Existing CO provider response contract, sanitized diagnostics and shared conversation failure presentation only",
+  "official_sources": [
+    "https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat",
+    "https://developers.openai.com/api/docs/models/gpt-5.6-terra"
+  ],
+  "request_contract": {
+    "endpoint_unchanged": true,
+    "response_format": "json_schema",
+    "strict": true,
+    "required": ["answer", "citations"],
+    "answer_type": "string",
+    "citations_type": "array_of_strings",
+    "additional_properties": false,
+    "model_changed": false,
+    "completion_limit_changed": false,
+    "maximum_attempts_changed": false,
+    "maximum_attempts": 2,
+    "invalid_response_retry": false,
+    "legacy_valid_answer_compatibility": "Existing string answer with optional citations remains parseable; explicit invalid citations and blank answers fail closed"
+  },
+  "diagnostics": {
+    "sink": "Laravel log event co_provider_diagnostic; usage ledger retains available failed-attempt token counts",
+    "fields": ["attempt", "result", "http_status", "finish_reason", "json_parse_success", "answer_present", "answer_type", "input_tokens", "output_tokens", "failure_class"],
+    "unknown_finish_reason": "unknown (never store arbitrary provider strings)",
+    "transport_classification": "timeout_or_connection; no raw exception chain retained",
+    "excluded": ["API key", "Authorization header", "raw response", "company policy body", "nonpublic context body"],
+    "historical_failure_reconstructed": false
+  },
+  "presentation": {
+    "known_gateway_failure": "Safe redirect and alert; no success flash",
+    "question_preserved": true,
+    "failed_request_preserved": true,
+    "assistant_answer_saved_or_published_on_failure": false,
+    "app_debug_setting_changed": false,
+    "unexpected_exception_handling_changed": false
+  },
+  "verification": {
+    "command": "php artisan test --filter='CoLiveAiCompletionLimitTest|CoMeetingLimitedContextTest|ScopeElevenAiCommonEntryTest|AnnualManagementPolicyTest|CompanyContextReaderTest|ManagementDesignCoreP1Test'",
+    "passed": 95,
+    "assertions": 570,
+    "failed": 0,
+    "duration_seconds": 15.30,
+    "pint": "PASS",
+    "git_diff_check": "PASS",
+    "coverage": ["strict schema and unchanged synthetic context", "invalid JSON, missing or nonstring answer", "empty answer and invalid citations", "completion limit", "HTTP error metadata without body", "timeout without raw exception", "safe shared failure alert", "question and failure persistence", "invalid response one attempt", "existing maximum two-attempt regression", "permission revocation", "approved Planning snapshot", "JST lifecycle boundaries"],
+    "database": "isolated in-memory SQLite",
+    "provider": "fake only",
+    "full_suite": "Not rerun for this bounded corrective; previously reported 11 failures remain unresolved release pending, not waived"
+  },
+  "safety": {
+    "live_ai_calls": 0,
+    "production_connections": 0,
+    "consent_changes": 0,
+    "existing_local_conversation_changes": 0,
+    "migration_changes": 0,
+    "frozen_rc_changes": 0,
+    "deploy_authorized": false
+  },
+  "pending": ["Human review", "Separately authorized real-provider Annual Policy review", "Live answer quality"],
+  "g5": "OPEN",
+  "deploy": "NO_GO"
+}

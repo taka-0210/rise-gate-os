@@ -10,6 +10,7 @@ use App\Models\AiCommonSharedSessionEndRun;
 use App\Models\AiProposal;
 use App\Models\OrganizationUser;
 use App\Models\User;
+use App\Services\AiCommon\AiCommonGatewayException;
 use App\Services\AiCommon\AiCommonHumanMessageWriter;
 use App\Services\AiCommon\AiCommonProposalFactory;
 use App\Services\AiCommon\AiCommonProposalLineage;
@@ -204,7 +205,11 @@ class AiCommonSharedConversationController extends Controller
             'realtime_target_provider_session_id' => ['nullable', 'uuid', 'required_with:realtime_target_receive_order'],
             'realtime_target_receive_order' => ['nullable', 'integer', 'min:1', 'required_with:realtime_target_provider_session_id'],
         ]);
-        $writer->request($request->user(), $request->attributes->get('currentCompany'), $conversation, $validated);
+        try {
+            $writer->request($request->user(), $request->attributes->get('currentCompany'), $conversation, $validated);
+        } catch (AiCommonGatewayException $error) {
+            return back()->with('error', 'COの回答を取得できませんでした。質問は記録されています。再送せず、管理者へ確認してください。');
+        }
 
         return back()->with('status', 'One Shared CO response is ready.');
     }

@@ -6,6 +6,7 @@ use App\Contracts\AiCommonProvider;
 use App\Models\AiCommonConversation;
 use App\Models\AiUsageLedger;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -43,6 +44,9 @@ class AiCommonGateway
             try {
                 $result = $this->provider->respond($messages, $sources);
                 $this->record($actor, $conversation, $requestId, $attempt, $result, 'success', null, $started, $purpose);
+                if (isset($result['_diagnostic'])) {
+                    Log::info('co_provider_diagnostic', ['attempt' => $attempt, 'result' => 'success'] + $result['_diagnostic']);
+                }
 
                 return array_replace($result, [
                     'logical_request_id' => $requestId,
@@ -52,8 +56,16 @@ class AiCommonGateway
                 $lastError = $error;
                 $code = in_array($error->getMessage(), ['provider_unavailable', 'provider_error', 'provider_invalid_response'], true)
                     ? $error->getMessage() : 'provider_failure';
+                Log::info('co_provider_diagnostic', ['attempt' => $attempt, 'result' => 'failed'] + ($error instanceof AiCommonProviderResponseException
+                    ? $error->diagnostic : [
+                        'http_status' => null, 'finish_reason' => 'unknown', 'json_parse_success' => null,
+                        'answer_present' => null, 'answer_type' => 'unknown', 'input_tokens' => null,
+                        'output_tokens' => null, 'failure_class' => $code,
+                    ]));
                 $this->record($actor, $conversation, $requestId, $attempt, [
-                    'provider' => 'openai', 'model' => null, 'input_tokens' => null, 'output_tokens' => null,
+                    'provider' => 'openai', 'model' => null,
+                    'input_tokens' => $error instanceof AiCommonProviderResponseException ? $error->diagnostic['input_tokens'] : null,
+                    'output_tokens' => $error instanceof AiCommonProviderResponseException ? $error->diagnostic['output_tokens'] : null,
                 ], 'failed', $code, $started, $purpose);
                 if ($code === 'provider_invalid_response') {
                     break;

@@ -11,6 +11,7 @@ use App\Models\ProductAccountEligibility;
 use App\Models\User;
 use App\Services\AiCommon\AiCommonManagementContext;
 use App\Services\AiCommon\AiCommonPolicyWriter;
+use App\Services\AiCommon\AiCommonProviderResponseException;
 use App\Services\AiCommon\AiCommonResourcePolicyWriter;
 use App\Services\AiCommon\AiCommonSharedContext;
 use App\Services\AiCommon\AiCommonSharedConversationWriter;
@@ -24,6 +25,7 @@ use App\Services\ManagementDesign\ManagementDesignWriter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -50,6 +52,40 @@ class CoMeetingLimitedContextTest extends TestCase
             ['name' => '営業部の会議', 'purpose' => '年度方針を踏まえて論点・未決事項を整理する', 'operation_id' => (string) Str::uuid()]);
 
         return [$user, $org, $membership, $item, $conversation];
+    }
+
+    public function test_provider_failure_keeps_question_and_shows_safe_error(): void
+    {
+        Log::spy();
+        [$user, $org, , , $room] = $this->fixture();
+        $this->app->instance(AiCommonProvider::class, new class implements AiCommonProvider
+        {
+            public int $calls = 0;
+
+            public function respond(array $messages, array $sources): array
+            {
+                $this->calls++;
+                throw new AiCommonProviderResponseException('provider_invalid_response', [
+                    'http_status' => 200, 'finish_reason' => 'stop', 'json_parse_success' => true,
+                    'answer_present' => false, 'answer_type' => 'missing', 'input_tokens' => 100,
+                    'output_tokens' => 20, 'failure_class' => 'answer_format',
+                ]);
+            }
+        });
+        $response = $this->actingAs($user)->withSession(['current_company_id' => $org->id])
+            ->from(route('ai-common.shared.show', $room))
+            ->post(route('ai-common.shared.co-requests.store', $room), [
+                'operation_id' => (string) Str::uuid(), 'content' => 'Synthetic question', 'source_ids' => [],
+            ]);
+        $response->assertRedirect()->assertSessionHas('error')->assertSessionMissing('status');
+        $this->assertSame(1, app(AiCommonProvider::class)->calls);
+        Log::shouldHaveReceived('info')->once()->with('co_provider_diagnostic', \Mockery::on(fn ($metadata) => $metadata['attempt'] === 1 && $metadata['failure_class'] === 'answer_format'
+            && array_keys($metadata) === ['attempt', 'result', 'http_status', 'finish_reason', 'json_parse_success', 'answer_present', 'answer_type', 'input_tokens', 'output_tokens', 'failure_class']));
+        $this->assertDatabaseHas('ai_common_messages', ['ai_common_conversation_id' => $room->id, 'role' => 'user', 'content' => 'Synthetic question']);
+        $this->assertSame(0, $room->messages()->where('role', 'assistant')->count());
+        $this->assertDatabaseHas('ai_common_shared_ai_requests', ['state' => 'unavailable', 'phase' => 'discarded', 'response_message_id' => null]);
+        $this->assertDatabaseHas('ai_usage_ledgers', ['attempt' => 1, 'result' => 'failed', 'output_tokens' => 20]);
+        $this->get(route('ai-common.shared.show', $room))->assertOk()->assertSee('再送せず、管理者へ確認してください。')->assertDontSee('AiCommonGatewayException');
     }
 
     private function allow($user, $org, $type, $id): void
