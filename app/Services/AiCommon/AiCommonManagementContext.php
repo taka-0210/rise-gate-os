@@ -84,6 +84,20 @@ class AiCommonManagementContext
             'source_url' => route('annual-management-policy.revisions.show', [$policy, $export['revision_no']]),
             'content' => $content,
         ];
+        if ((int) $policy->period->organization_id === (int) $organization->id) {
+            $supplement = AiCommonPeriodMetadata::supplement($official, [
+                'organization_public_id' => $organization->public_id,
+                'public_id' => $policy->period->public_id,
+                'name' => $policy->period->name,
+                'starts_on' => $policy->period->starts_on?->timezone('Asia/Tokyo')->toDateString(),
+                'ends_on' => $policy->period->ends_on?->timezone('Asia/Tokyo')->toDateString(),
+                'fiscal_term_number' => $policy->period->fiscal_term_number,
+                'version' => $policy->period->version,
+            ]);
+            if ($supplement !== null) {
+                $projection['supplemental_period_metadata'] = $supplement;
+            }
+        }
 
         // Bind period correction as well as the immutable approved document.
         return [$policy, OrganizationAiPolicy::CATEGORY_MANAGEMENT,

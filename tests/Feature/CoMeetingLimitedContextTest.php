@@ -18,6 +18,7 @@ use App\Services\AiCommon\AiCommonSharedConversationWriter;
 use App\Services\AiCommon\AiCommonSharedCoWriter;
 use App\Services\AiCommon\AiCommonSourceManifest;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyPermissionManager;
+use App\Services\AnnualManagementPolicy\AnnualManagementPolicySnapshot;
 use App\Services\AnnualManagementPolicy\AnnualManagementPolicyWriter;
 use App\Services\AnnualManagementPolicy\ManagementPeriodWriter;
 use App\Services\ManagementDesign\ManagementDesignPermissionManager;
@@ -25,6 +26,7 @@ use App\Services\ManagementDesign\ManagementDesignWriter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -342,6 +344,13 @@ class CoMeetingLimitedContextTest extends TestCase
         $saved = $writer->saveDraft($user, $annual, $draft, 0, (string) Str::uuid());
         $preview = $writer->preview($user, $saved);
         $writer->approve($user, $saved, 1, null, 0, $preview['snapshot_hash'], false, null, (string) Str::uuid());
+        // Synthetic legacy approved snapshot: the historic format had no fiscal term.
+        $approved = $annual->fresh()->currentApprovedRevision;
+        $legacy = $approved->snapshot;
+        unset($legacy['annual']['period']['organization_fiscal_term_number']);
+        $legacyHash = app(AnnualManagementPolicySnapshot::class)->hash($legacy);
+        DB::table('annual_management_policy_revisions')->where('id', $approved->id)
+            ->update(['snapshot' => json_encode($legacy), 'snapshot_hash' => $legacyHash]);
         $draft['policy'] = '未承認の変更';
         $writer->saveDraft($user, $annual->fresh(), $draft, 1, (string) Str::uuid());
         $this->allow($user, $org, 'annual_management_policy', $annual->public_id);
@@ -350,6 +359,33 @@ class CoMeetingLimitedContextTest extends TestCase
         $this->assertSame('approved', $source->projection['approval_status']);
         $this->assertSame('upcoming', $source->projection['effective_status']);
         $this->assertSame('Asia/Tokyo', $source->projection['timezone']);
+        $this->assertSame(23, $source->projection['supplemental_period_metadata']['fiscal_term_number']);
+        $this->assertFalse($source->projection['supplemental_period_metadata']['is_part_of_approved_snapshot']);
+        $this->assertArrayNotHasKey('organization_fiscal_term_number', $source->projection['period']);
+        $this->assertSame($legacyHash, $approved->fresh()->snapshot_hash);
+        $fake = new MeetingContextFakeProvider;
+        $this->app->instance(AiCommonProvider::class, $fake);
+        $this->assertSame(0, $room->messages()->count());
+        app(AiCommonSharedCoWriter::class)->request($user, $org, $room, [
+            'operation_id' => (string) Str::uuid(), 'content' => 'Synthetic period question', 'source_ids' => [$source->id],
+        ]);
+        $this->assertSame(1, $fake->calls);
+        $this->assertCount(1, $fake->sources);
+        $this->assertSame(2, $room->messages()->count());
+        $this->assertStringContainsString('supplemental_period_metadata', json_encode($fake->sources));
+        $this->assertSame(23, $fake->sources[0]['data']['supplemental_period_metadata']['fiscal_term_number']);
+        $this->actingAs($user)->withSession(['current_company_id' => $org->id])
+            ->get(route('ai-common.shared.show', $room))->assertOk()
+            ->assertSee('期番号補足：第23期')->assertSee('承認済みSnapshot・方針本文の一部ではありません。');
+        $historicProjection = $source->projection;
+        $period->update(['fiscal_term_number' => 24, 'version' => $period->version + 1]);
+        try {
+            app(AiCommonSharedContext::class)->authorizeRevision($user, $org, $source->currentRevision);
+            $this->fail('Stale period metadata was reused');
+        } catch (ValidationException) {
+            $this->assertSame($historicProjection, $source->fresh()->projection);
+            $this->assertSame($legacyHash, $approved->fresh()->snapshot_hash);
+        }
         $departmentId = $annual->fresh()->currentApprovedRevision->snapshot['annual']['departments'][0]['public_id'];
         $department = app(AiCommonSharedContext::class)->select($user, $org, $room, 'department_policy', $annual->public_id.':'.$departmentId, '営業部会議');
         $this->assertSame('営業部', $department->projection['content']['group_name_at_approval']);

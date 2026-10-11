@@ -1,0 +1,73 @@
+{
+  "status": "CODE_COMPLETE_HUMAN_REVIEW_WAITING",
+  "date_jst": "2026-10-11",
+  "timezone": "Asia/Tokyo",
+  "contract": {
+    "approved_snapshot_unchanged": true,
+    "approved_body_year_dates_revision_authority": "Approved snapshot",
+    "supplement_authority": "Current formal organization_management_periods row after existing document access authorization",
+    "required_matching_fields": ["organization", "period public ID", "organization year label", "declared year label", "organization and declared starts_on", "organization and declared ends_on"],
+    "missing_mismatch_invalid_number": "Omit supplement; never infer or calculate fiscal term",
+    "snapshot_term_present": "Retain snapshot; no current term override",
+    "metadata": ["fiscal_term_number", "period_version", "period_public_id", "source", "is_current_period_metadata", "is_part_of_approved_snapshot", "usage_note"],
+    "approved_content_citation": "Usage note explicitly prohibits citing supplemental period metadata as approved policy text",
+    "presentation": "CO citation area labels supplemental fiscal term and formal period DB Version separately from approved Revision",
+    "history": "No existing projection, source revision, message or answer is rewritten. Existing strict source reauthorization remains; a changed projection requires explicit reselection and may withhold historical answer display until access/lineage can be established. No automatic upgrade of historical source metadata."
+  },
+  "local_read_only_reconciliation": {
+    "organization_id": 4,
+    "annual_id": 1,
+    "approved_revision_no": 1,
+    "supplement_fiscal_term_number": 23,
+    "formal_period_version": 4,
+    "is_part_of_approved_snapshot": false,
+    "matching_conditions": "PASS"
+  },
+  "verification": {
+    "command": "php artisan test --filter='CoPeriodMetadataTest|CoMeetingLimitedContextTest|CoLiveAiCompletionLimitTest|ScopeElevenAiCommonEntryTest|AnnualManagementPolicyTest|CompanyContextReaderTest|ManagementDesignCoreP1Test'",
+    "passed": 98,
+    "assertions": 606,
+    "failed": 0,
+    "duration_seconds": 18.02,
+    "pint": "PASS",
+    "git_diff_check": "PASS",
+    "fixture": "Isolated in-memory SQLite and fake provider only; historic snapshot shape constructed only in synthetic fixture",
+    "covered": ["metadata provenance", "mismatch and missing omission", "invalid fiscal term omission", "snapshot term not overridden", "new empty shared conversation with exactly one annual source", "provider receives supplemental metadata", "CO citation UI distinguishes supplemental information", "immutable snapshot hash", "stale period metadata rejected without stored projection rewrite", "permission and consent regression", "JST and Reader compatibility"],
+    "full_suite": "Not rerun for bounded corrective; prior 11 failures remain unresolved release pending"
+  },
+  "formal_close_review": {
+    "implementation_and_safety": "AUTOMATED_PASS",
+    "previous_live_annual_reference": "HUMAN_PASS_WITHOUT_SUPPLEMENT",
+    "previous_reload_persistence": "HUMAN_PASS",
+    "new_empty_annual_conversation": "FAKE_PROVIDER_PASS; LIVE_PENDING",
+    "new_supplement_live_interpretation": "PENDING",
+    "final_human_product_review": "PENDING",
+    "scope36_37_insights": "Later input only; not additional close requirements"
+  },
+  "human_gate": {
+    "name": "ONE CO NEW EMPTY ANNUAL PERIOD CONTEXT LIVE REVIEW / HUMAN ONLY",
+    "authorization": "NOT_YET_APPROVED",
+    "organization_id": 4,
+    "user_id": 5,
+    "participant_count": 1,
+    "new_empty_conversation_required": true,
+    "source": "Annual Revision 1 only; no department policy, draft, attachment or voice session",
+    "questions": 1,
+    "provider_max_attempts": 2,
+    "model": "gpt-5.6-terra",
+    "max_completion_tokens": 2048,
+    "failure": "Stop without resending; inspect sanitized diagnostics",
+    "confirmation": "Annual/year/date/Revision accuracy, fiscal term 23 from current formal period Version 4 not approved snapshot, source display and reload persistence"
+  },
+  "safety": {
+    "live_provider_calls": 0,
+    "production_connections": 0,
+    "consent_changes": 0,
+    "existing_local_business_or_conversation_data_changes": 0,
+    "migration_changes": 0,
+    "frozen_rc_or_new_rc_candidate_changes": 0,
+    "deploy_authorized": false
+  },
+  "g5": "OPEN",
+  "deploy": "NO_GO"
+}
