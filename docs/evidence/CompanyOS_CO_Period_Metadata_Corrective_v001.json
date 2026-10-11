@@ -1,5 +1,6 @@
 {
-  "status": "CODE_COMPLETE_HUMAN_REVIEW_WAITING",
+  "status": "HUMAN_REVIEW_PASS",
+  "final_close_evidence": "docs/evidence/CompanyOS_CO_Meeting_Limited_Context_Formal_Close_v001.json",
   "date_jst": "2026-10-11",
   "timezone": "Asia/Tokyo",
   "contract": {
@@ -39,9 +40,9 @@
     "implementation_and_safety": "AUTOMATED_PASS",
     "previous_live_annual_reference": "HUMAN_PASS_WITHOUT_SUPPLEMENT",
     "previous_reload_persistence": "HUMAN_PASS",
-    "new_empty_annual_conversation": "FAKE_PROVIDER_PASS; LIVE_PENDING",
-    "new_supplement_live_interpretation": "PENDING",
-    "final_human_product_review": "PENDING",
+    "new_empty_annual_conversation": "FAKE_PROVIDER_PASS; HUMAN_LIVE_PASS",
+    "new_supplement_live_interpretation": "HUMAN_PASS",
+    "final_human_product_review": "HUMAN_PASS",
     "scope36_37_insights": "Later input only; not additional close requirements"
   },
   "human_gate": {

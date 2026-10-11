@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
-  "status": "CO MEETING LIMITED CONTEXT / HUMAN PRODUCT REVIEW",
+  "status": "CO MEETING LIMITED CONTEXT INTEGRATION / FORMAL CLOSED",
+  "final_close_evidence": "docs/evidence/CompanyOS_CO_Meeting_Limited_Context_Formal_Close_v001.json",
+  "historical_results_note": "Original implementation verification and pending observations below are retained as history. Final Human acceptance and present disposition are in final_close_evidence; historical pending does not override that bounded closure.",
   "review_date_jst": "2026-10-10",
   "implementation_base_head": "401ba448ed2487accc7ef53d9e5e68c3466da89d",
   "exact_commit_binding": "The Git commit containing this Evidence and implementation is the implementation identity; it is not a Release Candidate freeze.",

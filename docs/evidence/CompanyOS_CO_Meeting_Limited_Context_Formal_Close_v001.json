@@ -1,0 +1,86 @@
+{
+  "status": "CO MEETING LIMITED CONTEXT INTEGRATION / FORMAL CLOSED",
+  "review_date_jst": "2026-10-11",
+  "timezone": "Asia/Tokyo",
+  "reviewed_implementation_head": "8fdf327530df4fd973782485961195f45e028637",
+  "implementation_identity": "d107603290ca411f314eb61b84d7a433bca323db",
+  "provider_corrective_identity": "5f516d939f12f469af6bb6a4266bccc56355bb7e",
+  "period_metadata_corrective_identity": "8fdf327530df4fd973782485961195f45e028637",
+  "basis": "Existing automated safety/regression evidence, earlier live annual and persistence evidence, and final explicit Human Product Review",
+  "evidence_sources": [
+    "CompanyOS_CO_Meeting_Limited_Context_v001.json",
+    "CompanyOS_CO_Annual_Live_Provider_Minimal_Corrective_v001.json",
+    "CompanyOS_CO_Annual_Live_Human_Result_v001.json",
+    "CompanyOS_CO_Period_Metadata_Corrective_v001.json"
+  ],
+  "accepted_conditions": {
+    "limited_context_implementation_and_safety": "PASS_AUTOMATED",
+    "approved_annual_revision_1_live_reference": "PASS_HUMAN",
+    "new_empty_shared_conversation_live_answer": "PASS_HUMAN_AND_SAVED_METADATA",
+    "fiscal_term_23_supplement_provenance": "PASS_HUMAN_AND_SAVED_METADATA",
+    "source_display": "PASS_HUMAN",
+    "reload_answer_source_supplement_persistence": "PASS_HUMAN",
+    "same_room_continuation_operation": "PASS_HUMAN; not a claim of additional provider turns recorded",
+    "final_product_review": "PASS_HUMAN",
+    "remaining_in_scope_close_conditions": 0
+  },
+  "read_only_saved_metadata": {
+    "organization_id": 4,
+    "user_id": 5,
+    "conversation_id": 5,
+    "provider_attempt": 1,
+    "result": "success",
+    "saved_user_messages": 1,
+    "saved_assistant_messages": 1,
+    "input_tokens": 1251,
+    "output_tokens": 1299,
+    "created_at_jst": "2026-10-11 11:39:06",
+    "revision_no": 1,
+    "supplement_fiscal_term_number": 23,
+    "supplement_period_version": 4,
+    "is_part_of_approved_snapshot": false,
+    "raw_response_or_company_body_copied": false
+  },
+  "verification_reused": {
+    "latest_connected_tests": 98,
+    "latest_connected_assertions": 606,
+    "latest_connected_failures": 0,
+    "new_tests_run_this_documentation_review": 0,
+    "full_repository_regression": "Previously recorded 11 failures remain release pending; this closure is not repository-wide PASS or release readiness"
+  },
+  "preserved_contract": {
+    "approved_snapshot_is_policy_authority": true,
+    "supplement_is_current_formal_period_metadata_not_approved_text": true,
+    "organization_view_consent_audience_reauthorization": true,
+    "draft_excluded": true,
+    "historical_data_not_rewritten": true,
+    "history_limit": "Last 10 visible messages, cumulative 12000 characters including current question",
+    "explicit_sources_and_context_limits": "Existing limits and fail-closed retained",
+    "human_final_decision_and_manual_project_action_registration": true
+  },
+  "later_product_insights_not_close_conditions": [
+    {"item": "Question input field naming and instructions", "route": "Later UX corrective candidate"},
+    {"item": "Separate question from decided/undecided meeting notes", "route": "Later UX/Product review; not authorized now"},
+    {"item": "Input disappears when selecting a source", "route": "Human-reported UX issue; technical cause not investigated or fixed"},
+    {"item": "Long-meeting context continuity", "route": "Scope36 candidate; retain existing history limits and authorization"},
+    {"item": "Short staged facilitation questions", "route": "Scope36 Product Insight"},
+    {"item": "Natural spoken dialogue", "route": "Scope37 Product Insight"}
+  ],
+  "outside_closure": [
+    "Full Scope35/36/37 completion",
+    "Live department-policy coverage across all departments and physical meeting rehearsal not claimed",
+    "Production readiness and unresolved full-regression failures",
+    "New Release Candidate adoption, composition, compatibility and freeze",
+    "Existing Scope34 Backup/Restore and Public Entry blockers"
+  ],
+  "this_review_operations": {
+    "new_implementation_or_ux_changes": false,
+    "live_ai_calls": 0,
+    "consent_changes": 0,
+    "production_connections_or_changes": 0,
+    "migration_or_deploy": false,
+    "frozen_rc_or_new_rc_candidate_changed": false
+  },
+  "g5": "OPEN",
+  "deploy": "NO_GO"
+}
