@@ -1,0 +1,90 @@
+{
+  "status": "ONE CO POLICY CONTEXT INTERPRETATION LIVE REVIEW / HUMAN ONLY / AWAITING APPROVAL",
+  "date_jst": "2026-10-12",
+  "timezone": "Asia/Tokyo",
+  "accepted_implementation": "3e8d4aef83bb91d99a0e83cc1999dc407bbf4499",
+  "formal_close": "HELD; actual AI interpretation quality pending",
+  "local_read_only_observation": {
+    "method": "Local Laravel CLI, SQLite query_only ON, existing organization/category and Approved View source resolver; no text/secret output",
+    "web_identity": "Prior Human authenticated Web binding reused, not newly measured; Human confirms same localhost identity before sending",
+    "organization_id": 4,
+    "user_id": 5,
+    "membership_status": "active",
+    "role": "owner",
+    "common_entry_and_company_management_authorization": "PASS",
+    "annual_document_ai_consent": true,
+    "approved_view_source_authorization": "PASS",
+    "annual_public_id": "01M4033WHM0RWGFSHNEJRX0NEV",
+    "revision_no": 1,
+    "year": "2026年度",
+    "starts_on": "2026-12-01",
+    "ends_on": "2027-11-30",
+    "approval_status": "approved",
+    "effective_status": "upcoming",
+    "supplement_fiscal_term_number": 23,
+    "supplement_period_version": 4,
+    "supplement_authority": "Current formal period DB; not part of approved Snapshot",
+    "provider": "Existing OpenAiCommonProvider",
+    "key_present": true,
+    "model": "gpt-5.6-terra",
+    "max_completion_tokens": 2048,
+    "timeout_seconds_per_attempt": 30,
+    "provider_max_attempts": 2,
+    "temporary_cli_helper": "Removed after inspection; no Web route added"
+  },
+  "human_gate": {
+    "authorization": "NOT APPROVED; preparation only",
+    "mutation_after_approval": "One local new Shared conversation, explicit annual source selection and one request with normal conversation/usage persistence only",
+    "steps": [
+      "Confirm localhost, 高見 昌也 user 5 and 株式会社 ライズアップ organization 4; keep Consent unchanged",
+      "Create NEW empty Shared Conversation 第23期・次期計画の解釈確認, purpose 次期年度方針を正式な参照元としてアクションプランを検討する; operator only",
+      "Explicitly select ONLY annual 2026年度 Revision 1; confirm 第23期 supplement Version 4 and upcoming; no other source, earlier history, attachments or audio session",
+      "After source selection enter the question into 議論・決定済み事項・未決事項のメモ; click COに論点整理を相談する（テキスト） ONCE, not Human Message posting",
+      "Check interpretation, citation and separate period supplement; reload after completion to verify persistence; stop"
+    ],
+    "question": "第23期・2026年度の承認済み年度経営方針を正式な参照方針として、次期の営業部アクションプランを検討します。現在の実行管理ではなく、2026年12月1日からの次期計画の策定です。会社方針との整合を踏まえて、まず重要な検討論点を整理してください。",
+    "acceptance": [
+      "Approved Upcoming is a formal next-period planning reference, not invalid or unofficial merely because it has not started",
+      "Does not confuse next-period planning with currently applicable policy",
+      "Proceeds with concrete discussion without repeated unnecessary not-yet-effective warnings or redundant clarification",
+      "Does not invent unprovided department policy and retains Human final judgment",
+      "Correct annual Revision 1/source and separate period supplement persist after reload"
+    ],
+    "limits": "One Human send; existing maximum two internal Provider attempts, 2048 completion tokens each, 30 seconds per attempt; no manual retry/additional question",
+    "cost": "Paid API call. Output-token cap is not a strict total cost ceiling; input length and failed attempts affect charges. No refreshed pricing quote or new budget claim",
+    "stop": "Wrong identity, source/revision/dates/supplement/consent mismatch, extra audience/context or provider failure: do not send or resend; return safe status",
+    "report": "Three interpretation criteria PASS/FAIL, sources and reload PASS/FAIL; no secrets or raw provider response"
+  },
+  "release_audit_handoff": {
+    "next_audit": "Compare prior 11 FAIL with latest 8 FAIL by exact identity and runtime/fixture/evidence dependencies; do not waive existing release pending",
+    "latest_full_suite": "843 PASS / 17 SKIP / 8 FAIL / 7663 assertions",
+    "failures": "CompanyNavigationTest 1; Ir1G2PreflightV2ExecutionTest 7",
+    "prior_three_action_failures": "Not reproduced in latest run; root-cause/impact assessment remains pending, not proven repaired"
+  },
+  "master_sync_human_hold": {
+    "status": "HUMAN HOLD",
+    "completed_read_only_scope_preserved": "Repository corrective identity, accepted verification and review status recorded here; no Roadmap PPT or requirements Excel comparison completed",
+    "pending_audit_item": "CO Policy Context Interpretation / 3e8d4ae / Code Complete / Human Review Pending",
+    "updates_versions_new_masters": "PROHIBITED until Human supplies current formal masters and reviews proposed differences",
+    "next": "After receipt, compare exact supplied masters with formal Repository Contract/Evidence, protect structure/design/content and propose differences only",
+    "other_authorized_work": "Not globally paused; local Human Gate preparation continued"
+  },
+  "verification": {
+    "reused_implementation": "102 connected tests / 706 assertions PASS; existing full suite evidence unchanged",
+    "new_delta": "Evidence/Human Gate preparation only; no Application source changes",
+    "checks": "Read-only metadata authorization, JSON parse, temporary helper absence, git diff --check; no repeated full suite"
+  },
+  "safety": {
+    "provider_calls": 0,
+    "consent_changes": 0,
+    "local_business_or_conversation_mutations": 0,
+    "production_connections_or_mutations": 0,
+    "secret_or_company_body_output": false,
+    "master_files_modified": 0,
+    "new_rc_or_freeze": false,
+    "migration_or_deploy": false,
+    "g5": "OPEN",
+    "deploy": "NO-GO",
+    "existing_blockers": "MAINTAINED"
+  }
+}
