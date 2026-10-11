@@ -25,7 +25,15 @@
     "phase": "published",
     "assistant_message_saved": true,
     "assistant_visibility": "visible",
-    "human_browser_reload": "PENDING",
+    "human_browser_reload": "HUMAN_PASS",
+    "human_reload_confirmation": {
+      "question_retained": true,
+      "assistant_answer_retained": true,
+      "annual_2026_revision_1_source_retained": true,
+      "additional_question_or_resend": false,
+      "consent_changes": false,
+      "basis": "Human Persistence PASS report; not an additional Codex browser execution"
+    },
     "old_failure_records_preserved": true
   },
   "source": {
@@ -60,9 +68,8 @@
     "existing_presentation_pending": "Assistant author label shown as Author未記録"
   },
   "formal_close_pending": [
-    "Human browser reload and history redisplay confirmation",
     "Fiscal-term metadata gap disposition",
-    "Human review of same-conversation execution difference",
+    "Fresh-empty-conversation condition remains NOT_MET; no waiver or new execution authorized",
     "Limited integration overall review scope is not closed by this single Annual test"
   ],
   "safety": {
