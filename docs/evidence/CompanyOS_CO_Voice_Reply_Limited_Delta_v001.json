@@ -1,0 +1,39 @@
+{
+  "status": "CO VOICE REPLY LIMITED DELTA / CODE COMPLETE / HUMAN REVIEW PENDING",
+  "date_jst": "2026-10-11",
+  "base_head": "1b21376dbd216a7613a7ba05547ee09337a94fa5",
+  "commit_binding": "Commit containing this evidence and delta is the implementation identity, not a new Release Candidate",
+  "human_decision": "Browser Speech Synthesis with localService === true Japanese voices only",
+  "implementation": {
+    "scope": "Visible published assistant replies in existing private/shared CO history; start, stop, replay, live status and unavailable guidance",
+    "read_target": "Already-rendered answer paragraph only; never sources, other hidden text or entire conversation",
+    "voice": "Japanese lang ja/ja-* and strict localService true; no voice found means disabled playback; no default/remote fallback",
+    "authorization": "Authenticated same-organization voice-access GET delegates to existing private/shared Reader; active membership, account/audience and source/consent lineage reuse; assistant role and visible publication only. Response contains allow flag/content hash, never answer/source body. No Owner bypass.",
+    "lifecycle": "Recheck before start/replay and each <=80-codepoint segment; 2-second in-play polling with 3-second fetch timeout; revoked access, redirected/error response, changed content hash, timeout/network failure cancels. One active playback generation; stop clears timer and aborts pending request. Visibilitychange/pagehide/beforeunload/offline/form submission/link navigation cancel.",
+    "limitations": "Revocation is not instantaneous: nominal polling interval plus timeout can take approximately 5 seconds, and browser throttling can add delay. Already heard speech cannot be revoked. Hiding the page stops locally. Browser speech implementation and installed voices require real-device acceptance.",
+    "unchanged": "Text body, persisted history, citations, provider request path, AI model/token cap, Scope34 frozen RC and G5 contracts",
+    "new_secret_provider_audio_storage": false,
+    "migration": false
+  },
+  "verification": {
+    "connected_regression": "127 PASS / 785 assertions / 55.85 seconds; CO meeting, token cap, Scope11 entry, S11 Delta B P1-P5, Annual, Reader and MDC",
+    "browser": "Mocked SpeechSynthesis in offline Chrome; local Japanese selection, no autoplay, max80 chunks including multiline/company-name fixture, double taps, stop/replay, source access denied, network failure, offline, hidden and pagehide cancellation, no remote fallback PASS. Requests intercepted; no actual speech or external provider call.",
+    "syntax": "Controller PHP / routes PHP / JS execution PASS",
+    "pint": "New controller PASS",
+    "diff_check": "PASS",
+    "full_regression": "Not repeated for localized reply-access/UI delta; existing eleven full-suite failures remain pending before new RC",
+    "api_compatibility": "Uses standard SpeechSynthesis, utterance, voiceschanged, cancel and localService APIs. Edge/iPad Safari actual Japanese voice inventory, sound and interaction NOT VERIFIED. No claim of real-device PASS."
+  },
+  "human_review": {
+    "status": "PENDING",
+    "procedure": "Open an existing authorized CO reply on Windows Edge and physical iPad Safari; do not generate another AI answer solely for this test. Verify local Japanese availability, tap start/stop/replay, listen to long multiline answer and names, switch tab/navigate and check stop. If unavailable, text remains and remote voice is not substituted. Actual tablet access setup requires existing approved local-network boundary; do not create a tunnel or expose localhost automatically.",
+    "security_review": "Permission/consent-loss and cross-user negative tests use isolated synthetic tests, not ad hoc mutation of business permissions",
+    "broader_meeting_dependencies": "Annual Context real-AI reference review, department Snapshot completeness and tablet meeting quality remain separate Pending; this delta does not approve them"
+  },
+  "scope37_formal_close": false,
+  "new_rc_or_freeze": false,
+  "production_operations": 0,
+  "external_tts_or_ai_calls": 0,
+  "g5": "OPEN",
+  "deploy": "NO-GO"
+}

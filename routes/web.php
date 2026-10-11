@@ -163,6 +163,7 @@ Route::middleware(['auth', 'active-user', 'credential-session'])->group(function
         Route::get('/company', CompanyHomeController::class)->name('company.home');
         Route::get('/company/company-context', CompanyContextReaderController::class)->name('company-context-reader.show');
         Route::get('/company/co', [AiCommonController::class, 'index'])->name('ai-common.index');
+        Route::get('/company/co/conversations/{conversation}/messages/{message}/voice-access', \App\Http\Controllers\CoVoiceReplyAccessController::class)->name('ai-common.voice-reply.access');
         Route::post('/company/co/conversations', [AiCommonController::class, 'store'])->name('ai-common.store');
         Route::get('/company/co/conversations/{conversation}', [AiCommonController::class, 'show'])->name('ai-common.show');
         Route::post('/company/co/conversations/{conversation}/archive', [AiCommonController::class, 'archive'])->name('ai-common.archive');

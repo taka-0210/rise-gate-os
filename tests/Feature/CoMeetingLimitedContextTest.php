@@ -57,6 +57,57 @@ class CoMeetingLimitedContextTest extends TestCase
         app(AiCommonResourcePolicyWriter::class)->update($user, $org, $type, $id, true);
     }
 
+    public function test_voice_reply_reuses_shared_access_and_returns_no_body(): void
+    {
+        [$user, $org, $membership, , $room] = $this->fixture();
+        $message = $room->messages()->create(['role' => 'assistant', 'content' => 'Synthetic reply',
+            'visibility_status' => 'visible', 'source_lineage_version' => 'source-lineage.v1']);
+        $url = route('ai-common.voice-reply.access', [$room, $message->public_id]);
+        $this->actingAs($user)->withSession(['current_company_id' => $org->id])->getJson($url)
+            ->assertOk()->assertExactJson(['allowed' => true, 'content_hash' => hash('sha256', 'Synthetic reply')])
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $membership->update(['membership_status' => 'left']);
+        $response = $this->getJson($url);
+        $this->assertNotSame(200, $response->status());
+        $response->assertDontSee('Synthetic reply');
+    }
+
+    public function test_voice_reply_rejects_human_message_and_wrong_conversation(): void
+    {
+        [$user, $org, , , $room] = $this->fixture();
+        $message = $room->messages()->create(['role' => 'user', 'content' => 'Not an AI reply', 'visibility_status' => 'visible']);
+        $this->actingAs($user)->withSession(['current_company_id' => $org->id])
+            ->getJson(route('ai-common.voice-reply.access', [$room, $message->public_id]))->assertForbidden();
+        $this->getJson(route('ai-common.voice-reply.access', [$room, (string) Str::ulid()]))->assertForbidden();
+    }
+
+    public function test_voice_reply_stops_after_source_consent_revocation(): void
+    {
+        [$user, $org, , $item, $room] = $this->fixture();
+        $this->allow($user, $org, 'management_design', $item->public_id);
+        $source = app(AiCommonSharedContext::class)->select($user, $org, $room, 'management_design', $item->public_id, 'Voice test');
+        $message = $room->messages()->create(['role' => 'assistant', 'content' => 'Restricted reply',
+            'visibility_status' => 'visible', 'source_lineage_version' => 'source-lineage.v1']);
+        $message->sourceRevisions()->attach($source->current_revision_id);
+        $url = route('ai-common.voice-reply.access', [$room, $message->public_id]);
+        $this->actingAs($user)->withSession(['current_company_id' => $org->id])->getJson($url)->assertOk();
+        app(AiCommonResourcePolicyWriter::class)->update($user, $org, 'management_design', $item->public_id, false);
+        $this->getJson($url)->assertForbidden()->assertDontSee('Restricted reply');
+    }
+
+    public function test_voice_reply_supports_private_history_without_owner_bypass(): void
+    {
+        [$user, $org] = $this->fixture();
+        $room = AiCommonConversation::create(['organization_id' => $org->id, 'user_id' => $user->id,
+            'conversation_kind' => 'private', 'title' => 'Private fixture', 'status' => 'active']);
+        $message = $room->messages()->create(['role' => 'assistant', 'content' => 'Private reply',
+            'visibility_status' => 'visible', 'source_lineage_version' => 'source-lineage.v1']);
+        $url = route('ai-common.voice-reply.access', [$room, $message->public_id]);
+        $this->actingAs($user)->withSession(['current_company_id' => $org->id])->getJson($url)->assertOk();
+        $room->update(['user_id' => User::factory()->create()->id]);
+        $this->getJson($url)->assertForbidden()->assertDontSee('Private reply');
+    }
+
     public function test_document_consent_is_default_off_even_for_owner(): void
     {
         [$user,$org,,$item,$room] = $this->fixture();

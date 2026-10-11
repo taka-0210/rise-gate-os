@@ -24,6 +24,7 @@
 <article class="shared-card shared-message">
     <strong>{{ $message->sharedAuthor?->author?->name ?? 'Author未記録' }}</strong>
     <p style="white-space:pre-wrap">{{ $message->content }}</p>
+    @include('ai-common._voice-reply')
     @include('ai-common._management-citations')
     <small>{{ $message->created_at->timezone('Asia/Tokyo')->format('Y/m/d H:i') }} JST</small>
 </article>

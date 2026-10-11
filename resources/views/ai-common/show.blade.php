@@ -20,6 +20,7 @@
     <article class="co-panel co-message {{ $row['message']->role === 'user' ? 'co-message--user' : '' }} {{ !$row['visible'] ? 'co-revoked' : '' }}">
         <strong>{{ $row['message']->role === 'user' ? 'あなた' : 'CO（AI回答）' }}</strong>
         @if($row['visible'])<p style="white-space:pre-wrap">{{ $row['message']->content }}</p>
+            @include('ai-common._voice-reply', ['message' => $row['message']])
             @include('ai-common._management-citations')
             @foreach($row['sources'] as $source)<span class="co-source">{{ $source['type'] }} / {{ $source['handle'] }}</span>@endforeach
         @else<p>参照元の現在権限・Policy・版を確認できないため、この回答本文と次turnへの再投入を停止しました。</p>@endif
