@@ -1,0 +1,95 @@
+{
+  "status": "CO POLICY CONTEXT INTERPRETATION / CODE COMPLETE / HUMAN REVIEW WAITING",
+  "date_jst": "2026-10-12",
+  "timezone": "Asia/Tokyo",
+  "base_head": "5bf0588a893034402fee51d4c79c7ad0e30a3e65",
+  "implementation_identity": "Commit containing this evidence and the named source/test delta; no RC adoption or freeze",
+  "human_decision": "Approval Status, Effective Status and Usage Purpose are separate, company/year-independent interpretation principles",
+  "closed_contract_sources": [
+    "docs/CompanyOS_35A_AnnualManagementPolicy_Formal_Closure_v001.md",
+    "docs/evidence/CompanyOS_CO_Meeting_Limited_Context_Formal_Close_v001.json"
+  ],
+  "verified_delta": {
+    "application_file": "app/Services/AiCommon/AiCommonSharedCoWriter.php",
+    "scope": "Existing shared CO meeting system instruction, only when authorized management sources are present",
+    "approval": "Officialness comes from provided approved Context, never inferred from purpose",
+    "effective": "upcoming/effective/ended and existing JST dates remain unchanged",
+    "usage": "Interpret existing conversation purpose and current question; ask only when genuine ambiguity affects the decision",
+    "upcoming": "Approved next-period policy is a formal planning reference, not current application and not invalid merely because it has not started",
+    "current": "Current policy supports current execution management",
+    "past": "Past policy supports retrospective review, not current application",
+    "supplement": "Keep provenance and distinction from approved Snapshot",
+    "not_changed": [
+      "Context projection, stored source fingerprint and source authorization",
+      "Approved Snapshot, Revision, citation UI and historical answers",
+      "Organization, participant, Approved View, Consent and retry reauthorization",
+      "DB schema, migrations, lifecycle values and publication/sharing rules",
+      "Provider, Model, response format, token limit, timeout and maximum attempts",
+      "Private conversation prompt and long-meeting history limits"
+    ]
+  },
+  "verification": {
+    "method": "Synthetic in-memory SQLite fixtures and Fake Provider only; assertions inspect instruction delivery, source metadata and immutable history, not actual model interpretation quality",
+    "focused": {"tests": 24, "assertions": 185, "failures": 0},
+    "connected_regression": {"tests": 102, "assertions": 706, "failures": 0},
+    "connected_command": "php artisan test --filter='CoPeriodMetadataTest|CoMeetingLimitedContextTest|CoLiveAiCompletionLimitTest|ScopeElevenAiCommonEntryTest|AnnualManagementPolicyTest|CompanyContextReaderTest|ManagementDesignCoreP1Test'",
+    "cases": {
+      "approved_upcoming_planning": "PASS: correct instruction, purpose, question and approved upcoming source delivered",
+      "current_execution": "PASS: correct instruction and unchanged effective source delivered",
+      "past_retrospective": "PASS: correct instruction and unchanged ended source delivered",
+      "ambiguous_year_or_purpose": "PASS: ambiguity instruction delivered without guessing or rewriting source state; actual clarification quality pending",
+      "draft_exists": "PASS: new unapproved Draft excluded, approved Snapshot/hash unchanged",
+      "permissions_or_consent_missing": "PASS existing regression: default OFF, Owner no bypass, all participants, cross-organization exclusion, revocation during IO and history reuse fail-closed",
+      "revision_citations_history": "PASS: Revision display, persisted source projection, Snapshot/hash and period supplement regression",
+      "jst": "PASS: synthetic status dates evaluated in Asia/Tokyo"
+    },
+    "format": "Pint PASS",
+    "full_repository": {
+      "command": "php artisan test --compact",
+      "reason": "Repository AGENTS.md explicitly requires full suite before delivery when environment permits",
+      "passed": 843,
+      "skipped": 17,
+      "failed": 8,
+      "assertions": 7663,
+      "duration_seconds": 667.40,
+      "exit_code": 1,
+      "failure_comparison": [
+        {"class": "CompanyNavigationTest", "count": 1, "boundary": "Stale forbidden intended URL redirect expectation", "disposition": "Matches previously recorded failure; release impact remains pending"},
+        {"class": "Ir1G2PreflightV2ExecutionTest", "count": 7, "boundary": "setUp asserts existing preserved execution evidence directory does not exist", "disposition": "Matches previously recorded failure; no state deleted or contract weakened"},
+        {"class": "ScopeNineActionExecutionTest", "count": 0, "boundary": "Previously recorded three failures did not reproduce in this run", "disposition": "Observed PASS is not a root-cause resolution or release waiver; prior impact assessment remains pending"}
+      ],
+      "new_failure_class_observed": false,
+      "repository_wide_pass": false
+    },
+    "official_prompt_reference": "https://developers.openai.com/api/docs/guides/prompt-engineering"
+  },
+  "human_review_gate": {
+    "status": "PREPARED / NOT AUTHORIZED / NOT EXECUTED",
+    "scope": "Local new empty shared conversation, existing approved annual Revision and explicit source selection, existing consent and Approved View only",
+    "question_example": "選択した承認済みの次期年度経営方針を正式な参照元として、次期のアクションプランを検討します。適用状態と計画での利用を区別して、重要な論点を整理してください。",
+    "acceptance": [
+      "Approved Upcoming is a formal planning reference, not current application or invalid information",
+      "No unnecessary year/purpose confirmation when clear",
+      "Correct Revision/source and separately attributed period supplement",
+      "No invented department policy or automatic business data change",
+      "Response and sources persist after reload"
+    ],
+    "limits": "One question, existing maximum two Provider attempts and 2048 completion-token limit; on failure do not resend",
+    "before_execution": "Separate Human approval and current local readiness/permission/consent confirmation; no consent changes implicitly authorized",
+    "real_ai_interpretation_quality": "PENDING"
+  },
+  "safety": {
+    "external_ai_calls": 0,
+    "production_connections": 0,
+    "production_mutations": 0,
+    "local_business_db_mutations": 0,
+    "consent_changes": 0,
+    "secret_or_business_body_output": false,
+    "frozen_rc_changed": false,
+    "new_rc_adopted_or_frozen": false,
+    "deploy_authorized": false,
+    "scope34": "G5 OPEN / DEPLOY NO-GO",
+    "existing_backup_restore_and_public_entry_blockers": "MAINTAINED",
+    "prior_limited_context_formal_close_evidence": "UNCHANGED; this delta's live interpretation review is separate"
+  }
+}

@@ -26,10 +26,12 @@ use App\Services\ManagementDesign\ManagementDesignWriter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CoMeetingLimitedContextTest extends TestCase
@@ -327,6 +329,70 @@ class CoMeetingLimitedContextTest extends TestCase
             ['statement' => '変更後の理念', 'sections' => []], 1, '改定', (string) Str::uuid());
         $this->expectException(ValidationException::class);
         app(AiCommonSharedContext::class)->authorizeRevision($user, $org, $source->currentRevision);
+    }
+
+    public static function policyInterpretationCases(): array
+    {
+        return [
+            'approved upcoming planning' => ['2026-10-12', 'upcoming', '次期のアクションプランを検討する', '2026年度の次期計画の論点を整理してください。'],
+            'current execution' => ['2027-01-12', 'effective', '現在の実行管理を検討する', '2026年度の現在の実行管理の論点を整理してください。'],
+            'past retrospective' => ['2028-01-12', 'ended', '過年度を振り返る', '2026年度を振り返る論点を整理してください。'],
+            'ambiguous target' => ['2026-10-12', 'upcoming', '方針について相談する', 'どの年度の方針を今の仕事に使うべきですか。'],
+        ];
+    }
+
+    #[DataProvider('policyInterpretationCases')]
+    public function test_policy_status_and_usage_purpose_reach_provider_without_changing_sources(string $date, string $status, string $purpose, string $question): void
+    {
+        $this->travelTo(Carbon::parse($date.' 12:00:00', 'Asia/Tokyo'));
+        [$user, $org, $membership] = $this->fixture();
+        $room = app(AiCommonSharedConversationWriter::class)->create($user, $org,
+            ['name' => 'Synthetic policy review', 'purpose' => $purpose, 'operation_id' => (string) Str::uuid()]);
+        $period = app(ManagementPeriodWriter::class)->register($user, $org, '2026年度', '2026-12-01', '2027-11-30', (string) Str::uuid(), 23);
+        $manager = app(AnnualManagementPolicyPermissionManager::class);
+        $annual = $manager->initialize($user, $org, $period, (string) Str::uuid());
+        $annual = $manager->update($user, $org, $annual, 'explicit', [$membership->id => ['can_view_approved' => true, 'can_view_draft' => true, 'can_edit' => true, 'can_approve' => true]], (string) Str::uuid());
+        $writer = app(AnnualManagementPolicyWriter::class);
+        $draft = ['period_name' => '2026年度', 'starts_on' => '2026-12-01', 'ends_on' => '2027-11-30',
+            'purpose' => 'Synthetic purpose', 'background' => 'Synthetic background', 'policy' => 'Synthetic approved policy', 'themes' => [], 'departments' => []];
+        $saved = $writer->saveDraft($user, $annual, $draft, 0, (string) Str::uuid());
+        $preview = $writer->preview($user, $saved);
+        $writer->approve($user, $saved, 1, null, 0, $preview['snapshot_hash'], false, null, (string) Str::uuid());
+        $approved = $annual->fresh()->currentApprovedRevision;
+        $snapshot = $approved->snapshot;
+        $hash = $approved->snapshot_hash;
+        $draft['policy'] = 'Synthetic unapproved draft';
+        $writer->saveDraft($user, $annual->fresh(), $draft, 1, (string) Str::uuid());
+        $this->allow($user, $org, 'annual_management_policy', $annual->public_id);
+        $source = app(AiCommonSharedContext::class)->select($user, $org, $room, 'annual_management_policy', $annual->public_id, 'Synthetic review');
+        $projection = $source->projection;
+        $fake = new MeetingContextFakeProvider;
+        $this->app->instance(AiCommonProvider::class, $fake);
+        app(AiCommonSharedCoWriter::class)->request($user, $org, $room, [
+            'operation_id' => (string) Str::uuid(), 'content' => $question, 'source_ids' => [$source->id],
+        ]);
+        $this->assertSame(1, $fake->calls);
+        $this->assertCount(1, $fake->sources);
+        $this->assertSame($projection, $fake->sources[0]['data']);
+        $this->assertSame('approved', $projection['approval_status']);
+        $this->assertSame($status, $projection['effective_status']);
+        $this->assertSame('Asia/Tokyo', $projection['timezone']);
+        $this->assertSame('Synthetic approved policy', $projection['content']['policy']);
+        $messages = collect($fake->messages);
+        $this->assertSame('Shared Conversation purpose: '.$purpose, $messages->first()['content']);
+        $instruction = $messages->where('role', 'system')->pluck('content')->implode("\n");
+        foreach (['Approval Status', 'Effective Status', 'Usage Purpose', '正式な参照方針', 'Current（effective', 'Past（ended', '本当に曖昧で判断に影響する場合のみ確認', '未承認Draft', '最終判断とProject/Action登録は人間'] as $rule) {
+            $this->assertStringContainsString($rule, $instruction);
+        }
+        $this->assertStringContainsString($question, $messages->pluck('content')->implode("\n"));
+        $this->assertStringNotContainsString('Synthetic unapproved draft', json_encode([$fake->messages, $fake->sources]));
+        $this->assertSame($snapshot, $approved->fresh()->snapshot);
+        $this->assertSame($hash, $approved->fresh()->snapshot_hash);
+        $this->assertSame($projection, $source->fresh()->projection);
+        $this->assertSame(2, $room->messages()->count());
+        $this->actingAs($user)->withSession(['current_company_id' => $org->id])
+            ->get(route('ai-common.shared.show', $room))->assertOk()->assertSee('Revision 1');
+        $this->travelBack();
     }
 
     public function test_approved_planning_uses_approved_snapshot_not_new_draft(): void
