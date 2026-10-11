@@ -1,0 +1,78 @@
+{
+  "status": "LIVE_ANNUAL_REFERENCE_PASS_FORMAL_CLOSE_PENDING",
+  "review_date_jst": "2026-10-11",
+  "implementation_commit": "5f516d939f12f469af6bb6a4266bccc56355bb7e",
+  "organization_id": 4,
+  "user_id": 5,
+  "conversation_id": 4,
+  "request_id": 4,
+  "request_message_id": 5,
+  "response_message_id": 6,
+  "provider": {
+    "http_status": 200,
+    "attempt": 1,
+    "result": "success",
+    "finish_reason": "stop",
+    "json_parse_success": true,
+    "answer_present": true,
+    "answer_type": "string",
+    "input_tokens": 1197,
+    "output_tokens": 1650,
+    "failure_class": null
+  },
+  "persistence": {
+    "state": "answer_ready",
+    "phase": "published",
+    "assistant_message_saved": true,
+    "assistant_visibility": "visible",
+    "human_browser_reload": "PENDING",
+    "old_failure_records_preserved": true
+  },
+  "source": {
+    "type": "annual_management_policy",
+    "revision_no": 1,
+    "effective_status": "upcoming",
+    "source_link_display": "HUMAN_PASS",
+    "source_url_revision_binding": "Revision 1",
+    "formal_period_fiscal_term_number": 23,
+    "ai_projection_period_fiscal_term_number_present": false,
+    "period_label": "2026年度",
+    "starts_on": "2026-12-01",
+    "ends_on": "2027-11-30",
+    "timezone": "Asia/Tokyo",
+    "gap": "AI projection uses approved snapshot period; fiscal term is available in currentness metadata but not included in this saved projection. Do not infer the missing term from the question."
+  },
+  "human_product_review": {
+    "annual_policy_based_sales_issues": "PASS",
+    "unprovided_department_policy_not_invented": "PASS",
+    "human_final_decision_preserved": "PASS",
+    "source_and_revision_display": "PASS",
+    "answer_body_copied_to_evidence": false
+  },
+  "execution_boundary_observation": {
+    "fresh_conversation_condition": "NOT_MET",
+    "basis": "Successful request 4 uses conversation 4, same as preceding HTTP 429 request 3. Two user messages and one assistant message are saved.",
+    "disposition": "Record as live annual-reference success, not a fresh-empty-conversation validation. No deletion or automatic rerun."
+  },
+  "handoff_not_implementation_authorization": {
+    "scope36": ["Short, staged facilitation questions instead of exhaustive lists", "Separate decided, undecided and proposed items", "Clarify formal fiscal-term/year metadata"],
+    "scope37": ["Spoken-answer length and meeting pacing", "Keep full text available without requiring full-length speech"],
+    "existing_presentation_pending": "Assistant author label shown as Author未記録"
+  },
+  "formal_close_pending": [
+    "Human browser reload and history redisplay confirmation",
+    "Fiscal-term metadata gap disposition",
+    "Human review of same-conversation execution difference",
+    "Limited integration overall review scope is not closed by this single Annual test"
+  ],
+  "safety": {
+    "investigation_provider_calls": 0,
+    "production_connections": 0,
+    "consent_changes": 0,
+    "existing_conversation_changes": 0,
+    "application_code_changes": 0,
+    "new_rc_or_freeze": false
+  },
+  "g5": "OPEN",
+  "deploy": "NO_GO"
+}
